@@ -1,0 +1,6 @@
+{
+  "namespace": "Threads",
+  "dependsOn": ["design/generated/api/Threads.md"],
+  "variants": ["happy", "empty", "error"]
+}
+
