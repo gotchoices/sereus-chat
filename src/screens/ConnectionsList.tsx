@@ -13,12 +13,14 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { useVariant } from '../mock/VariantContext';
 import { listThreads, type ThreadSummary } from '../data/threads';
+import { useT } from '../i18n';
 
 type Variant = 'happy' | 'empty' | 'error';
 
 export default function ConnectionsList() {
   const navigation: any = useNavigation();
   const { mockMode, variant } = useVariant();
+  const t = useT();
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -69,7 +71,7 @@ export default function ConnectionsList() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Sereus Chat</Text>
+        <Text style={styles.title}>{t('screens.connections.title', 'Sereus Chat')}</Text>
       </View>
       <View style={styles.controls}>
         <View style={styles.row}>
@@ -89,7 +91,7 @@ export default function ConnectionsList() {
       {error ? (
         <View style={styles.banner}><Text style={styles.bannerText}>{error}</Text></View>
       ) : threads.length === 0 ? (
-        <View style={styles.empty} testID="empty-state"><Text>No threads yet. Invite a friend to start a thread.</Text></View>
+        <View style={styles.empty} testID="empty-state"><Text testID="empty-state-text">{t('screens.connections.empty', 'No threads yet. Invite a friend to start a thread.')}</Text></View>
       ) : (
         <FlatList
           contentContainerStyle={styles.list}

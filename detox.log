@@ -1,19 +1,40 @@
-23:05:05.149 detox[37578] B jest --config e2e/jest.config.js e2e
-23:05:05.153 detox[37578] i (node:37578) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+13:35:15.574 detox[10531] B jest --config e2e/jest.config.js e2e
+13:35:15.577 detox[10531] i (node:10531) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-23:05:08.311 detox[37585] i navigation.e2e.test.js is assigned to emulator-5554 (Medium_Phone_API_34)
-23:05:21.949 detox[37585] i Navigation and deep links: shows connections list on launch
-23:05:27.466 detox[37585] i Navigation and deep links: shows connections list on launch [OK]
-23:05:27.467 detox[37585] i Navigation and deep links: deep links to empty variant
-23:05:37.795 detox[37585] i Navigation and deep links: deep links to empty variant [OK]
+13:35:18.303 detox[10532] i i18n.e2e.test.js is assigned to emulator-5554 (Medium_Phone_API_34)
+13:35:31.749 detox[10532] i i18n – Spanish empty-state: switches locale dynamically to Spanish on the same app instance
+13:35:42.421 detox[10532] i i18n – Spanish empty-state: switches locale dynamically to Spanish on the same app instance [FAIL]
+FAIL e2e/i18n.e2e.test.js (25.593 s)
+  ● i18n – Spanish empty-state › switches locale dynamically to Spanish on the same app instance
 
-PASS e2e/navigation.e2e.test.js (31.153 s)
-  Navigation and deep links
-    ✓ shows connections list on launch (5517 ms)
-    ✓ deep links to empty variant (10327 ms)
+    Test Failed: '(an instance of android.widget.TextView and view.getText() with or without transformation to match: is "No hay conversaciones todavía. Invita a un amigo para empezar." and view has effective visibility <VISIBLE>)' doesn't match the selected view.
+    Expected: (an instance of android.widget.TextView and view.getText() with or without transformation to match: is "No hay conversaciones todavía. Invita a un amigo para empezar." and view has effective visibility <VISIBLE>)
+         Got: an instance of android.widget.TextView and view.getText() with or without transformation to match: is "No hay conversaciones todavía. Invita a un amigo para empezar." <com.facebook.react.views.view.ReactViewGroup{cff1d62 V.E...... ........ 0,341-1080,540 #30}> is a com.facebook.react.views.view.ReactViewGroup
+    View Details: ReactViewGroup{id=48, visibility=VISIBLE, width=1080, height=199, has-focus=false, has-focusable=false, has-window-focus=true, is-clickable=false, is-enabled=true, is-focused=false, is-focusable=false, is-layout-requested=false, is-selected=false, layout-params=android.view.ViewGroup$LayoutParams@YYYYYY, tag=empty-state, root-is-layout-requested=false, has-input-connection=false, x=0.0, y=341.0, child-count=0}
 
-Test Suites: 1 passed, 1 total
-Tests:       2 passed, 2 total
+      14 | 		// Switch locale at runtime via deep link
+      15 | 		await device.openURL({ url: 'chat://connections?locale=es' });
+    > 16 | 		await expect(empty).toHaveText('No hay conversaciones todavía. Invita a un amigo para empezar.');
+         | 		                    ^
+      17 | 	});
+      18 | });
+      19 |
+
+      at Object.toHaveText (i18n.e2e.test.js:16:23)
+
+
+13:35:43.186 detox[10532] i navigation.e2e.test.js is assigned to emulator-5554 (Medium_Phone_API_34)
+13:35:56.683 detox[10532] i Navigation and deep links: shows connections list on launch
+13:36:02.165 detox[10532] i Navigation and deep links: shows connections list on launch [OK]
+13:36:02.165 detox[10532] i Navigation and deep links: deep links to empty variant
+13:36:12.346 detox[10532] i Navigation and deep links: deep links to empty variant [OK]
+PASS e2e/navigation.e2e.test.js (29.886 s)
+
+Test Suites: 1 failed, 1 passed, 2 total
+Tests:       1 failed, 2 passed, 3 total
 Snapshots:   0 total
-Time:        31.249 s, estimated 40 s
+Time:        55.593 s, estimated 56 s
 Ran all test suites matching /e2e/i.
+
+13:36:12.473 detox[10531] E Command failed with exit code = 1:
+jest --config e2e/jest.config.js e2e

@@ -1,5 +1,6 @@
 module.exports = {
   testTimeout: 120000,
+  maxWorkers: 1,
   globalSetup: 'detox/runners/jest/globalSetup',
   globalTeardown: 'detox/runners/jest/globalTeardown',
   testEnvironment: 'detox/runners/jest/testEnvironment',
