@@ -18,7 +18,7 @@ describe('Navigation and deep links', () => {
         url: 'chat://connections?variant=empty',
       });
     }
-    await waitFor(element(by.text('No threads yet. Invite a friend to start a thread.')))
+    await waitFor(element(by.id('empty-state')))
       .toBeVisible()
       .withTimeout(8000);
   });

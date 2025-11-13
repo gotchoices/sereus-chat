@@ -1,35 +1,19 @@
-23:01:17.539 detox[35832] B jest --config e2e/jest.config.js e2e
-23:01:17.543 detox[35832] i (node:35832) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+23:05:05.149 detox[37578] B jest --config e2e/jest.config.js e2e
+23:05:05.153 detox[37578] i (node:37578) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-23:01:20.638 detox[35839] i navigation.e2e.test.js is assigned to emulator-5554 (Medium_Phone_API_34)
-23:01:34.494 detox[35839] i Navigation and deep links: shows connections list on launch
-23:01:39.970 detox[35839] i Navigation and deep links: shows connections list on launch [OK]
-23:01:39.971 detox[35839] i Navigation and deep links: deep links to empty variant
-23:01:58.180 detox[35839] i Navigation and deep links: deep links to empty variant [FAIL]
+23:05:08.311 detox[37585] i navigation.e2e.test.js is assigned to emulator-5554 (Medium_Phone_API_34)
+23:05:21.949 detox[37585] i Navigation and deep links: shows connections list on launch
+23:05:27.466 detox[37585] i Navigation and deep links: shows connections list on launch [OK]
+23:05:27.467 detox[37585] i Navigation and deep links: deep links to empty variant
+23:05:37.795 detox[37585] i Navigation and deep links: deep links to empty variant [OK]
 
-FAIL e2e/navigation.e2e.test.js (39.283 s)
+PASS e2e/navigation.e2e.test.js (31.153 s)
   Navigation and deep links
-    ✓ shows connections list on launch (5476 ms)
-    ✕ deep links to empty variant (18208 ms)
+    ✓ shows connections list on launch (5517 ms)
+    ✓ deep links to empty variant (10327 ms)
 
-  ● Navigation and deep links › deep links to empty variant
-
-    Test Failed: 8.0sec timeout expired without matching of given matcher: (view has effective visibility <VISIBLE> and view.getGlobalVisibleRect() covers at least <75> percent of the view's area)
-
-      21 |     await waitFor(element(by.text('No threads yet. Invite a friend to start a thread.')))
-      22 |       .toBeVisible()
-    > 23 |       .withTimeout(8000);
-         |        ^
-      24 |   });
-      25 | });
-      26 |
-
-      at Object.withTimeout (navigation.e2e.test.js:23:8)
-
-Test Suites: 1 failed, 1 total
-Tests:       1 failed, 1 passed, 2 total
+Test Suites: 1 passed, 1 total
+Tests:       2 passed, 2 total
 Snapshots:   0 total
-Time:        39.371 s
+Time:        31.249 s, estimated 40 s
 Ran all test suites matching /e2e/i.
-23:01:58.324 detox[35832] E Command failed with exit code = 1:
-jest --config e2e/jest.config.js e2e

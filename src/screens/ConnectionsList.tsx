@@ -51,7 +51,7 @@ export default function ConnectionsList() {
         setError(e?.message || 'Failed to load threads');
       }
     })();
-  }, [sortMode]);
+  }, [sortMode, activeVariant]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -89,7 +89,7 @@ export default function ConnectionsList() {
       {error ? (
         <View style={styles.banner}><Text style={styles.bannerText}>{error}</Text></View>
       ) : threads.length === 0 ? (
-        <View style={styles.empty}><Text>No threads yet. Invite a friend to start a thread.</Text></View>
+        <View style={styles.empty} testID="empty-state"><Text>No threads yet. Invite a friend to start a thread.</Text></View>
       ) : (
         <FlatList
           contentContainerStyle={styles.list}
