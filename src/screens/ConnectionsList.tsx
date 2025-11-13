@@ -10,20 +10,21 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import { useVariant } from '../mock/VariantContext';
 import { listThreads, type ThreadSummary } from '../data/threads';
 
 type Variant = 'happy' | 'empty' | 'error';
 
 export default function ConnectionsList() {
   const navigation: any = useNavigation();
-  const route: any = useRoute();
+  const { mockMode, variant } = useVariant();
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sortMode, setSortMode] = useState<'recent' | 'alpha' | 'unread'>('recent');
 
-  const variant: Variant = (route?.params?.variant ?? 'happy') as Variant;
+  const activeVariant: Variant = (mockMode ? (variant as Variant) : 'happy');
 
   const applySort = (items: ThreadSummary[]) => {
     const copy = [...items];
@@ -44,7 +45,7 @@ export default function ConnectionsList() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await listThreads(variant);
+        const data = await listThreads(activeVariant);
         setThreads(applySort(data));
       } catch (e: any) {
         setError(e?.message || 'Failed to load threads');
@@ -55,7 +56,7 @@ export default function ConnectionsList() {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      const data = await listThreads(variant);
+      const data = await listThreads(activeVariant);
       setThreads(applySort(data));
       setError(null);
     } catch (e: any) {
@@ -96,7 +97,7 @@ export default function ConnectionsList() {
           keyExtractor={(item) => item.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('ChatInterface', { threadId: item.id, variant })}>
+            <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('ChatInterface', { threadId: item.id })}>
               <View style={styles.itemLeft}>
                 <View style={styles.avatar}><Text>{(item.displayName[0] || '?').toUpperCase()}</Text></View>
               </View>
