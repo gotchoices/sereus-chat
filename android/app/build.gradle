@@ -78,6 +78,7 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "org.sereus.chat"
+    testNamespace "org.sereus.chat.test"
     defaultConfig {
         applicationId "org.sereus.chat"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -105,6 +106,9 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
+    defaultConfig {
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
 }
 
 dependencies {
@@ -116,6 +120,11 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+    androidTestImplementation('com.wix:detox:20.45.1') { transitive = true }
+    androidTestImplementation('androidx.test:runner:1.5.2')
+    androidTestImplementation('androidx.test:rules:1.5.0')
+    androidTestImplementation('androidx.test.espresso:espresso-core:3.5.1')
+    androidTestImplementation('androidx.test.uiautomator:uiautomator:2.3.0')
 }
 
 // Ensure vector icons fonts are bundled on Android

@@ -4,3 +4,15 @@ extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autoli
 rootProject.name = 'chat'
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        mavenCentral()
+        google()
+        // JSC fallback for non-Hermes builds
+        maven { url("$rootDir/../node_modules/jsc-android/dist") }
+        // Detox Android artifacts
+        maven { url("$rootDir/../node_modules/detox/Detox-android") }
+    }
+}

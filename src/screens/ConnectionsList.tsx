@@ -95,9 +95,14 @@ export default function ConnectionsList() {
           contentContainerStyle={styles.list}
           data={threads}
           keyExtractor={(item) => item.id}
+          testID="connections-list"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('ChatInterface', { threadId: item.id })}>
+            <TouchableOpacity
+              style={styles.item}
+              testID={`thread-${item.id}`}
+              onPress={() => navigation.navigate('ChatInterface', { threadId: item.id })}
+            >
               <View style={styles.itemLeft}>
                 <View style={styles.avatar}><Text>{(item.displayName[0] || '?').toUpperCase()}</Text></View>
               </View>
