@@ -1,0 +1,17 @@
+Staleness summary (per screen):
+Route                 | stale | reason
+----------------------+-------+---------------------------
+ConnectionsList        | false | 
+ChatInterface          | true  | inputs newer than outputs
+ProfileSetup           | true  | inputs newer than outputs
+MediaPicker            | true  | missing output src/screens/MediaPicker.tsx
+SearchInterface        | true  | inputs newer than outputs
+InvitationGenerator    | true  | inputs newer than outputs
+QrScanner              | true  | inputs newer than outputs
+MessageEditMode        | true  | missing output src/screens/MessageEditMode.tsx
+VideoCallActive        | true  | missing output src/screens/VideoCallActive.tsx
+VoiceCallOverlay       | true  | missing output src/screens/VoiceCallOverlay.tsx
+InvitationAcceptance   | true  | missing output src/screens/InvitationAcceptance.tsx
+
+Wrote JSON report to /Users/kyle/share/devel/ser/chat/design/generated/status.json
+Next: run appeus/scripts/generate-next.sh to target the next vertical slice.

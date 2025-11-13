@@ -2,6 +2,8 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import type { LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { View, Text } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import ConnectionsList from '../screens/ConnectionsList';
 import SearchInterface from '../screens/SearchInterface';
 import InvitationGenerator from '../screens/InvitationGenerator';
@@ -36,7 +38,57 @@ export default function AppNavigator() {
         <Stack.Screen name="ProfileSetup" component={ProfileSetup} options={{ title: 'Profile' }} />
         <Stack.Screen name="QrScanner" component={QrScanner} options={{ title: 'Scan' }} />
         <Stack.Screen name="Alerts" component={Alerts} options={{ title: 'Alerts' }} />
-        <Stack.Screen name="ChatInterface" component={ChatInterface} options={{ title: 'Chat' }} />
+        <Stack.Screen
+          name="ChatInterface"
+          component={ChatInterface}
+          options={({ route }) => {
+            const params: any = route?.params ?? {};
+            const name: string = params.name || 'Chat';
+            const initial = (name?.[0] || '?').toUpperCase();
+            return {
+              headerTitle: () => (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View
+                    style={{
+                      width: 28, height: 28, borderRadius: 14,
+                      backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center', marginRight: 8,
+                    }}
+                    accessibilityLabel="Chat partner avatar"
+                  >
+                    <Text>{initial}</Text>
+                  </View>
+                  <Text numberOfLines={1} style={{ maxWidth: 200 }}>{name}</Text>
+                </View>
+              ),
+              headerRight: () => (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons
+                    name="call-outline"
+                    size={20}
+                    style={{ marginHorizontal: 8 }}
+                    accessibilityLabel="Voice call"
+                    onPress={() => {}}
+                  />
+                  <Ionicons
+                    name="camera-outline"
+                    size={20}
+                    style={{ marginHorizontal: 8 }}
+                    accessibilityLabel="Video call"
+                    onPress={() => {}}
+                  />
+                  <Ionicons
+                    name="search-outline"
+                    size={20}
+                    style={{ marginLeft: 8 }}
+                    accessibilityLabel="Search in thread"
+                    onPress={() => {}}
+                  />
+                </View>
+              ),
+              headerBackTitleVisible: false,
+            };
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

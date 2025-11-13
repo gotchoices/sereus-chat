@@ -12,7 +12,8 @@
     "detox:test:android": "detox test -c android.emu.debug --headless",
     "detox:test:android:reuse": "detox test -c android.emu.debug --reuse --headless",
     "e2e:android": "yarn detox:build:android && yarn detox:test:android",
-    "e2e:android:reuse": "yarn detox:test:android:reuse"
+    "e2e:android:reuse": "yarn detox:test:android:reuse",
+    "e2e:android:file": "DETOX_CONFIGURATION=android.emu.debug jest --config e2e/jest.config.js"
   },
   "dependencies": {
     "@react-native/new-app-screen": "0.82.1",

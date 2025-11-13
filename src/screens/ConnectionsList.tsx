@@ -103,7 +103,13 @@ export default function ConnectionsList() {
             <TouchableOpacity
               style={styles.item}
               testID={`thread-${item.id}`}
-              onPress={() => navigation.navigate('ChatInterface', { threadId: item.id })}
+              onPress={() =>
+                navigation.navigate('ChatInterface', {
+                  threadId: item.id,
+                  name: item.displayName,
+                  avatarUrl: item.avatarUrl,
+                })
+              }
             >
               <View style={styles.itemLeft}>
                 <View style={styles.avatar}><Text>{(item.displayName[0] || '?').toUpperCase()}</Text></View>

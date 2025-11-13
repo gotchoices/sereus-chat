@@ -2,6 +2,14 @@
   "connections": {
     "title": "Sereus Chat",
     "empty": "No threads yet. Invite a friend to start a thread."
+  },
+  "chat": {
+    "title": "Chat",
+    "empty": "No messages yet. Say hello!",
+    "composerPlaceholder": "Message",
+    "attach": "Attach",
+    "record": "Record",
+    "send": "Send"
   }
 }
 
