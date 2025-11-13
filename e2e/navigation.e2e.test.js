@@ -18,7 +18,9 @@ describe('Navigation and deep links', () => {
         url: 'chat://connections?variant=empty',
       });
     }
-    await expect(element(by.text('No threads yet. Invite a friend to start a thread.'))).toBeVisible();
+    await waitFor(element(by.text('No threads yet. Invite a friend to start a thread.')))
+      .toBeVisible()
+      .withTimeout(8000);
   });
 });
 

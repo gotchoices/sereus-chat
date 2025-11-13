@@ -49,8 +49,13 @@
     "node": ">=20"
   },
   "detox": {
-    "testRunner": "jest",
-    "runnerConfig": "e2e/jest.config.js",
+    "testRunner": {
+      "$0": "jest",
+      "args": {
+        "config": "e2e/jest.config.js",
+        "_": ["e2e"]
+      }
+    },
     "apps": {
       "android.debug": {
         "type": "android.apk",
@@ -62,7 +67,7 @@
       "android.emu": {
         "type": "android.emulator",
         "device": {
-          "avdName": "Pixel_6_API_34"
+          "avdName": "Medium_Phone_API_34"
         }
       }
     },
