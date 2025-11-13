@@ -1,4 +1,4 @@
-package com.chat
+package org.sereus.chat
 
 import android.app.Application
 import com.facebook.react.PackageList
@@ -14,8 +14,7 @@ class MainApplication : Application(), ReactApplication {
       context = applicationContext,
       packageList =
         PackageList(this).packages.apply {
-          // Packages that cannot be autolinked yet can be added manually here, for example:
-          // add(MyReactNativePackage())
+          // add additional packages if needed
         },
     )
   }
@@ -25,3 +24,5 @@ class MainApplication : Application(), ReactApplication {
     loadReactNative(this)
   }
 }
+
+
