@@ -34,7 +34,7 @@
       ],
       "depHashes": {
         "design/generated/screens/ChatInterface.md": "1d7fb51c135ca730988e934db64bd16ff059fd73740f8ac9d859ebc5d1db7a6e",
-        "design/specs/screens/chat-interface.md": "341acab5d9b04a5da959598c9b827139cebe721095361a43fe492c1807bcd2d8",
+        "design/specs/screens/chat-interface.md": "951b9c7b5e935d928a0aa04d67f7ce99e23b06be4ab3a640bb0d254dd37ec653",
         "design/specs/navigation.md": "1f5829e9f8d212dbddd2e398492148ee42063d58ebab2846f9e4af44e5b1c3b1"
       }
     },

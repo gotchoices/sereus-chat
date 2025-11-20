@@ -58,6 +58,7 @@ This is a pushed screen from Home (shows a Back arrow, not a root screen).
   - Others’ messages: Reply, Copy (more actions can be added later)
   - My messages: Edit, Delete, Copy
   - Long-press may also open the same menu on touch devices; overflow icon must be visible and accessible to support simulator/desktop environments.
+  - The menu opens as a popup overlay (does not reflow/push messages).
 - Read receipts (future): Optional small status per bubble
 
 ## States
@@ -67,7 +68,7 @@ This is a pushed screen from Home (shows a Back arrow, not a root screen).
 - Loading: Skeleton or spinner while history loads
 - Error: Inline error banner with Retry
 - Empty: Show placeholder “No messages yet” centered
- - Editing (inline): Show an editing banner above the composer with Cancel/Save; prefill composer with the existing message text; highlight the target bubble; only own messages can be edited. Optional deep link `?editing=<messageId>` enters edit state for demos/tests.
+ - Editing (inline): No banner. Prefill composer with the existing message text; highlight the target bubble; only own messages can be edited. Controls to the right of the composer become a vertical stack: red “X” (Cancel) over green “✓” (Save). Optional deep link `?editing=<messageId>` enters edit state for demos/tests.
 
 ## Accessibility
 - Tap targets ≥ 44×44 px
@@ -102,7 +103,7 @@ This is a pushed screen from Home (shows a Back arrow, not a root screen).
 - [ ] Text and attachments render as separate bubbles in history (no mixed text+attachment)
 - [ ] Tapping Phone/Camera initiates appropriate flows
 - [ ] Search enters in-strand search mode and highlights matches
-- [ ] Long-press on own message shows Edit; entering Edit shows an inline banner with Cancel/Save and the composer prefilled; Save updates the message in-place; Cancel restores previous composer state
+- [ ] Long-press on own message shows Edit; entering Edit pre-fills the composer; the right controls become red “X” (Cancel) over green “✓” (Save); Save updates the message in-place; Cancel restores previous composer state
 - [ ] Each message has a visible overflow menu button (three dots):
   - Others’ messages: Reply, Copy
   - Own messages: Edit, Delete, Copy

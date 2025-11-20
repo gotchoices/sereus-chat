@@ -119,7 +119,7 @@ export default function ChatInterface() {
             ];
             const isOwn = !!item.outgoing;
             return (
-              <View>
+              <View style={styles.rowWrap}>
                 <View style={[styles.row, { justifyContent: isOwn ? 'flex-end' : 'flex-start' }]}>
                   <View
                     style={bubbleStyle}
@@ -146,7 +146,7 @@ export default function ChatInterface() {
                   </TouchableOpacity>
                 </View>
                 {menuForId === item.id && (
-                  <View style={[styles.menuPanel, isOwn ? styles.menuPanelOwn : undefined]}>
+                  <View style={[styles.menuPanel, styles.menuPanelAbs, isOwn ? styles.menuRight : styles.menuLeft]}>
                     {isOwn ? (
                       <>
                         <TouchableOpacity
@@ -215,16 +215,6 @@ export default function ChatInterface() {
           keyboardShouldPersistTaps="handled"
         />
       )}
-      {/* Editing banner */}
-      {isEditing && (
-        <View style={styles.editBar} accessibilityLabel="Editing message bar">
-          <Text style={styles.editTitle}>{t('screens.chat.editingTitle', 'Editing')}</Text>
-          <View style={{ flex: 1 }} />
-          <TouchableOpacity onPress={onCancelEdit} accessibilityLabel={t('screens.chat.cancel', 'Cancel')} style={styles.editBtn}>
-            <Text style={styles.editBtnText}>{t('screens.chat.cancel', 'Cancel')}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
       {/* Provisional attachments strip */}
       {attachments.length > 0 && (
         <View style={styles.attachStrip}>
@@ -266,20 +256,35 @@ export default function ChatInterface() {
             testID="composer-input"
           />
         </View>
-        <TouchableOpacity
-          style={[styles.composeButton, canSend ? styles.primary : undefined]}
-          onPress={canSend ? onSend : undefined}
-          accessibilityLabel={
-            isEditing
-              ? t('screens.chat.save', 'Save')
-              : canSend
-              ? t('screens.chat.send', 'Send')
-              : t('screens.chat.record', 'Record')
-          }
-          testID={isEditing ? 'composer-save' : canSend ? 'composer-send' : 'composer-mic'}
-        >
-          <Ionicons name={isEditing ? 'checkmark-outline' : canSend ? 'send-outline' : 'mic-outline'} size={20} />
-        </TouchableOpacity>
+        {isEditing ? (
+          <View style={styles.composeRightStack}>
+            <TouchableOpacity
+              style={styles.composeIconBtn}
+              onPress={onCancelEdit}
+              accessibilityLabel={t('screens.chat.cancel', 'Cancel')}
+              testID="composer-cancel"
+            >
+              <Ionicons name="close" size={20} color="#b00020" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.composeIconBtn, styles.saveBtn, { marginTop: 6 }]}
+              onPress={onSend}
+              accessibilityLabel={t('screens.chat.save', 'Save')}
+              testID="composer-save"
+            >
+              <Ionicons name="checkmark-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.composeButton, canSend ? styles.primary : undefined]}
+            onPress={canSend ? onSend : undefined}
+            accessibilityLabel={canSend ? t('screens.chat.send', 'Send') : t('screens.chat.record', 'Record')}
+            testID={canSend ? 'composer-send' : 'composer-mic'}
+          >
+            <Ionicons name={canSend ? 'send-outline' : 'mic-outline'} size={20} />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -289,6 +294,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', padding: 20 },
   empty: { paddingVertical: 20 },
   list: { paddingTop: 8, paddingBottom: 90 },
+  rowWrap: { position: 'relative' },
   row: { flexDirection: 'row', alignItems: 'flex-start' },
   bubble: { maxWidth: '80%', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14 },
   tight: { marginTop: 4, marginBottom: 4 },
@@ -298,8 +304,10 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: 15 },
   time: { fontSize: 11, color: '#666', marginTop: 4, alignSelf: 'flex-end' },
   kebabSlot: { width: 24, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2, marginLeft: 6 },
-  menuPanel: { alignSelf: 'flex-start', backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingVertical: 6, marginTop: 4, minWidth: 160, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6, elevation: 2 },
-  menuPanelOwn: { alignSelf: 'flex-end' },
+  menuPanel: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingVertical: 6, minWidth: 160, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6, elevation: 2 },
+  menuPanelAbs: { position: 'absolute', top: -4, zIndex: 5 },
+  menuLeft: { left: 0 },
+  menuRight: { right: 0 },
   menuItem: { paddingHorizontal: 12, paddingVertical: 8 },
   attachStrip: { paddingVertical: 6 },
   attachChip: { backgroundColor: '#f4f4f4', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, marginRight: 8, position: 'relative' },
@@ -317,13 +325,10 @@ const styles = StyleSheet.create({
   primary: {},
   inputWrapper: { flex: 1, marginHorizontal: 8, borderWidth: 1, borderColor: '#ddd', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6 },
   input: { fontSize: 16, padding: 0 },
-  editBar: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#fff7e6', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#f0c36d' },
-  editTitle: { color: '#a66a00', fontWeight: '600' },
   editingHighlight: { textDecorationLine: 'underline' },
-  editBtn: { paddingHorizontal: 10, paddingVertical: 6 },
-  editBtnText: { color: '#444' },
-  editSave: { backgroundColor: '#0066cc', borderRadius: 6 },
-  editSaveText: { color: '#fff' }
+  composeRightStack: { alignItems: 'center', justifyContent: 'flex-end' },
+  composeIconBtn: { padding: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
+  saveBtn: { backgroundColor: '#2e7d32' }
 });
 
 
