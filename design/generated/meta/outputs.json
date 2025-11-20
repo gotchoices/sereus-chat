@@ -8,7 +8,11 @@
         "design/specs/screens/connections-list.md",
         "design/specs/navigation.md"
       ],
-      "depHashes": {}
+      "depHashes": {
+        "design/generated/screens/ConnectionsList.md": "49b67357d6b59f3be0e0b83377553d4ffc23199b1d12d2c6a7bdd78a2385a4b1",
+        "design/specs/screens/connections-list.md": "bad822fd7b9577449b1ac2336f2f8318be4af94aba1033646c670d515f4c3f5b",
+        "design/specs/navigation.md": "49a319c6d6a9eb861b3fafc6b75eaaf82ae70cbb9a922b9feba5b6b984c7fc95"
+      }
     },
     {
       "route": "ChatInterface",
@@ -18,7 +22,11 @@
         "design/specs/screens/chat-interface.md",
         "design/specs/navigation.md"
       ],
-      "depHashes": {}
+      "depHashes": {
+        "design/generated/screens/ChatInterface.md": "1d7fb51c135ca730988e934db64bd16ff059fd73740f8ac9d859ebc5d1db7a6e",
+        "design/specs/screens/chat-interface.md": "769bfd677586b7c7f8f963fa5adb1fcb8a01ecc2a21e29345fc70a8b864cd481",
+        "design/specs/navigation.md": "49a319c6d6a9eb861b3fafc6b75eaaf82ae70cbb9a922b9feba5b6b984c7fc95"
+      }
     },
     {
       "route": "MediaPicker",
@@ -28,7 +36,11 @@
         "design/specs/screens/media-picker.md",
         "design/specs/navigation.md"
       ],
-      "depHashes": {}
+      "depHashes": {
+        "design/generated/screens/MediaPicker.md": "cd2a5eccd7b88988f5d05b8035a624b3fbf25fe3bb62fb3c960e4726000dc490",
+        "design/specs/screens/media-picker.md": "56f048bd204cfa3b9780dd8f75a395d87e00cfc4260d1b95ee1526852dd36162",
+        "design/specs/navigation.md": "49a319c6d6a9eb861b3fafc6b75eaaf82ae70cbb9a922b9feba5b6b984c7fc95"
+      }
     },
     {
       "route": "ProfileSetup",
@@ -38,7 +50,11 @@
         "design/specs/screens/profile-setup.md",
         "design/specs/navigation.md"
       ],
-      "depHashes": {}
+      "depHashes": {
+        "design/generated/screens/ProfileSetup.md": "c94ac2174f85a6b149e37c1d150af85a61b37b1d39c5c5b0dd47f26866081135",
+        "design/specs/screens/profile-setup.md": "975304e518dce6a546b0271d414a17e7475dd7592208c9ce7d10bb387bf1deba",
+        "design/specs/navigation.md": "49a319c6d6a9eb861b3fafc6b75eaaf82ae70cbb9a922b9feba5b6b984c7fc95"
+      }
     },
     {
       "route": "SearchInterface",
@@ -48,7 +64,10 @@
         "design/specs/screens/search-interface.md",
         "design/specs/navigation.md"
       ],
-      "depHashes": {}
+      "depHashes": {
+        "design/generated/screens/SearchInterface.md": "898e8e66f5406b0c33fa864220fa10bc286e2abfc7d02c6d4ccfe75685d5df3c",
+        "design/specs/navigation.md": "49a319c6d6a9eb861b3fafc6b75eaaf82ae70cbb9a922b9feba5b6b984c7fc95"
+      }
     },
     {
       "route": "InvitationGenerator",
@@ -58,9 +77,11 @@
         "design/specs/screens/invitation-generator.md",
         "design/specs/navigation.md"
       ],
-      "depHashes": {}
+      "depHashes": {
+        "design/specs/screens/invitation-generator.md": "39fa74f08a02c0a33d325e0a73bfd12248b90f6476f2690b0542c42199e41b07",
+        "design/generated/screens/InvitationGenerator.md": "ecd47bfa7864b9c4a7aa75af5a3ff0489783afb3190008fda532e283ac4bab21",
+        "design/specs/navigation.md": "49a319c6d6a9eb861b3fafc6b75eaaf82ae70cbb9a922b9feba5b6b984c7fc95"
+      }
     }
   ]
 }
-
-
