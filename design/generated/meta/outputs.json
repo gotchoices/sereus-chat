@@ -19,6 +19,16 @@
         "design/specs/navigation.md"
       ],
       "depHashes": {}
+    },
+    {
+      "route": "ProfileSetup",
+      "output": "src/screens/ProfileSetup.tsx",
+      "dependsOn": [
+        "design/generated/screens/ProfileSetup.md",
+        "design/specs/screens/profile-setup.md",
+        "design/specs/navigation.md"
+      ],
+      "depHashes": {}
     }
   ]
 }

@@ -26,3 +26,8 @@
   - Magnifying glass: search
 - In other cases, text or an icon plus text will be more helpful.
 - In some cases, a full descriptive message will be needed for example a security warning.
+
+## Data Model (Local vs Shared)
+- Local (device/cadre): profile data (name, email, phone, avatar, notes) persists locally and is not shared by default. In mock/demo mode, local writes are allowed and stored in a local mock store.
+- Shared (strand): chat messages, strand membership and message metadata are shared with strand partners. Mock/demo mode drives shared data via variant-controlled fixtures.
+- Mock writes: local profile edits write to the local mock store (not to static JSON files). Shared data remains read-only fixtures unless explicitly extended.
