@@ -18,6 +18,13 @@
     "sharePrefix": "Join me on Sereus Chat",
     "scanQRIfVisible": "Scan the QR if visible",
     "toastCopied": "Copied"
+  },
+  "QrScanner": {
+    "title": "Scan QR",
+    "simulatorNote": "Camera not available in simulator. Paste an invite link below.",
+    "pasteLabel": "Paste invite link",
+    "pastePlaceholder": "sereus://invite/abc123?variant=happy",
+    "open": "Open"
   }
 }
 
