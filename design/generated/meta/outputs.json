@@ -39,6 +39,16 @@
         "design/specs/navigation.md"
       ],
       "depHashes": {}
+    },
+    {
+      "route": "SearchInterface",
+      "output": "src/screens/SearchInterface.tsx",
+      "dependsOn": [
+        "design/generated/screens/SearchInterface.md",
+        "design/specs/screens/search-interface.md",
+        "design/specs/navigation.md"
+      ],
+      "depHashes": {}
     }
   ]
 }
