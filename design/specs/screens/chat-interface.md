@@ -7,7 +7,7 @@ variants: [happy, empty, error]
 # Spec: Chat Interface
 
 ## Purpose & Scope
-The Chat Interface shows a single thread’s conversation and provides controls to compose and send messages, place calls, and search within the thread. Opens when a user taps a thread in the Home (Connections List) screen.
+The Chat Interface shows a single strand’s conversation and provides controls to compose and send messages, place calls, and search within the strand. Opens when a user taps a strand in the Home (Connections List) screen.
 
 ## Layout
 This is a pushed screen from Home (shows a Back arrow, not a root screen).
@@ -46,7 +46,7 @@ This is a pushed screen from Home (shows a Back arrow, not a root screen).
 - Back: Returns to Home list
 - Voice call: Initiates voice call (pushes/overlays call UI)
 - Video call: Initiates video call (pushes video-call screen)
-- Search: Enters in-thread search mode (highlights matches in history)
+- Search: Enters in-strand search mode (highlights matches in history)
 - Attachments: Tap “+” opens `media-picker` toast (Camera, Gallery, File, Location). OS/library UIs handle selection.
 - Provisional attachments: After selection, attachments appear in the strip (not sent). User can continue typing; all content remains provisional until Send.
 - Remove attachment: Tap the “X” overlay on a chip/thumbnail to detach it from the message.
@@ -71,20 +71,20 @@ This is a pushed screen from Home (shows a Back arrow, not a root screen).
 - Support VoiceOver focus through history and composer controls
 
 ## Data Mapping (examples)
-- Partner name: thread.partner.displayName
-- Partner avatar: thread.partner.avatarUrl (fallback initials)
-- Messages: thread.messages[]
+- Partner name: strand.partner.displayName
+- Partner avatar: strand.partner.avatarUrl (fallback initials)
+- Messages: strand.messages[]
   - text: message.text
   - sentAt: message.timestamp
   - fromSelf: message.senderId == me.id
   - status: message.status (sent, delivered, read)
-- Unread count: thread.unreadCount (cleared on open)
+- Unread count: strand.unreadCount (cleared on open)
 
 ## Open Questions
 - Call UI: push full screen vs compact overlay?
 - Voice recording gestures: hold-to-record vs toggle-to-record?
 - Edit/delete permissions and retention policy?
-- In-thread search UI placement (overlay bar vs inline)?
+- In-strand search UI placement (overlay bar vs inline)?
 - Read receipts indicators and placement?
 
 ## Acceptance Criteria
@@ -96,5 +96,5 @@ This is a pushed screen from Home (shows a Back arrow, not a root screen).
 - [ ] Tapping Send sends text plus all provisional attachments; composer and strip clear
 - [ ] Text and attachments render as separate bubbles in history (no mixed text+attachment)
 - [ ] Tapping Phone/Camera initiates appropriate flows
-- [ ] Search enters in-thread search mode and highlights matches
+- [ ] Search enters in-strand search mode and highlights matches
 - [ ] Screen adheres to accessibility targets and contrast

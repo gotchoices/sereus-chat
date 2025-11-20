@@ -1,5 +1,5 @@
 ---
-provides: ["api:Threads"]
+provides: ["api:Strands"]
 dependsOn:
   - design/specs/api
   - design/specs/screens/connections-list.md
@@ -10,17 +10,17 @@ dependsOn:
 usedBy: ["screen:ConnectionsList","screen:ChatInterface"]
 ---
 
-# API Consolidation: Threads
+# API Consolidation: Strands
 
 Procedures
 
-## listThreads()
-- Purpose: return the user’s thread summaries for the home list
+## listStrands()
+- Purpose: return the user’s strand summaries for the home list
 - Params: none
 - Result (array of):
 ```json
 {
-  "id": "thread-123",
+  "id": "strand-123",
   "displayName": "Alice",
   "avatarUrl": "https://…", 
   "lastMessage": {

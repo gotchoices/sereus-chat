@@ -1,0 +1,10 @@
+[
+  { "id": "t-susan", "displayName": "Susan", "avatarUrl": null, "lastMessage": { "previewText": "Looking forward to it!", "timestamp": "2025-11-12T14:30:00Z" }, "unreadCount": 2 },
+  { "id": "t-mike", "displayName": "Mike", "avatarUrl": null, "lastMessage": { "previewText": "Hey you found this app too. Pretty cool!", "timestamp": "2025-11-11T09:00:00Z" }, "unreadCount": 0 },
+  { "id": "t-sarah", "displayName": "Sarah", "avatarUrl": null, "lastMessage": { "previewText": "Thanks for sharing that", "timestamp": "2025-11-11T08:00:00Z" }, "unreadCount": 0 },
+  { "id": "t-martha", "displayName": "Martha", "avatarUrl": null, "lastMessage": { "previewText": "No messages yet", "timestamp": null }, "unreadCount": 0 },
+  { "id": "t-alex", "displayName": "Alex", "avatarUrl": null, "lastMessage": { "previewText": "Let's sync later today", "timestamp": "2025-11-10T10:00:00Z" }, "unreadCount": 1 },
+  { "id": "t-team", "displayName": "Team Group", "avatarUrl": null, "lastMessage": { "previewText": "Design notes updated", "timestamp": "2025-11-09T15:00:00Z" }, "unreadCount": 0 }
+]
+
+

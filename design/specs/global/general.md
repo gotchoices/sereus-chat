@@ -6,12 +6,12 @@
   - optimystic: peer-to-peer storage, b-tree engine
   - fret: Distributed hash table
   - libp2p: Low level peer-to-peer networking
-- Sereus controls the negotiation and establishment of secure channels, edges called "threads".
-- The Sereus ecosystem all together is called a "fabric" (man interconnected threads).
-- Threads can be established between 2 parties or N parties.
-- A thread is a quereus database which the parties to the thread receive access.
+- Sereus controls the negotiation and establishment of secure channels, edges called "strands".
+- The Sereus ecosystem all together is called a "fabric" (many interconnected strands).
+- Strands can be established between 2 parties or N parties.
+- A strand is a quereus database which the parties to the strand receive access.
 - Those given access might be able to read only or also write.
-- Invitees might also be given the ability to invite others to the same thread.
+- Invitees might also be given the ability to invite others to the same strand.
 - This app, Sereus Chat, is a messaging app using a subset of Sereus capabilities.
 - It implements basic text messaging, attachments, calling, video conferencing.
 

@@ -1,6 +1,6 @@
 ---
 provides: ["screen:ConnectionsList"]
-needs: ["api:Threads"]
+needs: ["api:Strands"]
 dependsOn:
   - design/specs/screens/connections-list.md
   - design/specs/navigation.md
@@ -23,11 +23,11 @@ dependsOn:
 # Consolidation: ConnectionsList
 
 Purpose
-- Home list of threads/connections with quick access to Search, Invite, Sort, and Profile.
+- Home list of strands/connections with quick access to Search, Invite, Sort, and Profile.
 
 States
-- happy: threads present
-- empty: no threads → CTA to Invite
+- happy: strands present
+- empty: no strands → CTA to Invite
 - error: inline banner with Retry
 
 Layout and Behaviors (from specs + stories)
@@ -38,7 +38,7 @@ Layout and Behaviors (from specs + stories)
 - Sorting: Recent (default), Alphabetical, Unread first (persist locally)
 
 Data requirements
-- api:Threads → listThreads(): returns array of { id, displayName, avatarUrl?, lastMessage: { previewText, timestamp }, unreadCount }
+- api:Strands → listStrands(): returns array of { id, displayName, avatarUrl?, lastMessage: { previewText, timestamp }, unreadCount }
 
 Deep links
 - N/A for ConnectionsList itself; primary entry after onboarding

@@ -13,8 +13,8 @@ Template
 
 | Screen Name        | Route            | Purpose                                 | Variants                |
 |--------------------|------------------|-----------------------------------------|-------------------------|
-| ConnectionsList    | ConnectionsList  | Home list of connections/threads        | happy, empty, error     |
-| ChatInterface      | ChatInterface    | Thread conversation view                | happy, empty, error     |
+| ConnectionsList    | ConnectionsList  | Home list of connections/strands        | happy, empty, error     |
+| ChatInterface      | ChatInterface    | Strand conversation view                | happy, empty, error     |
 | ProfileSetup       | ProfileSetup     | Setup/edit profile                      | happy, error            |
 | MediaPicker        | MediaPicker      | Select or capture media                 | happy, empty, error     |
 | SearchInterface    | SearchInterface  | Global search across people/messages    | happy, empty, error     |

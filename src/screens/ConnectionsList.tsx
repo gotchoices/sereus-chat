@@ -3,7 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } fr
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { useVariant } from '../mock/VariantContext';
-import { listThreads, type ThreadSummary } from '../data/threads';
+import { listStrands, type StrandSummary } from '../data/strands';
 import { useT } from '../i18n';
 
 type Variant = 'happy' | 'empty' | 'error';
@@ -12,14 +12,14 @@ export default function ConnectionsList() {
   const navigation: any = useNavigation();
   const { mockMode, variant } = useVariant();
   const t = useT();
-  const [threads, setThreads] = useState<ThreadSummary[]>([]);
+  const [threads, setThreads] = useState<StrandSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sortMode, setSortMode] = useState<'recent' | 'alpha' | 'unread'>('recent');
 
   const activeVariant: Variant = (mockMode ? (variant as Variant) : 'happy');
 
-  const applySort = (items: ThreadSummary[]) => {
+  const applySort = (items: StrandSummary[]) => {
     const copy = [...items];
     if (sortMode === 'recent') {
       copy.sort((a, b) => {
@@ -38,10 +38,10 @@ export default function ConnectionsList() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await listThreads(activeVariant);
+        const data = await listStrands(activeVariant);
         setThreads(applySort(data));
       } catch (e: any) {
-        setError(e?.message || 'Failed to load threads');
+        setError(e?.message || 'Failed to load strands');
       }
     })();
   }, [sortMode, activeVariant]);
@@ -49,11 +49,11 @@ export default function ConnectionsList() {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      const data = await listThreads(activeVariant);
+      const data = await listStrands(activeVariant);
       setThreads(applySort(data));
       setError(null);
     } catch (e: any) {
-      setError(e?.message || 'Failed to load threads');
+      setError(e?.message || 'Failed to load strands');
     } finally {
       setRefreshing(false);
     }
@@ -82,7 +82,7 @@ export default function ConnectionsList() {
       {error ? (
         <View style={styles.banner}><Text style={styles.bannerText}>{error}</Text></View>
       ) : threads.length === 0 ? (
-        <View style={styles.empty} testID="empty-state"><Text testID="empty-state-text">{t('screens.connections.empty', 'No threads yet. Invite a friend to start a thread.')}</Text></View>
+        <View style={styles.empty} testID="empty-state"><Text testID="empty-state-text">{t('screens.connections.empty', 'No strands yet. Invite a friend to start a strand.')}</Text></View>
       ) : (
         <FlatList
           contentContainerStyle={styles.list}
@@ -93,10 +93,10 @@ export default function ConnectionsList() {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.item}
-              testID={`thread-${item.id}`}
+              testID={`strand-${item.id}`}
               onPress={() =>
                 navigation.navigate('ChatInterface', {
-                  threadId: item.id,
+                  strandId: item.id,
                   name: item.displayName,
                   avatarUrl: item.avatarUrl,
                 })

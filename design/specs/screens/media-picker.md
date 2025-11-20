@@ -45,7 +45,7 @@ Lightweight, toast-style chooser that appears over `chat-interface` when the use
 
 ### What to Display
 - Static list of options; availability can be gated by feature flags/capabilities.
-- Option labels and icons only; no dynamic content from the thread.
+- Option labels and icons only; no dynamic content from the strand.
 
 ### Real-time Updates
 - None; the picker is stateless aside from availability flags.

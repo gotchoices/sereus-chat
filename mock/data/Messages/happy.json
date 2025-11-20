@@ -1,7 +1,7 @@
 [
-  { "id": "m1", "threadId": "t-susan", "sender": "Susan", "text": "Hey! How's your day going?", "timestamp": "2025-11-13T21:00:00Z" },
-  { "id": "m2", "threadId": "t-susan", "sender": "Me", "text": "Pretty good, shipped the Appeus slice.", "timestamp": "2025-11-13T21:01:00Z", "outgoing": true },
-  { "id": "m3", "threadId": "t-susan", "sender": "Susan", "text": "Nice! Let's test variants.", "timestamp": "2025-11-13T21:02:00Z" }
+  { "id": "m1", "strandId": "t-susan", "sender": "Susan", "text": "Hey! How's your day going?", "timestamp": "2025-11-13T21:00:00Z" },
+  { "id": "m2", "strandId": "t-susan", "sender": "Me", "text": "Pretty good, shipped the Appeus slice.", "timestamp": "2025-11-13T21:01:00Z", "outgoing": true },
+  { "id": "m3", "strandId": "t-susan", "sender": "Susan", "text": "Nice! Let's test variants.", "timestamp": "2025-11-13T21:02:00Z" }
 ]
 
 

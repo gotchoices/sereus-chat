@@ -8,7 +8,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 
 export default function ChatInterface() {
   const route: any = useRoute();
-  const threadId: string | undefined = route?.params?.threadId;
+  const strandId: string | undefined = route?.params?.strandId;
   const { mockMode, variant } = useVariant();
   const t = useT();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -19,10 +19,10 @@ export default function ChatInterface() {
   useEffect(() => {
     (async () => {
       const active = mockMode ? (variant as 'happy' | 'empty' | 'error') : 'happy';
-      const data = await listMessages(threadId || 'susan', active);
+      const data = await listMessages(strandId || 't-susan', active);
       setMessages(data);
     })();
-  }, [threadId, mockMode, variant]);
+  }, [strandId, mockMode, variant]);
 
   const canSend = useMemo(() => text.trim().length > 0 || attachments.length > 0, [text, attachments]);
 
@@ -52,7 +52,7 @@ export default function ChatInterface() {
     if (!canSend) return;
     const newMsg: ChatMessage = {
       id: `m-${Date.now()}`,
-      threadId: threadId || 't-susan',
+      strandId: strandId || 't-susan',
       sender: 'Me',
       text: text.trim(),
       timestamp: new Date().toISOString(),

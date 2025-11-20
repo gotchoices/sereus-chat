@@ -20,7 +20,7 @@ export default function AppNavigator() {
     config: {
       screens: {
         ConnectionsList: 'connections',
-        ChatInterface: 'chat/:threadId',
+        ChatInterface: 'chat/:strandId',
         SearchInterface: 'search',
         InvitationGenerator: 'invite',
         ProfileSetup: 'profile',
@@ -80,7 +80,7 @@ export default function AppNavigator() {
                     name="search-outline"
                     size={20}
                     style={{ marginLeft: 8 }}
-                    accessibilityLabel="Search in thread"
+                    accessibilityLabel="Search in strand"
                     onPress={() => {}}
                   />
                 </View>

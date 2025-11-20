@@ -7,7 +7,7 @@ variants: [happy, empty, error]
 # Spec: Connections List (Home)
 
 ## Purpose & Scope
-The Home screen shows the user's established threads and provides quick access to search, inviting friends, sorting, and profile. This is the app entry point after first‑launch name modal.
+The Home screen shows the user's established strands and provides quick access to search, inviting friends, sorting, and profile. This is the app entry point after first‑launch name modal.
 
 ## Layout
 This is the home screen so it does not contain a back button.
@@ -32,9 +32,9 @@ This is the home screen so it does not contain a back button.
   - Persist selection locally
 
 ### Content Area (below header → bottom)
-- **Threads list** (scrollable)
+- **Strands list** (scrollable)
   - Row shows: avatar/initials, display name, last message preview (1 line, ellipsis), timestamp (relative), unread badge (if >0)
-  - Tap row → push `Thread` (ChatInterface)
+  - Tap row → push `Strand` (ChatInterface)
 
 ### Footer Bar (bottom, left → right)
 - **QR Scanner**
@@ -46,9 +46,9 @@ This is the home screen so it does not contain a back button.
   - Action: Push/Modal `Profile` (reuse ProfileSetup for now)
 
 ## Behaviors
-- **Empty state**: If no threads, show CTA: “Invite a friend to start a thread” + button → Invite modal
+- **Empty state**: If no strands, show CTA: “Invite a friend to start a strand” + button → Invite modal
 - **Pull to refresh**: Refreshes list and previews
-- **Unread badge**: Red circular badge at end of row (99+ cap), cleared on entering thread
+- **Unread badge**: Red circular badge at end of row (99+ cap), cleared on entering strand
 - **Timestamps**: Relative under 24h (e.g., “2:30 PM”), otherwise day (“Tue”) or date (locale)
 - **Sorting**: Applies to the entire list; tiebreak by latest message timestamp desc
 - **Long‑press / swipe (future)**: Archive, Delete, Block (defer; not implemented in XML yet)
@@ -65,9 +65,9 @@ This is the home screen so it does not contain a back button.
 
 ## Data Mapping (examples)
 - Row name: connection.displayName
-- Preview: thread.lastMessage.previewText
-- Timestamp: thread.lastMessage.timestamp
-- Unread: thread.unreadCount
+- Preview: strand.lastMessage.previewText
+- Timestamp: strand.lastMessage.timestamp
+- Unread: strand.unreadCount
 - Avatar: connection.avatarUrl (fallback to initials)
 
 ## Implementation Notes
@@ -78,12 +78,12 @@ This is the home screen so it does not contain a back button.
 - Profile navigation: push vs modal?
 - Sort menu placement: simple overlay from header, or anchored popover?
 - Empty state messaging copy and iconography?
-- Do we need a “New Thread” FAB in addition to header Invite?
+- Do we need a “New Strand” FAB in addition to header Invite?
 
 ## Acceptance Criteria
 - [ ] Header shows Search, Invite, Sort, Profile in that order
-- [ ] Threads list displays name, preview, timestamp, unread badge
-- [ ] Tapping a thread opens `Thread`
+- [ ] Strands list displays name, preview, timestamp, unread badge
+- [ ] Tapping a strand opens `Strand`
 - [ ] Invite opens `Invite` modal; Search opens `Search`
 - [ ] Sorting updates order according to selection and persists
-- [ ] Empty state appears when there are no threads and offers Invite
+- [ ] Empty state appears when there are no strands and offers Invite

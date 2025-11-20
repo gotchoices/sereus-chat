@@ -5,22 +5,22 @@
 ## Primary Navigation Structure
 
 ```
-HOME (Threads List) ← Root
+HOME (Strands List) ← Root
 ├── Profile (push)
 ├── Search (push)
 ├── Invite (modal)
 ├── QR Scanner (modal)
-└── Thread (push)
+└── Strand (push)
     ├── Media Picker (modal/overlay)
     ├── Message Edit (modal)
     ├── Voice Call (overlay / floating controls)
     └── Video Call (full-screen)
 ```
 
-### Home: Threads List (ConnectionsList)
+### Home: Strands List (ConnectionsList)
 - Entry point after onboarding
-- Shows existing threads; primary actions: Invite, Search, Profile
-- Selecting a thread → push to Thread
+- Shows existing strands; primary actions: Invite, Search, Profile
+- Selecting a strand → push to Strand
 
 ### Profile (ProfileSetup for now)
 - Manage name, contact info, profile picture
@@ -37,7 +37,7 @@ HOME (Threads List) ← Root
 ### QR Scanner (QrScanner)
 - Scan an invitation QR to initiate/respond to connection flow
 
-### Thread (ChatInterface)
+### Strand (ChatInterface)
 - Chronological message list; tail view by default
 - Message entry area: text input, + (attachments), microphone (voice)
 - Call icons for voice and video
@@ -51,12 +51,12 @@ HOME (Threads List) ← Root
 ```
 ONBOARDING
 ├── Profile Setup (profile-setup.xml) ← Entry Point (modal)
-└── → Redirect to Home (Threads List)
+└── → Redirect to Home (Strands List)
 ```
 
 ## Deep Links
 - `sereus://invite/{token}` → Invitation Acceptance (InvitationAcceptance) as modal over Home
-- Future: `sereus://thread/{id}` → Thread (push)
+- Future: `sereus://strand/{id}` → Strand (push)
 
 ## Screen Transition Types
 
@@ -70,7 +70,7 @@ ONBOARDING
 
 ### ✅ Completed Screens (mapped)
 - Home: `connections-list.xml`
-- Thread: `chat-interface.xml`
+- Strand: `chat-interface.xml`
 - Profile / Onboarding: `profile-setup.xml`
 - Invite: `invitation-generator.xml`
 - Invitation Acceptance (deep link): `invitation-acceptance.xml`
