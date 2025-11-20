@@ -15,6 +15,16 @@
       }
     },
     {
+      "route": "InvitationAcceptance",
+      "output": "src/screens/InvitationAcceptance.tsx",
+      "dependsOn": [
+        "design/specs/navigation.md"
+      ],
+      "depHashes": {
+        "design/specs/navigation.md": "1f5829e9f8d212dbddd2e398492148ee42063d58ebab2846f9e4af44e5b1c3b1"
+      }
+    },
+    {
       "route": "QrScanner",
       "output": "src/screens/QrScanner.tsx",
       "dependsOn": [

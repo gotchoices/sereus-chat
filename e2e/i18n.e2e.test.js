@@ -14,7 +14,7 @@ describe('i18n – Spanish empty-state', () => {
 		// Switch locale at runtime via deep link
 		await device.openURL({ url: 'chat://connections?locale=es' });
 		await expect(element(by.id('empty-state-text'))).toHaveText(
-			'No hay conversaciones todavía. Invita a un amigo para empezar.',
+			'No hay hebras todavía. Invita a un amigo para empezar.',
 		);
 	});
 });

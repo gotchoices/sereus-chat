@@ -7,6 +7,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import ConnectionsList from '../screens/ConnectionsList';
 import SearchInterface from '../screens/SearchInterface';
 import InvitationGenerator from '../screens/InvitationGenerator';
+import InvitationAcceptance from '../screens/InvitationAcceptance';
 import ProfileSetup from '../screens/ProfileSetup';
 import QrScanner from '../screens/QrScanner';
 import Alerts from '../screens/Alerts';
@@ -24,6 +25,7 @@ export default function AppNavigator() {
         ChatInterface: 'chat/:strandId',
         SearchInterface: 'search',
         InvitationGenerator: 'invite',
+        InvitationAcceptance: 'invite/:token',
         ProfileSetup: 'profile',
         QrScanner: 'scan',
         Alerts: 'alerts',
@@ -36,6 +38,7 @@ export default function AppNavigator() {
         <Stack.Screen name="ConnectionsList" component={ConnectionsList} options={{ title: 'Sereus Chat' }} />
         <Stack.Screen name="SearchInterface" component={SearchInterface} options={{ title: 'Search' }} />
         <Stack.Screen name="InvitationGenerator" component={InvitationGenerator} options={{ title: 'Invite' }} />
+        <Stack.Screen name="InvitationAcceptance" component={InvitationAcceptance} options={{ title: 'Accept Invite' }} />
         <Stack.Screen name="ProfileSetup" component={ProfileSetup} options={{ title: 'Profile' }} />
         <Stack.Screen name="QrScanner" component={QrScanner} options={{ title: 'Scan' }} />
         <Stack.Screen name="Alerts" component={Alerts} options={{ title: 'Alerts' }} />

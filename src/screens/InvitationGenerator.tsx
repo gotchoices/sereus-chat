@@ -14,7 +14,7 @@ export default function InvitationGenerator() {
   const inviteLink = useMemo(() => {
     const token = Math.random().toString(36).slice(2, 10);
     const v = mockMode && variant ? `?variant=${encodeURIComponent(variant)}` : '';
-    return `sereus://invite/${token}${v}`;
+    return `chat://invite/${token}${v}`;
   }, [variant, mockMode]);
 
   const onShare = async () => {

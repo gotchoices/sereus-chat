@@ -3,6 +3,13 @@
     "title": "Sereus Chat",
     "empty": "No strands yet. Invite a friend to start a strand."
   },
+  "InvitationAcceptance": {
+    "title": "Accept Invitation",
+    "summary": "Accept invitation to connect and start a strand.",
+    "token": "Token",
+    "join": "Join",
+    "cancel": "Cancel"
+  },
   "chat": {
     "title": "Chat",
     "empty": "No messages yet. Say hello!",
