@@ -9,19 +9,19 @@ dependsOn:
   - mock/data/Messages/empty.json
 ---
 
-# Scenario: Chat – Empty Strand
+# Scenarios: Chat – Empty Strand
 
-Persona: Alice viewing a new strand with no messages yet.
+Based on: `design/stories/responding.md`
 
-Steps
-1. Open the new strand from Home.
-2. Observe the empty-state hint.
-3. Use the composer to start the conversation (optional).
+Persona: Alice (new participant)  
+Preconditions: locale=en, variant=empty, strandId=t-susan
 
-Preview
-
-![Chat (empty)](../images/chat-susan-empty.png)
-
-[Open in App](chat://chat/t-susan?variant=empty)
+## Scenario 1: Empty conversation setup
+- Intent: Validate empty-state and initial compose experience
+- Deep link: `chat://chat/t-susan?variant=empty&locale=en&scenario=chat-empty-1`
+- Narrative:
+  - Alice opens a newly created strand with Susan and sees that there are no messages yet.
+  - The empty-state copy encourages her to say hello.
+- Screenshot: `design/generated/images/chat-interface-empty.png`
 
 

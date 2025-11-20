@@ -8,20 +8,22 @@ dependsOn:
   - src/screens/ProfileSetup.tsx
 ---
 
-# Scenario: Edit Profile (Happy)
+# Scenarios: Profile – Setup/Edit
 
-Persona: Returning user updating their profile name and avatar.
+Based on: `design/stories/profile-management.md`
 
-Steps
-1. Open Profile from Home.
-2. Tap the pencil icon to edit avatar (media picker placeholder shown).
-3. Enter a new Name and optional details (Email/Phone/Notes).
-4. Tap Save to apply changes.
+Persona: Taylor (returning user)  
+Preconditions: locale=en, mock mode (read-only persist)
 
-Preview
+## Scenario 1: Update basic info
+- Intent: Review and update profile information
+- Deep link: `chat://profile?locale=en&scenario=profile-1`
+- Narrative:
+  - Taylor opens Profile and reviews the current Name, Email, Phone, and Notes.
+  - They edit the Name and adjust Notes.
+- Screenshot: `design/generated/images/profile-setup.png`
 
-![Profile Setup](../images/profile-setup-happy.png)
-
-[Open in App](chat://profile)
+## Alternates
+- Avatar change triggers the MediaPicker overlay; for now, this is a placeholder.
 
 

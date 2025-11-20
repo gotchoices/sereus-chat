@@ -9,19 +9,19 @@ dependsOn:
   - mock/data/Messages/happy.json
 ---
 
-# Scenario: Chat – Happy Path
+# Scenarios: Chat – Happy Path
 
-Persona: Alice viewing an active strand with Susan.
+Based on: `design/stories/responding.md`
 
-Steps
-1. Open the strand with Susan from Home.
-2. Scroll the recent message bubbles.
-3. Use the composer to send a short reply.
+Persona: Alice (active participant)  
+Preconditions: locale=en, variant=happy, strandId=t-susan
 
-Preview
-
-![Chat (happy)](../images/chat-susan-happy.png)
-
-[Open in App](chat://chat/t-susan?variant=happy)
+## Scenario 1: Read and reply
+- Intent: Read recent messages and send a short response
+- Deep link: `chat://chat/t-susan?variant=happy&locale=en&scenario=chat-happy-1`
+- Narrative:
+  - Alice reviews the latest messages from Susan; contiguous bubbles group by sender.
+  - She types a brief reply and taps Send; the message appears as an outgoing bubble.
+- Screenshot: `design/generated/images/chat-interface-happy.png`
 
 
