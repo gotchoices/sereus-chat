@@ -13,7 +13,7 @@ The Home screen shows the user's established strands and provides quick access t
 This is the home screen so it does not contain a back button.
 
 ### Title Bar (top)
-- **App Title** Sereus Chat
+- Title is provided by the native navigator header. Do not render a duplicate title inside the screen content.
 
 ### Control Bar (top, left → right)
 - **Search icon**

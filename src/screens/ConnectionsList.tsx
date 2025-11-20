@@ -61,9 +61,7 @@ export default function ConnectionsList() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{t('screens.connections.title', 'Sereus Chat')}</Text>
-      </View>
+      {/* Title uses navigator header; no duplicate in content */}
       <View style={styles.controls}>
         <View style={styles.row}>
           <TouchableOpacity style={[styles.iconButton, styles.flex1]} onPress={() => { navigation.navigate('SearchInterface'); }}>
