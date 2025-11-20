@@ -59,5 +59,7 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Allow camera access to scan QR invitations.</string>
 </dict>
 </plist>
