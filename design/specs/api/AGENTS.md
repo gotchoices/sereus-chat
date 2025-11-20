@@ -1,1 +1,1 @@
-../appeus/agent-rules/api.md
+../../../appeus/agent-rules/api.md

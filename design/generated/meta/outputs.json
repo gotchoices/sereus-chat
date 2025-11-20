@@ -1,0 +1,26 @@
+{
+  "outputs": [
+    {
+      "route": "ConnectionsList",
+      "output": "src/screens/ConnectionsList.tsx",
+      "dependsOn": [
+        "design/generated/screens/ConnectionsList.md",
+        "design/specs/screens/connections-list.md",
+        "design/specs/navigation.md"
+      ],
+      "depHashes": {}
+    },
+    {
+      "route": "ChatInterface",
+      "output": "src/screens/ChatInterface.tsx",
+      "dependsOn": [
+        "design/generated/screens/ChatInterface.md",
+        "design/specs/screens/chat-interface.md",
+        "design/specs/navigation.md"
+      ],
+      "depHashes": {}
+    }
+  ]
+}
+
+

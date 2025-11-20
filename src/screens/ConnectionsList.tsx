@@ -1,12 +1,3 @@
-/* AppeusMeta:
-{
-  "dependsOn": [
-    "design/generated/screens/ConnectionsList.md",
-    "design/specs/screens/connections-list.md",
-    "design/specs/navigation.md"
-  ]
-}
-*/
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';

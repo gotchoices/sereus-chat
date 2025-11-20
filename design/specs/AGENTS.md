@@ -1,1 +1,1 @@
-../appeus/agent-rules/specs.md
+../../appeus/agent-rules/specs.md
