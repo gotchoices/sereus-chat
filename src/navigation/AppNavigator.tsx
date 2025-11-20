@@ -8,6 +8,7 @@ import ConnectionsList from '../screens/ConnectionsList';
 import SearchInterface from '../screens/SearchInterface';
 import InvitationGenerator from '../screens/InvitationGenerator';
 import InvitationAcceptance from '../screens/InvitationAcceptance';
+import { showToast } from '../ui/toast';
 import ProfileSetup from '../screens/ProfileSetup';
 import QrScanner from '../screens/QrScanner';
 import Alerts from '../screens/Alerts';
@@ -76,14 +77,14 @@ export default function AppNavigator() {
                     size={20}
                     style={{ marginHorizontal: 8 }}
                     accessibilityLabel="Voice call"
-                    onPress={() => {}}
+                    onPress={() => showToast('Voice call not implemented')}
                   />
                   <Ionicons
-                    name="camera-outline"
+                    name="videocam-outline"
                     size={20}
                     style={{ marginHorizontal: 8 }}
                     accessibilityLabel="Video call"
-                    onPress={() => {}}
+                    onPress={() => showToast('Video call not implemented')}
                   />
                   <Ionicons
                     name="search-outline"

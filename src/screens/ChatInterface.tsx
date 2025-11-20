@@ -7,6 +7,7 @@ import { useT } from '../i18n';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { consumePendingAttachment, type ProvisionalAttachment } from '../data/attachmentDraft';
 import Clipboard from '@react-native-clipboard/clipboard';
+import { showToast } from '../ui/toast';
 
 export default function ChatInterface() {
   const route: any = useRoute();
@@ -79,6 +80,10 @@ export default function ChatInterface() {
     setText('');
     setAttachments([]);
     setInputHeight(40);
+  };
+
+  const onMicPress = () => {
+    showToast('Voice message not implemented');
   };
 
   const onCancelEdit = () => {
@@ -278,7 +283,7 @@ export default function ChatInterface() {
         ) : (
           <TouchableOpacity
             style={[styles.composeButton, canSend ? styles.primary : undefined]}
-            onPress={canSend ? onSend : undefined}
+            onPress={canSend ? onSend : onMicPress}
             accessibilityLabel={canSend ? t('screens.chat.send', 'Send') : t('screens.chat.record', 'Record')}
             testID={canSend ? 'composer-send' : 'composer-mic'}
           >
