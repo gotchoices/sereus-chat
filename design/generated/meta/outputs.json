@@ -49,6 +49,16 @@
         "design/specs/navigation.md"
       ],
       "depHashes": {}
+    },
+    {
+      "route": "InvitationGenerator",
+      "output": "src/screens/InvitationGenerator.tsx",
+      "dependsOn": [
+        "design/generated/screens/InvitationGenerator.md",
+        "design/specs/screens/invitation-generator.md",
+        "design/specs/navigation.md"
+      ],
+      "depHashes": {}
     }
   ]
 }

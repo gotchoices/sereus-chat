@@ -33,9 +33,19 @@ typography:
     size: 12
     weight: 400
 
+notifications:
+  toast:
+    # Non-blocking auto-dismiss notifications for low-importance events.
+    enabled: true
+    durationMs: 1200
+    blocking: false
+    android: ToastAndroid     # Prefer native toast
+    ios: overlay              # Lightweight in-app overlay
+
 notes:
 - Semantic names map to RN components; refine over time.
 - Choose icon names from the selected icon set; adjust per platform if needed.
 - Navigation theming can adopt these colors via a navigation theme if/when added.
+- Use toast notifications for brief confirmations (e.g., “Copied”); avoid modal alerts.
 
 

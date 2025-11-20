@@ -10,6 +10,14 @@
     "attach": "Adjuntar",
     "record": "Grabar",
     "send": "Enviar"
+  },
+  "InvitationGenerator": {
+    "title": "Invitar amigos",
+    "labelLink": "Enlace de invitación",
+    "includeQR": "Incluir QR",
+    "sharePrefix": "Únete conmigo en Sereus Chat",
+    "scanQRIfVisible": "Escanea el QR si está visible",
+    "toastCopied": "Copiado"
   }
 }
 

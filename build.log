@@ -58,6 +58,18 @@ Build was configured to prefer settings repositories over project repositories b
 Build was configured to prefer settings repositories over project repositories but repository 'MavenRepo' was added by plugin 'com.facebook.react'
 Build was configured to prefer settings repositories over project repositories but repository 'Google' was added by plugin 'com.facebook.react'
 Build was configured to prefer settings repositories over project repositories but repository 'maven2' was added by plugin 'com.facebook.react'
+Build was configured to prefer settings repositories over project repositories but repository 'maven' was added by plugin 'com.facebook.react'
+Build was configured to prefer settings repositories over project repositories but repository 'MavenRepo' was added by plugin 'com.facebook.react'
+Build was configured to prefer settings repositories over project repositories but repository 'Google' was added by plugin 'com.facebook.react'
+Build was configured to prefer settings repositories over project repositories but repository 'maven2' was added by plugin 'com.facebook.react'
+Build was configured to prefer settings repositories over project repositories but repository 'maven' was added by plugin 'com.facebook.react'
+Build was configured to prefer settings repositories over project repositories but repository 'MavenRepo' was added by plugin 'com.facebook.react'
+Build was configured to prefer settings repositories over project repositories but repository 'Google' was added by plugin 'com.facebook.react'
+Build was configured to prefer settings repositories over project repositories but repository 'maven2' was added by plugin 'com.facebook.react'
+
+> Configure project :react-native-clipboard_clipboard
+Build was configured to prefer settings repositories over project repositories but repository 'Google2' was added by build file '../node_modules/@react-native-clipboard/clipboard/android/build.gradle'
+Build was configured to prefer settings repositories over project repositories but repository 'MavenRepo2' was added by build file '../node_modules/@react-native-clipboard/clipboard/android/build.gradle'
 
 > Configure project :react-native-documents_picker
 Build was configured to prefer settings repositories over project repositories but repository 'Google2' was added by build file '../node_modules/@react-native-documents/picker/android/build.gradle'
@@ -85,6 +97,12 @@ Build was configured to prefer settings repositories over project repositories b
 Build was configured to prefer settings repositories over project repositories but repository 'MavenLocal' was added by build file '../node_modules/react-native-screens/android/build.gradle'
 Build was configured to prefer settings repositories over project repositories but repository 'Google2' was added by build file '../node_modules/react-native-screens/android/build.gradle'
 
+> Configure project :react-native-svg
+Build was configured to prefer settings repositories over project repositories but repository 'MavenRepo2' was added by build file '../node_modules/react-native-svg/android/build.gradle'
+Build was configured to prefer settings repositories over project repositories but repository 'MavenLocal' was added by build file '../node_modules/react-native-svg/android/build.gradle'
+Build was configured to prefer settings repositories over project repositories but repository 'Google2' was added by build file '../node_modules/react-native-svg/android/build.gradle'
+Build was configured to prefer settings repositories over project repositories but repository 'maven3' was added by build file '../node_modules/react-native-svg/android/build.gradle'
+
 > Configure project :react-native-vector-icons
 Build was configured to prefer settings repositories over project repositories but repository 'maven3' was added by build file '../node_modules/react-native-vector-icons/android/build.gradle'
 Build was configured to prefer settings repositories over project repositories but repository 'MavenRepo2' was added by build file '../node_modules/react-native-vector-icons/android/build.gradle'
@@ -96,6 +114,9 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :app:generateCodegenSchemaFromJavaScript SKIPPED
 > Task :app:generateCodegenArtifactsFromSchema SKIPPED
 > Task :app:generateReactNativeEntryPoint UP-TO-DATE
+> Task :react-native-clipboard_clipboard:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :react-native-clipboard_clipboard:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-clipboard_clipboard:preBuild UP-TO-DATE
 > Task :react-native-documents_picker:generateCodegenSchemaFromJavaScript UP-TO-DATE
 > Task :react-native-documents_picker:generateCodegenArtifactsFromSchema UP-TO-DATE
 > Task :react-native-documents_picker:preBuild UP-TO-DATE
@@ -111,12 +132,17 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :react-native-screens:generateCodegenSchemaFromJavaScript UP-TO-DATE
 > Task :react-native-screens:generateCodegenArtifactsFromSchema UP-TO-DATE
 > Task :react-native-screens:preBuild UP-TO-DATE
+> Task :react-native-svg:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :react-native-svg:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-svg:preBuild UP-TO-DATE
 > Task :react-native-vector-icons:generateCodegenSchemaFromJavaScript UP-TO-DATE
 > Task :react-native-vector-icons:generateCodegenArtifactsFromSchema UP-TO-DATE
 > Task :react-native-vector-icons:preBuild UP-TO-DATE
 > Task :app:preBuild UP-TO-DATE
 > Task :app:preDebugBuild UP-TO-DATE
 > Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-clipboard_clipboard:preDebugBuild UP-TO-DATE
+> Task :react-native-clipboard_clipboard:writeDebugAarMetadata UP-TO-DATE
 > Task :react-native-documents_picker:preDebugBuild UP-TO-DATE
 > Task :react-native-documents_picker:writeDebugAarMetadata UP-TO-DATE
 > Task :react-native-image-picker:preDebugBuild UP-TO-DATE
@@ -127,10 +153,15 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :react-native-safe-area-context:writeDebugAarMetadata UP-TO-DATE
 > Task :react-native-screens:preDebugBuild UP-TO-DATE
 > Task :react-native-screens:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-svg:preDebugBuild UP-TO-DATE
+> Task :react-native-svg:writeDebugAarMetadata UP-TO-DATE
 > Task :react-native-vector-icons:preDebugBuild UP-TO-DATE
 > Task :react-native-vector-icons:writeDebugAarMetadata UP-TO-DATE
 > Task :app:checkDebugAarMetadata UP-TO-DATE
 > Task :app:generateDebugResValues UP-TO-DATE
+> Task :react-native-clipboard_clipboard:generateDebugResValues UP-TO-DATE
+> Task :react-native-clipboard_clipboard:generateDebugResources UP-TO-DATE
+> Task :react-native-clipboard_clipboard:packageDebugResources UP-TO-DATE
 > Task :react-native-documents_picker:generateDebugResValues UP-TO-DATE
 > Task :react-native-documents_picker:generateDebugResources UP-TO-DATE
 > Task :react-native-documents_picker:packageDebugResources UP-TO-DATE
@@ -146,6 +177,9 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :react-native-screens:generateDebugResValues UP-TO-DATE
 > Task :react-native-screens:generateDebugResources UP-TO-DATE
 > Task :react-native-screens:packageDebugResources UP-TO-DATE
+> Task :react-native-svg:generateDebugResValues UP-TO-DATE
+> Task :react-native-svg:generateDebugResources UP-TO-DATE
+> Task :react-native-svg:packageDebugResources UP-TO-DATE
 > Task :react-native-vector-icons:generateDebugResValues UP-TO-DATE
 > Task :react-native-vector-icons:generateDebugResources UP-TO-DATE
 > Task :react-native-vector-icons:packageDebugResources UP-TO-DATE
@@ -156,6 +190,8 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :app:parseDebugLocalResources UP-TO-DATE
 > Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
 > Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-clipboard_clipboard:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-clipboard_clipboard:processDebugManifest UP-TO-DATE
 > Task :react-native-documents_picker:extractDeepLinksDebug UP-TO-DATE
 > Task :react-native-documents_picker:processDebugManifest UP-TO-DATE
 > Task :react-native-image-picker:extractDeepLinksDebug UP-TO-DATE
@@ -166,11 +202,16 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :react-native-safe-area-context:processDebugManifest UP-TO-DATE
 > Task :react-native-screens:extractDeepLinksDebug UP-TO-DATE
 > Task :react-native-screens:processDebugManifest UP-TO-DATE
+> Task :react-native-svg:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-svg:processDebugManifest UP-TO-DATE
 > Task :react-native-vector-icons:extractDeepLinksDebug UP-TO-DATE
 > Task :react-native-vector-icons:processDebugManifest UP-TO-DATE
 > Task :app:processDebugMainManifest UP-TO-DATE
 > Task :app:processDebugManifest UP-TO-DATE
 > Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :react-native-clipboard_clipboard:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-clipboard_clipboard:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-clipboard_clipboard:generateDebugRFile UP-TO-DATE
 > Task :react-native-documents_picker:compileDebugLibraryResources UP-TO-DATE
 > Task :react-native-documents_picker:parseDebugLocalResources UP-TO-DATE
 > Task :react-native-documents_picker:generateDebugRFile UP-TO-DATE
@@ -186,10 +227,17 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :react-native-screens:compileDebugLibraryResources UP-TO-DATE
 > Task :react-native-screens:parseDebugLocalResources UP-TO-DATE
 > Task :react-native-screens:generateDebugRFile UP-TO-DATE
+> Task :react-native-svg:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-svg:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-svg:generateDebugRFile UP-TO-DATE
 > Task :react-native-vector-icons:compileDebugLibraryResources UP-TO-DATE
 > Task :react-native-vector-icons:parseDebugLocalResources UP-TO-DATE
 > Task :react-native-vector-icons:generateDebugRFile UP-TO-DATE
 > Task :app:processDebugResources UP-TO-DATE
+> Task :react-native-clipboard_clipboard:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-clipboard_clipboard:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-clipboard_clipboard:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-clipboard_clipboard:bundleLibCompileToJarDebug UP-TO-DATE
 > Task :react-native-documents_picker:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :react-native-documents_picker:generateDebugBuildConfig UP-TO-DATE
 > Task :react-native-documents_picker:compileDebugKotlin UP-TO-DATE
@@ -218,6 +266,10 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :react-native-screens:javaPreCompileDebug UP-TO-DATE
 > Task :react-native-screens:compileDebugJavaWithJavac UP-TO-DATE
 > Task :react-native-screens:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-svg:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-svg:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-svg:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-svg:bundleLibCompileToJarDebug UP-TO-DATE
 > Task :react-native-vector-icons:generateDebugBuildConfig UP-TO-DATE
 > Task :react-native-vector-icons:javaPreCompileDebug UP-TO-DATE
 > Task :react-native-vector-icons:compileDebugJavaWithJavac UP-TO-DATE
@@ -229,6 +281,10 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:copyReactNativeVectorIconFonts UP-TO-DATE
 > Task :app:generateDebugAssets UP-TO-DATE
+> Task :react-native-clipboard_clipboard:mergeDebugShaders UP-TO-DATE
+> Task :react-native-clipboard_clipboard:compileDebugShaders NO-SOURCE
+> Task :react-native-clipboard_clipboard:generateDebugAssets UP-TO-DATE
+> Task :react-native-clipboard_clipboard:mergeDebugAssets UP-TO-DATE
 > Task :react-native-documents_picker:mergeDebugShaders UP-TO-DATE
 > Task :react-native-documents_picker:compileDebugShaders NO-SOURCE
 > Task :react-native-documents_picker:generateDebugAssets UP-TO-DATE
@@ -249,6 +305,10 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :react-native-screens:compileDebugShaders NO-SOURCE
 > Task :react-native-screens:generateDebugAssets UP-TO-DATE
 > Task :react-native-screens:mergeDebugAssets UP-TO-DATE
+> Task :react-native-svg:mergeDebugShaders UP-TO-DATE
+> Task :react-native-svg:compileDebugShaders NO-SOURCE
+> Task :react-native-svg:generateDebugAssets UP-TO-DATE
+> Task :react-native-svg:mergeDebugAssets UP-TO-DATE
 > Task :react-native-vector-icons:mergeDebugShaders UP-TO-DATE
 > Task :react-native-vector-icons:compileDebugShaders NO-SOURCE
 > Task :react-native-vector-icons:generateDebugAssets UP-TO-DATE
@@ -259,17 +319,21 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :react-native-permissions:bundleLibRuntimeToJarDebug UP-TO-DATE
 > Task :react-native-safe-area-context:bundleLibRuntimeToJarDebug UP-TO-DATE
 > Task :react-native-screens:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-clipboard_clipboard:bundleLibRuntimeToJarDebug UP-TO-DATE
 > Task :react-native-image-picker:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :react-native-svg:bundleLibRuntimeToJarDebug UP-TO-DATE
 > Task :react-native-vector-icons:bundleLibRuntimeToJarDebug UP-TO-DATE
 > Task :app:desugarDebugFileDependencies UP-TO-DATE
 > Task :app:dexBuilderDebug UP-TO-DATE
 > Task :app:mergeDebugGlobalSynthetics UP-TO-DATE
 > Task :app:processDebugJavaRes UP-TO-DATE
+> Task :react-native-clipboard_clipboard:processDebugJavaRes NO-SOURCE
 > Task :react-native-documents_picker:processDebugJavaRes UP-TO-DATE
 > Task :react-native-image-picker:processDebugJavaRes NO-SOURCE
 > Task :react-native-permissions:processDebugJavaRes UP-TO-DATE
 > Task :react-native-safe-area-context:processDebugJavaRes UP-TO-DATE
 > Task :react-native-screens:processDebugJavaRes UP-TO-DATE
+> Task :react-native-svg:processDebugJavaRes NO-SOURCE
 > Task :react-native-vector-icons:processDebugJavaRes NO-SOURCE
 > Task :app:mergeDebugJavaResource UP-TO-DATE
 > Task :app:checkDebugDuplicateClasses UP-TO-DATE
@@ -278,7 +342,9 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :react-native-permissions:bundleLibRuntimeToDirDebug UP-TO-DATE
 > Task :react-native-safe-area-context:bundleLibRuntimeToDirDebug UP-TO-DATE
 > Task :react-native-screens:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-clipboard_clipboard:bundleLibRuntimeToDirDebug UP-TO-DATE
 > Task :react-native-image-picker:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :react-native-svg:bundleLibRuntimeToDirDebug UP-TO-DATE
 > Task :react-native-vector-icons:bundleLibRuntimeToDirDebug UP-TO-DATE
 > Task :app:mergeProjectDexDebug UP-TO-DATE
 > Task :app:configureCMakeDebug[arm64-v8a]
@@ -291,6 +357,9 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :app:configureCMakeDebug[x86_64]
 > Task :app:buildCMakeDebug[x86_64]
 > Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-clipboard_clipboard:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-clipboard_clipboard:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-clipboard_clipboard:copyDebugJniLibsProjectOnly UP-TO-DATE
 > Task :react-native-documents_picker:mergeDebugJniLibFolders UP-TO-DATE
 > Task :react-native-documents_picker:mergeDebugNativeLibs NO-SOURCE
 > Task :react-native-documents_picker:copyDebugJniLibsProjectOnly UP-TO-DATE
@@ -314,6 +383,9 @@ Build was configured to prefer settings repositories over project repositories b
 > Task :react-native-screens:mergeDebugJniLibFolders UP-TO-DATE
 > Task :react-native-screens:mergeDebugNativeLibs UP-TO-DATE
 > Task :react-native-screens:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-svg:mergeDebugJniLibFolders UP-TO-DATE
+> Task :react-native-svg:mergeDebugNativeLibs NO-SOURCE
+> Task :react-native-svg:copyDebugJniLibsProjectOnly UP-TO-DATE
 > Task :react-native-vector-icons:mergeDebugJniLibFolders UP-TO-DATE
 > Task :react-native-vector-icons:mergeDebugNativeLibs NO-SOURCE
 > Task :react-native-vector-icons:copyDebugJniLibsProjectOnly UP-TO-DATE
@@ -337,8 +409,8 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.0.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 11s
-203 actionable tasks: 17 executed, 186 up-to-date
+BUILD SUCCESSFUL in 7s
+245 actionable tasks: 17 executed, 228 up-to-date
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.0.0/userguide/configuration_cache_enabling.html
 info Connecting to the development server...
 info Starting the app on "emulator-5554"...
