@@ -53,7 +53,11 @@ This is a pushed screen from Home (shows a Back arrow, not a root screen).
 - Icon switching: Mic ↔ Send based on presence of text or attachments (Send if any present).
 - Message send: Tapping Send posts the current text and all provisional attachments, then clears the composer and strip.
 - Voice messages: render as a message bubble with a voice icon and duration label (e.g., “🔊 0:15”).
-- Long press on message: Copy, Delete, Edit (if own message)
+- Long press on message: Copy, Delete, Edit (if own message). Edit is inline (no separate screen).
+- Per-message overflow (three-dot) menu:
+  - Others’ messages: Reply, Copy (more actions can be added later)
+  - My messages: Edit, Delete, Copy
+  - Long-press may also open the same menu on touch devices; overflow icon must be visible and accessible to support simulator/desktop environments.
 - Read receipts (future): Optional small status per bubble
 
 ## States
@@ -63,6 +67,7 @@ This is a pushed screen from Home (shows a Back arrow, not a root screen).
 - Loading: Skeleton or spinner while history loads
 - Error: Inline error banner with Retry
 - Empty: Show placeholder “No messages yet” centered
+ - Editing (inline): Show an editing banner above the composer with Cancel/Save; prefill composer with the existing message text; highlight the target bubble; only own messages can be edited. Optional deep link `?editing=<messageId>` enters edit state for demos/tests.
 
 ## Accessibility
 - Tap targets ≥ 44×44 px
@@ -97,4 +102,8 @@ This is a pushed screen from Home (shows a Back arrow, not a root screen).
 - [ ] Text and attachments render as separate bubbles in history (no mixed text+attachment)
 - [ ] Tapping Phone/Camera initiates appropriate flows
 - [ ] Search enters in-strand search mode and highlights matches
+- [ ] Long-press on own message shows Edit; entering Edit shows an inline banner with Cancel/Save and the composer prefilled; Save updates the message in-place; Cancel restores previous composer state
+- [ ] Each message has a visible overflow menu button (three dots):
+  - Others’ messages: Reply, Copy
+  - Own messages: Edit, Delete, Copy
 - [ ] Screen adheres to accessibility targets and contrast

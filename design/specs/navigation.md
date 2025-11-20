@@ -12,7 +12,6 @@ HOME (Strands List) ← Root
 ├── QR Scanner (modal)
 └── Strand (push)
     ├── Media Picker (modal/overlay)
-    ├── Message Edit (modal)
     ├── Voice Call (overlay / floating controls)
     └── Video Call (full-screen)
 ```
@@ -43,7 +42,7 @@ HOME (Strands List) ← Root
 - Call icons for voice and video
 - From here:
   - Media Picker (MediaPicker) modal/overlay
-  - Message Edit (MessageEditMode) modal
+  - Message Edit: inline editing state (no separate route)
   - Voice Call (overlay) – floating controls (mute, hang up)
   - Video Call (VideoCallActive) full-screen
 
@@ -75,7 +74,6 @@ ONBOARDING
 - Invite: `invitation-generator.xml`
 - Invitation Acceptance (deep link): `invitation-acceptance.xml`
 - Media Picker: `media-picker.xml`
-- Message Edit: `message-edit-mode.xml`
 - Video Call: `video-call-active.xml`
 - QR Scanner: `qr-scanner.xml`
 - Search: `search-interface.xml`

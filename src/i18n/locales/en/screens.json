@@ -9,7 +9,16 @@
     "composerPlaceholder": "Message",
     "attach": "Attach",
     "record": "Record",
-    "send": "Send"
+    "send": "Send",
+    "editingTitle": "Editing",
+    "cancel": "Cancel",
+    "save": "Save",
+    "menu": {
+      "reply": "Reply",
+      "copy": "Copy",
+      "delete": "Delete",
+      "edit": "Edit"
+    }
   },
   "InvitationGenerator": {
     "title": "Invite Friends",

@@ -20,7 +20,6 @@ Template
 | SearchInterface    | SearchInterface  | Global search across people/messages    | happy, empty, error     |
 | InvitationGenerator| InvitationGenerator | Create/share invite link/QR          | happy, error            |
 | QrScanner          | QrScanner        | Scan invitation QR                      | happy, error            |
-| MessageEditMode    | MessageEditMode  | Edit/delete an existing message         | happy, error            |
 | VideoCallActive    | VideoCallActive  | Full-screen video call UI               | happy, error            |
 | VoiceCallOverlay   | VoiceCallOverlay | Floating voice call controls            | happy, error            |
 | InvitationAcceptance | InvitationAcceptance | Accept invite via deep link        | happy, error            |

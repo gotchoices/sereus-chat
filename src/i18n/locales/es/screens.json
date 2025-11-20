@@ -9,7 +9,16 @@
     "composerPlaceholder": "Mensaje",
     "attach": "Adjuntar",
     "record": "Grabar",
-    "send": "Enviar"
+    "send": "Enviar",
+    "editingTitle": "Editando",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "menu": {
+      "reply": "Responder",
+      "copy": "Copiar",
+      "delete": "Eliminar",
+      "edit": "Editar"
+    }
   },
   "InvitationGenerator": {
     "title": "Invitar amigos",
