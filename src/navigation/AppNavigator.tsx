@@ -11,6 +11,7 @@ import ProfileSetup from '../screens/ProfileSetup';
 import QrScanner from '../screens/QrScanner';
 import Alerts from '../screens/Alerts';
 import ChatInterface from '../screens/ChatInterface';
+import MediaPicker from '../screens/MediaPicker';
 
 const Stack = createNativeStackNavigator();
 
@@ -38,6 +39,11 @@ export default function AppNavigator() {
         <Stack.Screen name="ProfileSetup" component={ProfileSetup} options={{ title: 'Profile' }} />
         <Stack.Screen name="QrScanner" component={QrScanner} options={{ title: 'Scan' }} />
         <Stack.Screen name="Alerts" component={Alerts} options={{ title: 'Alerts' }} />
+        <Stack.Screen
+          name="MediaPicker"
+          component={MediaPicker}
+          options={{ headerShown: false, presentation: 'transparentModal' as any }}
+        />
         <Stack.Screen
           name="ChatInterface"
           component={ChatInterface}

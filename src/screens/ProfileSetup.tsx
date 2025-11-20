@@ -50,7 +50,7 @@ export default function ProfileSetup() {
   }, [navigation, name, email, phone, notes]);
 
   const onEditAvatar = () => {
-    Alert.alert('Media picker', 'Avatar edit not implemented yet.');
+    navigation.navigate('MediaPicker');
   };
 
   const initials = name.trim() ? name.trim()[0].toUpperCase() : '?';

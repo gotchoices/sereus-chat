@@ -67,6 +67,44 @@ Lightweight, toast-style chooser that appears over `chat-interface` when the use
 - Render option items with icon + label; accessible role “button”
 - Provide an inline notice area for permission/errors
 
+## Implementation Notes (Libraries and OS Facilities)
+- Camera/Gallery:
+  - Use `react-native-image-picker` to invoke native UI.
+  - iOS: Under the hood, this uses `PHPicker` (iOS 14+) or `UIImagePickerController`.
+  - Android: Uses camera intent and Storage/Media picker via system intents.
+- File:
+  - Use `@react-native-documents/picker` (migration from `react-native-document-picker`).
+  - Use named imports (`pick`, `keepLocalCopy`); replace `pickSingle` with `pick` and `copyTo` with `keepLocalCopy`. See migration guide.
+- Permissions:
+  - Use `react-native-permissions` to request Camera/Photo/Media permissions as needed.
+  - Handle “denied” and “limited” (iOS Photos) gracefully; show inline notice and keep picker open.
+- Location (optional/future):
+  - If enabled, a simple library-driven location input (e.g., `react-native-geolocation-service` + map sheet) or disable the option on platforms where not available.
+
+## Return Payload (to ChatInterface)
+- After successful selection, dismiss the toast and return a provisional attachment to the composer via a callback/context:
+```ts
+type ProvisionalAttachment = {
+  id: string;                       // generated id
+  type: 'image' | 'video' | 'file' | 'location';
+  uri?: string;                     // content URI or file path
+  mimeType?: string;
+  name?: string;
+  size?: number;
+  thumbnailUri?: string;            // optional generated thumbnail
+  location?: { lat: number; lon: number; label?: string };
+};
+```
+- The composer shows a chip/thumbnail; sending is handled by ChatInterface.
+
+## Platform Notes
+- iOS:
+  - Prefer `PHPicker` to avoid extra permission prompts; fall back to `UIImagePickerController` if needed.
+  - “Limited Photos” access should show inline notice and still allow picking from the limited set.
+- Android:
+  - Use `ACTION_OPEN_DOCUMENT` with persistable URI permissions for files/media.
+  - Ensure returned URIs are persisted for session use (no copying large files synchronously).
+
 ## Edge Cases
 
 ### Permissions Denied

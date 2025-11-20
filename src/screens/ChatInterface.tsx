@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useVariant } from '../mock/VariantContext';
 import { listMessages, type ChatMessage } from '../data/messages';
 import { useT } from '../i18n';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { consumePendingAttachment, type ProvisionalAttachment } from '../data/attachmentDraft';
 
 export default function ChatInterface() {
   const route: any = useRoute();
+  const navigation: any = useNavigation();
   const strandId: string | undefined = route?.params?.strandId;
   const { mockMode, variant } = useVariant();
   const t = useT();
@@ -39,9 +41,7 @@ export default function ChatInterface() {
   };
 
   const onPressAttach = () => {
-    // Stub: add a provisional attachment to demonstrate strip
-    const id = `a-${Date.now()}`;
-    setAttachments(prev => [...prev, { id, name: 'photo.jpg', type: 'image' }]);
+    navigation.navigate('MediaPicker');
   };
 
   const onRemoveAttachment = (id: string) => {
@@ -64,8 +64,19 @@ export default function ChatInterface() {
     setInputHeight(40);
   };
 
+  // Consume pending attachment when screen gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const att = consumePendingAttachment();
+      if (att) {
+        setAttachments(prev => [...prev, { id: att.id, name: att.name ?? 'attachment', type: att.type === 'file' ? 'file' : 'image' }]);
+      }
+    }, []),
+  );
+
   return (
     <View style={styles.container}>
+      {/* Consume any pending attachment from MediaPicker when focused */}
       {messages.length === 0 ? (
         <View style={styles.empty} testID="chat-empty"><Text>{t('screens.chat.empty', 'No messages yet. Say hello!')}</Text></View>
       ) : (
@@ -74,6 +85,7 @@ export default function ChatInterface() {
           data={messages}
           keyExtractor={(m) => m.id}
           testID="chat-list"
+          accessibilityLabel="Messages list"
           renderItem={({ item, index }) => {
             const prev = index > 0 ? messages[index - 1] : undefined;
             const sameSenderAsPrev = !!prev && (prev.outgoing === item.outgoing) && (prev.sender === item.sender);

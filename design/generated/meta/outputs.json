@@ -21,6 +21,16 @@
       "depHashes": {}
     },
     {
+      "route": "MediaPicker",
+      "output": "src/screens/MediaPicker.tsx",
+      "dependsOn": [
+        "design/generated/screens/MediaPicker.md",
+        "design/specs/screens/media-picker.md",
+        "design/specs/navigation.md"
+      ],
+      "depHashes": {}
+    },
+    {
       "route": "ProfileSetup",
       "output": "src/screens/ProfileSetup.tsx",
       "dependsOn": [
