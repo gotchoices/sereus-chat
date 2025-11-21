@@ -22,6 +22,6 @@ Preconditions: locale=en, variant=empty, strandId=t-susan
 - Narrative:
   - Alice opens a newly created strand with Susan and sees that there are no messages yet.
   - The empty-state copy encourages her to say hello.
-- Screenshot: `design/generated/images/chat-interface-empty.png`
+- [![chat-interface-empty](../images/chat-interface-empty.png)](chat://chat/t-susan?variant=empty&locale=en&scenario=chat-empty-1)
 
 

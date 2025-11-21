@@ -11,7 +11,7 @@ Preconditions: locale=en, variant=happy, invite token is valid
 - Narrative:
   - Maria taps the link Alex shared and lands on the acceptance screen.
   - She reviews the token and taps Join to proceed; a new strand will be created.
-- Screenshot: `design/generated/images/invitation-acceptance.png`
+- [![invitation-acceptance](../images/invitation-acceptance.png)](chat://invite/demo-1234?variant=happy&locale=en&scenario=accept-1)
 
 ## Alternates and Errors
 - Error (expired token): Use a non-existent token to surface an error message (future).

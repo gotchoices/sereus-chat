@@ -11,7 +11,7 @@ Preconditions: locale=en, variant=happy
 - Narrative:
   - Alex opens the Invite screen and sees a deep link token plus a toggle for QR.
   - He copies the link to the clipboard to share by text later.
-- Screenshot: `design/generated/images/invitation-generator.png`
+- [![invitation-generator](../images/invitation-generator.png)](chat://invite?variant=happy&locale=en&scenario=invite-1)
 
 ## Alternates and Errors
 - Alternate (QR emphasis): Leave “Include QR” on to show a scannable code for in-person sharing.

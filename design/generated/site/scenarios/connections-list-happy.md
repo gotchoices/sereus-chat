@@ -11,7 +11,7 @@ Preconditions: locale=en, variant=happy (sample hebras present)
 - Narrative:
   - Alex sees a list of existing hebras, sorted by recent activity.
   - He spots Susan’s strand and intends to open it.
-- Screenshot: `design/generated/images/connections-list-happy.png`
+- [![connections-list-happy](../images/connections-list-happy.png)](chat://connections?variant=happy&locale=en&scenario=home-happy-1)
 
 ## Alternates and Errors
 - Alternate (search entry): Use `chat://search?locale=en&scenario=home-search` to discover via search instead of the list.

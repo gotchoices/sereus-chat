@@ -11,7 +11,7 @@ Preconditions: locale=en, variant=empty (no strands)
 - Narrative:
   - Alex opens the app for the first time and sees that there are no hebras yet.
   - The empty-state text suggests inviting a friend to get started.
-- Screenshot: `design/generated/images/connections-list-empty.png`
+- [![connections-list-empty](../images/connections-list-empty.png)](chat://connections?variant=empty&locale=en&scenario=home-empty-1)
 
 ## Alternates and Errors
 - Alternate (locale=es): Use `chat://connections?variant=empty&locale=es&scenario=home-empty-1` to verify localized copy and layout.

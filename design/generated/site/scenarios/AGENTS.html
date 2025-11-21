@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AGENTS</title>
+  <style>
+    body { margin: 20px; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #222; }
+    a { color: #0066cc; text-decoration: none; }
+    img { width: 360px; max-width: 100%; height: auto; display: block; margin: 12px auto; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    code, pre { background: #f7f7f7; padding: 2px 4px; border-radius: 4px; }
+    pre { padding: 12px; overflow: auto; }
+    h1,h2,h3 { line-height: 1.25; }
+  </style>
+</head>
+<body>
+  <article>
+    <h1>AI Agent Rules: Scenarios (Appeus)</h1>
+<p>Scenarios are narrative walkthroughs that deep-link into the running app (device/simulator). They live under <code>design/generated/scenarios/</code> and are fully regenerable. They must read like a story for humans — concrete personas and step-by-step visuals — not technical notes.</p>
+<p>Image workflow</p>
+<ul>
+<li>Source of truth is Markdown scenarios; HTML is a publish artifact.</li>
+<li>Use screenshot builders (Android: <code>appeus/scripts/android-screenshot.sh</code>) to capture PNGs for each screen/variant/locale. See <code>appeus/reference/scenarios.md</code>.</li>
+</ul>
+<p>Guidelines (human-first)</p>
+<ul>
+<li>Create one scenario doc per source story (e.g., <code>discovery.md</code>, <code>responding.md</code>) and link the story at the top.</li>
+<li>Maintain <code>design/generated/scenarios/index.md</code> with a reviewer-friendly order (onboarding → invite/accept → chat → search → profile → alternates/errors).</li>
+<li>Avoid technical lingo (“deeplink”, “PNG path”, “variant”) in the narrative. Speak plainly as if guiding a reviewer through the app.</li>
+<li>For each scenario (4–8 steps typical):<ul>
+<li>Each step is 1–3 sentences of narrative (persona intent + what they see/do)</li>
+<li>Include a clickable image (phone-sized) that links to the deep link for that step</li>
+<li>Keep deep-link URLs in link targets, not as inline prose</li>
+<li>Example: <code>[![home-empty](../images/connections-list-empty.png)](app://connections?variant=empty&amp;locale=en&amp;scenario=home-empty-1)</code></li>
+</ul>
+</li>
+<li>Include alternates and error paths if relevant (short sections at the end).</li>
+<li>Keep in sync with current screens, navigation, i18n strings and screenshots.</li>
+</ul>
+<p>How to capture screenshots (Android)</p>
+<ul>
+<li>Use the helper: <code>appeus/scripts/android-screenshot.sh</code></li>
+<li>Example:<ul>
+<li><code>appeus/scripts/android-screenshot.sh --deeplink &quot;chat://connections?variant=happy&amp;locale=en&quot; --output &quot;design/generated/images/connections-list-happy.png&quot; --reuse</code></li>
+</ul>
+</li>
+<li>Defaults:<ul>
+<li>AVD: <code>APPEUS_ANDROID_AVD</code> (default Medium_Phone_API_34)</li>
+<li>App ID: <code>APPEUS_APP_ID</code> (default org.sereus.chat)</li>
+<li>Delay: <code>APPEUS_SCREEN_DELAY</code> (default 3s before capture)</li>
+</ul>
+</li>
+<li>File naming: <code>design/generated/images/&lt;route&gt;[-&lt;variant&gt;[-&lt;locale&gt;]].png</code></li>
+</ul>
+<p>Agent actions (explicit)</p>
+<ul>
+<li>You generate the exact screenshot commands for each scenario step and execute them.</li>
+<li>You ensure the PNGs are written to <code>design/generated/images/</code> with the expected filenames.</li>
+<li>After images are captured, you update/verify the scenario docs and <code>index.md</code> links.</li>
+<li>You prioritize multi-step flows per story over single-screen snapshots. Single-screen docs are optional reference, not the primary artifacts.</li>
+</ul>
+<p>Mock variants</p>
+<ul>
+<li>Prefer <code>?variant=</code> query in deep links for demo data selection. See <code>appeus/reference/mock-variants.md</code>.</li>
+</ul>
+<p>When to regenerate</p>
+<ul>
+<li>After screens, navigation, i18n, or specs change</li>
+<li>After mock variants change (links or visuals)</li>
+</ul>
+<p>Do not</p>
+<ul>
+<li>Don’t reference non-existent screens or routes</li>
+<li>Don’t hand-edit generated scenarios; update stories/specs then regenerate</li>
+</ul>
+<p>Deep-link patterns</p>
+<ul>
+<li>Prefer <code>app://&lt;route&gt;?variant=&lt;name&gt;&amp;locale=&lt;tag&gt;&amp;scenario=&lt;id&gt;</code>; keep parameters stable and documented per screen in the scenario doc.</li>
+</ul>
+<p>Quality checklist</p>
+<ul>
+<li>References source stories at top</li>
+<li>Persona and preconditions are clear</li>
+<li>Each step: narrative + deep-link + screenshot embed</li>
+<li>Includes alternates/errors when applicable</li>
+<li>Index updated to include new docs and order makes sense to a reviewer</li>
+</ul>
+  </article>
+</body>
+</html>

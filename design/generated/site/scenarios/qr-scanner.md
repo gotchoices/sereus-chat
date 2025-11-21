@@ -11,7 +11,7 @@ Preconditions: locale=en
 - Narrative:
   - On simulator, Alex sees the paste field (no live camera).
   - He pastes an invite URL to simulate scanning and proceeds.
-- Screenshot: `design/generated/images/qr-scanner.png`
+- [![qr-scanner](../images/qr-scanner.png)](chat://scan?locale=en&scenario=qr-1)
 
 ## Alternates
 - Device with camera: Use the same deep link on a device to see the live camera overlay.

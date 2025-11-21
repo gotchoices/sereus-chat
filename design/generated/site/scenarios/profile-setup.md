@@ -21,7 +21,7 @@ Preconditions: locale=en, mock mode (read-only persist)
 - Narrative:
   - Taylor opens Profile and reviews the current Name, Email, Phone, and Notes.
   - They edit the Name and adjust Notes.
-- Screenshot: `design/generated/images/profile-setup.png`
+- [![profile-setup](../images/profile-setup.png)](chat://profile?locale=en&scenario=profile-1)
 
 ## Alternates
 - Avatar change triggers the MediaPicker overlay; for now, this is a placeholder.

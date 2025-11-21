@@ -22,6 +22,6 @@ Preconditions: locale=en, variant=happy, strandId=t-susan
 - Narrative:
   - Alice reviews the latest messages from Susan; contiguous bubbles group by sender.
   - She types a brief reply and taps Send; the message appears as an outgoing bubble.
-- Screenshot: `design/generated/images/chat-interface-happy.png`
+- [![chat-interface-happy](../images/chat-interface-happy.png)](chat://chat/t-susan?variant=happy&locale=en&scenario=chat-happy-1)
 
 

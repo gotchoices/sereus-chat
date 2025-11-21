@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>search-interface</title>
+  <style>
+    body { margin: 20px; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #222; }
+    a { color: #0066cc; text-decoration: none; }
+    img { width: 360px; max-width: 100%; height: auto; display: block; margin: 12px auto; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    code, pre { background: #f7f7f7; padding: 2px 4px; border-radius: 4px; }
+    pre { padding: 12px; overflow: auto; }
+    h1,h2,h3 { line-height: 1.25; }
+  </style>
+</head>
+<body>
+  <article>
+    <h1>Scenarios: Search</h1>
+<p>Based on: <code>design/stories/searching-messages.md</code></p>
+<p>Persona: Alex (returning user)<br>Preconditions: locale=en</p>
+<h2>Scenario 1: Search across strands</h2>
+<ul>
+<li>Intent: Find an existing conversation by name</li>
+<li>Deep link: <code>chat://search?locale=en&amp;scenario=search-1</code></li>
+<li>Narrative:<ul>
+<li>Alex types “Susan” and sees the corresponding strand in results.</li>
+<li>He taps the result to navigate to the conversation.</li>
+</ul>
+</li>
+<li><a href="chat://search?locale=en&scenario=search-1"><img src="../images/search-interface.png" alt="search-interface"></a></li>
+</ul>
+<p>Notes:</p>
+<ul>
+<li>Results should include names and last preview; tapping opens ChatInterface.</li>
+</ul>
+<h1>Scenario: SearchInterface (EN)</h1>
+<p>Deep link:</p>
+<p><code>chat://search?locale=en</code></p>
+<p>Screenshot:</p>
+<p><code>design/generated/images/search-interface.png</code> (to be captured)</p>
+<p>Notes:</p>
+<ul>
+<li>Typing in the search field shows mock results over strands; tapping navigates to ChatInterface.</li>
+</ul>
+  </article>
+</body>
+</html>
