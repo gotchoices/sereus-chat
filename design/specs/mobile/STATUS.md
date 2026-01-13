@@ -1,30 +1,34 @@
-# Target STATUS (phase checklist)
-
-This file tracks progress for a single app target (`<target>`). It is meant to be updated by the human (with agent assistance).
-
-Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
+# Target STATUS: mobile
 
 ## Bootstrap / Discovery (shared)
-- [ ] `design/specs/project.md` is complete enough to proceed
+- [x] `design/specs/project.md` complete
 
-## Story Generation (this target)
-- [ ] Stories exist under `design/stories/<target>/` and describe the intended experience
+## Story Generation (mobile)
+- [x] Stories exist under `design/stories/mobile/`
+- [x] Stories reviewed and STATUS trimmed
 
-## Navigation Planning (this target)
-- [ ] `design/specs/<target>/navigation.md` exists and is reviewed
-- [ ] `design/specs/<target>/screens/index.md` lists the intended screens/routes
+## Navigation Planning (mobile)
+- [x] `design/specs/mobile/navigation.md` exists and reviewed
+- [x] `design/specs/mobile/screens/index.md` lists intended screens
 
 ## Domain Contract (shared)
-- [ ] `design/specs/domain/` is sufficient to support this target’s slices
+- [x] `design/specs/domain/overview.md` covers terminology and data ownership
+- [ ] Additional domain specs as needed (schema, ops, rules)
 
-## Screen/Component Slicing (this target)
-- [ ] Key screens/components have specs under `design/specs/<target>/screens/` and `design/specs/<target>/components/`
-- [ ] Slices are being generated one at a time with test/commit pauses
+## Screen/Component Slicing (mobile)
+- [x] ConnectionsList spec
+- [x] ChatInterface spec
+- [x] InvitationGenerator spec
+- [x] MediaPicker spec
+- [x] ProfileSetup spec
+- [ ] SearchInterface spec
+- [ ] QrScanner spec
+- [ ] VideoCallActive spec
+- [ ] VoiceCallOverlay spec
+- [ ] InvitationAcceptance spec
 
 ## Scenario / Peer Review (optional)
-- [ ] Scenario docs/images exist under `design/generated/<target>/scenarios/` and `design/generated/<target>/images/`
+- [ ] Scenario docs/images under `design/generated/mobile/`
 
-## Final wiring
-- [ ] Production data wiring is implemented and tested
-
-
+## Final Wiring
+- [ ] Production data wiring implemented and tested
