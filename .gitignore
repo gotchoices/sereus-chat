@@ -1,0 +1,28 @@
+# Appeus symlinks (recreate with: path/to/appeus/scripts/init-project.sh)
+appeus
+AGENTS.md
+**/AGENTS.md
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+.svelte-kit/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
