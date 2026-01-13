@@ -1,1 +1,0 @@
-../../appeus/agent-rules/specs.md
