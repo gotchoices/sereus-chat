@@ -1,42 +1,38 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { loadProfile, type Profile } from '../data/profile';
-import { useVariant } from '../mock/VariantContext';
+import { getProfile, saveProfile } from '../data/adapter';
+import type { Profile } from '../data/types';
 
 export default function ProfileSetup() {
   const navigation: any = useNavigation();
-  const { variant, mockMode } = useVariant();
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const [initial, setInitial] = useState<Profile | null>(null);
-  const [allowLeave, setAllowLeave] = useState(false);
-
-  const dirty = false; // read-only in mock/demo mode
 
   useEffect(() => {
     (async () => {
-      const p = await loadProfile(mockMode ? ((variant as 'happy' | 'empty') ?? 'happy') : 'happy');
+      const p = await getProfile();
       if (p) {
         setName(p.name || '');
         setEmail(p.email || '');
         setPhone(p.phone || '');
         setNotes(p.notes || '');
       }
-      setInitial(p || { name: '', email: '', phone: '', notes: '' });
     })();
   }, []);
 
   const onSave = async () => {
-    // No-op save in mock mode; engine will handle persistence later
+    if (!name.trim()) {
+      setError('Name is required');
+      return;
+    }
+    await saveProfile({ name: name.trim(), email, phone, notes });
     navigation.goBack();
   };
-
-  // No discard warning in mock/demo; read-only profile mocks
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -72,7 +68,7 @@ export default function ProfileSetup() {
           style={[styles.input, error ? styles.inputError : null]}
           placeholder="Your name"
           value={name}
-          onChangeText={setName}
+          onChangeText={(t) => { setName(t); setError(null); }}
           accessibilityLabel="Name"
           testID="profile-name"
         />
@@ -142,5 +138,3 @@ const styles = StyleSheet.create({
   notice: { marginTop: 8 },
   noticeText: { color: '#555' },
 });
-
-

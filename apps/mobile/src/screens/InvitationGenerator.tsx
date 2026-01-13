@@ -1,33 +1,46 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, Switch, Platform, ToastAndroid } from 'react-native';
-import { useVariant } from '../mock/VariantContext';
 import { useT } from '../i18n';
+import { createInvitation } from '../data/adapter';
+import type { Invitation } from '../data/types';
 import Clipboard from '@react-native-clipboard/clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 export default function InvitationGenerator() {
   const t = useT();
-  const { variant, mockMode } = useVariant();
   const [includeQR, setIncludeQR] = useState(true);
+  const [invitation, setInvitation] = useState<Invitation | null>(null);
   const qrRef = useRef<QRCode | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const inv = await createInvitation();
+      setInvitation(inv);
+    })();
+  }, []);
+
   const inviteLink = useMemo(() => {
-    const token = Math.random().toString(36).slice(2, 10);
-    const v = mockMode && variant ? `?variant=${encodeURIComponent(variant)}` : '';
-    return `chat://invite/${token}${v}`;
-  }, [variant, mockMode]);
+    if (!invitation) return '';
+    return `sereus://invite/${invitation.token}`;
+  }, [invitation]);
+
+  const onRegenerate = async () => {
+    const inv = await createInvitation();
+    setInvitation(inv);
+  };
 
   const onShare = async () => {
+    if (!inviteLink) return;
     try {
       if (includeQR && qrRef.current && Platform.OS === 'ios') {
-        // iOS Share can use URL; base64 image sharing is limited – include link + note
         await Share.share({
-          message: `${t('screens.InvitationGenerator.sharePrefix')}: ${inviteLink}\n(${t('screens.InvitationGenerator.scanQRIfVisible')})`,
+          message: `${t('screens.InvitationGenerator.sharePrefix', 'Join me on Sereus Chat')}: ${inviteLink}\n(${t('screens.InvitationGenerator.scanQRIfVisible', 'Scan QR if visible')})`,
           url: undefined,
         });
       } else {
         await Share.share({
-          message: `${t('screens.InvitationGenerator.sharePrefix')}: ${inviteLink}`,
+          message: `${t('screens.InvitationGenerator.sharePrefix', 'Join me on Sereus Chat')}: ${inviteLink}`,
         });
       }
     } catch {}
@@ -35,9 +48,10 @@ export default function InvitationGenerator() {
 
   const [toastVisible, setToastVisible] = useState(false);
   const onCopy = () => {
+    if (!inviteLink) return;
     Clipboard.setString(inviteLink);
     if (Platform.OS === 'android') {
-      ToastAndroid.show(t('screens.InvitationGenerator.toastCopied'), ToastAndroid.SHORT);
+      ToastAndroid.show(t('screens.InvitationGenerator.toastCopied', 'Copied'), ToastAndroid.SHORT);
     } else {
       setToastVisible(true);
       setTimeout(() => setToastVisible(false), 1200);
@@ -47,20 +61,20 @@ export default function InvitationGenerator() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{t('screens.InvitationGenerator.title')}</Text>
+      <Text style={styles.title}>{t('screens.InvitationGenerator.title', 'Invite Friends')}</Text>
       <View style={styles.card}>
-        <Text style={styles.label}>{t('screens.InvitationGenerator.labelLink')}</Text>
+        <Text style={styles.label}>{t('screens.InvitationGenerator.labelLink', 'Invitation Link')}</Text>
         <View style={styles.linkRow}>
-          <Text selectable style={styles.link} numberOfLines={1} ellipsizeMode="middle" testID="invite-link">{inviteLink}</Text>
+          <Text selectable style={styles.link} numberOfLines={1} ellipsizeMode="middle" testID="invite-link">{inviteLink || 'Generating...'}</Text>
           <TouchableOpacity onPress={onCopy} accessibilityLabel="Copy link" testID="invite-copy" style={styles.copyBtn}>
             <Ionicons name="copy-outline" size={18} color="#0066cc" />
           </TouchableOpacity>
         </View>
         <View style={styles.toggleRow}>
           <Switch value={includeQR} onValueChange={setIncludeQR} />
-          <Text style={styles.toggleLabel}>{t('screens.InvitationGenerator.includeQR')}</Text>
+          <Text style={styles.toggleLabel}>{t('screens.InvitationGenerator.includeQR', 'Include QR')}</Text>
         </View>
-        {includeQR && (
+        {includeQR && inviteLink ? (
           <View style={styles.qrBox} accessible accessibilityLabel="Invitation QR code">
             <QRCode
               value={inviteLink}
@@ -70,14 +84,20 @@ export default function InvitationGenerator() {
               getRef={(c) => (qrRef.current = c)}
             />
           </View>
-        )}
-        <TouchableOpacity style={styles.shareBtn} onPress={onShare} accessibilityLabel="Share invite" testID="invite-share">
-          <Ionicons name={shareIcon} size={20} color="#fff" />
-        </TouchableOpacity>
+        ) : null}
+        <View style={styles.btnRow}>
+          <TouchableOpacity style={styles.shareBtn} onPress={onShare} accessibilityLabel="Share invite" testID="invite-share">
+            <Ionicons name={shareIcon} size={20} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.regenBtn} onPress={onRegenerate} accessibilityLabel="Regenerate" testID="invite-regen">
+            <Ionicons name="refresh-outline" size={18} color="#0066cc" />
+            <Text style={styles.regenText}>{t('screens.InvitationGenerator.regenerate', 'Regenerate')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       {toastVisible && (
         <View style={styles.toast} accessibilityLabel="Toast">
-          <Text style={styles.toastText}>{t('screens.InvitationGenerator.toastCopied')}</Text>
+          <Text style={styles.toastText}>{t('screens.InvitationGenerator.toastCopied', 'Copied')}</Text>
         </View>
       )}
     </View>
@@ -95,7 +115,10 @@ const styles = StyleSheet.create({
   toggleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 8 },
   toggleLabel: { marginLeft: 8 },
   qrBox: { alignItems: 'center', marginTop: 8, marginBottom: 8 },
-  shareBtn: { alignSelf: 'flex-start', marginTop: 12, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#0066cc', borderRadius: 6 },
+  btnRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 12 },
+  shareBtn: { paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#0066cc', borderRadius: 6 },
+  regenBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#0066cc', borderRadius: 6 },
+  regenText: { marginLeft: 6, color: '#0066cc' },
   toast: {
     position: 'absolute',
     bottom: 24,
@@ -112,5 +135,3 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   }
 });
-
-

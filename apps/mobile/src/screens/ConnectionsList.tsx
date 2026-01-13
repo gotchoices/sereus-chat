@@ -2,22 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
-import { useVariant } from '../mock/VariantContext';
-import { listStrands, type StrandSummary } from '../data/strands';
+import { listStrands } from '../data/adapter';
+import type { StrandSummary } from '../data/types';
 import { useT } from '../i18n';
-
-type Variant = 'happy' | 'empty' | 'error';
 
 export default function ConnectionsList() {
   const navigation: any = useNavigation();
-  const { mockMode, variant } = useVariant();
   const t = useT();
   const [threads, setThreads] = useState<StrandSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sortMode, setSortMode] = useState<'recent' | 'alpha' | 'unread'>('recent');
-
-  const activeVariant: Variant = (mockMode ? (variant as Variant) : 'happy');
 
   const applySort = (items: StrandSummary[]) => {
     const copy = [...items];
@@ -35,33 +30,28 @@ export default function ConnectionsList() {
     return copy;
   };
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await listStrands(activeVariant);
-        setThreads(applySort(data));
-      } catch (e: any) {
-        setError(e?.message || 'Failed to load strands');
-      }
-    })();
-  }, [sortMode, activeVariant]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
+  const loadData = async () => {
     try {
-      const data = await listStrands(activeVariant);
+      const data = await listStrands();
       setThreads(applySort(data));
       setError(null);
     } catch (e: any) {
       setError(e?.message || 'Failed to load strands');
-    } finally {
-      setRefreshing(false);
     }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [sortMode]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
   };
 
   return (
     <View style={styles.container}>
-      {/* Title uses navigator header; no duplicate in content */}
       <View style={styles.controls}>
         <View style={styles.row}>
           <TouchableOpacity style={[styles.iconButton, styles.flex1]} onPress={() => { navigation.navigate('SearchInterface'); }}>
@@ -157,5 +147,3 @@ const styles = StyleSheet.create({
   badge: { backgroundColor: '#e33', borderRadius: 10, minWidth: 20, paddingHorizontal: 6, paddingVertical: 2, alignItems: 'center' },
   badgeText: { color: 'white', fontSize: 12 }
 });
-
-

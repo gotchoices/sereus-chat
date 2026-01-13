@@ -1,33 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useVariant } from '../mock/VariantContext';
-import { listStrands, type StrandSummary } from '../data/strands';
+import { searchStrands } from '../data/adapter';
+import type { StrandSummary } from '../data/types';
 
 export default function SearchInterface() {
   const navigation: any = useNavigation();
-  const { mockMode, variant } = useVariant();
   const [query, setQuery] = useState<string>('');
-  const [all, setAll] = useState<StrandSummary[]>([]);
-
-  const activeVariant: 'happy' | 'empty' | 'error' = mockMode ? (variant as any) ?? 'happy' : 'happy';
+  const [results, setResults] = useState<StrandSummary[]>([]);
 
   useEffect(() => {
-    (async () => {
-      const data = await listStrands(activeVariant);
-      setAll(data);
-    })();
-  }, [activeVariant]);
-
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return all;
-    return all.filter(item => {
-      const name = item.displayName.toLowerCase();
-      const preview = (item.lastMessage?.previewText || '').toLowerCase();
-      return name.includes(q) || preview.includes(q);
-    });
-  }, [query, all]);
+    const timeout = setTimeout(async () => {
+      const data = await searchStrands(query);
+      setResults(data);
+    }, 300); // debounce
+    return () => clearTimeout(timeout);
+  }, [query]);
 
   return (
     <View style={styles.container}>
@@ -104,4 +92,3 @@ const styles = StyleSheet.create({
   name: { fontSize: 16, fontWeight: '500' },
   preview: { color: '#666', marginTop: 4 },
 });
-

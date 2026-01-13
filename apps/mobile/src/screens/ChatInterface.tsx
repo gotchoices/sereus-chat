@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
-import { useVariant } from '../mock/VariantContext';
-import { listMessages, type ChatMessage } from '../data/messages';
+import { listMessages } from '../data/adapter';
+import type { ChatMessage } from '../data/types';
 import { useT } from '../i18n';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { consumePendingAttachment, type ProvisionalAttachment } from '../data/attachmentDraft';
+import { consumePendingAttachment } from '../data/attachmentDraft';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { showToast } from '../ui/toast';
 
@@ -13,7 +13,6 @@ export default function ChatInterface() {
   const route: any = useRoute();
   const navigation: any = useNavigation();
   const strandId: string | undefined = route?.params?.strandId;
-  const { mockMode, variant } = useVariant();
   const t = useT();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState<string>('');
@@ -25,11 +24,10 @@ export default function ChatInterface() {
 
   useEffect(() => {
     (async () => {
-      const active = mockMode ? (variant as 'happy' | 'empty' | 'error') : 'happy';
-      const data = await listMessages(strandId || 't-susan', active);
+      const data = await listMessages(strandId || 't-susan');
       setMessages(data);
     })();
-  }, [strandId, mockMode, variant]);
+  }, [strandId]);
 
   const canSend = useMemo(() => text.trim().length > 0 || attachments.length > 0, [text, attachments]);
   const isEditing = editingId != null;
@@ -92,7 +90,6 @@ export default function ChatInterface() {
     setEditingOriginalText('');
   };
 
-  // Consume pending attachment when screen gains focus
   useFocusEffect(
     React.useCallback(() => {
       const att = consumePendingAttachment();
@@ -104,7 +101,6 @@ export default function ChatInterface() {
 
   return (
     <View style={styles.container}>
-      {/* Consume any pending attachment from MediaPicker when focused */}
       {messages.length === 0 ? (
         <View style={styles.empty} testID="chat-empty"><Text>{t('screens.chat.empty', 'No messages yet. Say hello!')}</Text></View>
       ) : (
@@ -220,7 +216,6 @@ export default function ChatInterface() {
           keyboardShouldPersistTaps="handled"
         />
       )}
-      {/* Provisional attachments strip */}
       {attachments.length > 0 && (
         <View style={styles.attachStrip}>
           <FlatList
@@ -239,7 +234,6 @@ export default function ChatInterface() {
           />
         </View>
       )}
-      {/* Composer */}
       <View style={styles.composer}>
         <TouchableOpacity
           style={styles.composeButton}
@@ -335,5 +329,3 @@ const styles = StyleSheet.create({
   composeIconBtn: { padding: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
   saveBtn: { backgroundColor: '#2e7d32' }
 });
-
-

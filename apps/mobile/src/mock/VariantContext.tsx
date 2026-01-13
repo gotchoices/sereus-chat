@@ -1,15 +1,15 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Linking } from 'react-native';
-import { mockMode, type Variant } from './config';
+import { setMockVariant } from '../data/adapters/mock';
+
+export type Variant = 'happy' | 'empty' | 'error' | string;
 
 type VariantContextValue = {
-  mockMode: boolean;
   variant: Variant;
   setVariant: (v: Variant) => void;
 };
 
 const VariantContext = createContext<VariantContextValue>({
-  mockMode,
   variant: 'happy',
   setVariant: () => {},
 });
@@ -27,7 +27,18 @@ function parseVariantFromUrl(url: string | null): Variant | null {
 }
 
 export function VariantProvider({ children }: { children: React.ReactNode }) {
-  const [variant, setVariant] = useState<Variant>('happy');
+  const [variant, setVariantState] = useState<Variant>('happy');
+
+  // Sync variant to mock adapter whenever it changes
+  const setVariant = (v: Variant) => {
+    setVariantState(v);
+    setMockVariant(v);
+  };
+
+  useEffect(() => {
+    // Set initial variant in adapter
+    setMockVariant(variant);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -49,12 +60,10 @@ export function VariantProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const value = useMemo(() => ({ mockMode, variant, setVariant }), [variant]);
+  const value = useMemo(() => ({ variant, setVariant }), [variant]);
   return <VariantContext.Provider value={value}>{children}</VariantContext.Provider>;
 }
 
 export function useVariant() {
   return useContext(VariantContext);
 }
-
-
