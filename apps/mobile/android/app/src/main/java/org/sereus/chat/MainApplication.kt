@@ -1,4 +1,4 @@
-package com.mobile
+package org.sereus.chat
 
 import android.app.Application
 import com.facebook.react.PackageList

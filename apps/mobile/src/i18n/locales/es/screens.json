@@ -1,0 +1,47 @@
+{
+  "connections": {
+    "title": "Sereus Chat",
+    "empty": "No hay hebras todavía. Invita a un amigo para empezar."
+  },
+  "InvitationAcceptance": {
+    "title": "Aceptar invitación",
+    "summary": "Acepta la invitación para conectar y comenzar una hebra.",
+    "token": "Token",
+    "join": "Unirse",
+    "cancel": "Cancelar"
+  },
+  "chat": {
+    "title": "Chat",
+    "empty": "No hay mensajes todavía. ¡Saluda!",
+    "composerPlaceholder": "Mensaje",
+    "attach": "Adjuntar",
+    "record": "Grabar",
+    "send": "Enviar",
+    "editingTitle": "Editando",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "menu": {
+      "reply": "Responder",
+      "copy": "Copiar",
+      "delete": "Eliminar",
+      "edit": "Editar"
+    }
+  },
+  "InvitationGenerator": {
+    "title": "Invitar amigos",
+    "labelLink": "Enlace de invitación",
+    "includeQR": "Incluir QR",
+    "sharePrefix": "Únete conmigo en Sereus Chat",
+    "scanQRIfVisible": "Escanea el QR si está visible",
+    "toastCopied": "Copiado"
+  },
+  "QrScanner": {
+    "title": "Escanear QR",
+    "simulatorNote": "Cámara no disponible en el simulador. Pega un enlace abajo.",
+    "pasteLabel": "Pegar enlace de invitación",
+    "pastePlaceholder": "sereus://invite/abc123?variant=happy",
+    "open": "Abrir"
+  }
+}
+
+

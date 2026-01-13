@@ -1,0 +1,47 @@
+{
+  "connections": {
+    "title": "Sereus Chat",
+    "empty": "No strands yet. Invite a friend to start a strand."
+  },
+  "InvitationAcceptance": {
+    "title": "Accept Invitation",
+    "summary": "Accept invitation to connect and start a strand.",
+    "token": "Token",
+    "join": "Join",
+    "cancel": "Cancel"
+  },
+  "chat": {
+    "title": "Chat",
+    "empty": "No messages yet. Say hello!",
+    "composerPlaceholder": "Message",
+    "attach": "Attach",
+    "record": "Record",
+    "send": "Send",
+    "editingTitle": "Editing",
+    "cancel": "Cancel",
+    "save": "Save",
+    "menu": {
+      "reply": "Reply",
+      "copy": "Copy",
+      "delete": "Delete",
+      "edit": "Edit"
+    }
+  },
+  "InvitationGenerator": {
+    "title": "Invite Friends",
+    "labelLink": "Invitation Link",
+    "includeQR": "Include QR",
+    "sharePrefix": "Join me on Sereus Chat",
+    "scanQRIfVisible": "Scan the QR if visible",
+    "toastCopied": "Copied"
+  },
+  "QrScanner": {
+    "title": "Scan QR",
+    "simulatorNote": "Camera not available in simulator. Paste an invite link below.",
+    "pasteLabel": "Paste invite link",
+    "pastePlaceholder": "sereus://invite/abc123?variant=happy",
+    "open": "Open"
+  }
+}
+
+
