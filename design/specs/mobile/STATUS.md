@@ -43,6 +43,20 @@
 
 ### Quereus Integration
 
+#### Schema & Foundation
+- [ ] Build Quereus SQL schema file from `specs/domain/schema.md`
+- [ ] Coordinate with Sereus core cadre management schema
+- [ ] Define migration strategy? (versioned schema changes)
+- [ ] Quereus TypeScript bindings / FFI bridge
+- [ ] React Native native module setup (iOS + Android)
+
+#### Cadre Management UI
+- [ ] Story for cadre management (add to `stories/mobile/STATUS.md` future)
+- [ ] Screen spec for CadreManagement (devices list, add/remove)
+- [ ] Entry point from Profile screen (or Settings)
+- [ ] Show cadre status indicator (synced, syncing, offline)
+- [ ] QR/deep link to invite device to cadre
+
 #### quereus-memory (in-memory, ephemeral)
 - [ ] Integrate Quereus memory module
 - [ ] Implement `listStrands()` via SQL
