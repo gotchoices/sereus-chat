@@ -1,7 +1,9 @@
-// Data adapter interface - all backends implement this contract
-// See specs/domain/ops.md for operation semantics
+// Data adapter interface — all backends implement this contract.
+// See design/specs/domain/ops.md for operation semantics and
+// design/specs/domain/interfaces.md for the operation→sereus mapping.
 
 import type { Profile, StrandSummary, ChatMessage, Invitation } from './types';
+import { USE_SEREUS } from './config';
 
 export interface DataAdapter {
   // Strands
@@ -18,78 +20,49 @@ export interface DataAdapter {
   acceptInvitation(token: string): Promise<{ strandId: string }>;
 }
 
-// Backend mode from environment or build config
-export type BackendMode = 'mock' | 'quereus-memory' | 'quereus-store' | 'quereus-sync' | 'quereus-optimystic';
-
 let currentAdapter: DataAdapter | null = null;
-let currentMode: BackendMode = 'mock';
 
-export function getBackendMode(): BackendMode {
-  return currentMode;
-}
-
-export function setBackendMode(mode: BackendMode): void {
-  currentMode = mode;
-  currentAdapter = null; // Force re-creation
+async function createAdapter(): Promise<DataAdapter> {
+  if (USE_SEREUS) {
+    const { SereusAdapter } = await import('./adapters/sereus');
+    return new SereusAdapter();
+  }
+  const { MockAdapter } = await import('./adapters/mock');
+  return new MockAdapter();
 }
 
 export async function getAdapter(): Promise<DataAdapter> {
-  if (currentAdapter) return currentAdapter;
-
-  switch (currentMode) {
-    case 'mock': {
-      const { MockAdapter } = await import('./adapters/mock');
-      currentAdapter = new MockAdapter();
-      break;
-    }
-    case 'quereus-memory':
-    case 'quereus-store':
-    case 'quereus-sync':
-    case 'quereus-optimystic': {
-      const { QuereusAdapter } = await import('./adapters/quereus');
-      currentAdapter = new QuereusAdapter(currentMode);
-      break;
-    }
-    default:
-      throw new Error(`Unknown backend mode: ${currentMode}`);
+  if (!currentAdapter) {
+    currentAdapter = await createAdapter();
   }
-
   return currentAdapter;
 }
 
 // Convenience functions that use the current adapter
 export async function listStrands(): Promise<StrandSummary[]> {
-  const adapter = await getAdapter();
-  return adapter.listStrands();
+  return (await getAdapter()).listStrands();
 }
 
 export async function listMessages(strandId: string): Promise<ChatMessage[]> {
-  const adapter = await getAdapter();
-  return adapter.listMessages(strandId);
+  return (await getAdapter()).listMessages(strandId);
 }
 
 export async function searchStrands(query: string): Promise<StrandSummary[]> {
-  const adapter = await getAdapter();
-  return adapter.searchStrands(query);
+  return (await getAdapter()).searchStrands(query);
 }
 
 export async function getProfile(): Promise<Profile> {
-  const adapter = await getAdapter();
-  return adapter.getProfile();
+  return (await getAdapter()).getProfile();
 }
 
 export async function saveProfile(profile: Profile): Promise<void> {
-  const adapter = await getAdapter();
-  return adapter.saveProfile(profile);
+  return (await getAdapter()).saveProfile(profile);
 }
 
 export async function createInvitation(): Promise<Invitation> {
-  const adapter = await getAdapter();
-  return adapter.createInvitation();
+  return (await getAdapter()).createInvitation();
 }
 
 export async function acceptInvitation(token: string): Promise<{ strandId: string }> {
-  const adapter = await getAdapter();
-  return adapter.acceptInvitation(token);
+  return (await getAdapter()).acceptInvitation(token);
 }
-

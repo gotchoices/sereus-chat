@@ -1,18 +1,17 @@
-// Quereus adapter stub - SQL backend via Quereus
-// See specs/domain/interfaces.md and specs/domain/schema.md
+// Sereus adapter — talks to the live cadre stack (CadreNode → strand Quereus DB).
+// Stub for now; wired up when the cadre layer (src/cadre/) lands.
+// See design/specs/domain/interfaces.md for the operation→sereus mapping
+// and design/specs/domain/sereus.md for the integration boundary.
 
-import type { DataAdapter, BackendMode } from '../adapter';
+import type { DataAdapter } from '../adapter';
 import type { Profile, StrandSummary, ChatMessage, Invitation } from '../types';
 
-export class QuereusAdapter implements DataAdapter {
-  private mode: BackendMode;
-
-  constructor(mode: BackendMode) {
-    this.mode = mode;
-  }
-
+export class SereusAdapter implements DataAdapter {
   private notImplemented(op: string): never {
-    throw new Error(`QuereusAdapter.${op} not implemented (mode: ${this.mode})`);
+    throw new Error(
+      `SereusAdapter.${op} not implemented — cadre layer not yet wired. ` +
+        `Set USE_SEREUS = false in src/data/config.ts to fall back to mocks.`,
+    );
   }
 
   async listStrands(): Promise<StrandSummary[]> {
@@ -43,4 +42,3 @@ export class QuereusAdapter implements DataAdapter {
     this.notImplemented('acceptInvitation');
   }
 }
-
