@@ -19,13 +19,6 @@
 - [x] `design/specs/domain/sereus.md` — integration boundary, cadre lifecycle, cadre-vs-chat code split, pending decisions
 - [ ] `design/specs/domain/rules.md` — validation, permissions (as needed)
 
-## Project-Level Decisions (pending)
-
-These are open and affect specs/code below. Capture in `design/specs/project.md` once decided. Until then, screens and adapters assume the simpler option (matches sereus reference app).
-
-- [ ] **Strand type**: open (`'o'`) or closed (`'c'`)? Stories ("invitation-only," "trusted peers") imply closed; reference app uses open. Closed adds sereus-managed membership/invite tables and changes the formation flow.
-- [ ] **Drone strategy**: no drone / user-provided / provider-hosted? Determines availability story and what the cadre/connections screens must support.
-
 ## Screen/Component Slicing (mobile)
 
 ### Chat surface
@@ -58,9 +51,9 @@ These are open and affect specs/code below. Capture in `design/specs/project.md`
 - [x] Screens refactored to use adapter (no variant params)
 - [ ] Adapter modes aligned with `interfaces.md` configuration axes (source / profile / storage / filter / bootstrap) — current `BackendMode` enum is obsolete
 
-### Cadre Layer (target: `src/cadre/`, future `@sereus/cadre-engine` + `@sereus/cadre-rn-ui`)
+### Cadre Layer (target: `src/cadre/`, future `@sereus/cadre-rn-ui` UI bundle)
 
-Must compile against `@sereus/cadre-core` with no chat-specific imports.
+Must compile against `@sereus/cadre-core` with no chat-specific imports. Must support every cadre/strand option sereus exposes (open and closed strands, any node type, any count).
 
 #### Foundation
 - [ ] CadreService singleton wrapping `CadreNode` (model on `ser/health/apps/mobile/src/services/CadreService.ts`)
