@@ -8723,7 +8723,6 @@ __metadata:
     "@babel/core": "npm:^7.25.2"
     "@babel/preset-env": "npm:^7.25.3"
     "@babel/runtime": "npm:^7.25.0"
-    "@libp2p/circuit-relay-v2": "npm:^4.1.3"
     "@libp2p/websockets": "npm:^10.1.3"
     "@noble/hashes": "npm:^2.0.0"
     "@optimystic/db-core": "portal:../../../optimystic/packages/db-core"

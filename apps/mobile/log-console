@@ -1,0 +1,5 @@
+#!/bin/bash
+# Watch android emulator logs and write them to a file (for AI parsing)
+
+adb logcat -c
+adb logcat "*:S" ReactNativeJS:V | tee tmp/console.log
