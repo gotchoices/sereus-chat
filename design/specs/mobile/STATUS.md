@@ -13,12 +13,22 @@
 
 ## Domain Contract (shared)
 - [x] `design/specs/domain/overview.md` — terminology and data ownership
-- [x] `design/specs/domain/schema.md` — SQL data model
+- [x] `design/specs/domain/schema.md` — local profile + per-strand chat sApp schema (sereus-owned data excluded)
 - [x] `design/specs/domain/ops.md` — domain operations
-- [x] `design/specs/domain/interfaces.md` — backend modes and adapter contract
+- [x] `design/specs/domain/interfaces.md` — operation→sereus mapping, configuration axes, RN platform gate
+- [x] `design/specs/domain/sereus.md` — integration boundary, cadre lifecycle, cadre-vs-chat code split, pending decisions
 - [ ] `design/specs/domain/rules.md` — validation, permissions (as needed)
 
+## Project-Level Decisions (pending)
+
+These are open and affect specs/code below. Capture in `design/specs/project.md` once decided. Until then, screens and adapters assume the simpler option (matches sereus reference app).
+
+- [ ] **Strand type**: open (`'o'`) or closed (`'c'`)? Stories ("invitation-only," "trusted peers") imply closed; reference app uses open. Closed adds sereus-managed membership/invite tables and changes the formation flow.
+- [ ] **Drone strategy**: no drone / user-provided / provider-hosted? Determines availability story and what the cadre/connections screens must support.
+
 ## Screen/Component Slicing (mobile)
+
+### Chat surface
 - [x] ConnectionsList spec
 - [x] ChatInterface spec
 - [x] InvitationGenerator spec
@@ -30,6 +40,12 @@
 - [ ] VoiceCallOverlay spec
 - [ ] InvitationAcceptance spec
 
+### Cadre surface (target for upstream extraction — keep chat-free)
+- [ ] CadreConnections spec (party id, my keys, my nodes, strand guests) — align with `ser/health/apps/mobile`
+- [ ] AddNode spec (phone↔drone, scan QR/link, dial)
+- [ ] AddGuest spec (open invitation creation, share via QR / deep link)
+- [ ] KeyManagement spec (vault, external, dongle-future)
+
 ## Scenario / Peer Review (optional)
 - [ ] Scenario docs/images under `design/generated/mobile/`
 
@@ -40,74 +56,65 @@
 - [x] MockAdapter implemented with variant support
 - [x] QuereusAdapter stub created
 - [x] Screens refactored to use adapter (no variant params)
+- [ ] Adapter modes aligned with `interfaces.md` configuration axes (source / profile / storage / filter / bootstrap) — current `BackendMode` enum is obsolete
 
-### Quereus Integration
+### Cadre Layer (target: `src/cadre/`, future `@sereus/cadre-engine` + `@sereus/cadre-rn-ui`)
 
-#### Schema & Foundation
-- [ ] Build Quereus SQL schema file from `specs/domain/schema.md`
-- [ ] Coordinate with Sereus core cadre management schema
-- [ ] Define migration strategy? (versioned schema changes)
-- [ ] Quereus TypeScript bindings / FFI bridge
-- [ ] React Native native module setup (iOS + Android)
+Must compile against `@sereus/cadre-core` with no chat-specific imports.
 
-#### Cadre Management UI
-- [ ] Story for cadre management (add to `stories/mobile/STATUS.md` future)
-- [ ] Screen spec for CadreManagement (devices list, add/remove)
-- [ ] Entry point from Profile screen (or Settings)
-- [ ] Show cadre status indicator (synced, syncing, offline)
-- [ ] QR/deep link to invite device to cadre
+#### Foundation
+- [ ] CadreService singleton wrapping `CadreNode` (model on `ser/health/apps/mobile/src/services/CadreService.ts`)
+- [ ] Peer identity persistence (Ed25519, MMKV / LevelDB-RN)
+- [ ] Party ID auto-generation + persistence
+- [ ] RN polyfills + Metro config (mirror `sereus/packages/reference-app-rn`)
+- [ ] Storage provider wiring (LevelDB-RN per strand, including `'control'`)
 
-#### quereus-memory (in-memory, ephemeral)
-- [ ] Integrate Quereus memory module
-- [ ] Implement `listStrands()` via SQL
-- [ ] Implement `listMessages()` via SQL
-- [ ] Implement `getProfile()` / `saveProfile()` via SQL
-- [ ] Implement `createInvitation()` / `acceptInvitation()`
-- [ ] Verify data clears on app restart
+#### Solo phase (no networking)
+- [ ] Start CadreNode in transaction profile, solo mode
+- [ ] Create local chat strand via `addStrand({ mode: 'bootstrap', strandRow, sAppConfig })`
+- [ ] Read/write strand DB end-to-end with zero peers
 
-#### quereus-store (persistent, single node)
-- [ ] Integrate Quereus store module
-- [ ] Verify schema migrations work
-- [ ] Verify data persists across app restarts
-- [ ] Profile edits persist locally
-- [ ] Messages persist locally
+#### First remote node
+- [ ] Authority key generation (vault storage; Keychain/Keystore)
+- [ ] Register self in `CadreControl.CadrePeer`
+- [ ] Add drone via `createSeed()` → deliver → dial
+- [ ] Add server-then-phone via QR/link → dial
+- [ ] Restart strand in networked mode (vs bootstrap) when first peer attached
+- [ ] CadreConnections / AddNode screens wired to live control DB
 
-#### quereus-sync (persistent, cadre sync)
-- [ ] Integrate Quereus sync module
-- [ ] Can add device to cadre (phone ↔ desktop)
-- [ ] Profile syncs across cadre devices
-- [ ] Pending messages sync when devices reconnect
+#### First partner (strand formation)
+- [ ] Generate `OpenInvitation` for a chat strand (sAppId = `org.sereus.chat`)
+- [ ] Share invitation via QR + deep link
+- [ ] Accept incoming invitation: `formStrand(token, disclosure)` → `registerMember(...)`
+- [ ] Cross-party strand appears in Control DB on both sides, joined automatically
+- [ ] AddGuest / InvitationAcceptance / QrScanner screens wired
 
-#### quereus-optimystic (full DHT distributed)
-- [ ] Integrate Optimystic module
-- [ ] **Cadre operations**
-  - [ ] Can invite device to cadre (QR/deep link)
-  - [ ] Can accept cadre invitation
-  - [ ] Cadre devices discover each other
-- [ ] **Partner operations**
-  - [ ] Can generate strand invitation
-  - [ ] Partner can accept invitation
-  - [ ] Strand established between cadres
-- [ ] **Messaging**
-  - [ ] Can send message to strand
-  - [ ] Partner receives message
-  - [ ] Messages replicate across strand cohort
-  - [ ] Offline messages queue and sync
-- [ ] **Attachments**
-  - [ ] Can send image/file attachment
-  - [ ] Attachment replicates to partner
-- [ ] **Calls (future)**
-  - [ ] Voice call signaling via strand
-  - [ ] Video call signaling via strand
+#### Key flows
+- [ ] Authority key creation (auto on first remote-node add)
+- [ ] External key import (JWK file or QR)
+- [ ] Dongle (future — UI placeholder only)
 
-### Backend Mode Switching
-- [ ] Environment variable `SEREUS_BACKEND` selects mode
-- [ ] Dev build defaults to `mock`
-- [ ] Release build defaults to `quereus-store` or `quereus-optimystic`
-- [ ] Mode switch tested without code changes
+### Chat sApp Wiring
+
+Imports the cadre layer; must not import sereus internals directly.
+
+- [ ] Build chat sApp schema string from `domain/schema.md` (Member, Message, Attachment)
+- [ ] Self-register in `App.Member` on strand attach
+- [ ] `listStrands()` via Control DB query + per-strand metadata
+- [ ] `listMessages(strandId)` via `StrandInstance.database`
+- [ ] `searchStrands(query)` via iteration over attached strand DBs
+- [ ] Send message (insert into `App.Message` with optimistic UI append)
+- [ ] Attachments (insert into `App.Attachment`, blob storage TBD)
+- [ ] Polling loop (~2s) until sereus exposes change subscriptions
+
+### Build Configuration
+- [ ] `source = mock | live` build flag (default mock for dev, live for release)
+- [ ] Live config: `profile = transaction`, storage = LevelDB-RN, strandFilter = `sAppId = 'org.sereus.chat'`
+- [ ] Switch tested without code changes
 
 ### Error Handling & Edge Cases
-- [ ] Network offline → graceful degradation
-- [ ] Quereus errors surface as user-visible messages
-- [ ] Retry logic for transient failures
-- [ ] Conflict resolution for concurrent edits
+- [ ] Cadre not connected → Settings banner with retry
+- [ ] Strand not ready (`status !== 'started'`) → per-strand loading, auto-recover
+- [ ] Cohort offline → inline banner; writes stay local until cohort returns
+- [ ] Invitation invalid / expired → friendly message on acceptance screen
+- [ ] Conflict resolution for concurrent edits (relies on Optimystic semantics)

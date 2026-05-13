@@ -28,6 +28,12 @@ Anyone on a mobile, web or desktop platform who wants to communicate with known,
 
 Each platform will have its own experience but hopefully they will be similar enough that users can easily adapt from one to another.
 
+## Identity (publisher + app id)
+
+- **Publisher id (reverse-DNS domain)**: `org.sereus`
+- **Preferred app name**: `chat`
+- **Default mobile app id (reverse-DNS)**: `org.sereus.chat`
+
 ## Apps
 
 List the apps to be built:

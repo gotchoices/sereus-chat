@@ -1,63 +1,67 @@
 # Schema
 
-Data model for Quereus SQL backend. Mock mode uses equivalent JSON fixtures.
+The chat app owns two pieces of data: device-local profile, and the per-strand chat sApp schema replicated to strand members. Everything else — strand registry, cadre peers, authority keys, invitations — is owned and persisted by sereus and is **not** declared here. See `sereus.md` for the integration boundary and `interfaces.md` for the call mapping.
 
-## Local (device/cadre scope)
+## Local (device only)
 
 ### profile
+
 | Column | Type | Notes |
 |--------|------|-------|
-| id | text | Single row, device identity |
+| id | text | Single row, this device |
 | name | text | Required |
 | email | text | Optional |
 | phone | text | Optional |
 | notes | text | Optional |
 | avatar_uri | text | Local file or blob ref |
 
-## Shared (strand scope)
+Profile is purely device-local (AsyncStorage / MMKV). Sereus's view of identity is the libp2p Peer ID; the chat app surfaces a friendlier name on top.
 
-### strand
+## Per-strand chat sApp schema
+
+Every chat strand carries this schema. Each participant inserts itself into `Member` on first attach — there is no central member list, read everything from the strand database.
+
+### Member
+
 | Column | Type | Notes |
 |--------|------|-------|
-| id | text | Strand identifier |
-| created_at | text | ISO timestamp |
+| Id | text | Peer ID of the participating member |
+| Name | text | Display name |
+| AvatarUri | text | Optional, shared blob ref |
 
-### strand_member
+### Message
+
 | Column | Type | Notes |
 |--------|------|-------|
-| strand_id | text | FK → strand |
-| member_id | text | Participant identity |
-| display_name | text | Name shown to us |
-| avatar_url | text | Optional |
-| role | text | owner, member, viewer |
+| Id | integer | Strand-unique, monotonic |
+| MemberId | text | FK → Member.Id |
+| Content | text | Message text |
+| Timestamp | datetime | When sent (UTC) |
+| Status | text | sent / delivered / read (advisory; computed where possible) |
 
-### message
+### Attachment
+
 | Column | Type | Notes |
 |--------|------|-------|
-| id | text | Message identifier |
-| strand_id | text | FK → strand |
-| sender_id | text | Who sent it |
-| text | text | Message content |
-| created_at | text | ISO timestamp |
-| status | text | sent, delivered, read |
+| Id | integer | Attachment id |
+| MessageId | integer | FK → Message.Id |
+| Type | text | image, video, file, location |
+| Uri | text | Content reference (blob, CID, …) |
+| MimeType | text | Optional |
+| Name | text | Display name |
 
-### attachment
-| Column | Type | Notes |
-|--------|------|-------|
-| id | text | Attachment identifier |
-| message_id | text | FK → message |
-| type | text | image, video, file, location |
-| uri | text | Content reference |
-| mime_type | text | Optional |
-| name | text | Display name |
+## What sereus owns (not in this file)
 
-### invitation
-| Column | Type | Notes |
-|--------|------|-------|
-| token | text | Invitation token |
-| strand_id | text | FK → strand (or null if new) |
-| created_by | text | Issuer identity |
-| created_at | text | ISO timestamp |
-| expires_at | text | Optional expiry |
-| accepted_at | text | Null until used |
+These concepts live in sereus's Control DB or its formation protocol — referenced from screens via the adapter, never modeled here:
 
+- Strand registry (which strands the user participates in)
+- Cadre peers (the user's own devices)
+- Authority and validation keys
+- Open invitations, registrations, formation usage
+- Strand type (`'o'` open vs `'c'` closed)
+
+## Notes
+
+- Sender identity **is** the Peer ID — never persist a parallel "sender_id".
+- Open vs closed strands changes the membership model; see `sereus.md` for the project-level decision.
+- Mock mode mirrors these tables as JSON fixtures with the same shapes.
