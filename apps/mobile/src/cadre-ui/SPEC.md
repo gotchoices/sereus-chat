@@ -96,8 +96,12 @@ provides without blocking.
 - **No host-app imports.** The component reaches data only through the cadre
   engine (`cadreService` from `src/cadre/`). When this folder is extracted,
   the engine moves with it.
-- **No theme assumption.** Inline `StyleSheet` with sensible defaults. Host
-  apps can wrap or restyle; theming hook is a future enhancement.
+- **Theme via prop or context.** All visible colors are tokens declared in
+  [theme.ts](theme.ts). Host apps override with `<CadreManager theme={...} />`
+  passing any subset of `CadreManagerTheme`; missing tokens fall back to
+  `DEFAULT_THEME`. Subcomponents read via `useCadreTheme()` from
+  `CadreThemeContext` so apps can also wrap larger trees in a provider.
+  Spacing/sizing intentionally aren't tokens — they're layout, not branding.
 - **i18n-friendly.** Visible strings centralised at the top of the component
   for easy override; no `t()` calls today (host apps wrap if needed).
 - **Action handlers are stubs in v0.** Add-key, add-node, remove-node all

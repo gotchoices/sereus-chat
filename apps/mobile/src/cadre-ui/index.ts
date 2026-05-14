@@ -13,3 +13,10 @@ export type {
   CadreDeviceType,
   CadreManagerState,
 } from './useCadreManager';
+export {
+  DEFAULT_THEME,
+  resolveTheme,
+  CadreThemeContext,
+  useCadreTheme,
+} from './theme';
+export type { CadreManagerTheme } from './theme';

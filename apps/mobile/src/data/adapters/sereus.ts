@@ -2,11 +2,14 @@
 // See design/specs/domain/interfaces.md for the operation→sereus mapping
 // and design/specs/domain/sereus.md for the integration boundary.
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DataAdapter } from '../adapter';
 import type { Profile, StrandSummary, ChatMessage, Invitation } from '../types';
 import { ensureDefaultChatStrand } from '../chat-strand';
 import { queryMessages, insertMessage } from '../chat-operations';
 import { cadreService } from '../../cadre';
+
+const PROFILE_KEY = '@sereus.chat/profile';
 
 export class SereusAdapter implements DataAdapter {
   private notImplemented(op: string): never {
@@ -98,12 +101,20 @@ export class SereusAdapter implements DataAdapter {
     this.notImplemented('searchStrands');
   }
 
+  // ── Profile (device-local; not stored in any sereus DB) ──────────────
+
   async getProfile(): Promise<Profile> {
-    this.notImplemented('getProfile');
+    const raw = await AsyncStorage.getItem(PROFILE_KEY);
+    if (!raw) return { name: '' };
+    try {
+      return JSON.parse(raw) as Profile;
+    } catch {
+      return { name: '' };
+    }
   }
 
-  async saveProfile(_profile: Profile): Promise<void> {
-    this.notImplemented('saveProfile');
+  async saveProfile(profile: Profile): Promise<void> {
+    await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
   }
 
   async createInvitation(): Promise<Invitation> {
