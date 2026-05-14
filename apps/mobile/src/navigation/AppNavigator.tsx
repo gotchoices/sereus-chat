@@ -14,6 +14,7 @@ import QrScanner from '../screens/QrScanner';
 import Alerts from '../screens/Alerts';
 import ChatInterface from '../screens/ChatInterface';
 import MediaPicker from '../screens/MediaPicker';
+import { CadreManager } from '../cadre-ui';
 
 const Stack = createNativeStackNavigator();
 
@@ -28,6 +29,7 @@ export default function AppNavigator() {
         InvitationGenerator: 'invite',
         InvitationAcceptance: 'invite/:token',
         ProfileSetup: 'profile',
+        CadreManager: 'cadre',
         QrScanner: 'scan',
         Alerts: 'alerts',
       },
@@ -41,6 +43,7 @@ export default function AppNavigator() {
         <Stack.Screen name="InvitationGenerator" component={InvitationGenerator} options={{ title: 'Invite' }} />
         <Stack.Screen name="InvitationAcceptance" component={InvitationAcceptance} options={{ title: 'Accept Invite' }} />
         <Stack.Screen name="ProfileSetup" component={ProfileSetup} options={{ title: 'Profile' }} />
+        <Stack.Screen name="CadreManager" component={CadreManager} options={{ title: 'My Devices' }} />
         <Stack.Screen name="QrScanner" component={QrScanner} options={{ title: 'Scan' }} />
         <Stack.Screen name="Alerts" component={Alerts} options={{ title: 'Alerts' }} />
         <Stack.Screen

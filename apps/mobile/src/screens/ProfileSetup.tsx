@@ -115,6 +115,20 @@ export default function ProfileSetup() {
         />
       </View>
 
+      <TouchableOpacity
+        style={styles.linkRow}
+        onPress={() => navigation.navigate('CadreManager')}
+        accessibilityLabel="Manage devices"
+        testID="profile-manage-devices"
+      >
+        <Ionicons name="hardware-chip-outline" size={20} />
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <Text style={styles.linkRowTitle}>Manage devices</Text>
+          <Text style={styles.linkRowSubtitle}>Add a drone, server, or another device to your cadre</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#888" />
+      </TouchableOpacity>
+
       <View style={styles.notice}>
         <Text style={styles.noticeText}>
           Personal information is not collected or stored by Sereus. But information you enter may be shared with connected peers.
@@ -135,6 +149,19 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 10, fontSize: 16, backgroundColor: '#fff' },
   inputError: { borderColor: '#d00' },
   errorText: { color: '#d00', marginTop: 6 },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#eee',
+    paddingHorizontal: 10,
+    paddingVertical: 14,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  linkRowTitle: { fontSize: 15, fontWeight: '600', color: '#111' },
+  linkRowSubtitle: { fontSize: 12, color: '#666', marginTop: 2 },
   notice: { marginTop: 8 },
   noticeText: { color: '#555' },
 });
