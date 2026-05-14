@@ -25,6 +25,7 @@ As a user, I want to set or change my profile picture so that my friends see a r
 - A1. From Chat: user taps their own bubble/avatar → “Edit Profile” → steps 2‑5.
 - A2. From first‑launch: user taps “Set up full profile” after entering name → steps 2‑5.
  - A3. Prefers handle: the user decides they go by a handle in apps, so they change the Name to “Moss” (a nickname friends recognize) and Save.
+ - A4. Manage devices: from Profile, user taps “Manage devices” to reach the cadre management screen (sereus-bundled component) where they can add a personal drone/desktop or another phone to strengthen their cadre.
 
 ## Acceptance Criteria
 - [ ] Profile shows an “Add/Change Photo” control with options: Camera, Library, Files/Drawing.
@@ -32,3 +33,4 @@ As a user, I want to set or change my profile picture so that my friends see a r
 - [ ] Removing photo falls back to initials‑based avatar.
 - [ ] Large images prompt to compress or choose a different source.
 - [ ] Cancel preserves previous avatar without changes.
+- [ ] Profile exposes a “Manage devices” entry that navigates to the cadre management screen.

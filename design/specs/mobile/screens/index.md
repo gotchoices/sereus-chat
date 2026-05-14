@@ -5,6 +5,7 @@
 | ConnectionsList | ConnectionsList | Home list of strands | happy, empty, error |
 | ChatInterface | ChatInterface | Strand conversation | happy, empty, error |
 | ProfileSetup | ProfileSetup | Edit profile | happy, error |
+| CadreManager | CadreManager | Manage cadre identity, keys, nodes (component-provided via `src/cadre-ui/`) | n/a |
 | MediaPicker | MediaPicker | Select attachment source | happy, error |
 | SearchInterface | SearchInterface | Global search | happy, empty, error |
 | InvitationGenerator | InvitationGenerator | Create/share invite | happy, error |

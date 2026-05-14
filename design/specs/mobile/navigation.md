@@ -7,6 +7,7 @@ Single-stack navigation (no tabs).
 ```
 HOME (ConnectionsList) ← Root
 ├── Profile (push)
+│   └── CadreManager (push) — provided by `src/cadre-ui/` (sereus-bundled)
 ├── Search (push)
 ├── Invite (modal)
 ├── QR Scanner (modal)
@@ -22,6 +23,7 @@ HOME (ConnectionsList) ← Root
 |--------|-------|-------|------------|
 | ConnectionsList | ConnectionsList | App launch | Root |
 | ProfileSetup | ProfileSetup | Home footer avatar | Push |
+| CadreManager | CadreManager | Profile "Manage devices" row | Push |
 | SearchInterface | SearchInterface | Home header search | Push |
 | InvitationGenerator | InvitationGenerator | Home header "Add Friends" | Modal |
 | QrScanner | QrScanner | Home footer QR icon | Modal |
@@ -57,6 +59,7 @@ First Launch
 
 - ConnectionsList: "Home"
 - ProfileSetup: "Profile"
+- CadreManager: "My Devices" (or component default)
 - SearchInterface: "Search"
 - InvitationGenerator: "Invite Friends"
 - ChatInterface: Partner name (dynamic)

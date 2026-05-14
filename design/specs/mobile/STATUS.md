@@ -33,11 +33,18 @@
 - [ ] VoiceCallOverlay spec
 - [ ] InvitationAcceptance spec
 
-### Cadre surface (target for upstream extraction — keep chat-free)
-- [ ] CadreConnections spec (party id, my keys, my nodes, strand guests) — align with `ser/health/apps/mobile`
-- [ ] AddNode spec (phone↔drone, scan QR/link, dial)
-- [ ] AddGuest spec (open invitation creation, share via QR / deep link)
-- [ ] KeyManagement spec (vault, external, dongle-future)
+### Cadre surface (target for upstream extraction as `@sereus/cadre-rn-ui`)
+
+The screen itself is component-provided; only the integration touch-points
+live in chat's app specs.
+
+- [ ] CadreManager component lives under `apps/mobile/src/cadre-ui/`, with
+      its own `SPEC.md` (layout, sections, JIT key, add-node sheet, exclusions)
+- [ ] Chat integration: `navigation.md` route + "Manage devices" row in
+      `screens/profile-setup.md`
+- [ ] AddGuest is **not** part of the component — chat uses its own invitation
+      flow (`InvitationGenerator` / `InvitationAcceptance`); other apps may
+      add their own equivalent on the same page
 
 ## Scenario / Peer Review (optional)
 - [ ] Scenario docs/images under `design/generated/mobile/`
