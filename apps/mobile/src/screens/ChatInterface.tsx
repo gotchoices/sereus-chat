@@ -9,6 +9,17 @@ import { consumePendingAttachment } from '../data/attachmentDraft';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { showToast } from '../ui/toast';
 
+/**
+ * Reconcile a poll result with prior state.  Keeps any optimistic ('pending-*')
+ * messages still in flight so the user doesn't see them flash out and back in
+ * between optimistic-append and sendMessage-resolve.
+ */
+function mergePersisted(prev: ChatMessage[], next: ChatMessage[]): ChatMessage[] {
+  const persistedIds = new Set(next.map(m => m.id));
+  const pending = prev.filter(m => m.id.startsWith('pending-') && !persistedIds.has(m.id));
+  return [...next, ...pending];
+}
+
 export default function ChatInterface() {
   const route: any = useRoute();
   const navigation: any = useNavigation();
@@ -23,10 +34,27 @@ export default function ChatInterface() {
   const [menuForId, setMenuForId] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
-      const data = await listMessages(strandId || 't-susan');
-      setMessages(data);
-    })();
+    let alive = true;
+    const sid = strandId || 't-susan';
+    const load = async () => {
+      try {
+        const data = await listMessages(sid);
+        if (!alive) return;
+        // Only update state if the persisted set differs from what we have,
+        // so optimistic appends don't get reverted by an in-flight poll.
+        setMessages(prev => mergePersisted(prev, data));
+      } catch (err) {
+        console.warn('listMessages poll failed:', err);
+      }
+    };
+    void load();
+    // Sereus has no live subscriptions yet; poll while screen is mounted.
+    // Cadence per design/specs/domain/interfaces.md (~2s).
+    const timer = setInterval(load, 2000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
   }, [strandId]);
 
   const canSend = useMemo(() => text.trim().length > 0 || attachments.length > 0, [text, attachments]);

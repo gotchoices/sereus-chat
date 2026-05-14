@@ -170,6 +170,59 @@ class CadreServiceImpl {
   }
 
   /**
+   * Reveal the active authority private key for offline backup.  Use only
+   * from explicit user-confirmed UI ("Export key for recovery") — never log,
+   * never persist outside its existing slot.  Returns base64url string or
+   * null if no key has been created yet.
+   */
+  async exportAuthorityPrivateKey(): Promise<string | null> {
+    return AsyncStorage.getItem(AUTHORITY_PRIV_KEY);
+  }
+
+  /**
+   * Install an externally-supplied authority private key (base64url) — the
+   * "import recovery key" path.  Validates the key derives a proper Ed25519
+   * public key and the cadre control table is currently empty (otherwise
+   * we'd need signed-add, which the upstream API doesn't yet expose; see
+   * apps/mobile/tmp/cadre-key-recovery-upstream.md §2).
+   */
+  async importAuthorityKey(privateKeyB64u: string): Promise<{ publicKey: string }> {
+    await this.ensureStarted();
+    if (!this.node) throw new Error('CadreNode not running');
+
+    const trimmed = privateKeyB64u.trim();
+    let publicKey: string;
+    try {
+      publicKey = getPublicKey(trimmed, 'ed25519', 'base64url', 'base64url') as string;
+    } catch {
+      throw new Error('Invalid key: not a base64url-encoded Ed25519 private key');
+    }
+
+    const controlDb = this.node.getControlDatabase();
+    if (!controlDb) throw new Error('Control database not available');
+
+    // Refuse if a different key is already installed.  Re-importing the
+    // same key (e.g., user pastes back what they exported) is fine — we
+    // detect and short-circuit.
+    if (this._authorityPublicKey && this._authorityPublicKey !== publicKey) {
+      throw new Error(
+        'A different authority key is already installed.  Multi-key add is not yet supported (see upstream report §2).',
+      );
+    }
+    if (this._authorityPublicKey === publicKey) {
+      return { publicKey };
+    }
+
+    await AsyncStorage.setItem(AUTHORITY_PRIV_KEY, trimmed);
+    this.node.initializeSeedBootstrap(trimmed);
+    this._authorityPublicKey = publicKey;
+    await this.reestablishAuthorityKeyRow();
+
+    console.info('[CadreService] ✓ authority key imported and seed flows enabled');
+    return { publicKey };
+  }
+
+  /**
    * Generate a base64url-encoded seed for transporting cadre membership to a
    * new node (typically a drone via cadre-cli).  Requires an authority key.
    */

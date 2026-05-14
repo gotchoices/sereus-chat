@@ -26,7 +26,8 @@ import {
   type CadreKeyRow,
   type CadreNodeRow,
 } from './useCadreManager';
-import SeedDisplayModal from './SeedDisplayModal';
+import SecretDisplayModal from './SecretDisplayModal';
+import KeyImportModal from './KeyImportModal';
 import {
   CadreThemeContext,
   resolveTheme,
@@ -42,6 +43,11 @@ const STRINGS = {
   myNodes: 'MY NODES',
   copied: 'Copied',
   loading: 'Loading…',
+  statusRunning: 'Cadre running',
+  statusStopped: 'Cadre stopped',
+  statusKeyOk: 'authority key on file',
+  statusKeyNone: 'no authority key',
+  statusNodes: (n: number) => (n === 0 ? 'no remote nodes' : `${n} remote node${n === 1 ? '' : 's'}`),
   noKeys: 'No keys yet',
   noKeysHint: 'One is created automatically when you add your first node.',
   noNodes: 'No remote nodes yet. Tap + to add one.',
@@ -68,6 +74,12 @@ const STRINGS = {
   notImplementedPhone: 'Phone-to-phone (relay-routed) is upcoming; currently requires a drone or server intermediary.',
   keyCreated: 'Authority key created and stored on this device.',
   keyCreatedFailed: 'Failed to create authority key',
+  exportTitle: 'Recovery key',
+  exportHint: 'This is your authority private key.  Anyone with it controls your cadre.  Write it down or transfer it to a secure location and keep it offline.  If you lose this device and no other authority key exists, this is the only way to restore access.',
+  exportEmpty: 'No authority key on file yet.  Generate one first via "Add a key".',
+  importMenuLabel: 'Import recovery key',
+  seedTitle: 'Drone seed',
+  seedHint: 'Paste this into your cadre-cli drone to authorize it for your cadre.  Generated seeds expire and should be transported privately.',
 };
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
@@ -93,6 +105,10 @@ function CadreManagerInner() {
   const [seedModal, setSeedModal] = useState<{ visible: boolean; seed: string | null; error: string | null }>(
     { visible: false, seed: null, error: null },
   );
+  const [exportModal, setExportModal] = useState<{ visible: boolean; value: string | null; error: string | null }>(
+    { visible: false, value: null, error: null },
+  );
+  const [importVisible, setImportVisible] = useState(false);
 
   const onCopyPartyId = useCallback(() => {
     if (cadre.partyId) {
@@ -119,6 +135,21 @@ function CadreManagerInner() {
     }
   }, [cadre]);
 
+  const onExportKey = useCallback(async () => {
+    setExportModal({ visible: true, value: null, error: null });
+    try {
+      const priv = await cadreService.exportAuthorityPrivateKey();
+      if (!priv) {
+        setExportModal({ visible: true, value: null, error: STRINGS.exportEmpty });
+      } else {
+        setExportModal({ visible: true, value: priv, error: null });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setExportModal({ visible: true, value: null, error: msg });
+    }
+  }, []);
+
   const onAddKey = useCallback(() => {
     Alert.alert(STRINGS.addKey, undefined, [
       {
@@ -129,9 +160,8 @@ function CadreManagerInner() {
         },
       },
       {
-        text: STRINGS.addKeyExternal,
-        onPress: () =>
-          Alert.alert(STRINGS.notImplementedTitle, 'External key import (JWK / QR) is upcoming.'),
+        text: STRINGS.importMenuLabel,
+        onPress: () => setImportVisible(true),
       },
       { text: STRINGS.addKeyDongle, style: 'cancel' },
       { text: STRINGS.cancel, style: 'cancel' },
@@ -214,6 +244,23 @@ function CadreManagerInner() {
       contentContainerStyle={{ padding: 16 }}
       refreshControl={<RefreshControl refreshing={false} onRefresh={cadre.refresh} />}
     >
+      {/* Status strip */}
+      <View style={styles.statusStrip}>
+        <View
+          style={[
+            styles.dot,
+            { backgroundColor: cadre.isRunning ? theme.online : theme.danger },
+          ]}
+        />
+        <Text style={styles.statusText} numberOfLines={1}>
+          {(cadre.isRunning ? STRINGS.statusRunning : STRINGS.statusStopped)
+            + ' · '
+            + (cadre.hasAuthorityKey ? STRINGS.statusKeyOk : STRINGS.statusKeyNone)
+            + ' · '
+            + STRINGS.statusNodes(cadre.remoteNodeCount)}
+        </Text>
+      </View>
+
       {/* Network ID */}
       <SectionHeader label={STRINGS.networkId} />
       <TouchableOpacity style={styles.card} onPress={onCopyPartyId} testID="cadre-partyid">
@@ -234,7 +281,9 @@ function CadreManagerInner() {
         onAdd={onAddKey}
       />
       {hasKeys ? (
-        cadre.keys.map(key => <KeyRow key={key.id} keyRow={key} />)
+        cadre.keys.map(key => (
+          <KeyRow key={key.id} keyRow={key} onLongPress={onExportKey} />
+        ))
       ) : (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>{STRINGS.noKeys}</Text>
@@ -262,11 +311,33 @@ function CadreManagerInner() {
         ))
       )}
 
-      <SeedDisplayModal
+      <SecretDisplayModal
         visible={seedModal.visible}
-        seed={seedModal.seed}
+        title={STRINGS.seedTitle}
+        hint={STRINGS.seedHint}
+        value={seedModal.seed}
         error={seedModal.error}
         onClose={() => setSeedModal({ visible: false, seed: null, error: null })}
+      />
+
+      <SecretDisplayModal
+        visible={exportModal.visible}
+        title={STRINGS.exportTitle}
+        hint={STRINGS.exportHint}
+        value={exportModal.value}
+        error={exportModal.error}
+        emphasis="sensitive"
+        onClose={() => setExportModal({ visible: false, value: null, error: null })}
+      />
+
+      <KeyImportModal
+        visible={importVisible}
+        onClose={() => setImportVisible(false)}
+        onImport={async (priv) => {
+          const res = await cadreService.importAuthorityKey(priv);
+          await cadre.refresh();
+          return res;
+        }}
       />
     </ScrollView>
   );
@@ -303,7 +374,13 @@ function SectionHeader({
   );
 }
 
-function KeyRow({ keyRow }: { keyRow: CadreKeyRow }) {
+function KeyRow({
+  keyRow,
+  onLongPress,
+}: {
+  keyRow: CadreKeyRow;
+  onLongPress?: () => void;
+}) {
   const theme = useCadreTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const icon =
@@ -313,7 +390,12 @@ function KeyRow({ keyRow }: { keyRow: CadreKeyRow }) {
         ? 'hardware-chip-outline'
         : 'document-outline';
   return (
-    <View style={styles.card}>
+    <TouchableOpacity
+      style={styles.card}
+      onLongPress={onLongPress}
+      delayLongPress={500}
+      activeOpacity={onLongPress ? 0.7 : 1}
+    >
       <Ionicons name={icon} size={20} color={theme.textPrimary} />
       <View style={{ flex: 1, marginLeft: 12, minWidth: 0 }}>
         <Text style={styles.cardTitle}>
@@ -327,7 +409,7 @@ function KeyRow({ keyRow }: { keyRow: CadreKeyRow }) {
           {keyRow.publicKey}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -433,6 +515,17 @@ function makeStyles(theme: CadreManagerTheme) {
     monoLike: { fontFamily: 'monospace', letterSpacing: 0.2 },
     statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
     dot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+    statusStrip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+      backgroundColor: theme.background,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    statusText: { flex: 1, fontSize: 12, color: theme.textSecondary },
     emptyCard: {
       borderWidth: 1,
       borderStyle: 'dashed',

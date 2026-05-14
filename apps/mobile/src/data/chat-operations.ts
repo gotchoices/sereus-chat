@@ -51,6 +51,27 @@ export async function insertMember(
   );
 }
 
+/**
+ * Upsert a member's display name.  Inserts if absent, updates if present.
+ * Used when the local profile name changes and we want every attached
+ * strand's Member row to reflect it.
+ */
+export async function upsertMember(
+  strand: StrandInstance,
+  id: string,
+  name: string,
+): Promise<void> {
+  const db = getDb(strand);
+  await db.exec(
+    'insert or ignore into App.Member (Id, Name) values (?, ?)',
+    [id, name],
+  );
+  await db.exec(
+    'update App.Member set Name = ? where Id = ?',
+    [name, id],
+  );
+}
+
 export async function queryMembers(strand: StrandInstance): Promise<ChatMember[]> {
   const db = getDb(strand);
   const out: ChatMember[] = [];

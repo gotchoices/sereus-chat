@@ -15,7 +15,9 @@ import type { StrandInstance } from '@serfab/cadre-core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cadreService } from '../cadre';
 import { createChatStrand } from './chat-sapp';
-import { insertMember } from './chat-operations';
+import { upsertMember } from './chat-operations';
+
+const PROFILE_KEY = '@sereus.chat/profile';
 
 const DEFAULT_STRAND_ID_KEY = '@sereus.chat/defaultStrandId';
 
@@ -47,20 +49,53 @@ export async function ensureDefaultChatStrand(): Promise<StrandInstance> {
     );
   }
 
-  // Idempotent self-registration as a Member of this strand.  Display name
-  // currently falls back to a truncated peer ID; profile-driven name is
-  // step 6.
+  // Idempotent self-registration as a Member of this strand.  Pull the
+  // display name from the local profile; fall back to a truncated peer id
+  // until the user enters one.
   const peerId = cadreService.peerId;
   if (peerId) {
     try {
-      await insertMember(strand, peerId, peerId.slice(0, 12));
+      const name = await readProfileDisplayName(peerId);
+      await upsertMember(strand, peerId, name);
     } catch (err) {
-      console.warn('[chat-strand] insertMember failed:', err);
+      console.warn('[chat-strand] upsertMember failed:', err);
     }
   }
 
   cachedStrand = strand;
   return strand;
+}
+
+/**
+ * Push the local profile name to App.Member across every attached strand.
+ * Called from SereusAdapter.saveProfile so the rename propagates immediately.
+ */
+export async function syncProfileNameToStrands(): Promise<void> {
+  const peerId = cadreService.peerId;
+  if (!peerId) return;
+  const name = await readProfileDisplayName(peerId);
+  for (const strand of cadreService.getStrands().values()) {
+    if (!strand.database) continue;
+    try {
+      await upsertMember(strand, peerId, name);
+    } catch (err) {
+      console.warn('[chat-strand] sync to strand', strand.strandId, 'failed:', err);
+    }
+  }
+}
+
+async function readProfileDisplayName(peerIdFallback: string): Promise<string> {
+  try {
+    const raw = await AsyncStorage.getItem(PROFILE_KEY);
+    if (raw) {
+      const profile = JSON.parse(raw) as { name?: string };
+      const trimmed = profile?.name?.trim();
+      if (trimmed) return trimmed;
+    }
+  } catch {
+    // fall through
+  }
+  return peerIdFallback.slice(0, 12);
 }
 
 /** Return the default strand if it's been attached; null otherwise. */

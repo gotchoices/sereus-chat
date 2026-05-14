@@ -5,7 +5,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DataAdapter } from '../adapter';
 import type { Profile, StrandSummary, ChatMessage, Invitation } from '../types';
-import { ensureDefaultChatStrand } from '../chat-strand';
+import { ensureDefaultChatStrand, syncProfileNameToStrands } from '../chat-strand';
 import { queryMessages, insertMessage } from '../chat-operations';
 import { cadreService } from '../../cadre';
 
@@ -97,8 +97,45 @@ export class SereusAdapter implements DataAdapter {
 
   // ── Step 5+ ────────────────────────────────────────────────────────────
 
-  async searchStrands(_query: string): Promise<StrandSummary[]> {
-    this.notImplemented('searchStrands');
+  async searchStrands(query: string): Promise<StrandSummary[]> {
+    const defaultStrand = await ensureDefaultChatStrand();
+    const defaultId = defaultStrand.strandId;
+    const q = query.trim().toLowerCase();
+
+    const out: StrandSummary[] = [];
+    for (const [id, strand] of cadreService.getStrands()) {
+      if (!strand.database) continue;
+      let preview: StrandSummary['lastMessage'] = null;
+      try {
+        const msgs = await queryMessages(strand);
+        if (q === '') {
+          // Empty query → behave like listStrands: return everything with
+          // its last message as preview.
+          const last = msgs[msgs.length - 1];
+          preview = last ? { previewText: last.Content, timestamp: last.Timestamp } : null;
+        } else {
+          // Newest matching message wins as the preview.
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].Content.toLowerCase().includes(q)) {
+              preview = { previewText: msgs[i].Content, timestamp: msgs[i].Timestamp };
+              break;
+            }
+          }
+          if (!preview) continue; // no match in this strand
+        }
+      } catch (err) {
+        console.warn('[SereusAdapter] search failed for', id, err);
+        continue;
+      }
+      out.push({
+        id,
+        displayName: id === defaultId ? 'My Notes' : `Strand ${id.slice(0, 8)}`,
+        avatarUrl: null,
+        lastMessage: preview,
+        unreadCount: 0,
+      });
+    }
+    return out;
   }
 
   // ── Profile (device-local; not stored in any sereus DB) ──────────────
@@ -115,6 +152,12 @@ export class SereusAdapter implements DataAdapter {
 
   async saveProfile(profile: Profile): Promise<void> {
     await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    // Best-effort propagation; UI persists regardless of sync result.
+    try {
+      await syncProfileNameToStrands();
+    } catch (err) {
+      console.warn('[SereusAdapter] saveProfile name sync failed:', err);
+    }
   }
 
   async createInvitation(): Promise<Invitation> {

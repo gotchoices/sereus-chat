@@ -1,9 +1,10 @@
 /**
- * SeedDisplayModal — shows an encoded cadre seed for out-of-band transport.
+ * SecretDisplayModal — generic modal for showing a base64url payload
+ * the user is meant to copy for out-of-band transport.
  *
- * The seed is a base64url string the user pastes into a `cadre-cli` instance
- * (drone) to authorize that node into the cadre.  Until QR/deep-link delivery
- * lands, copy/paste is the transport.
+ * Used for both drone seeds (transport to cadre-cli) and authority private
+ * key backup (offline recovery).  Title/hint are caller-supplied so the
+ * security framing fits the use case.
  */
 
 import React, { useMemo } from 'react';
@@ -22,17 +23,33 @@ import { useCadreTheme, type CadreManagerTheme } from './theme';
 
 interface Props {
   visible: boolean;
-  seed: string | null;
+  /** Modal title, e.g. "Drone seed" or "Recovery key". */
+  title: string;
+  /** Explanation text shown above the secret. */
+  hint: string;
+  /** The secret to display.  Null = "Generating…" placeholder. */
+  value: string | null;
+  /** Optional error to render in place of the secret. */
   error: string | null;
+  /** Optional emphasis stripe colour — pass theme.danger for sensitive data. */
+  emphasis?: 'normal' | 'sensitive';
   onClose: () => void;
 }
 
-export default function SeedDisplayModal({ visible, seed, error, onClose }: Props) {
+export default function SecretDisplayModal({
+  visible,
+  title,
+  hint,
+  value,
+  error,
+  emphasis = 'normal',
+  onClose,
+}: Props) {
   const theme = useCadreTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const onCopy = () => {
-    if (seed) {
-      Clipboard.setString(seed);
+    if (value) {
+      Clipboard.setString(value);
       Alert.alert('Copied');
     }
   };
@@ -41,8 +58,9 @@ export default function SeedDisplayModal({ visible, seed, error, onClose }: Prop
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
+          {emphasis === 'sensitive' && <View style={styles.sensitiveStripe} />}
           <View style={styles.header}>
-            <Text style={styles.title}>Drone seed</Text>
+            <Text style={styles.title}>{title}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={22} color={theme.textSecondary} />
             </TouchableOpacity>
@@ -51,13 +69,10 @@ export default function SeedDisplayModal({ visible, seed, error, onClose }: Prop
             <Text style={styles.error}>{error}</Text>
           ) : (
             <>
-              <Text style={styles.hint}>
-                Paste this into your cadre-cli drone to authorize it for your cadre.
-                Generated seeds expire and should be transported privately.
-              </Text>
-              <ScrollView style={styles.seedBox} contentContainerStyle={{ padding: 12 }}>
-                <Text selectable style={styles.seedText}>
-                  {seed ?? 'Generating…'}
+              <Text style={styles.hint}>{hint}</Text>
+              <ScrollView style={styles.box} contentContainerStyle={{ padding: 12 }}>
+                <Text selectable style={styles.boxText}>
+                  {value ?? 'Generating…'}
                 </Text>
               </ScrollView>
               <View style={styles.actions}>
@@ -65,12 +80,12 @@ export default function SeedDisplayModal({ visible, seed, error, onClose }: Prop
                   <Text style={styles.btnSecondaryText}>Done</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.btnPrimary, !seed && { opacity: 0.5 }]}
+                  style={[styles.btnPrimary, !value && { opacity: 0.5 }]}
                   onPress={onCopy}
-                  disabled={!seed}
+                  disabled={!value}
                 >
                   <Ionicons name="copy-outline" size={16} color={theme.accentText} />
-                  <Text style={styles.btnPrimaryText}>Copy seed</Text>
+                  <Text style={styles.btnPrimaryText}>Copy</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -96,6 +111,15 @@ function makeStyles(theme: CadreManagerTheme) {
       backgroundColor: theme.surface,
       borderRadius: 12,
       padding: 16,
+      overflow: 'hidden',
+    },
+    sensitiveStripe: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 4,
+      backgroundColor: theme.danger,
     },
     header: {
       flexDirection: 'row',
@@ -105,7 +129,7 @@ function makeStyles(theme: CadreManagerTheme) {
     },
     title: { fontSize: 17, fontWeight: '700', color: theme.textPrimary },
     hint: { fontSize: 13, color: theme.textSecondary, marginBottom: 10 },
-    seedBox: {
+    box: {
       maxHeight: 220,
       borderWidth: 1,
       borderColor: theme.border,
@@ -113,7 +137,7 @@ function makeStyles(theme: CadreManagerTheme) {
       backgroundColor: theme.background,
       marginBottom: 12,
     },
-    seedText: { fontSize: 12, fontFamily: 'monospace', color: theme.textPrimary },
+    boxText: { fontSize: 12, fontFamily: 'monospace', color: theme.textPrimary },
     actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
     btnPrimary: {
       flexDirection: 'row',

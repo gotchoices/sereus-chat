@@ -41,8 +41,11 @@ export interface CadreManagerState {
   partyId: string | null;
   peerId: string | null;
   isRunning: boolean;
+  hasAuthorityKey: boolean;
   keys: CadreKeyRow[];
   nodes: CadreNodeRow[];
+  /** Count of remote nodes (excludes "this device"). */
+  remoteNodeCount: number;
 }
 
 const INITIAL: CadreManagerState = {
@@ -51,8 +54,10 @@ const INITIAL: CadreManagerState = {
   partyId: null,
   peerId: null,
   isRunning: false,
+  hasAuthorityKey: false,
   keys: [],
   nodes: [],
+  remoteNodeCount: 0,
 };
 
 export function useCadreManager(): CadreManagerState & { refresh: () => Promise<void> } {
@@ -74,8 +79,10 @@ export function useCadreManager(): CadreManagerState & { refresh: () => Promise<
         partyId,
         peerId,
         isRunning: cadreService.isRunning,
+        hasAuthorityKey: cadreService.hasAuthorityKey,
         keys,
         nodes,
+        remoteNodeCount: remoteNodes.length,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
