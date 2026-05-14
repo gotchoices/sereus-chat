@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
-import { listMessages } from '../data/adapter';
+import { listMessages, sendMessage } from '../data/adapter';
 import type { ChatMessage } from '../data/types';
 import { useT } from '../i18n';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -64,20 +64,33 @@ export default function ChatInterface() {
       return;
     }
     const trimmed = text.trim();
+    setText('');
+    setAttachments([]);
+    setInputHeight(40);
     if (trimmed.length > 0) {
-      const newMsg: ChatMessage = {
-        id: `m-${Date.now()}`,
+      // Optimistic append; the persisted message replaces the optimistic
+      // one when sendMessage resolves (id may differ).
+      const tempId = `pending-${Date.now()}`;
+      const optimistic: ChatMessage = {
+        id: tempId,
         strandId: strandId || 't-susan',
         sender: 'Me',
         text: trimmed,
         timestamp: new Date().toISOString(),
         outgoing: true,
+        status: 'sent',
       };
-      setMessages(prev => [...prev, newMsg]);
+      setMessages(prev => [...prev, optimistic]);
+      (async () => {
+        try {
+          const persisted = await sendMessage(strandId || 't-susan', trimmed);
+          setMessages(prev => prev.map(m => (m.id === tempId ? persisted : m)));
+        } catch (err) {
+          console.warn('sendMessage failed:', err);
+          // Leave optimistic in place; future step adds explicit error UX.
+        }
+      })();
     }
-    setText('');
-    setAttachments([]);
-    setInputHeight(40);
   };
 
   const onMicPress = () => {

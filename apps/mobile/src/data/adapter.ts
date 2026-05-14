@@ -9,6 +9,7 @@ export interface DataAdapter {
   // Strands
   listStrands(): Promise<StrandSummary[]>;
   listMessages(strandId: string): Promise<ChatMessage[]>;
+  sendMessage(strandId: string, text: string): Promise<ChatMessage>;
   searchStrands(query: string): Promise<StrandSummary[]>;
 
   // Profile (local scope)
@@ -45,6 +46,10 @@ export async function listStrands(): Promise<StrandSummary[]> {
 
 export async function listMessages(strandId: string): Promise<ChatMessage[]> {
   return (await getAdapter()).listMessages(strandId);
+}
+
+export async function sendMessage(strandId: string, text: string): Promise<ChatMessage> {
+  return (await getAdapter()).sendMessage(strandId, text);
 }
 
 export async function searchStrands(query: string): Promise<StrandSummary[]> {

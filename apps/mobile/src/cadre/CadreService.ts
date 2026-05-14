@@ -38,6 +38,11 @@ import {
 import { LevelDB, LevelDBWriteBatch } from 'rn-leveldb';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// TODO(extraction): replace this one chat-aware import with a configure({
+// sAppId }) call before ensureStarted, so the cadre layer is a clean
+// candidate for `@sereus/cadre-rn-ui` extraction.
+import { CHAT_SAPP_ID } from '../data/chat-sapp';
+
 type OptimysticDb = ReturnType<typeof openOptimysticRNDb>;
 type EventHandler<T> = (payload: T) => void;
 
@@ -45,11 +50,7 @@ type EventHandler<T> = (payload: T) => void;
 // Constants
 // ---------------------------------------------------------------------------
 
-/** sApp ID for the chat app — matches design/specs/project.md. */
-export const CHAT_SAPP_ID = 'org.sereus.chat';
-
 const PARTY_ID_KEY = '@sereus.chat/partyId';
-const DEFAULT_STRAND_ID_KEY = '@sereus.chat/defaultStrandId';
 
 /**
  * LevelDB directory naming for optimystic stores.
@@ -112,37 +113,6 @@ class CadreServiceImpl {
   /** Look up a single strand by id (null if not attached). */
   getStrand(strandId: string): StrandInstance | null {
     return this.node?.getStrands().get(strandId) ?? null;
-  }
-
-  /**
-   * Return the default chat strand, creating it on first call.
-   *
-   * The default strand id is generated once and persisted to AsyncStorage so
-   * subsequent launches reattach the same strand.  This is the smallest piece
-   * of state needed to give the UI something to render before any partner
-   * strand has been formed.
-   */
-  async getOrCreateDefaultStrand(): Promise<StrandInstance> {
-    await this.ensureStarted();
-    if (!this.node) throw new Error('CadreNode not running');
-
-    const strandId = await this.getOrCreateValue(DEFAULT_STRAND_ID_KEY);
-
-    const existing = this.node.getStrands().get(strandId);
-    if (existing) return existing;
-
-    // Lazy import so the chat-sApp module (and its .qsql side import) only
-    // loads when the chat layer actually asks for a strand.
-    const { createChatStrand } = await import('./chat-sapp');
-    console.info('[CadreService] creating default chat strand:', strandId);
-    const instance = await createChatStrand(this.node, strandId);
-    console.info(
-      '[CadreService] ✓ default chat strand attached. status:',
-      instance.status,
-      ' database:',
-      !!instance.database,
-    );
-    return instance;
   }
 
   // -----------------------------------------------------------------------

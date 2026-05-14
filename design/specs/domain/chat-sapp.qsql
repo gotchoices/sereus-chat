@@ -1,0 +1,28 @@
+-- Sereus Chat sApp schema — applied to every chat strand.
+-- StrandDatabase wraps this DDL in `declare schema App { … }; apply schema App;`
+-- so tables are referenced as App.Member / App.Message / App.Attachment.
+
+table Member (
+    Id text primary key,                -- libp2p Peer ID of the participating member
+    Name text not null check (length(Name) between 1 and 100),
+    AvatarUri text
+);
+
+table Message (
+    Id integer primary key,
+    MemberId text not null,
+    Content text not null,
+    Timestamp datetime not null,
+    Status text,                        -- advisory: sent / delivered / read
+    foreign key (MemberId) references Member(Id)
+);
+
+table Attachment (
+    Id integer primary key,
+    MessageId integer not null,
+    Type text not null,                 -- image | video | file | location
+    Uri text not null,                  -- blob ref, CID, or local file
+    MimeType text,
+    Name text,
+    foreign key (MessageId) references Message(Id)
+);

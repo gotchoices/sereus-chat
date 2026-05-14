@@ -1,12 +1,17 @@
 /**
- * chat-sapp.ts — sApp config and strand create/join helpers for the chat app.
+ * chat-sapp.ts — chat-specific sApp config and strand create/join helpers.
  *
  * The schema lives at design/specs/domain/chat-sapp.qsql and is loaded as a
  * raw string by the Metro transformer (see metro.transformer.js).
  *
+ * Lives in the data layer (chat-specific).  The cadre layer reads
+ * `CHAT_SAPP_ID` from here for `strandFilter` configuration — that single
+ * import is the only chat → cadre coupling and is flagged for replacement
+ * with a configure(sAppId) call at extraction time.
+ *
  * Mirrors the pattern in:
  *   sereus/packages/reference-app-rn/src/chat-strand.ts
- *   health/apps/mobile/src/services/CadreService.ts (extractInnerDDL)
+ *   ser/health/apps/mobile/src/services/CadreService.ts (extractInnerDDL)
  */
 
 import type {
@@ -21,7 +26,8 @@ import type {
 // @ts-ignore — .qsql is a custom Metro source extension; no .d.ts shipped.
 import CHAT_SCHEMA_RAW from '../../../../design/specs/domain/chat-sapp.qsql';
 
-import { CHAT_SAPP_ID } from './CadreService';
+/** sApp ID for the chat app — matches design/specs/project.md. */
+export const CHAT_SAPP_ID = 'org.sereus.chat';
 
 const SAPP_VERSION = '0.1.0';
 
@@ -45,8 +51,8 @@ export function getChatSAppConfig(): SAppConfig {
     id: CHAT_SAPP_ID,
     version: SAPP_VERSION,
     schema: CHAT_SCHEMA_DDL,
-    // Signature placeholder — chat uses open strands today (Type: 'o').  When
-    // closed strands or signed schemas are required, this will be populated.
+    // Signature placeholder — chat uses open strands today (Type: 'o').
+    // Closed/signed strands will populate this when wired up.
     signature: '',
     latencyHint: 'interactive',
   } as SAppConfig;

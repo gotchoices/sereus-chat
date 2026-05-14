@@ -9,16 +9,15 @@ import { USE_SEREUS } from './src/data/config';
 export default function App() {
   useEffect(() => {
     if (!USE_SEREUS) return;
-    // Step 1+2 smoke test: boot the cadre layer in the background and attach
-    // the default chat strand.  Errors are logged; the rest of the app keeps
-    // running on mocks until adapter operations are wired up.
+    // Boot the cadre layer in the background and attach the default chat
+    // strand so the live data path is warm by the time the user opens a
+    // chat screen.  Errors are logged; the rest of the app keeps running.
     (async () => {
       try {
-        const { cadreService } = await import('./src/cadre');
-        await cadreService.ensureStarted();
-        await cadreService.getOrCreateDefaultStrand();
+        const { ensureDefaultChatStrand } = await import('./src/data/chat-strand');
+        await ensureDefaultChatStrand();
       } catch (err) {
-        console.error('[App] CadreService boot failed:', err);
+        console.error('[App] cadre boot failed:', err);
       }
     })();
   }, []);

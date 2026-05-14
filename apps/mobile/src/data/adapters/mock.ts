@@ -37,9 +37,17 @@ export class MockAdapter implements DataAdapter {
     return (source as ChatMessage[]).filter(m => m.strandId === strandId);
   }
 
-  async sendMessage(_strandId: string, _text: string): Promise<ChatMessage> {
-    // Mock: no-op, handled locally in UI
-    throw new Error('Mock sendMessage not implemented');
+  async sendMessage(strandId: string, text: string): Promise<ChatMessage> {
+    // Mock: synthesize a message; not persisted across reloads.
+    return {
+      id: `m-${Date.now()}`,
+      strandId,
+      sender: 'Me',
+      text,
+      timestamp: new Date().toISOString(),
+      outgoing: true,
+      status: 'sent',
+    };
   }
 
   async searchStrands(query: string): Promise<StrandSummary[]> {
