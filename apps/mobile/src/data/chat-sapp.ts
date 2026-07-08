@@ -51,20 +51,35 @@ export function getChatSAppConfig(): SAppConfig {
     id: CHAT_SAPP_ID,
     version: SAPP_VERSION,
     schema: CHAT_SCHEMA_DDL,
-    // Signature placeholder — chat uses open strands today (Type: 'o').
-    // Closed/signed strands will populate this when wired up.
+    // Unsigned.  cadre-core 0.8 verifies this fail-closed, so CadreService
+    // sets `requireSignedSchemas: false`.  Signing requires `id` to be an
+    // ed25519 author public key rather than the reverse-DNS name below —
+    // changing that is an sApp-identity decision, not a config tweak.
     signature: '',
     latencyHint: 'interactive',
   } as SAppConfig;
 }
 
 /**
- * Create a new chat strand on the given cadre node.
+ * Create a new open chat strand on the given cadre node.
  *
- * `mode: 'bootstrap'` skips consensus round-trips that can't complete with
- * zero peers — schema apply / DML route through the local optimystic
- * transactor backed by the strand's own LevelDB store.  Solo-mode by design;
- * a future step will restart strands in 'networked' mode once peers attach.
+ * Prescribed order (sereus reference-app-rn/src/chat-strand.ts):
+ *   1. `publishStrand` — the authority-signed `Strand` row in the control DB.
+ *      This is what makes the strand discoverable/joinable by anyone else.
+ *   2. `addStrand`     — start the LOCAL strand instance.  `founder: true`
+ *      runs the one-time membership bootstrap (writes `Strand.Header`).
+ *
+ * `mode` is deliberately NOT pinned to `'bootstrap'` any more.  Since 0.8,
+ * CadreNode infers it from cohort membership — `bootstrap` while we're a solo
+ * node with no other `CadrePeer` rows, `networked` once the cohort has other
+ * members.  Hardcoding `'bootstrap'` would keep the strand solo forever.
+ *
+ * Step 1 is fail-soft.  Publishing needs authority genesis to have succeeded
+ * and, in solo mode, writes to the control DB do not reliably survive a
+ * restart (tmp/cadre-key-recovery-upstream.md §1) — so a re-created default
+ * strand may attempt to publish a row that already exists.  The local strand
+ * must still come up in both cases, otherwise the app cannot boot at all.
+ * A failure here means "not shareable yet", not "broken".
  */
 export async function createChatStrand(
   cadreNode: CadreNode,
@@ -76,22 +91,34 @@ export async function createChatStrand(
     Type: 'o', // open — strand type is the user's choice; default to open
   };
 
+  try {
+    await cadreNode.publishStrand(strandId, 'o');
+  } catch (err) {
+    console.warn(
+      `[chat-sapp] publishStrand(${strandId}) failed — strand will be local-only ` +
+        'until it can be published (needs authority genesis + a reachable cohort):',
+      err,
+    );
+  }
+
   return cadreNode.addStrand({
-    mode: 'bootstrap',
     strandRow,
     sAppConfig: getChatSAppConfig(),
+    founder: true,
   });
 }
 
 /**
  * Join an existing chat strand that surfaced via the control network.
+ *
+ * No `founder` — a joiner writes no membership rows; it receives them via
+ * Optimystic sync.  No `mode` — inferred, as above.
  */
 export async function joinChatStrand(
   cadreNode: CadreNode,
   strandRow: StrandRow,
 ): Promise<StrandInstance> {
   return cadreNode.addStrand({
-    mode: 'bootstrap',
     strandRow,
     sAppConfig: getChatSAppConfig(),
   });

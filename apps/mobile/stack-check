@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+#
+# chat/apps/mobile/stack-check — chat-specific stack sanity check.
+#
+# Only meaningful in `local` stack mode (see use-stack.sh).  Verifies that
+# every ser dependency this app consumes is wired up correctly:
+#   1. Every @optimystic/*, @quereus/*, @serfab/*, @sereus/*, p2p-fret dep in
+#      this app's package.json resolves via a local portal / link / file /
+#      workspace spec (not via npmjs.org).
+#   2. Every such portal'd target package exists on disk and has a built
+#      `main` file.
+#
+# In `npm` mode this script short-circuits: the ser packages are supposed to
+# come from the registry, so there is nothing to audit here.
+#
+# Generic stack maintenance (pulling repos, building libraries) belongs to
+# `ser/pull-stack.sh`.  This script does NOT pull or build — run pull-stack.sh
+# first if it reports stale builds.
+#
+# Usage:
+#   bash stack-check        # full chat-specific audit
+#
+# Exit code = number of issues found (0 = clean).
+
+set -uo pipefail
+
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SER_ROOT="$(cd "$APP_DIR/../../.." && pwd)"
+
+MODE=$(python3 -c "
+import json,sys
+p=json.load(open('$APP_DIR/package.json'))
+spec=str((p.get('dependencies') or {}).get('@serfab/cadre-core',''))
+print('local' if spec.startswith('portal:') else 'npm')
+")
+
+if [ "$MODE" = "npm" ]; then
+  echo "Stack mode: NPM — ser packages resolve from npmjs.org; nothing to audit."
+  echo "Run 'bash use-stack.sh local' first if you meant to check portal wiring."
+  exit 0
+fi
+
+ISSUES=0
+hr() { echo; echo "============================================================"; echo "$*"; echo "============================================================"; }
+
+hr "Chat portal coverage in $(basename "$APP_DIR")/package.json"
+
+REPORT=$(APP_DIR="$APP_DIR" SER_ROOT="$SER_ROOT" python3 - <<'PY'
+import json, os
+APP_DIR  = os.environ['APP_DIR']
+SER_ROOT = os.environ['SER_ROOT']
+pj_path  = os.path.join(APP_DIR, 'package.json')
+p = json.load(open(pj_path))
+deps = {**(p.get('dependencies') or {}), **(p.get('devDependencies') or {})}
+res  = p.get('resolutions') or {}
+
+# Any dep whose name starts with these prefixes — or matches one of these
+# loose names — is considered "ser-local" and must resolve via portal/link.
+# rn-leveldb is deliberately NOT listed: chat consumes it from npmjs in both
+# stack modes even though a clone exists at ser/rn-leveldb.
+LOCAL_PREFIXES = ('@optimystic/', '@quereus/', '@serfab/', '@sereus/')
+LOCAL_LOOSE    = ('p2p-fret',)
+
+def is_local_dep(name):
+    return name.startswith(LOCAL_PREFIXES) or name in LOCAL_LOOSE
+
+def is_local_spec(spec):
+    return isinstance(spec, str) and spec.startswith(('portal:', 'link:', 'file:', 'workspace:'))
+
+def resolve_portal_target(spec):
+    """portal:../../../optimystic/packages/db-core → absolute path"""
+    if not isinstance(spec, str) or ':' not in spec:
+        return None
+    proto, rel = spec.split(':', 1)
+    if proto not in ('portal', 'link', 'file'):
+        return None
+    return os.path.normpath(os.path.join(APP_DIR, rel))
+
+issues = 0
+ok_count = 0
+
+# Pass 1: every ser-local dep must use a local spec.
+print('  -- dependency specs --')
+for name in sorted(deps):
+    spec = deps[name]
+    if is_local_dep(name):
+        if is_local_spec(spec):
+            print(f"  OK   {name:<55s} {spec}")
+            ok_count += 1
+        else:
+            print(f"  FAIL {name:<55s} {spec}   (resolves via registry, not portal)")
+            issues += 1
+
+# Pass 2: every ser-local resolution must also be local.
+print('  -- resolutions --')
+res_local = [(n, s) for n, s in sorted(res.items()) if is_local_dep(n)]
+if res_local:
+    for name, spec in res_local:
+        if is_local_spec(spec):
+            print(f"  OK   {name:<55s} {spec}")
+        else:
+            print(f"  FAIL {name:<55s} {spec}   (resolution resolves via registry)")
+            issues += 1
+else:
+    print('  (no ser-local resolutions configured)')
+
+# Pass 3: every portal/link target must exist + have a built main file.
+print('  -- portal target build state --')
+seen = set()
+all_specs = list(deps.items()) + list(res.items())
+for name, spec in all_specs:
+    if name in seen: continue
+    seen.add(name)
+    if not (is_local_dep(name) and is_local_spec(spec)):
+        continue
+    target = resolve_portal_target(spec)
+    if not target or not os.path.isdir(target):
+        print(f"  FAIL {name:<55s} portal target missing: {target}")
+        issues += 1
+        continue
+    target_pj = os.path.join(target, 'package.json')
+    if not os.path.isfile(target_pj):
+        print(f"  FAIL {name:<55s} no package.json at {target}")
+        issues += 1
+        continue
+    try:
+        tp = json.load(open(target_pj))
+    except Exception as e:
+        print(f"  FAIL {name:<55s} package.json unreadable: {e}")
+        issues += 1
+        continue
+    main = tp.get('main')
+    if not main:
+        # Some packages (exports map only, no `main`) are fine.
+        print(f"  note {name:<55s} no `main` declared at {os.path.relpath(target, SER_ROOT)}")
+        continue
+    full = os.path.join(target, main)
+    if os.path.exists(full):
+        print(f"  OK   {name:<55s} built ({os.path.relpath(full, SER_ROOT)})")
+    else:
+        print(f"  FAIL {name:<55s} unbuilt — missing {main} at {os.path.relpath(target, SER_ROOT)}")
+        issues += 1
+
+print(f"__SUMMARY__ ok={ok_count} issues={issues}")
+PY
+)
+echo "$REPORT" | grep -v '^__SUMMARY__'
+SUMMARY=$(echo "$REPORT" | grep '^__SUMMARY__')
+RUN_ISSUES=$(echo "$SUMMARY" | sed -n 's/.*issues=\([0-9][0-9]*\).*/\1/p')
+ISSUES=$((ISSUES + ${RUN_ISSUES:-0}))
+
+echo
+if [ "$ISSUES" = "0" ]; then
+  echo "Result: CLEAN — chat/apps/mobile is wired up correctly."
+else
+  echo "Result: $ISSUES issue(s) above need attention."
+  REL_SER=$(python3 -c "import os,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))" "$SER_ROOT" "$APP_DIR")
+  echo "        For pulling/building the ser/ libs, run: bash $REL_SER/pull-stack.sh"
+fi
+
+exit "$ISSUES"

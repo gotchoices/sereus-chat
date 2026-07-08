@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Share, Switch, Platform, ToastAndroid } from 'react-native';
 import { useT } from '../i18n';
 import { createInvitation } from '../data/adapter';
@@ -11,24 +11,40 @@ export default function InvitationGenerator() {
   const t = useT();
   const [includeQR, setIncludeQR] = useState(true);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const qrRef = useRef<QRCode | null>(null);
 
-  useEffect(() => {
-    (async () => {
+  // Minting an invitation talks to the live cadre and can legitimately fail —
+  // e.g. `createOpenInvitation` throws "No multiaddrs available for
+  // invitation" until this device has a dialable address (it needs a node in
+  // its cadre to relay through).  Never let that surface as an unhandled
+  // rejection with the UI stuck on "Generating...".
+  const generate = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
       const inv = await createInvitation();
       setInvitation(inv);
-    })();
+    } catch (err) {
+      setInvitation(null);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    void generate();
+  }, [generate]);
+
+  // Must match the deep-link prefixes registered in navigation/AppNavigator.
   const inviteLink = useMemo(() => {
     if (!invitation) return '';
-    return `sereus://invite/${invitation.token}`;
+    return `chat://invite/${invitation.token}`;
   }, [invitation]);
 
-  const onRegenerate = async () => {
-    const inv = await createInvitation();
-    setInvitation(inv);
-  };
+  const onRegenerate = generate;
 
   const onShare = async () => {
     if (!inviteLink) return;
@@ -59,15 +75,35 @@ export default function InvitationGenerator() {
   };
   const shareIcon = Platform.select({ ios: 'share-outline', android: 'share-social-outline', default: 'share-outline' }) as string;
 
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>{t('screens.InvitationGenerator.title', 'Invite Friends')}</Text>
+        <View style={styles.card}>
+          <Text style={styles.errorTitle} testID="invite-error-title">
+            {t('screens.InvitationGenerator.errorTitle', "Can't create an invitation yet")}
+          </Text>
+          <Text style={styles.errorBody} testID="invite-error">{error}</Text>
+          <TouchableOpacity style={styles.regenBtn} onPress={onRegenerate} testID="invite-retry">
+            <Ionicons name="refresh-outline" size={18} color="#0066cc" />
+            <Text style={styles.regenText}>{t('screens.InvitationGenerator.retry', 'Try again')}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{t('screens.InvitationGenerator.title', 'Invite Friends')}</Text>
       <View style={styles.card}>
         <Text style={styles.label}>{t('screens.InvitationGenerator.labelLink', 'Invitation Link')}</Text>
         <View style={styles.linkRow}>
-          <Text selectable style={styles.link} numberOfLines={1} ellipsizeMode="middle" testID="invite-link">{inviteLink || 'Generating...'}</Text>
-          <TouchableOpacity onPress={onCopy} accessibilityLabel="Copy link" testID="invite-copy" style={styles.copyBtn}>
-            <Ionicons name="copy-outline" size={18} color="#0066cc" />
+          <Text selectable style={styles.link} numberOfLines={1} ellipsizeMode="middle" testID="invite-link">
+            {inviteLink || (loading ? t('screens.InvitationGenerator.generating', 'Generating...') : '')}
+          </Text>
+          <TouchableOpacity onPress={onCopy} accessibilityLabel="Copy link" testID="invite-copy" style={styles.copyBtn} disabled={!inviteLink}>
+            <Ionicons name="copy-outline" size={18} color={inviteLink ? '#0066cc' : '#aaa'} />
           </TouchableOpacity>
         </View>
         <View style={styles.toggleRow}>
@@ -109,6 +145,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
   card: { borderWidth: 1, borderColor: '#eee', borderRadius: 12, padding: 16 },
   label: { color: '#666', marginBottom: 6 },
+  errorTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
+  errorBody: { color: '#666', marginBottom: 16, lineHeight: 20 },
   linkRow: { flexDirection: 'row', alignItems: 'center' },
   link: { flex: 1, fontSize: 14, color: '#0066cc' },
   copyBtn: { marginLeft: 8, padding: 6 },

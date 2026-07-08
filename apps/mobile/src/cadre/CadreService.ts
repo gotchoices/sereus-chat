@@ -20,6 +20,7 @@
 
 import {
   CadreNode,
+  ControlFormationUsageRecorder,
   type CadreNodeConfig,
   type CadreNodeEvents,
   type ControlDatabase,
@@ -37,7 +38,6 @@ import {
 } from '@optimystic/db-p2p-storage-rn';
 import { LevelDB, LevelDBWriteBatch } from 'rn-leveldb';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { generatePrivateKey, getPublicKey } from '@optimystic/quereus-plugin-crypto';
 
 // TODO(extraction): replace this one chat-aware import with a configure({
 // sAppId }) call before ensureStarted, so the cadre layer is a clean
@@ -52,10 +52,6 @@ type EventHandler<T> = (payload: T) => void;
 // ---------------------------------------------------------------------------
 
 const PARTY_ID_KEY = '@sereus.chat/partyId';
-// TODO(secure-storage): authority private keys belong in
-// Keychain/Keystore (e.g. react-native-keychain, expo-secure-store).
-// AsyncStorage is acceptable for dev only.
-const AUTHORITY_PRIV_KEY = '@sereus.chat/authorityPrivateKey';
 
 /**
  * LevelDB directory naming for optimystic stores.
@@ -125,106 +121,111 @@ class CadreServiceImpl {
   // Authority key + seed flows
   // -----------------------------------------------------------------------
 
-  /** True iff an authority key has been created and is wired into seed flows. */
+  /** True iff authority genesis has run and seed flows are armed. */
   get hasAuthorityKey(): boolean {
     return this._authorityPublicKey !== null;
   }
 
-  /** The authority public key (base64url) — populated after createAuthorityKey or restore from AsyncStorage. */
+  /** The authority public key (base64url) — populated by authority genesis. */
   get authorityPublicKey(): string | null {
     return this._authorityPublicKey;
   }
 
   /**
-   * Create the cadre's authority key (Ed25519), persist the private half,
-   * register the public half in the Control DB, and arm the seed bootstrap
-   * service.  Idempotent — returns immediately if a key already exists.
+   * Run authority genesis.  Idempotent, and safe to call on every start.
    *
-   * Encoding matches `@optimystic/quereus-plugin-crypto` defaults
-   * (base64url) — same package cadre-core uses internally.
+   * cadre-core 0.8 uses a SINGLE-KEY model: the cadre's authority key is
+   * *derived from the node identity* (`authorityKeyFromLibp2p`), not an
+   * independent keypair.  `publishStrand`, `publishFormationInvite` and
+   * `registerSelf` all sign with `getSelfSigningKey()`, which refuses to
+   * sign unless the derived public key matches the control node's PeerId.
    *
-   * Storage: AsyncStorage today (TODO: Keychain/Keystore via
-   * react-native-keychain or expo-secure-store).
+   * So generating a *separate* random authority key — what this service did
+   * against cadre-core 0.7 — puts a key in `CadreControl.AuthorityKey` that
+   * nothing will ever sign with.  Don't.
+   *
+   * `ensureAuthorityKey` is idempotent: it inserts only when the table is
+   * empty, which also subsumes the old `reestablishAuthorityKeyRow()`
+   * workaround for solo-mode control-DB writes not surviving a restart.
+   */
+  private async runAuthorityGenesis(): Promise<string> {
+    if (!this.node) throw new Error('CadreNode not running');
+
+    // Throws on an ephemeral libp2p identity; we always pass an explicit
+    // Ed25519 `privateKey`, so the identity is resolved and Ed25519.
+    const { privateKeyB64, publicKeyB64 } = this.node.getIdentityAuthorityKey();
+
+    const controlDb = this.node.getControlDatabase();
+    if (!controlDb) throw new Error('Control database not available');
+
+    const inserted = await controlDb.ensureAuthorityKey(publicKeyB64);
+    this.node.initializeSeedBootstrap(privateKeyB64);
+    this._authorityPublicKey = publicKeyB64;
+
+    console.info(
+      inserted
+        ? '[CadreService] ✓ authority genesis: inserted founding key, seed flows enabled'
+        : '[CadreService] ✓ authority key already present, seed flows enabled',
+    );
+    return publicKeyB64;
+  }
+
+  /**
+   * Public entry point for the "create authority key" UI affordance.  Under
+   * the 0.8 single-key model there is nothing to *create* — the key already
+   * exists as the node identity — so this just runs (idempotent) genesis and
+   * surfaces failures to the caller.
    */
   async createAuthorityKey(): Promise<{ publicKey: string }> {
     await this.ensureStarted();
-    if (!this.node) throw new Error('CadreNode not running');
-
-    if (this._authorityPublicKey) {
-      return { publicKey: this._authorityPublicKey };
-    }
-
-    const privateKey = generatePrivateKey('ed25519', 'base64url') as string;
-    const publicKey = getPublicKey(privateKey, 'ed25519', 'base64url', 'base64url') as string;
-
-    const controlDb = this.node.getControlDatabase();
-    if (!controlDb) throw new Error('Control database not available');
-
-    await controlDb.insertAuthorityKey(publicKey);
-    await AsyncStorage.setItem(AUTHORITY_PRIV_KEY, privateKey);
-    this.node.initializeSeedBootstrap(privateKey);
-    this._authorityPublicKey = publicKey;
-
-    console.info('[CadreService] ✓ authority key created and seed flows enabled');
+    const publicKey = await this.runAuthorityGenesis();
     return { publicKey };
   }
 
   /**
-   * Reveal the active authority private key for offline backup.  Use only
-   * from explicit user-confirmed UI ("Export key for recovery") — never log,
-   * never persist outside its existing slot.  Returns base64url string or
-   * null if no key has been created yet.
+   * Reveal the authority private key for offline backup.  Use only from
+   * explicit user-confirmed UI ("Export key for recovery") — never log it.
+   *
+   * Because authority == node identity, this IS the device's identity secret.
+   * It is derived on demand from the identity key held in the control
+   * LevelDB; it is never copied into AsyncStorage.
    */
   async exportAuthorityPrivateKey(): Promise<string | null> {
-    return AsyncStorage.getItem(AUTHORITY_PRIV_KEY);
+    await this.ensureStarted();
+    if (!this.node) return null;
+    try {
+      return this.node.getIdentityAuthorityKey().privateKeyB64;
+    } catch (err) {
+      console.warn('[CadreService] exportAuthorityPrivateKey failed:', err);
+      return null;
+    }
   }
 
   /**
-   * Install an externally-supplied authority private key (base64url) — the
-   * "import recovery key" path.  Validates the key derives a proper Ed25519
-   * public key and the cadre control table is currently empty (otherwise
-   * we'd need signed-add, which the upstream API doesn't yet expose; see
-   * apps/mobile/tmp/cadre-key-recovery-upstream.md §2).
+   * Not supported under cadre-core 0.8's single-key model.
+   *
+   * The authority key is derived from the node identity, and
+   * `getSelfSigningKey()` refuses to sign with any key whose public half
+   * doesn't match the control node's PeerId.  Installing a foreign authority
+   * private key would therefore produce a node that believes it is an
+   * authority but cannot sign anything.
+   *
+   * Recovering a cadre means restoring the *node identity* key (the value
+   * `exportAuthorityPrivateKey()` returns) into the control store before the
+   * node starts, or enrolling this device as a new peer of the existing
+   * cadre via a seed.  See tmp/cadre-key-recovery-upstream.md.
    */
-  async importAuthorityKey(privateKeyB64u: string): Promise<{ publicKey: string }> {
-    await this.ensureStarted();
-    if (!this.node) throw new Error('CadreNode not running');
-
-    const trimmed = privateKeyB64u.trim();
-    let publicKey: string;
-    try {
-      publicKey = getPublicKey(trimmed, 'ed25519', 'base64url', 'base64url') as string;
-    } catch {
-      throw new Error('Invalid key: not a base64url-encoded Ed25519 private key');
-    }
-
-    const controlDb = this.node.getControlDatabase();
-    if (!controlDb) throw new Error('Control database not available');
-
-    // Refuse if a different key is already installed.  Re-importing the
-    // same key (e.g., user pastes back what they exported) is fine — we
-    // detect and short-circuit.
-    if (this._authorityPublicKey && this._authorityPublicKey !== publicKey) {
-      throw new Error(
-        'A different authority key is already installed.  Multi-key add is not yet supported (see upstream report §2).',
-      );
-    }
-    if (this._authorityPublicKey === publicKey) {
-      return { publicKey };
-    }
-
-    await AsyncStorage.setItem(AUTHORITY_PRIV_KEY, trimmed);
-    this.node.initializeSeedBootstrap(trimmed);
-    this._authorityPublicKey = publicKey;
-    await this.reestablishAuthorityKeyRow();
-
-    console.info('[CadreService] ✓ authority key imported and seed flows enabled');
-    return { publicKey };
+  async importAuthorityKey(_privateKeyB64u: string): Promise<{ publicKey: string }> {
+    throw new Error(
+      'Importing a standalone authority key is not supported: since cadre-core 0.8 the ' +
+        'authority key is derived from this device\'s node identity. To recover a cadre, ' +
+        'restore the node identity key, or enrol this device with a seed from an existing node.',
+    );
   }
 
   /**
    * Generate a base64url-encoded seed for transporting cadre membership to a
-   * new node (typically a drone via cadre-cli).  Requires an authority key.
+   * new node (typically a drone via cadre-cli).  Requires authority genesis.
    */
   async createDroneSeed(): Promise<string> {
     await this.ensureStarted();
@@ -288,6 +289,16 @@ class CadreServiceImpl {
           // RN cannot listen for inbound connections.
           listenAddrs: [],
         },
+        // cadre-core 0.8 verifies the sApp schema signature fail-closed
+        // (`requireSignedSchemas ?? true` in strand-instance-manager).  Our
+        // sApp config carries `signature: ''` and its `id` is a name
+        // (`org.sereus.chat`) rather than an ed25519 author public key, so it
+        // cannot be verified — every addStrand() would throw
+        // SchemaVerificationError('missing signature').
+        //
+        // The reference app relaxes the policy for exactly this reason.  Flip
+        // this back on once the chat sApp schema is signed with an author key.
+        requireSignedSchemas: false,
       };
 
       console.info('[CadreService] creating CadreNode...');
@@ -299,30 +310,27 @@ class CadreServiceImpl {
         this.node.peerId?.toString(),
       );
 
-      // Re-arm seed bootstrap with a previously-created authority key.
-      // Errors are non-fatal; the user can still chat without seed flows.
-      const storedAuthorityPriv = await AsyncStorage.getItem(AUTHORITY_PRIV_KEY);
-      if (storedAuthorityPriv) {
-        try {
-          this.node.initializeSeedBootstrap(storedAuthorityPriv);
-          this._authorityPublicKey = getPublicKey(
-            storedAuthorityPriv, 'ed25519', 'base64url', 'base64url',
-          ) as string;
-          console.info('[CadreService] ✓ authority key restored, seed flows enabled');
+      // Authority genesis — idempotent, and the prerequisite for publishing
+      // strands, minting formation invites, and self-registering as a peer.
+      // Fail-soft: a node without an authority key can still read and write
+      // its own strands, it just can't publish or invite.  Mirrors
+      // `runAuthorityGenesis` in sereus reference-app-rn/src/cadre-phone.ts.
+      try {
+        await this.runAuthorityGenesis();
+      } catch (err) {
+        console.warn('[CadreService] authority genesis failed:', err);
+      }
 
-          // Solo-mode workaround: ControlDatabase uses optimystic's network
-          // transactor unconditionally and lacks the `mode: 'bootstrap'`
-          // option that StrandDatabase has.  Without consensus peers, writes
-          // to CadreControl.AuthorityKey don't survive a process restart.
-          // Re-establish the row from the persistent private key so the UI
-          // (which queries the table) stays consistent.
-          //
-          // Drop this when the upstream change in
-          // apps/mobile/tmp/cadre-key-recovery-upstream.md §1 lands.
-          await this.reestablishAuthorityKeyRow();
-        } catch (err) {
-          console.warn('[CadreService] failed to restore authority key:', err);
-        }
+      // Formation responder.  This is a SECURITY GATE, not an optimisation:
+      // `createOpenInvitation`/`formStrand` lazily spin up a solicitation
+      // service with NO usage recorder if one isn't already installed, and
+      // that service accepts every token presented to it.  Binding the
+      // ControlFormationUsageRecorder to the live control DB makes token
+      // validity and single-use enforcement real.
+      try {
+        await this.initializeFormationResponder();
+      } catch (err) {
+        console.warn('[CadreService] formation responder init failed:', err);
       }
     } catch (err) {
       this._startError = err instanceof Error ? err.message : String(err);
@@ -332,38 +340,19 @@ class CadreServiceImpl {
   }
 
   /**
-   * Re-insert the authority public key into CadreControl.AuthorityKey when
-   * the table is empty.  See doStart's call site for context.
-   *
-   * Safe because the schema's bootstrap clause `(count(AuthorityKey) <= 1)`
-   * accepts an unsigned insert when the table is empty.  No-ops when a row
-   * already exists.
+   * Install the strand-formation responder, backed by the control DB's
+   * `FormationInvite` / `FormationUsage` tables.  Without this, an invitation
+   * token is never actually checked (see doStart's call site).
    */
-  private async reestablishAuthorityKeyRow(): Promise<void> {
-    if (!this.node || !this._authorityPublicKey) return;
+  private async initializeFormationResponder(): Promise<void> {
+    if (!this.node) throw new Error('CadreNode not running');
     const controlDb = this.node.getControlDatabase();
-    if (!controlDb) return;
+    if (!controlDb) throw new Error('Control database not available');
 
-    let hasAnyKey = false;
-    try {
-      const db = controlDb.getDatabase();
-      for await (const _ of db.eval('select Key from CadreControl.AuthorityKey limit 1')) {
-        hasAnyKey = true;
-        break;
-      }
-    } catch (err) {
-      // Table may not be queryable yet; treat as absent.
-      console.warn('[CadreService] AuthorityKey probe failed:', err);
-    }
-
-    if (!hasAnyKey) {
-      try {
-        await controlDb.insertAuthorityKey(this._authorityPublicKey);
-        console.info('[CadreService] re-inserted authority key row (solo-mode workaround)');
-      } catch (err) {
-        console.warn('[CadreService] failed to re-insert authority key row:', err);
-      }
-    }
+    this.node.initializeStrandSolicitation({
+      formationUsageRecorder: new ControlFormationUsageRecorder(controlDb),
+    });
+    console.info('[CadreService] ✓ formation responder installed (token validity enforced)');
   }
 
   /** Stop the CadreNode gracefully.  Idempotent. */

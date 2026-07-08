@@ -7,9 +7,13 @@ import type { DataAdapter } from '../adapter';
 import type { Profile, StrandSummary, ChatMessage, Invitation } from '../types';
 import { ensureDefaultChatStrand, syncProfileNameToStrands } from '../chat-strand';
 import { queryMessages, insertMessage } from '../chat-operations';
+import { CHAT_SAPP_ID } from '../chat-sapp';
 import { cadreService } from '../../cadre';
 
 const PROFILE_KEY = '@sereus.chat/profile';
+
+/** Open invitations are valid for 24h — matches the cadre-core default. */
+const INVITE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 export class SereusAdapter implements DataAdapter {
   private notImplemented(op: string): never {
@@ -160,10 +164,58 @@ export class SereusAdapter implements DataAdapter {
     }
   }
 
+  // ── Invitations ───────────────────────────────────────────────────────
+
+  /**
+   * Mint an open invitation to the default chat strand.
+   *
+   * Prescribed sequence (sereus reference-app-rn `createClosedStrandWithInvite`):
+   *   1. `createOpenInvitation(sAppId, expiry)` — mints the out-of-band
+   *      envelope only.  Inert on its own.
+   *   2. `publishFormationInvite(token, sAppId, { expiresAtMs, strandId })` —
+   *      writes the authority-signed `FormationInvite` row that makes the
+   *      token redeemable, bound to our existing strand.  Without this the
+   *      responder would mint a *fresh* strand on redemption instead of
+   *      provisioning ours.
+   *   3. `encodeInvitation(...)` — the single base64url code we hand out.
+   *
+   * The token in the returned `Invitation` is the ENCODED invitation, not the
+   * raw `invitation.token`; that's what the invitee feeds to `formStrand`.
+   *
+   * Expected failure: `createOpenInvitation` throws
+   * `'No multiaddrs available for invitation'` on a solo node.  React Native
+   * sets `listenAddrs: []`, so this device has no dialable address until it
+   * holds a relay reservation via a drone/server in its cadre.  In other
+   * words: you must add a node to your cadre before you can invite anyone.
+   * That is a real precondition, not a bug — surface it to the user.
+   */
   async createInvitation(): Promise<Invitation> {
-    this.notImplemented('createInvitation');
+    const strand = await ensureDefaultChatStrand();
+    const node = cadreService.cadreNode;
+    if (!node) throw new Error('Cadre is not running');
+
+    const invitation = await node.createOpenInvitation(CHAT_SAPP_ID, INVITE_EXPIRY_MS);
+
+    await node.publishFormationInvite(invitation.token, CHAT_SAPP_ID, {
+      expiresAtMs: invitation.expiration.getTime(),
+      strandId: strand.strandId,
+    });
+
+    return {
+      token: node.encodeInvitation(invitation),
+      strandId: strand.strandId,
+      createdAt: new Date().toISOString(),
+      expiresAt: invitation.expiration.toISOString(),
+    };
   }
 
+  /**
+   * Redeem an encoded invitation.  Still unwired: `formStrand` performs a
+   * consent handshake with the host over libp2p, so it needs a reachable
+   * host — it cannot be exercised on a single device.  Wiring it also means
+   * handling `FormStrandResult.memberPrivateKey` (NOT `invitePrivateKey`)
+   * when attaching the resulting strand.  See STATUS.md "First partner".
+   */
   async acceptInvitation(_token: string): Promise<{ strandId: string }> {
     this.notImplemented('acceptInvitation');
   }
