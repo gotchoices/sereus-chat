@@ -32,7 +32,10 @@ export default function App() {
         const { ensureDefaultChatStrand } = await import('./src/data/chat-strand');
         await ensureDefaultChatStrand();
       } catch (err) {
-        console.error('[App] cadre boot failed:', err);
+        // Expected on a solo node: attaching the default strand reads the
+        // control DB, which times out without a cohort.  It attaches once the
+        // phone joins a cadre (a drone/relay).  Warn, don't error.
+        console.warn('[App] default strand not attached yet:', err instanceof Error ? err.message : err);
       }
     })();
   }, []);

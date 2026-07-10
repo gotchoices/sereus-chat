@@ -17,6 +17,13 @@ export const AUTHORITY_GENESIS_TIMEOUT_MS = 20_000;
 export const CONTROL_OP_TIMEOUT_MS = 15_000;
 
 /**
+ * Shorter cap for control-DB reads that back UI (e.g. the CadreManager device
+ * list).  Solo, these reads never return; we want the screen to render its
+ * actions promptly rather than spin, so the read is best-effort.
+ */
+export const CONTROL_READ_UI_TIMEOUT_MS = 6_000;
+
+/**
  * Reject with a clear error if `p` hasn't settled within `ms`.  The underlying
  * promise is left to settle on its own (we can't cancel it); this just stops
  * the caller from awaiting a control op that never acknowledges.

@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from 'react';
 import { cadreService } from '../cadre';
+import { withTimeout, CONTROL_READ_UI_TIMEOUT_MS } from '../cadre/async';
 
 export type CadreKeyType = 'vault' | 'external' | 'dongle';
 export type CadreKeyProtection = 'login' | 'biometric' | 'password';
@@ -68,22 +69,35 @@ export function useCadreManager(): CadreManagerState & { refresh: () => Promise<
       await cadreService.ensureStarted();
       const partyId = cadreService.partyId;
       const peerId = cadreService.peerId ?? null;
-      const keys = await readKeys();
-      const remoteNodes = await readRemoteNodes(peerId);
-      const nodes: CadreNodeRow[] = peerId
-        ? [thisDeviceRow(peerId), ...remoteNodes]
-        : remoteNodes;
-      setState({
+
+      // Render immediately with node identity + "This device".  The AuthorityKey
+      // / CadrePeer reads below go through the control network's `network`
+      // transactor and BLOCK on a solo node, so we must not gate the screen on
+      // them — otherwise "My Devices" spins forever and the user can never reach
+      // "Add a node" to apply a drone seed.
+      setState(prev => ({
+        ...prev,
         loading: false,
         error: null,
         partyId,
         peerId,
         isRunning: cadreService.isRunning,
         hasAuthorityKey: cadreService.hasAuthorityKey,
+        nodes: peerId ? [thisDeviceRow(peerId)] : prev.nodes,
+      }));
+
+      // Best-effort, time-boxed control reads; fill in keys + remote nodes once
+      // (if) they resolve.  Empty on a solo node.
+      const [keys, remoteNodes] = await Promise.all([
+        withTimeout(readKeys(), CONTROL_READ_UI_TIMEOUT_MS, 'readKeys').catch(() => [] as CadreKeyRow[]),
+        withTimeout(readRemoteNodes(peerId), CONTROL_READ_UI_TIMEOUT_MS, 'readRemoteNodes').catch(() => [] as CadreNodeRow[]),
+      ]);
+      setState(prev => ({
+        ...prev,
         keys,
-        nodes,
+        nodes: peerId ? [thisDeviceRow(peerId), ...remoteNodes] : remoteNodes,
         remoteNodeCount: remoteNodes.length,
-      });
+      }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setState(prev => ({ ...prev, loading: false, error: msg }));

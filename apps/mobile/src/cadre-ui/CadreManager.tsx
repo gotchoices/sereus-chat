@@ -28,6 +28,7 @@ import {
 } from './useCadreManager';
 import SecretDisplayModal from './SecretDisplayModal';
 import KeyImportModal from './KeyImportModal';
+import SeedApplyModal from './SeedApplyModal';
 import {
   CadreThemeContext,
   resolveTheme,
@@ -60,6 +61,7 @@ const STRINGS = {
   addKeyDongle: 'Hardware dongle (future)',
   addNode: 'Add a node',
   addNodeDrone: 'Drone (server)',
+  addNodeJoinSeed: 'Join with a seed',
   addNodeServerQr: 'Server (scan QR)',
   addNodeBrowser: 'Browser node (future)',
   addNodePhone: 'Another phone (future)',
@@ -109,6 +111,7 @@ function CadreManagerInner() {
     { visible: false, value: null, error: null },
   );
   const [importVisible, setImportVisible] = useState(false);
+  const [seedApplyVisible, setSeedApplyVisible] = useState(false);
 
   const onCopyPartyId = useCallback(() => {
     if (cadre.partyId) {
@@ -187,6 +190,7 @@ function CadreManagerInner() {
   const onAddNode = useCallback(() => {
     Alert.alert(STRINGS.addNode, undefined, [
       { text: STRINGS.addNodeDrone, onPress: onAddDrone },
+      { text: STRINGS.addNodeJoinSeed, onPress: () => setSeedApplyVisible(true) },
       {
         text: STRINGS.addNodeServerQr,
         onPress: () =>
@@ -335,6 +339,16 @@ function CadreManagerInner() {
         onClose={() => setImportVisible(false)}
         onImport={async (priv) => {
           const res = await cadreService.importAuthorityKey(priv);
+          await cadre.refresh();
+          return res;
+        }}
+      />
+
+      <SeedApplyModal
+        visible={seedApplyVisible}
+        onClose={() => setSeedApplyVisible(false)}
+        onApply={async (seed) => {
+          const res = await cadreService.applySeedFromCode(seed);
           await cadre.refresh();
           return res;
         }}

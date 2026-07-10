@@ -21,16 +21,14 @@
 import {
   CadreNode,
   ControlFormationUsageRecorder,
+  pinnedKeyTrustPolicy,
   type CadreNodeConfig,
   type CadreNodeEvents,
   type ControlDatabase,
   type StrandInstance,
 } from '@serfab/cadre-core';
 import { webSockets } from '@libp2p/websockets';
-// TODO(step-4+): re-add `circuitRelayTransport` from @libp2p/circuit-relay-v2
-// once we wire up partner-dialing.  Direct dep on circuit-relay-v2 pulls in a
-// newer @libp2p/peer-collections than the rest of the workspace, breaking type
-// identity with cadre-core; resolve via a `resolutions:` pin at that point.
+import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import {
   LevelDBRawStorage,
   openOptimysticRNDb,
@@ -238,6 +236,46 @@ class CadreServiceImpl {
     return this.node.encodeSeed(seed);
   }
 
+  /**
+   * Join an existing cadre from a base64url seed produced by another node
+   * (typically a drone/server via cadre-cli).  This is the INBOUND enrolment
+   * path: decode the seed, dial the peers it advertises, and add them to the
+   * control network.  Once at least one peer is connected the control network
+   * has a cohort, so control-DB reads (authority genesis, strand attach) stop
+   * blocking and normal operation resumes.
+   *
+   * Trust: a cold-start node's default policy (`dbAnchoredTrustPolicy`) rejects
+   * every seed because its `AuthorityKey` table is empty.  We pin the seed's
+   * OWN `signerKey`, so the node trusts the authority whose seed the user is
+   * explicitly pasting.  This is deliberate trust-on-paste — the security
+   * boundary is the user choosing to enter this specific seed.
+   *
+   * Mirrors `applySeed` in sereus reference-app-rn/src/use-cadre.ts.
+   */
+  async applySeedFromCode(encoded: string): Promise<{ peersAdded: number }> {
+    await this.ensureStarted();
+    if (!this.node) throw new Error('CadreNode not running');
+
+    let seed;
+    try {
+      seed = this.node.decodeSeed(encoded.trim());
+    } catch {
+      throw new Error('Invalid seed: not a base64url-encoded cadre seed.');
+    }
+
+    const result = await this.node.applySeed(seed, {
+      trustPolicy: pinnedKeyTrustPolicy([seed.signerKey]),
+    });
+    if (!result.success) {
+      throw new Error(result.error ?? 'Seed could not be applied.');
+    }
+
+    console.info(
+      `[CadreService] ✓ applied seed for party ${seed.partyId} — ${result.peersAdded} peer(s) added`,
+    );
+    return { peersAdded: result.peersAdded };
+  }
+
   // -----------------------------------------------------------------------
   // Lifecycle
   // -----------------------------------------------------------------------
@@ -286,7 +324,24 @@ class CadreServiceImpl {
           provider: (strandId: string) => new LevelDBRawStorage(this.getOrOpenDb(strandId)),
         },
         network: {
-          transports: [webSockets()],
+          // webSockets — dial a drone/relay over `wss`.
+          // circuitRelayTransport — request a `/p2p-circuit` reservation on that
+          //   relay so this non-listening phone gets a DIALABLE address
+          //   (`getMultiaddrs()` becomes non-empty), which is what unblocks
+          //   self-registration and invitations.  Passive until we dial a relay.
+          // webRTC (relayed→direct hole-punch) is added in a follow-up — it needs
+          //   the native `react-native-webrtc` module and is only used
+          //   phone↔phone, not for reaching a drone.
+          // `circuitRelayTransport()` is cast to bridge a nominal brand skew:
+          // chat's `@libp2p/circuit-relay-v2` resolves a slightly different
+          // `Components`/`@libp2p/interface` identity than db-p2p's transport-
+          // factory element type.  Runtime-safe — libp2p matches transports by
+          // the global `transportSymbol`, not by structural type.  Same bridge
+          // the reference app uses for `webRTC()`.
+          transports: [
+            webSockets(),
+            circuitRelayTransport() as unknown as ReturnType<typeof webSockets>,
+          ],
           // RN cannot listen for inbound connections.
           listenAddrs: [],
         },
