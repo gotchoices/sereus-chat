@@ -8,6 +8,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { consumePendingAttachment } from '../data/attachmentDraft';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { showToast } from '../ui/toast';
+import { MessageBubble, EmptyState, IconButton } from '../components';
+import { useTheme, typography, spacing, radius } from '../theme';
 
 /**
  * Reconcile a poll result with prior state.  Keeps any optimistic ('pending-*')
@@ -25,6 +27,7 @@ export default function ChatInterface() {
   const navigation: any = useNavigation();
   const strandId: string | undefined = route?.params?.strandId;
   const t = useT();
+  const theme = useTheme();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState<string>('');
   const [attachments, setAttachments] = useState<Array<{ id: string; name: string; type: 'image' | 'file' }>>([]);
@@ -141,9 +144,13 @@ export default function ChatInterface() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {messages.length === 0 ? (
-        <View style={styles.empty} testID="chat-empty"><Text>{t('screens.chat.empty', 'No messages yet. Say hello!')}</Text></View>
+        <EmptyState
+          testID="chat-empty"
+          icon="chatbubbles-outline"
+          title={t('screens.chat.empty', 'No messages yet. Say hello!')}
+        />
       ) : (
         <FlatList
           contentContainerStyle={styles.list}
@@ -154,20 +161,18 @@ export default function ChatInterface() {
           renderItem={({ item, index }) => {
             const prev = index > 0 ? messages[index - 1] : undefined;
             const sameSenderAsPrev = !!prev && (prev.outgoing === item.outgoing) && (prev.sender === item.sender);
-            const bubbleStyle = [
-              styles.bubble,
-              item.outgoing ? styles.out : styles.in,
-              sameSenderAsPrev ? styles.tight : styles.loose,
-            ];
             const isOwn = !!item.outgoing;
             return (
               <View style={styles.rowWrap}>
                 <View style={[styles.row, { justifyContent: isOwn ? 'flex-end' : 'flex-start' }]}>
-                  <View
-                    style={bubbleStyle}
-                    accessible
-                    accessibilityLabel={item.outgoing ? 'Outgoing message' : `Message from ${item.sender}`}
+                  <MessageBubble
                     testID={`message-${item.id}`}
+                    text={item.text}
+                    outgoing={isOwn}
+                    senderName={!isOwn && !sameSenderAsPrev ? item.sender : undefined}
+                    timestamp={item.timestamp ? formatTime(item.timestamp) : undefined}
+                    status={item.status}
+                    accessibilityLabel={isOwn ? 'Outgoing message' : `Message from ${item.sender}`}
                     onLongPress={() => {
                       if (isOwn) {
                         setEditingId(item.id);
@@ -175,20 +180,18 @@ export default function ChatInterface() {
                         setText(item.text || '');
                       }
                     }}
-                  >
-                    <Text style={[styles.bubbleText, isEditing && editingId === item.id ? styles.editingHighlight : undefined]}>{item.text}</Text>
-                    {!!item.timestamp && <Text style={styles.time}>{formatTime(item.timestamp)}</Text>}
-                  </View>
-                  <TouchableOpacity
+                  />
+                  <IconButton
+                    name="ellipsis-vertical"
+                    size={16}
+                    color={theme.textMuted}
                     onPress={() => setMenuForId(prev => (prev === item.id ? null : item.id))}
                     accessibilityLabel="Message actions"
                     style={styles.kebabSlot}
-                  >
-                    <Ionicons name="ellipsis-vertical" size={14} color="#666" />
-                  </TouchableOpacity>
+                  />
                 </View>
                 {menuForId === item.id && (
-                  <View style={[styles.menuPanel, styles.menuPanelAbs, isOwn ? styles.menuRight : styles.menuLeft]}>
+                  <View style={[styles.menuPanel, styles.menuPanelAbs, isOwn ? styles.menuRight : styles.menuLeft, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                     {isOwn ? (
                       <>
                         <TouchableOpacity
@@ -201,7 +204,7 @@ export default function ChatInterface() {
                           }}
                           accessibilityLabel={t('screens.chat.menu.edit', 'Edit')}
                         >
-                          <Text>{t('screens.chat.menu.edit', 'Edit')}</Text>
+                          <Text style={{ color: theme.textPrimary }}>{t('screens.chat.menu.edit', 'Edit')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.menuItem}
@@ -211,7 +214,7 @@ export default function ChatInterface() {
                           }}
                           accessibilityLabel={t('screens.chat.menu.delete', 'Delete')}
                         >
-                          <Text style={{ color: '#b00020' }}>{t('screens.chat.menu.delete', 'Delete')}</Text>
+                          <Text style={{ color: theme.danger }}>{t('screens.chat.menu.delete', 'Delete')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.menuItem}
@@ -221,7 +224,7 @@ export default function ChatInterface() {
                           }}
                           accessibilityLabel={t('screens.chat.menu.copy', 'Copy')}
                         >
-                          <Text>{t('screens.chat.menu.copy', 'Copy')}</Text>
+                          <Text style={{ color: theme.textPrimary }}>{t('screens.chat.menu.copy', 'Copy')}</Text>
                         </TouchableOpacity>
                       </>
                     ) : (
@@ -235,7 +238,7 @@ export default function ChatInterface() {
                           }}
                           accessibilityLabel={t('screens.chat.menu.reply', 'Reply')}
                         >
-                          <Text>{t('screens.chat.menu.reply', 'Reply')}</Text>
+                          <Text style={{ color: theme.textPrimary }}>{t('screens.chat.menu.reply', 'Reply')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.menuItem}
@@ -245,7 +248,7 @@ export default function ChatInterface() {
                           }}
                           accessibilityLabel={t('screens.chat.menu.copy', 'Copy')}
                         >
-                          <Text>{t('screens.chat.menu.copy', 'Copy')}</Text>
+                          <Text style={{ color: theme.textPrimary }}>{t('screens.chat.menu.copy', 'Copy')}</Text>
                         </TouchableOpacity>
                       </>
                     )}
@@ -264,10 +267,10 @@ export default function ChatInterface() {
             data={attachments}
             keyExtractor={(a) => a.id}
             renderItem={({ item }) => (
-              <View style={styles.attachChip}>
-                <Text style={styles.attachName} numberOfLines={1}>{item.name}</Text>
-                <TouchableOpacity style={styles.attachClose} onPress={() => onRemoveAttachment(item.id)} accessibilityLabel="Remove attachment">
-                  <Ionicons name="close" size={14} />
+              <View style={[styles.attachChip, { backgroundColor: theme.surfaceAlt }]}>
+                <Text style={[styles.attachName, { color: theme.textPrimary }]} numberOfLines={1}>{item.name}</Text>
+                <TouchableOpacity style={[styles.attachClose, { backgroundColor: theme.surface }]} onPress={() => onRemoveAttachment(item.id)} accessibilityLabel="Remove attachment">
+                  <Ionicons name="close" size={14} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>
             )}
@@ -275,19 +278,22 @@ export default function ChatInterface() {
           />
         </View>
       )}
-      <View style={styles.composer}>
-        <TouchableOpacity
-          style={styles.composeButton}
+      <View style={[styles.composer, { backgroundColor: theme.surface, borderTopColor: theme.divider }]}>
+        <IconButton
+          name="add"
+          size={24}
           onPress={onPressAttach}
           accessibilityLabel={t('screens.chat.attach', 'Attach')}
           testID="composer-attach"
-        >
-          <Ionicons name="add" size={22} />
-        </TouchableOpacity>
+        />
         <View style={styles.inputWrapper}>
           <TextInput
-            style={[styles.input, { height: Math.min(Math.max(40, inputHeight), 120) }]}
+            style={[
+              styles.input,
+              { backgroundColor: theme.surfaceAlt, borderColor: theme.border, color: theme.textPrimary, height: Math.min(Math.max(40, inputHeight), 120) },
+            ]}
             placeholder={t('screens.chat.composerPlaceholder', 'Message')}
+            placeholderTextColor={theme.textMuted}
             value={text}
             onChangeText={setText}
             multiline
@@ -298,32 +304,33 @@ export default function ChatInterface() {
         </View>
         {isEditing ? (
           <View style={styles.composeRightStack}>
-            <TouchableOpacity
-              style={styles.composeIconBtn}
+            <IconButton
+              name="close"
+              size={20}
+              color={theme.danger}
               onPress={onCancelEdit}
               accessibilityLabel={t('screens.chat.cancel', 'Cancel')}
               testID="composer-cancel"
-            >
-              <Ionicons name="close" size={20} color="#b00020" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.composeIconBtn, styles.saveBtn, { marginTop: 6 }]}
+            />
+            <IconButton
+              name="checkmark-outline"
+              size={20}
+              variant="accent"
               onPress={onSend}
               accessibilityLabel={t('screens.chat.save', 'Save')}
               testID="composer-save"
-            >
-              <Ionicons name="checkmark-outline" size={20} color="#fff" />
-            </TouchableOpacity>
+              style={styles.saveBtn}
+            />
           </View>
         ) : (
-          <TouchableOpacity
-            style={[styles.composeButton, canSend ? styles.primary : undefined]}
+          <IconButton
+            name={canSend ? 'send-outline' : 'mic-outline'}
+            size={20}
+            variant={canSend ? 'accent' : 'plain'}
             onPress={canSend ? onSend : onMicPress}
             accessibilityLabel={canSend ? t('screens.chat.send', 'Send') : t('screens.chat.record', 'Record')}
             testID={canSend ? 'composer-send' : 'composer-mic'}
-          >
-            <Ionicons name={canSend ? 'send-outline' : 'mic-outline'} size={20} />
-          </TouchableOpacity>
+          />
         )}
       </View>
     </View>
@@ -331,42 +338,36 @@ export default function ChatInterface() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 20 },
-  empty: { paddingVertical: 20 },
-  list: { paddingTop: 8, paddingBottom: 90 },
+  container: { flex: 1 },
+  list: { paddingHorizontal: spacing[3], paddingTop: spacing[1], paddingBottom: spacing[5] },
   rowWrap: { position: 'relative' },
   row: { flexDirection: 'row', alignItems: 'flex-start' },
-  bubble: { maxWidth: '80%', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14 },
-  tight: { marginTop: 4, marginBottom: 4 },
-  loose: { marginTop: 10, marginBottom: 8 },
-  in: { alignSelf: 'flex-start', backgroundColor: '#f0f0f0' },
-  out: { alignSelf: 'flex-end', backgroundColor: '#d7eeff' },
-  bubbleText: { fontSize: 15 },
-  time: { fontSize: 11, color: '#666', marginTop: 4, alignSelf: 'flex-end' },
-  kebabSlot: { width: 24, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2, marginLeft: 6 },
-  menuPanel: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingVertical: 6, minWidth: 160, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6, elevation: 2 },
+  kebabSlot: { minWidth: 24, marginLeft: spacing[0] },
+  menuPanel: { borderWidth: 1, borderRadius: radius.control, paddingVertical: spacing[0], minWidth: 160, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6, elevation: 2 },
   menuPanelAbs: { position: 'absolute', top: -4, zIndex: 5 },
   menuLeft: { left: 0 },
   menuRight: { right: 0 },
-  menuItem: { paddingHorizontal: 12, paddingVertical: 8 },
-  attachStrip: { paddingVertical: 6 },
-  attachChip: { backgroundColor: '#f4f4f4', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, marginRight: 8, position: 'relative' },
+  menuItem: { paddingHorizontal: spacing[2], paddingVertical: spacing[1] },
+  attachStrip: { paddingVertical: spacing[0], paddingHorizontal: spacing[3] },
+  attachChip: { borderRadius: radius.card, paddingVertical: spacing[0], paddingHorizontal: spacing[1], marginRight: spacing[1], position: 'relative' },
   attachName: { maxWidth: 140 },
-  attachClose: { position: 'absolute', top: -6, right: -6, backgroundColor: '#fff', borderRadius: 10, padding: 2, elevation: 2 },
+  attachClose: { position: 'absolute', top: -6, right: -6, borderRadius: 10, padding: 2, elevation: 2 },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingHorizontal: spacing[2],
+    paddingTop: spacing[1],
+    paddingBottom: spacing[1],
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#ddd'
   },
-  composeButton: { padding: 8, alignItems: 'center', justifyContent: 'center' },
-  primary: {},
-  inputWrapper: { flex: 1, marginHorizontal: 8, borderWidth: 1, borderColor: '#ddd', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6 },
-  input: { fontSize: 16, padding: 0 },
-  editingHighlight: { textDecorationLine: 'underline' },
+  inputWrapper: { flex: 1, marginHorizontal: spacing[1] },
+  input: {
+    borderWidth: 1,
+    borderRadius: radius.control,
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[1],
+    ...typography.body,
+  },
   composeRightStack: { alignItems: 'center', justifyContent: 'flex-end' },
-  composeIconBtn: { padding: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
-  saveBtn: { backgroundColor: '#2e7d32' }
+  saveBtn: { marginTop: spacing[0] },
 });

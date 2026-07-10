@@ -4,6 +4,8 @@ needs: ["domain:Entity:Profile"]
 dependsOn:
   - design/specs/mobile/screens/profile-setup.md
   - design/specs/mobile/navigation.md
+  - design/specs/mobile/global/ui.md
+  - design/specs/mobile/components/index.md
   - design/stories/mobile/discovery.md
   - design/stories/mobile/profile-management.md
 ---
@@ -33,10 +35,13 @@ Edit basic profile details (avatar, name, optional contact fields) with save in 
 
 ## Component Inventory
 
-- Header: BackButton, Title ("Profile"), SaveButton
-- AvatarSection: large Image with PencilOverlay → opens MediaPicker
-- FieldList: TextInput for Name*, Email, Phone; multiline for Notes
-- PrivacyNotice: static text block
+Shared component layer (`src/components/`); theme tokens throughout.  Header
+Save button is supplied via the navigator options.
+
+- AvatarSection: `Avatar size="lg"` (name-hashed initial) with a pencil overlay → opens MediaPicker
+- FieldList: themed TextInputs grouped in a card — Name*, Email, Phone; multiline Notes
+- ManageDevices: `ListRow` → CadreManager
+- PrivacyNotice: muted footnote (`textMuted`)
 - DiscardDialog: confirm on back with unsaved changes
 
 ## Implementation Notes

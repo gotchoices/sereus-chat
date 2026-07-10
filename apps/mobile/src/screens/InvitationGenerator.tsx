@@ -6,9 +6,12 @@ import type { Invitation } from '../data/types';
 import Clipboard from '@react-native-clipboard/clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Banner, IconButton } from '../components';
+import { useTheme, typography, spacing, radius } from '../theme';
 
 export default function InvitationGenerator() {
   const t = useT();
+  const theme = useTheme();
   const [includeQR, setIncludeQR] = useState(true);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,41 +80,51 @@ export default function InvitationGenerator() {
 
   if (error) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>{t('screens.InvitationGenerator.title', 'Invite Friends')}</Text>
-        <View style={styles.card}>
-          <Text style={styles.errorTitle} testID="invite-error-title">
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <Text style={[styles.title, { color: theme.textPrimary }]}>{t('screens.InvitationGenerator.title', 'Invite Friends')}</Text>
+        <View style={[styles.card, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
+          <Text style={[styles.errorTitle, { color: theme.textPrimary }]} testID="invite-error-title">
             {t('screens.InvitationGenerator.errorTitle', "Can't create an invitation yet")}
           </Text>
-          <Text style={styles.errorBody} testID="invite-error">{error}</Text>
-          <TouchableOpacity style={styles.regenBtn} onPress={onRegenerate} testID="invite-retry">
-            <Ionicons name="refresh-outline" size={18} color="#0066cc" />
-            <Text style={styles.regenText}>{t('screens.InvitationGenerator.retry', 'Try again')}</Text>
-          </TouchableOpacity>
+          <Banner
+            testID="invite-error"
+            variant="error"
+            message={error}
+            action={{ label: t('screens.InvitationGenerator.retry', 'Try again'), onPress: onRegenerate, testID: 'invite-retry' }}
+          />
         </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{t('screens.InvitationGenerator.title', 'Invite Friends')}</Text>
-      <View style={styles.card}>
-        <Text style={styles.label}>{t('screens.InvitationGenerator.labelLink', 'Invitation Link')}</Text>
-        <View style={styles.linkRow}>
-          <Text selectable style={styles.link} numberOfLines={1} ellipsizeMode="middle" testID="invite-link">
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <Text style={[styles.title, { color: theme.textPrimary }]}>{t('screens.InvitationGenerator.title', 'Invite Friends')}</Text>
+      <View style={[styles.card, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>{t('screens.InvitationGenerator.labelLink', 'Invitation Link')}</Text>
+        <View style={[styles.linkRow, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text selectable style={[styles.link, { color: theme.textPrimary }]} numberOfLines={1} ellipsizeMode="middle" testID="invite-link">
             {inviteLink || (loading ? t('screens.InvitationGenerator.generating', 'Generating...') : '')}
           </Text>
-          <TouchableOpacity onPress={onCopy} accessibilityLabel="Copy link" testID="invite-copy" style={styles.copyBtn} disabled={!inviteLink}>
-            <Ionicons name="copy-outline" size={18} color={inviteLink ? '#0066cc' : '#aaa'} />
-          </TouchableOpacity>
+          <IconButton
+            name="copy-outline"
+            size={20}
+            onPress={onCopy}
+            disabled={!inviteLink}
+            accessibilityLabel="Copy link"
+            testID="invite-copy"
+          />
         </View>
         <View style={styles.toggleRow}>
-          <Switch value={includeQR} onValueChange={setIncludeQR} />
-          <Text style={styles.toggleLabel}>{t('screens.InvitationGenerator.includeQR', 'Include QR')}</Text>
+          <Switch
+            value={includeQR}
+            onValueChange={setIncludeQR}
+            trackColor={{ true: theme.accent, false: theme.border }}
+          />
+          <Text style={[styles.toggleLabel, { color: theme.textPrimary }]}>{t('screens.InvitationGenerator.includeQR', 'Include QR')}</Text>
         </View>
         {includeQR && inviteLink ? (
-          <View style={styles.qrBox} accessible accessibilityLabel="Invitation QR code">
+          <View style={[styles.qrBox, { backgroundColor: theme.surface, borderColor: theme.border }]} accessible accessibilityLabel="Invitation QR code">
             <QRCode
               value={inviteLink}
               size={200}
@@ -122,18 +135,30 @@ export default function InvitationGenerator() {
           </View>
         ) : null}
         <View style={styles.btnRow}>
-          <TouchableOpacity style={styles.shareBtn} onPress={onShare} accessibilityLabel="Share invite" testID="invite-share">
-            <Ionicons name={shareIcon} size={20} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.regenBtn} onPress={onRegenerate} accessibilityLabel="Regenerate" testID="invite-regen">
-            <Ionicons name="refresh-outline" size={18} color="#0066cc" />
-            <Text style={styles.regenText}>{t('screens.InvitationGenerator.regenerate', 'Regenerate')}</Text>
+          <IconButton
+            name={shareIcon}
+            size={20}
+            variant="accent"
+            onPress={onShare}
+            accessibilityLabel="Share invite"
+            testID="invite-share"
+          />
+          <TouchableOpacity
+            style={[styles.regenBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
+            onPress={onRegenerate}
+            accessibilityLabel="Regenerate"
+            testID="invite-regen"
+          >
+            <Ionicons name="refresh-outline" size={18} color={theme.textPrimary} />
+            <Text style={[styles.regenText, { color: theme.textPrimary }]}>{t('screens.InvitationGenerator.regenerate', 'Regenerate')}</Text>
           </TouchableOpacity>
         </View>
       </View>
       {toastVisible && (
         <View style={styles.toast} accessibilityLabel="Toast">
-          <Text style={styles.toastText}>{t('screens.InvitationGenerator.toastCopied', 'Copied')}</Text>
+          <Text style={[styles.toastText, { backgroundColor: theme.surfaceAlt, borderColor: theme.border, color: theme.textPrimary }]}>
+            {t('screens.InvitationGenerator.toastCopied', 'Copied')}
+          </Text>
         </View>
       )}
     </View>
@@ -141,35 +166,53 @@ export default function InvitationGenerator() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 20 },
-  title: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
-  card: { borderWidth: 1, borderColor: '#eee', borderRadius: 12, padding: 16 },
-  label: { color: '#666', marginBottom: 6 },
-  errorTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
-  errorBody: { color: '#666', marginBottom: 16, lineHeight: 20 },
-  linkRow: { flexDirection: 'row', alignItems: 'center' },
-  link: { flex: 1, fontSize: 14, color: '#0066cc' },
-  copyBtn: { marginLeft: 8, padding: 6 },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 8 },
-  toggleLabel: { marginLeft: 8 },
-  qrBox: { alignItems: 'center', marginTop: 8, marginBottom: 8 },
-  btnRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 12 },
-  shareBtn: { paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#0066cc', borderRadius: 6 },
-  regenBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#0066cc', borderRadius: 6 },
-  regenText: { marginLeft: 6, color: '#0066cc' },
+  container: { flex: 1, padding: spacing[4] },
+  title: { ...typography.title, marginBottom: spacing[2] },
+  card: { borderWidth: 1, borderRadius: radius.card, padding: spacing[3] },
+  label: { ...typography.small, marginBottom: spacing[1] },
+  errorTitle: { ...typography.body, fontWeight: '600', marginBottom: spacing[2] },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: radius.control,
+    paddingLeft: spacing[2],
+  },
+  link: { ...typography.body, flex: 1 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing[2], marginBottom: spacing[1] },
+  toggleLabel: { ...typography.body, marginLeft: spacing[1] },
+  qrBox: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginTop: spacing[1],
+    marginBottom: spacing[1],
+    padding: spacing[2],
+    borderWidth: 1,
+    borderRadius: radius.card,
+  },
+  btnRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing[2], gap: spacing[2] },
+  regenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing[1],
+    paddingHorizontal: spacing[2],
+    borderWidth: 1,
+    borderRadius: radius.control,
+  },
+  regenText: { ...typography.body, marginLeft: spacing[0] },
   toast: {
     position: 'absolute',
-    bottom: 24,
-    left: 20,
-    right: 20,
+    bottom: spacing[5],
+    left: spacing[4],
+    right: spacing[4],
     alignItems: 'center',
   },
   toastText: {
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    color: '#fff',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    ...typography.body,
+    borderWidth: 1,
+    paddingVertical: spacing[1],
+    paddingHorizontal: spacing[2],
+    borderRadius: radius.control,
     overflow: 'hidden',
-  }
+  },
 });

@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useT } from '../i18n';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
+import { EmptyState } from '../components';
+import { useTheme, typography, spacing, radius } from '../theme';
 
 export default function QrScanner() {
   const t = useT();
+  const theme = useTheme();
   const [value, setValue] = useState('');
   const [permission, setPermission] = useState<'authorized' | 'denied' | 'not-determined'>('not-determined');
   const device = useCameraDevice('back');
@@ -38,10 +40,12 @@ export default function QrScanner() {
     return /^sereus:\/\/invite\/[A-Za-z0-9_-]+(\?.*)?$/.test(value.trim());
   }, [value]);
 
+  const cameraReady = permission === 'authorized' && device && !isSimulator;
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{t('screens.QrScanner.title')}</Text>
-      {permission === 'authorized' && device && !isSimulator ? (
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <Text style={[styles.title, { color: theme.textPrimary }]}>{t('screens.QrScanner.title')}</Text>
+      {cameraReady ? (
         <View style={styles.cameraWrap}>
           <Camera
             style={styles.camera}
@@ -49,18 +53,25 @@ export default function QrScanner() {
             isActive={true}
             codeScanner={codeScanner}
           />
-          <View style={styles.overlay} pointerEvents="none" />
+          <View style={[styles.overlay, { borderColor: theme.overlay }]} pointerEvents="none" />
         </View>
       ) : (
-        <View style={styles.preview} accessibilityLabel="Camera preview placeholder">
-          <Ionicons name="scan-outline" size={48} color="#888" />
-          <Text style={styles.previewText}>{t('screens.QrScanner.simulatorNote')}</Text>
+        <View
+          style={[styles.preview, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}
+          accessibilityLabel="Camera preview placeholder"
+        >
+          <EmptyState
+            icon="camera-outline"
+            title={t('screens.QrScanner.cameraUnavailable', 'Camera unavailable')}
+            hint={t('screens.QrScanner.simulatorNote')}
+          />
         </View>
       )}
-      <Text style={styles.label}>{t('screens.QrScanner.pasteLabel')}</Text>
+      <Text style={[styles.label, { color: theme.textSecondary }]}>{t('screens.QrScanner.pasteLabel')}</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, { backgroundColor: theme.surfaceAlt, borderColor: theme.border, color: theme.textPrimary }]}
         placeholder={t('screens.QrScanner.pastePlaceholder')}
+        placeholderTextColor={theme.textMuted}
         value={value}
         onChangeText={setValue}
         autoCapitalize="none"
@@ -68,7 +79,7 @@ export default function QrScanner() {
         testID="qr-paste-input"
       />
       <TouchableOpacity
-        style={[styles.openBtn, !valid && styles.openBtnDisabled]}
+        style={[styles.openBtn, { backgroundColor: theme.accent }, !valid && styles.openBtnDisabled]}
         disabled={!valid}
         onPress={() => {
           // In future: navigate to InvitationAcceptance with parsed token
@@ -76,62 +87,53 @@ export default function QrScanner() {
         accessibilityLabel="Open invite"
         testID="qr-open"
       >
-        <Text style={styles.openText}>{t('screens.QrScanner.open')}</Text>
+        <Text style={[styles.openText, { color: theme.accentText }]}>{t('screens.QrScanner.open')}</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 20 },
-  title: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
+  container: { flex: 1, padding: spacing[4] },
+  title: { ...typography.title, marginBottom: spacing[2] },
   cameraWrap: {
     height: 260,
-    borderRadius: 12,
+    borderRadius: radius.card,
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: spacing[3],
   },
   camera: { flex: 1 },
   overlay: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    borderColor: 'rgba(255,255,255,0.6)',
     borderWidth: 2,
     borderStyle: 'dashed',
   },
   preview: {
     height: 220,
-    borderRadius: 12,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: '#cccccc',
-    alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-    backgroundColor: '#fafafa',
+    marginBottom: spacing[3],
   },
-  previewText: { color: '#777', marginTop: 8 },
-  label: { color: '#666', marginBottom: 6 },
+  label: { ...typography.small, marginBottom: spacing[1] },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+    borderRadius: radius.control,
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[2],
+    ...typography.body,
   },
   openBtn: {
     alignSelf: 'flex-start',
-    marginTop: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    backgroundColor: '#0066cc',
-    borderRadius: 6,
+    marginTop: spacing[2],
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[3],
+    borderRadius: radius.control,
   },
   openBtnDisabled: {
-    backgroundColor: '#9bbfe6',
+    opacity: 0.5,
   },
-  openText: { color: '#fff', fontWeight: '600' },
+  openText: { ...typography.body, fontWeight: '600' },
 });
-
-

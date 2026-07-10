@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { listStrands } from '../data/adapter';
 import type { StrandSummary } from '../data/types';
 import { useT } from '../i18n';
+import { Avatar, ListRow, Badge, EmptyState, Banner, IconButton } from '../components';
+import { useTheme, spacing } from '../theme';
 
 export default function ConnectionsList() {
   const navigation: any = useNavigation();
   const t = useT();
+  const theme = useTheme();
   const [threads, setThreads] = useState<StrandSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -42,6 +44,7 @@ export default function ConnectionsList() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortMode]);
 
   const onRefresh = async () => {
@@ -50,100 +53,69 @@ export default function ConnectionsList() {
     setRefreshing(false);
   };
 
+  const sortIcon = sortMode === 'recent' ? 'time-outline' : sortMode === 'alpha' ? 'text-outline' : 'mail-unread-outline';
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.controls}>
-        <View style={styles.row}>
-          <TouchableOpacity style={[styles.iconButton, styles.flex1]} onPress={() => { navigation.navigate('SearchInterface'); }}>
-            <Ionicons name="search-outline" size={20} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.iconButton, styles.flex2]} onPress={() => { navigation.navigate('InvitationGenerator'); }}>
-            <Ionicons name="person-add-outline" size={20} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.iconButton, styles.flex1]} onPress={() => {
-            setSortMode(prev => prev === 'recent' ? 'alpha' : prev === 'alpha' ? 'unread' : 'recent');
-          }}>
-            <Ionicons name={sortMode === 'recent' ? 'time-outline' : sortMode === 'alpha' ? 'text-outline' : 'mail-unread-outline'} size={20} />
-          </TouchableOpacity>
-        </View>
+        <IconButton name="search-outline" size={20} variant="bordered" style={styles.flex1}
+          accessibilityLabel="Search" onPress={() => navigation.navigate('SearchInterface')} />
+        <IconButton name="person-add-outline" size={20} variant="accent" style={styles.flex2}
+          accessibilityLabel="Add Friends" onPress={() => navigation.navigate('InvitationGenerator')} />
+        <IconButton name={sortIcon} size={20} variant="bordered" style={styles.flex1}
+          accessibilityLabel="Sort"
+          onPress={() => setSortMode(prev => prev === 'recent' ? 'alpha' : prev === 'alpha' ? 'unread' : 'recent')} />
       </View>
+
       {error ? (
-        <View style={styles.banner}><Text style={styles.bannerText}>{error}</Text></View>
+        <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: loadData }} />
       ) : threads.length === 0 ? (
-        <View style={styles.empty} testID="empty-state"><Text testID="empty-state-text">{t('screens.connections.empty', 'No strands yet. Invite a friend to start a strand.')}</Text></View>
+        <EmptyState
+          testID="empty-state"
+          hintTestID="empty-state-text"
+          icon="chatbubbles-outline"
+          title={t('screens.connections.emptyTitle', 'No strands yet')}
+          hint={t('screens.connections.empty', 'Invite a friend to start a strand.')}
+          cta={{ label: t('screens.connections.emptyCta', 'Invite a friend'), onPress: () => navigation.navigate('InvitationGenerator') }}
+        />
       ) : (
         <FlatList
           contentContainerStyle={styles.list}
           data={threads}
           keyExtractor={(item) => item.id}
           testID="connections-list"
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.textSecondary} />}
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.item}
+            <ListRow
               testID={`strand-${item.id}`}
-              onPress={() =>
-                navigation.navigate('ChatInterface', {
-                  strandId: item.id,
-                  name: item.displayName,
-                  avatarUrl: item.avatarUrl,
-                })
-              }
-            >
-              <View style={styles.itemLeft}>
-                <View style={styles.avatar}><Text>{(item.displayName[0] || '?').toUpperCase()}</Text></View>
-              </View>
-              <View style={styles.itemCenter}>
-                <Text style={styles.name}>{item.displayName}</Text>
-                <Text numberOfLines={1} style={styles.preview}>{item.lastMessage?.previewText || ''}</Text>
-              </View>
-              <View style={styles.itemRight}>
-                {!!item.unreadCount && <View style={styles.badge}><Text style={styles.badgeText}>{Math.min(item.unreadCount, 99)}</Text></View>}
-              </View>
-            </TouchableOpacity>
+              title={item.displayName}
+              subtitle={item.lastMessage?.previewText || ''}
+              leading={<Avatar name={item.displayName} uri={item.avatarUrl} size="sm" />}
+              trailing={item.unreadCount ? <Badge mode="count" count={item.unreadCount} /> : undefined}
+              onPress={() => navigation.navigate('ChatInterface', {
+                strandId: item.id,
+                name: item.displayName,
+                avatarUrl: item.avatarUrl,
+              })}
+            />
           )}
         />
       )}
-      <View style={styles.footer}>
-        <View style={[styles.row, { gap: 0 }]}>
-          <TouchableOpacity style={[styles.footerBtn, styles.flex1]} onPress={() => { navigation.navigate('QrScanner'); }}>
-            <Ionicons name="qr-code-outline" size={22} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.footerBtn, styles.flex1]} onPress={() => { navigation.navigate('Alerts'); }}>
-            <Ionicons name="notifications-outline" size={22} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.footerBtn, styles.flex1]} onPress={() => { navigation.navigate('ProfileSetup'); }}>
-            <Ionicons name="person-circle-outline" size={22} />
-          </TouchableOpacity>
-        </View>
+
+      <View style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.divider }]}>
+        <IconButton name="qr-code-outline" size={22} style={styles.flex1} accessibilityLabel="Scan QR" onPress={() => navigation.navigate('QrScanner')} />
+        <IconButton name="notifications-outline" size={22} style={styles.flex1} accessibilityLabel="Alerts" onPress={() => navigation.navigate('Alerts')} />
+        <IconButton name="person-circle-outline" size={22} style={styles.flex1} accessibilityLabel="Profile" onPress={() => navigation.navigate('ProfileSetup')} />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  header: { paddingTop: 48, paddingHorizontal: 20 },
-  title: { fontSize: 20, fontWeight: '600' },
-  controls: { paddingHorizontal: 20, paddingVertical: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  button: { borderWidth: 1, borderColor: '#ddd', borderRadius: 6, paddingVertical: 6, alignItems: 'center' },
-  iconButton: { borderWidth: 1, borderColor: '#ddd', borderRadius: 6, paddingVertical: 8, alignItems: 'center' },
+  container: { flex: 1 },
+  controls: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: spacing[3], paddingVertical: spacing[1] },
   flex1: { flex: 1 },
   flex2: { flex: 2 },
-  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingBottom: 16, backgroundColor: '#fff' },
-  footerBtn: { alignItems: 'center' },
-  banner: { backgroundColor: '#fee', padding: 12, marginHorizontal: 20, borderRadius: 6 },
-  bannerText: { color: '#900' },
-  empty: { padding: 20 },
-  list: { paddingHorizontal: 0, paddingTop: 8 },
-  item: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eee' },
-  itemLeft: { width: 44, alignItems: 'center' },
-  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' },
-  itemCenter: { flex: 1, paddingHorizontal: 8 },
-  name: { fontSize: 16, fontWeight: '500' },
-  preview: { color: '#555', marginTop: 2 },
-  itemRight: { width: 40, alignItems: 'flex-end' },
-  badge: { backgroundColor: '#e33', borderRadius: 10, minWidth: 20, paddingHorizontal: 6, paddingVertical: 2, alignItems: 'center' },
-  badgeText: { color: 'white', fontSize: 12 }
+  list: { paddingHorizontal: spacing[3], paddingTop: spacing[1], paddingBottom: spacing[2] },
+  footer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[1], borderTopWidth: StyleSheet.hairlineWidth },
 });

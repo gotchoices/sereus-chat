@@ -3,6 +3,8 @@ provides: ["screen:mobile:SearchInterface"]
 needs: ["domain:Op:Strands.search", "domain:Entity:Strand", "domain:Entity:Message"]
 dependsOn:
   - design/specs/mobile/navigation.md
+  - design/specs/mobile/global/ui.md
+  - design/specs/mobile/components/index.md
   - design/stories/mobile/searching-messages.md
   - design/stories/mobile/managing-connections.md
 ---
@@ -32,10 +34,11 @@ Global search across people (connections) and message content. Selecting a resul
 
 ## Component Inventory
 
-- Header: BackButton, SearchInput (auto-focus, debounced)
-- ResultsList: FlatList of SearchResultRow
-- SearchResultRow: Avatar, Name, MatchedPreview (highlighted), Timestamp
-- EmptyState: "No results" message
+Shared component layer (`src/components/`); theme tokens throughout.
+
+- SearchInput: themed TextInput (surfaceAlt, textMuted placeholder), debounced
+- ResultsList: FlatList of `ListRow` (leading `Avatar`, title=name, subtitle=matched preview)
+- `EmptyState`: distinct copy for "start searching" vs "no results"
 
 ## Implementation Notes
 

@@ -4,7 +4,22 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
 import { VariantProvider } from './src/mock/VariantContext';
 import { I18nProvider } from './src/i18n';
+import { ThemeProvider, useThemeContext } from './src/theme';
 import { USE_SEREUS } from './src/data/config';
+
+/** Themed shell: safe-area background + status bar follow the active theme. */
+function ThemedShell() {
+  const { theme, scheme } = useThemeContext();
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
+      <StatusBar
+        barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
+      <AppNavigator />
+    </SafeAreaView>
+  );
+}
 
 export default function App() {
   useEffect(() => {
@@ -24,14 +39,13 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <I18nProvider>
-        <VariantProvider>
-          <SafeAreaView style={{ flex: 1 }}>
-            <StatusBar barStyle="dark-content" />
-            <AppNavigator />
-          </SafeAreaView>
-        </VariantProvider>
-      </I18nProvider>
+      <ThemeProvider>
+        <I18nProvider>
+          <VariantProvider>
+            <ThemedShell />
+          </VariantProvider>
+        </I18nProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

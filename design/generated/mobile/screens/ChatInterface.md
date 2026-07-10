@@ -4,6 +4,8 @@ needs: ["domain:Op:Strands.listMessages", "domain:Entity:Message"]
 dependsOn:
   - design/specs/mobile/screens/chat-interface.md
   - design/specs/mobile/navigation.md
+  - design/specs/mobile/global/ui.md
+  - design/specs/mobile/components/index.md
   - design/specs/domain/overview.md
   - design/stories/mobile/responding.md
   - design/stories/mobile/sending-media.md
@@ -21,7 +23,7 @@ Strand conversation view with message history and composer. Access to voice/vide
 ## Route
 
 - `ChatInterface`
-- Deep link: `sereus://strand/{strandId}?variant=<v>&locale=<tag>`
+- Deep link: `chat://chat/{strandId}` (see navigation.md linking config)
 
 ## UI States
 
@@ -42,11 +44,15 @@ Strand conversation view with message history and composer. Access to voice/vide
 
 ## Component Inventory
 
-- Header bar: BackButton, PartnerAvatar, PartnerName, CallButton (voice), CallButton (video), SearchButton
-- MessageList: virtualized FlatList, MessageBubble components
-- Composer: AttachButton, TextInput (multiline, max 4 lines), ActionButton (mic/send toggle)
-- AttachmentStrip: horizontal chips with remove X overlay
-- EditControls: Cancel (red X), Save (green check) — replaces ActionButton during edit
+Built from the shared component layer (`src/components/`); all color/spacing via
+theme tokens.  The header (back, `Avatar`, name, call/video/search `IconButton`s)
+is supplied by the navigator, not this screen.
+
+- MessageList: FlatList of `MessageBubble` (outgoing=accent, incoming=surfaceAlt; status tick; optional attachment slot)
+- Composer bar: `IconButton` attach + themed multiline TextInput (surfaceAlt) + accent send `IconButton`
+- AttachmentStrip: horizontal chips with remove overlay
+- EditControls: Cancel + Save `IconButton`s replace send during edit
+- `EmptyState` for a conversation with no messages
 
 ## Implementation Notes
 

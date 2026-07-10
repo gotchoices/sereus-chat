@@ -4,6 +4,8 @@ needs: []
 dependsOn:
   - design/specs/mobile/screens/invitation-generator.md
   - design/specs/mobile/navigation.md
+  - design/specs/mobile/global/ui.md
+  - design/specs/mobile/components/index.md
   - design/stories/mobile/discovery.md
 ---
 
@@ -30,17 +32,18 @@ Generate and share an invitation deep link/QR that on acceptance establishes a s
 
 ## Component Inventory
 
-- Header: "Invite Friends" title
-- LinkDisplay: read-only TextInput with link text
-- CopyButton: icon button → clipboard + toast
-- QRToggle: switch to show/hide QR
-- QRPreview: large scannable QR (visible if toggle on)
-- ShareButton: icon button → native Share.share()
-- RegenerateButton: secondary action to mint new token
+Shared component layer (`src/components/`); theme tokens throughout.
+
+- LinkDisplay: themed card row with the link `Text` + copy `IconButton`
+- QRToggle: Switch (accent track) to show/hide QR
+- QRPreview: large scannable QR — kept on white (`#fff`/`#000`) for scannability; only the surrounding box is themed
+- ShareButton: accent `IconButton` → native Share.share()
+- RegenerateButton: secondary themed button to mint a new token
+- Error: `Banner` (error variant) + retry, when minting fails (e.g. no dialable address yet)
 
 ## Implementation Notes
 
-- Link format: `sereus://invite/{token}`
+- Link format: `chat://invite/{token}` (matches navigator linking prefixes)
 - Mock/demo: append `?variant=<name>` for testing
 - QR: `react-native-qrcode-svg` with `toDataURL` for share attachment
 - Copy: `@react-native-clipboard/clipboard`

@@ -4,6 +4,8 @@ needs: ["domain:Op:Strands.list", "domain:Entity:Strand"]
 dependsOn:
   - design/specs/mobile/screens/connections-list.md
   - design/specs/mobile/navigation.md
+  - design/specs/mobile/global/ui.md
+  - design/specs/mobile/components/index.md
   - design/specs/domain/overview.md
   - design/stories/mobile/discovery.md
   - design/stories/mobile/managing-connections.md
@@ -37,19 +39,23 @@ Home screen listing all strands/connections with quick access to Search, Invite,
 
 ## Component Inventory
 
-- Header bar: SearchButton, InviteButton ("Add Friends"), SortButton
-- StrandList: FlatList of StrandRow components
-- StrandRow: Avatar, Name, Preview (1 line ellipsis), Timestamp, UnreadBadge
-- Footer bar: QRScannerButton, NotificationsButton, ProfileAvatar
-- EmptyState: CTA with invite button
-- SortOverlay: menu with Recent/Alphabetical/Unread options
+Built from the shared component layer (`src/components/`, see
+`specs/mobile/components/index.md`); all color/spacing via theme tokens.
+
+- Controls row: `IconButton` ×3 — Search (bordered), Add Friends (accent), Sort (bordered)
+- StrandList: FlatList of `ListRow`
+- `ListRow`: leading `Avatar` (name-hashed color), title=name, subtitle=preview (1 line), trailing `Badge` (unread count)
+- Footer bar: `IconButton` ×3 — QR scanner, Notifications, Profile
+- `EmptyState`: icon + title + hint + invite CTA
+- `Banner` (error variant) with retry on load failure
+- SortOverlay: cycles Recent/Alphabetical/Unread (icon reflects mode)
 
 ## Implementation Notes
 
-- Unread badge: red circle, cap at "99+"
+- Unread: `Badge mode="count"` (danger token), caps at "99+"
 - Timestamps: relative (<24h) or day/date
 - Sorting persists locally (AsyncStorage)
-- Pull-to-refresh via RefreshControl
+- Pull-to-refresh via RefreshControl (tint = theme.textSecondary)
 - Tap row → navigate to ChatInterface with strandId
 - Long-press/swipe (future): archive, delete, block actions
 

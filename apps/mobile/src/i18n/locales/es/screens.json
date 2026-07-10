@@ -37,6 +37,7 @@
   },
   "QrScanner": {
     "title": "Escanear QR",
+    "cameraUnavailable": "Cámara no disponible",
     "simulatorNote": "Cámara no disponible en el simulador. Pega un enlace abajo.",
     "pasteLabel": "Pegar enlace de invitación",
     "pastePlaceholder": "sereus://invite/abc123?variant=happy",

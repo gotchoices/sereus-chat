@@ -1,18 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { useT } from '../i18n';
+import { EmptyState } from '../components';
+import { useTheme } from '../theme';
 
 export default function Alerts() {
+  const t = useT();
+  const theme = useTheme();
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Alerts</Text>
-      <Text>Stub screen</Text>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <EmptyState
+        icon="notifications-outline"
+        title={t('screens.alerts.emptyTitle', 'No alerts')}
+        hint={t('screens.alerts.emptyHint', 'Invitations and notifications will show up here.')}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 20 },
-  title: { fontSize: 18, fontWeight: '600', marginBottom: 8 }
+  container: { flex: 1 },
 });
-
-

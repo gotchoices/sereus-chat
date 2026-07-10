@@ -1,9 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Modal, Pressable } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
 import { pick, keepLocalCopy } from '@react-native-documents/picker';
 import { setPendingAttachment, type ProvisionalAttachment } from '../data/attachmentDraft';
 import { useNavigation } from '@react-navigation/native';
+import { useT } from '../i18n';
+import { ListRow, IconButton } from '../components';
+import { useTheme, typography, spacing, radius } from '../theme';
 
 type Props = {
   visible?: boolean;
@@ -14,6 +18,8 @@ type Props = {
 export default function MediaPicker(props: Props) {
   const { visible = true, onClose, onPick } = props;
   const navigation: any = useNavigation();
+  const t = useT();
+  const theme = useTheme();
 
   const close = () => {
     onClose?.();
@@ -83,34 +89,64 @@ export default function MediaPicker(props: Props) {
       close();
     }
   };
+
+  const leading = (name: string) => (
+    <Ionicons name={name} size={22} color={theme.accent} />
+  );
+
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} android_ripple={{ color: '#00000020' }} onPress={close} testID="media-picker-backdrop">
+      <Pressable
+        style={[styles.backdrop, { backgroundColor: theme.overlay }]}
+        onPress={close}
+        testID="media-picker-backdrop"
+      >
         <View />
       </Pressable>
-      <View style={styles.sheet} testID="media-picker">
-        <Text style={styles.title}>Attach</Text>
-        <View style={styles.row}>
-          <PickerButton label="Camera" onPress={pickFromCamera} testID="media-camera" />
-          <PickerButton label="Gallery" onPress={pickFromGallery} testID="media-gallery" />
+      <View
+        style={[styles.sheet, { backgroundColor: theme.surface, borderTopColor: theme.divider }]}
+        testID="media-picker"
+      >
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>
+            {t('screens.mediaPicker.title', 'Attach')}
+          </Text>
+          <IconButton
+            name="close"
+            size={22}
+            variant="plain"
+            onPress={close}
+            accessibilityLabel={t('screens.mediaPicker.close', 'Close picker')}
+            testID="media-close"
+          />
         </View>
-        <View style={styles.row}>
-          <PickerButton label="File" onPress={pickFile} testID="media-file" />
-          <PickerButton label="Location" onPress={() => onPick?.('location')} testID="media-location" />
-        </View>
-        <TouchableOpacity style={styles.close} onPress={close} accessibilityLabel="Close picker" testID="media-close">
-          <Text style={styles.closeText}>Close</Text>
-        </TouchableOpacity>
+
+        <ListRow
+          title={t('screens.mediaPicker.camera', 'Camera')}
+          leading={leading('camera-outline')}
+          onPress={pickFromCamera}
+          testID="media-camera"
+        />
+        <ListRow
+          title={t('screens.mediaPicker.gallery', 'Gallery')}
+          leading={leading('images-outline')}
+          onPress={pickFromGallery}
+          testID="media-gallery"
+        />
+        <ListRow
+          title={t('screens.mediaPicker.file', 'File')}
+          leading={leading('document-outline')}
+          onPress={pickFile}
+          testID="media-file"
+        />
+        <ListRow
+          title={t('screens.mediaPicker.location', 'Location')}
+          leading={leading('location-outline')}
+          onPress={() => onPick?.('location')}
+          testID="media-location"
+        />
       </View>
     </Modal>
-  );
-}
-
-function PickerButton({ label, onPress, testID }: { label: string; onPress: () => void; testID?: string }) {
-  return (
-    <TouchableOpacity style={styles.btn} onPress={onPress} accessibilityRole="button" testID={testID}>
-      <Text style={styles.btnText}>{label}</Text>
-    </TouchableOpacity>
   );
 }
 
@@ -121,32 +157,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.25)',
   },
   sheet: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 24,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    elevation: 6,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: radius.card,
+    borderTopRightRadius: radius.card,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing[3],
+    paddingTop: spacing[2],
+    paddingBottom: spacing[5],
   },
-  title: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  btn: {
-    flex: 1,
-    marginHorizontal: 6,
-    backgroundColor: '#f4f4f4',
-    paddingVertical: 20,
-    borderRadius: 10,
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing[2],
   },
-  btnText: { fontSize: 14, fontWeight: '500' },
-  close: { alignSelf: 'flex-end', paddingVertical: 8, paddingHorizontal: 12, marginTop: 8 },
-  closeText: { color: '#0066cc', fontWeight: '600' },
+  title: { ...typography.title },
 });
-
-

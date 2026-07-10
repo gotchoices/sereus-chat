@@ -4,6 +4,8 @@ needs: []
 dependsOn:
   - design/specs/mobile/screens/media-picker.md
   - design/specs/mobile/navigation.md
+  - design/specs/mobile/global/ui.md
+  - design/specs/mobile/components/index.md
   - design/stories/mobile/sending-media.md
   - design/stories/mobile/profile-management.md
 ---
@@ -28,9 +30,10 @@ Toast-style chooser overlay to select attachment source (Camera, Gallery, File, 
 ## Component Inventory
 
 - Container: toast/sheet with minimal backdrop dim
-- OptionButton (×4): Camera, Gallery, File, Location — icon + label, large touch target
-- CloseButton: dismiss affordance
-- ErrorNotice: inline text for permission/size errors
+- Container: themed bottom sheet (`surface`, rounded top, `overlay` backdrop) — shared conventions
+- OptionRows (×4): `ListRow` — Camera, Gallery, File, Location (accent-tinted leading icon)
+- CloseButton: `IconButton` in the sheet header
+- ErrorNotice: `Banner` for permission/size errors
 
 ## Implementation Notes
 
