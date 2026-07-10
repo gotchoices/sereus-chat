@@ -4,7 +4,7 @@
     "details": [
       {
         "appID": "TEAMID.org.sereus.chat",
-        "paths": ["/invite/*"]
+        "paths": ["/chat/invite/*"]
       }
     ]
   }

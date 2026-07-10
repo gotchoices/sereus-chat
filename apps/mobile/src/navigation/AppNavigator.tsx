@@ -47,7 +47,7 @@ export default function AppNavigator() {
   } as const;
 
   const linking: LinkingOptions<any> = {
-    prefixes: ['chat://', 'https://chat.sereus.org'],
+    prefixes: ['chat://', 'https://sereus.org/chat'],
     config: {
       screens: {
         ConnectionsList: 'connections',

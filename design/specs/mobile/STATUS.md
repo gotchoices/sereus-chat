@@ -210,7 +210,7 @@ with `listenAddrs: []`. Progress:
       ("add a node to your cadre…") — verified on emulator. Will actually mint an
       invite once Transports gives the phone a dialable address.
 - [x] Share invitation via QR + deep link — App Link / Universal Link
-      `https://chat.sereus.org/invite/<encoded>` (`chat://` fallback), registered
+      `https://sereus.org/chat/invite/<encoded>` (`chat://` fallback), registered
       + verified routing on device (see Screen conformance gaps → Invite loop)
 - [ ] Accept incoming invitation: `formStrand(invitation, disclosure)` then
       `addStrand` using **`FormStrandResult.memberPrivateKey`** (NOT
@@ -279,19 +279,20 @@ Imports the cadre layer; must not import sereus internals directly.
 ### Invite loop — deep-link scheme fixed; accept logic still pending
 - [x] Link shape unified in `src/data/inviteLink.ts` — one source of truth.
       Primary form is the App Link / Universal Link
-      `https://chat.sereus.org/invite/<token>`; `chat://invite/<token>` kept as an
+      `https://sereus.org/chat/invite/<token>`; `chat://invite/<token>` kept as an
       app-installed fallback. Generator emits it; scanner parses either form.
 - [x] `QrScanner` scheme mismatch fixed (was `sereus://`) and the "Open" button
       now routes to `InvitationAcceptance` with the parsed token.
 - [x] OS deep-link registration: Android App-Link + `chat://` intent-filters
       (`AndroidManifest.xml`, `autoVerify`); iOS `CFBundleURLTypes` +
-      `mobile.entitlements` (`applinks:chat.sereus.org`) + `AppDelegate` handlers.
+      `mobile.entitlements` (`applinks:sereus.org`) + `AppDelegate` handlers.
       **Verified on emulator:** `chat://invite/<token>` cold-launches → Accept
       Invite screen with the token.
 - [x] Web site + association files live in `web/` (chat repo root, modelled on
       `ser/health/web`): `index.html`, `invite.html`, `.well-known/{assetlinks.json,
-      apple-app-site-association}`, `publish.sh` → `chat.sereus.org`.
-- [ ] Deploy `web/` to `chat.sereus.org` (`./web/publish.sh`) and fill the release
+      apple-app-site-association}`, `publish.sh` → `sereus.org/chat`.
+- [ ] Deploy `web/` to `sereus.org/chat` (`./web/publish.sh`, which merges chat's
+      entries into the shared apex `.well-known/`) and fill the release
       SHA-256 + Apple Team ID placeholders so the `https` links verify.
 - [ ] iOS: add the Associated Domains capability to the Xcode target so
       `mobile.entitlements` is compiled in (one manual step; see the well-known README).

@@ -2,10 +2,15 @@
  * inviteLink.ts — the ONE place that defines chat's invitation URL shape.
  *
  * Primary (shared) form is an Android App Link / iOS Universal Link:
- *   https://chat.sereus.org/invite/<token>
+ *   https://sereus.org/chat/invite/<token>
  * If the recipient has the app installed, the OS opens it directly; if not, the
  * link loads the web landing page at that URL (download prompt). This is the
  * form the generator emits and shares (QR, text, email).
+ *
+ * Path-based on the existing `sereus.org` host (rather than a `chat.sereus.org`
+ * subdomain) so it reuses the site's TLS cert / vhost — see the design decision
+ * in ../../../web/README.md.  The two verification files therefore live at the
+ * APEX (`sereus.org/.well-known/`), shared with other Sereus apps.
  *
  * A custom-scheme fallback is also accepted on the parse side:
  *   chat://invite/<token>
@@ -16,12 +21,14 @@
  * so the scheme can never drift out of sync across the app again.
  */
 
-/** Web host that owns the App Link / Universal Link (see design decision). */
-export const INVITE_HOST = 'chat.sereus.org';
+/** Web host that owns the App Link / Universal Link. */
+export const INVITE_HOST = 'sereus.org';
+/** Path under the host that routes to invitations (also the App-Link pathPrefix). */
+export const INVITE_PATH_PREFIX = '/chat/invite';
 /** Custom URI scheme fallback (app-installed only). */
 export const INVITE_APP_SCHEME = 'chat';
 
-const HTTPS_PREFIX = `https://${INVITE_HOST}/invite/`;
+const HTTPS_PREFIX = `https://${INVITE_HOST}${INVITE_PATH_PREFIX}/`;
 const SCHEME_PREFIX = `${INVITE_APP_SCHEME}://invite/`;
 
 /** Build the shareable invitation URL for a token. */

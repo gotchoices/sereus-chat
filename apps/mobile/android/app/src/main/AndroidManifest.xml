@@ -33,18 +33,20 @@
             <data android:scheme="chat" />
         </intent-filter>
 
-        <!-- Android App Link: https://chat.sereus.org/invite/<token>.  With
-             autoVerify + a hosted /.well-known/assetlinks.json, the OS opens the
-             app directly for these links; without the app, they load the web
-             landing page.  Association file: ../../../../web/.well-known/. -->
+        <!-- Android App Link: https://sereus.org/chat/invite/<token>.  With
+             autoVerify + a hosted https://sereus.org/.well-known/assetlinks.json
+             (APEX — App Links only read the host root, never /chat/.well-known),
+             the OS opens the app directly for these links; without the app, they
+             load the web landing page.  Association files: ../../../../web/.well-known/
+             (merged into the apex on deploy — see web/publish.sh). -->
         <intent-filter android:autoVerify="true">
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data
                 android:scheme="https"
-                android:host="chat.sereus.org"
-                android:pathPrefix="/invite" />
+                android:host="sereus.org"
+                android:pathPrefix="/chat/invite" />
         </intent-filter>
       </activity>
     </application>
