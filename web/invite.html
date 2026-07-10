@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>You're invited — Sereus Chat</title>
+  <meta name="description" content="Someone invited you to chat privately on Sereus Chat. Install the app to accept." />
+  <link rel="icon" href="/images/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <img class="logo" src="/images/logo.svg" alt="Sereus Chat logo" width="88" height="88" />
+    <h1>You're invited to chat</h1>
+    <p class="tagline">Someone wants to reach you privately on Sereus&nbsp;Chat.</p>
+  </header>
+
+  <main>
+    <section class="invite-card">
+      <p>
+        Sereus Chat is a private, invitation-only messenger — no phone number, no
+        account, no server in the middle. Install the app, then this invitation will
+        connect you directly with the person who sent it.
+      </p>
+
+      <div class="btn-row">
+        <a class="apk-btn" href="/chat.apk" download>Get the app (Android) ↓</a>
+        <a class="btn-secondary" id="open-app" href="#">Already installed? Open it</a>
+      </div>
+
+      <p class="note" id="token-note" hidden>Invitation<br /><span class="token" id="token"></span></p>
+    </section>
+
+    <section class="how">
+      <h2>What happens next</h2>
+      <ol class="steps">
+        <li>Install Sereus Chat and enter a display name.</li>
+        <li>Come back to this link (or scan the QR again in the app) to accept.</li>
+        <li>You're connected — directly, privately, with no account to create.</li>
+      </ol>
+      <p class="note">
+        Invitations are single-use and expire, so if this one has already been used
+        you'll need a fresh link from your contact.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <p>Part of the <a href="https://sereus.org/">Sereus</a> project. Proprietary — Sereus Chat.</p>
+  </footer>
+
+  <script>
+    // The token is the last path segment of /invite/<token> (or a ?token= fallback).
+    (function () {
+      var m = location.pathname.match(/\/invite\/([^\/?#]+)/);
+      var token = (m && m[1]) || new URLSearchParams(location.search).get('token') || '';
+      if (token) {
+        var el = document.getElementById('token');
+        el.textContent = decodeURIComponent(token);
+        document.getElementById('token-note').hidden = false;
+        // "Open it" tries the custom scheme, which launches the app if installed.
+        document.getElementById('open-app').setAttribute('href', 'chat://invite/' + token);
+      }
+    })();
+  </script>
+</body>
+</html>
