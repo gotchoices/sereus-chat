@@ -43,6 +43,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // sAppId }) call before ensureStarted, so the cadre layer is a clean
 // candidate for `@sereus/cadre-rn-ui` extraction.
 import { CHAT_SAPP_ID } from '../data/chat-sapp';
+import { withTimeout, AUTHORITY_GENESIS_TIMEOUT_MS } from './async';
 
 type OptimysticDb = ReturnType<typeof openOptimysticRNDb>;
 type EventHandler<T> = (payload: T) => void;
@@ -310,28 +311,20 @@ class CadreServiceImpl {
         this.node.peerId?.toString(),
       );
 
-      // Authority genesis — idempotent, and the prerequisite for publishing
-      // strands, minting formation invites, and self-registering as a peer.
-      // Fail-soft: a node without an authority key can still read and write
-      // its own strands, it just can't publish or invite.  Mirrors
-      // `runAuthorityGenesis` in sereus reference-app-rn/src/cadre-phone.ts.
-      try {
-        await this.runAuthorityGenesis();
-      } catch (err) {
-        console.warn('[CadreService] authority genesis failed:', err);
-      }
-
-      // Formation responder.  This is a SECURITY GATE, not an optimisation:
-      // `createOpenInvitation`/`formStrand` lazily spin up a solicitation
-      // service with NO usage recorder if one isn't already installed, and
-      // that service accepts every token presented to it.  Binding the
-      // ControlFormationUsageRecorder to the live control DB makes token
-      // validity and single-use enforcement real.
-      try {
-        await this.initializeFormationResponder();
-      } catch (err) {
-        console.warn('[CadreService] formation responder init failed:', err);
-      }
+      // Arm authority genesis + the formation responder OFF the boot path.
+      //
+      // Both touch the control network.  On a SOLO node (no control cohort) a
+      // control-DB read blocks indefinitely: the control DB registers
+      // optimystic with `default_transactor: 'network'`, and a consistent read
+      // (e.g. the `hasAuthorityKey()` query inside `ensureAuthorityKey`) has no
+      // quorum to answer it.  Awaiting genesis here froze `doStart` before the
+      // default chat strand could attach — the whole app hung on a fresh boot.
+      //
+      // Strand reads/writes are unaffected (they run in bootstrap mode against
+      // the strand's own LevelDB), so the app is fully usable locally without
+      // genesis.  Genesis/formation are best-effort and complete once a cohort
+      // exists.  See armCadreServicesInBackground.
+      this.armCadreServicesInBackground();
     } catch (err) {
       this._startError = err instanceof Error ? err.message : String(err);
       console.error('[CadreService] doStart failed:', this._startError);
@@ -340,11 +333,44 @@ class CadreServiceImpl {
   }
 
   /**
+   * Best-effort background bring-up of the control-network services that must
+   * NOT gate boot.  Fired (not awaited) from doStart.
+   *
+   * Authority genesis is time-boxed: on a solo node its control-DB read never
+   * returns, so we cap the wait, log, and move on.  The formation responder is
+   * a synchronous install (no control-DB read) but is kept here so both live
+   * off the boot path.
+   */
+  private armCadreServicesInBackground(): void {
+    void (async () => {
+      try {
+        await withTimeout(
+          this.runAuthorityGenesis(),
+          AUTHORITY_GENESIS_TIMEOUT_MS,
+          'authority genesis',
+        );
+      } catch (err) {
+        console.warn(
+          '[CadreService] authority genesis deferred (solo node / no control cohort yet):',
+          err instanceof Error ? err.message : err,
+        );
+      }
+
+      try {
+        this.initializeFormationResponder();
+      } catch (err) {
+        console.warn('[CadreService] formation responder init failed:', err);
+      }
+    })();
+  }
+
+  /**
    * Install the strand-formation responder, backed by the control DB's
    * `FormationInvite` / `FormationUsage` tables.  Without this, an invitation
-   * token is never actually checked (see doStart's call site).
+   * token is never actually checked.  Synchronous — `initializeStrandSolicitation`
+   * only constructs + registers a responder; it performs no control-DB read.
    */
-  private async initializeFormationResponder(): Promise<void> {
+  private initializeFormationResponder(): void {
     if (!this.node) throw new Error('CadreNode not running');
     const controlDb = this.node.getControlDatabase();
     if (!controlDb) throw new Error('Control database not available');

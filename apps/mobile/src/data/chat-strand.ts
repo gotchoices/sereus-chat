@@ -22,13 +22,28 @@ const PROFILE_KEY = '@sereus.chat/profile';
 const DEFAULT_STRAND_ID_KEY = '@sereus.chat/defaultStrandId';
 
 let cachedStrand: StrandInstance | null = null;
+let inFlight: Promise<StrandInstance> | null = null;
 
 /**
  * Boot the cadre, attach the default chat strand (creating one on first run),
  * and ensure this device is registered as a Member.  Idempotent — repeated
  * calls return the same StrandInstance.
+ *
+ * App boot and the first `listStrands()` fire this concurrently; the in-flight
+ * guard collapses them into one attach instead of racing two `createChatStrand`
+ * calls on the same strandId.
  */
 export async function ensureDefaultChatStrand(): Promise<StrandInstance> {
+  if (cachedStrand?.database) return cachedStrand;
+  if (inFlight) return inFlight;
+
+  inFlight = doEnsureDefaultChatStrand().finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+async function doEnsureDefaultChatStrand(): Promise<StrandInstance> {
   if (cachedStrand?.database) return cachedStrand;
 
   await cadreService.ensureStarted();

@@ -5,10 +5,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DataAdapter } from '../adapter';
 import type { Profile, StrandSummary, ChatMessage, Invitation } from '../types';
-import { ensureDefaultChatStrand, syncProfileNameToStrands } from '../chat-strand';
+import { ensureDefaultChatStrand, getDefaultChatStrand, syncProfileNameToStrands } from '../chat-strand';
 import { queryMessages, insertMessage } from '../chat-operations';
 import { CHAT_SAPP_ID } from '../chat-sapp';
 import { cadreService } from '../../cadre';
+import { withTimeout, CONTROL_OP_TIMEOUT_MS } from '../../cadre/async';
 
 const PROFILE_KEY = '@sereus.chat/profile';
 
@@ -67,9 +68,15 @@ export class SereusAdapter implements DataAdapter {
   // DB will join this list once invitation/formation flow is wired (step 8).
 
   async listStrands(): Promise<StrandSummary[]> {
-    // Ensure the default strand is attached so it shows up.
-    const defaultStrand = await ensureDefaultChatStrand();
-    const defaultId = defaultStrand.strandId;
+    // Kick the default-strand attach in the BACKGROUND — never block the list
+    // on it.  Attaching a strand reads the control DB (queryCadrePeers), which
+    // is slow/blocking on a solo node, and we want the list (empty or not) to
+    // render immediately.  Once the strand attaches it shows on the next
+    // refresh.  `defaultStrandId()` lets us still label it "My Notes".
+    void ensureDefaultChatStrand().catch(err =>
+      console.warn('[SereusAdapter] default strand attach deferred:', err instanceof Error ? err.message : err),
+    );
+    const defaultId = getDefaultChatStrand()?.strandId ?? null;
 
     const strands = cadreService.getStrands();
     const summaries: StrandSummary[] = [];
@@ -102,8 +109,10 @@ export class SereusAdapter implements DataAdapter {
   // ── Step 5+ ────────────────────────────────────────────────────────────
 
   async searchStrands(query: string): Promise<StrandSummary[]> {
-    const defaultStrand = await ensureDefaultChatStrand();
-    const defaultId = defaultStrand.strandId;
+    // Non-blocking: search over already-attached strands; don't wait on the
+    // default-strand attach (see listStrands).
+    void ensureDefaultChatStrand().catch(() => {});
+    const defaultId = getDefaultChatStrand()?.strandId ?? null;
     const q = query.trim().toLowerCase();
 
     const out: StrandSummary[] = [];
@@ -188,18 +197,39 @@ export class SereusAdapter implements DataAdapter {
    * holds a relay reservation via a drone/server in its cadre.  In other
    * words: you must add a node to your cadre before you can invite anyone.
    * That is a real precondition, not a bug — surface it to the user.
+   *
+   * `publishFormationInvite` is a control-DB write, which blocks indefinitely
+   * on a solo node, so it is time-boxed: the caller (InvitationGenerator) gets
+   * a prompt, explanatory failure and shows its retry Banner instead of
+   * hanging on "Generating…".
    */
   async createInvitation(): Promise<Invitation> {
-    const strand = await ensureDefaultChatStrand();
     const node = cadreService.cadreNode;
-    if (!node) throw new Error('Cadre is not running');
+    if (!node) throw new Error('Cadre is not running.');
 
+    // Precondition check FIRST, so a solo device fails instantly with a
+    // meaningful message instead of waiting out the strand-attach / control
+    // writes.  Without a dialable address there is nothing to put in the
+    // invitation's bootstrap list, and no peer could ever reach us.
+    if (node.getMultiaddrs().length === 0) {
+      throw new Error(
+        'This device has no reachable address yet. Add a node to your cadre ' +
+          '(a drone or server, under "My Devices") so friends have somewhere to connect, ' +
+          'then try again.',
+      );
+    }
+
+    const strand = await ensureDefaultChatStrand();
     const invitation = await node.createOpenInvitation(CHAT_SAPP_ID, INVITE_EXPIRY_MS);
 
-    await node.publishFormationInvite(invitation.token, CHAT_SAPP_ID, {
-      expiresAtMs: invitation.expiration.getTime(),
-      strandId: strand.strandId,
-    });
+    await withTimeout(
+      node.publishFormationInvite(invitation.token, CHAT_SAPP_ID, {
+        expiresAtMs: invitation.expiration.getTime(),
+        strandId: strand.strandId,
+      }),
+      CONTROL_OP_TIMEOUT_MS,
+      'publishFormationInvite',
+    );
 
     return {
       token: node.encodeInvitation(invitation),
