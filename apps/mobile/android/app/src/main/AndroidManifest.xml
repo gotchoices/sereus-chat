@@ -22,6 +22,30 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+
+        <!-- Custom-scheme fallback: chat://invite/<token>.  Works whenever the
+             app is installed (no domain verification needed) — handy for
+             same-device / pre-domain testing. -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="chat" />
+        </intent-filter>
+
+        <!-- Android App Link: https://chat.sereus.org/invite/<token>.  With
+             autoVerify + a hosted /.well-known/assetlinks.json, the OS opens the
+             app directly for these links; without the app, they load the web
+             landing page.  Association file: ../../../../web/.well-known/. -->
+        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data
+                android:scheme="https"
+                android:host="chat.sereus.org"
+                android:pathPrefix="/invite" />
+        </intent-filter>
       </activity>
     </application>
 </manifest>

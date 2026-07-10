@@ -31,6 +31,28 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     return true
   }
+
+  // Custom-scheme deep links: chat://invite/<token>
+  func application(
+    _ application: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
+    return RCTLinkingManager.application(application, open: url, options: options)
+  }
+
+  // Universal Links: https://chat.sereus.org/invite/<token>
+  func application(
+    _ application: UIApplication,
+    continue userActivity: NSUserActivity,
+    restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
+  ) -> Bool {
+    return RCTLinkingManager.application(
+      application,
+      continue: userActivity,
+      restorationHandler: restorationHandler
+    )
+  }
 }
 
 class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {

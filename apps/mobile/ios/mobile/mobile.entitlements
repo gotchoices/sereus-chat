@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  iOS Universal Links for https://chat.sereus.org/invite/<token>.
+	  Requires web/.well-known/apple-app-site-association (in the chat repo root)
+	  to be hosted at https://chat.sereus.org/.well-known/apple-app-site-association.
+
+	  This file must be wired into the Xcode target once:
+	    Target "mobile" → Signing & Capabilities → + Associated Domains
+	    (or Build Settings → Code Signing Entitlements → mobile/mobile.entitlements)
+	-->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:chat.sereus.org</string>
+	</array>
+</dict>
+</plist>

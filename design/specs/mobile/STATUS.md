@@ -209,7 +209,9 @@ with `listenAddrs: []`. Progress:
       precondition first and fails **instantly** with an actionable message
       ("add a node to your cadre…") — verified on emulator. Will actually mint an
       invite once Transports gives the phone a dialable address.
-- [x] Share invitation via QR + deep link (`chat://invite/<encoded>`)
+- [x] Share invitation via QR + deep link — App Link / Universal Link
+      `https://chat.sereus.org/invite/<encoded>` (`chat://` fallback), registered
+      + verified routing on device (see Screen conformance gaps → Invite loop)
 - [ ] Accept incoming invitation: `formStrand(invitation, disclosure)` then
       `addStrand` using **`FormStrandResult.memberPrivateKey`** (NOT
       `invitePrivateKey` — that one cannot authorize reads). Needs a reachable
@@ -265,8 +267,8 @@ Imports the cadre layer; must not import sereus internals directly.
 - [ ] Conflict resolution for concurrent edits (relies on Optimystic semantics)
 
 ### Known defects (not stack-related)
-- [ ] `android/app/src/main/AndroidManifest.xml` has **no `VIEW` intent filter**,
-      so `chat://` deep links are not registered despite README's adb instructions
+- [x] Deep links registered — `AndroidManifest.xml` now has App-Link + `chat://`
+      `VIEW` intent-filters; iOS Info.plist/entitlements/AppDelegate wired.
 - [ ] `npx jest` fails 6/6 suites: bare `preset: 'react-native'` doesn't transform
       `@react-navigation` (ESM), and the default run sweeps in the Detox `e2e/*` files
 - [ ] `InvitationAcceptance.tsx` still imports `useVariant` / `mockMode` and never
@@ -274,13 +276,29 @@ Imports the cadre layer; must not import sereus internals directly.
 
 ## Screen conformance gaps (code vs human spec)
 
-### The invite loop is broken end-to-end (blocker — do together)
-- [ ] `QrScanner` validates `^sereus://invite/…$` but the app emits
-      `chat://invite/…`; a QR this app makes can never scan successfully
-- [ ] `QrScanner` "Open" button is a no-op (empty `onPress`)
-- [ ] `InvitationAcceptance` Join just navigates home — never calls
-      `acceptInvitation`; and `SereusAdapter.acceptInvitation` is a
-      `notImplemented()` stub
+### Invite loop — deep-link scheme fixed; accept logic still pending
+- [x] Link shape unified in `src/data/inviteLink.ts` — one source of truth.
+      Primary form is the App Link / Universal Link
+      `https://chat.sereus.org/invite/<token>`; `chat://invite/<token>` kept as an
+      app-installed fallback. Generator emits it; scanner parses either form.
+- [x] `QrScanner` scheme mismatch fixed (was `sereus://`) and the "Open" button
+      now routes to `InvitationAcceptance` with the parsed token.
+- [x] OS deep-link registration: Android App-Link + `chat://` intent-filters
+      (`AndroidManifest.xml`, `autoVerify`); iOS `CFBundleURLTypes` +
+      `mobile.entitlements` (`applinks:chat.sereus.org`) + `AppDelegate` handlers.
+      **Verified on emulator:** `chat://invite/<token>` cold-launches → Accept
+      Invite screen with the token.
+- [x] Web site + association files live in `web/` (chat repo root, modelled on
+      `ser/health/web`): `index.html`, `invite.html`, `.well-known/{assetlinks.json,
+      apple-app-site-association}`, `publish.sh` → `chat.sereus.org`.
+- [ ] Deploy `web/` to `chat.sereus.org` (`./web/publish.sh`) and fill the release
+      SHA-256 + Apple Team ID placeholders so the `https` links verify.
+- [ ] iOS: add the Associated Domains capability to the Xcode target so
+      `mobile.entitlements` is compiled in (one manual step; see the well-known README).
+- [ ] `InvitationAcceptance` Join still just navigates home — the actual accept
+      (`formStrand(invitation, disclosure)` → attach with
+      `FormStrandResult.memberPrivateKey`) is unimplemented; `SereusAdapter.acceptInvitation`
+      is still a `notImplemented()` stub. Needs a reachable host (two-device).
 
 ### Attachments / media (blocker cluster)
 - [ ] Attachments are picked (`MediaPicker` → `attachmentDraft`) and rendered as a

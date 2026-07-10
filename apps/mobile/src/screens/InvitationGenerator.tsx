@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Share, Switch, Platform, ToastAndroid } from 'react-native';
 import { useT } from '../i18n';
 import { createInvitation } from '../data/adapter';
+import { buildInviteUrl } from '../data/inviteLink';
 import type { Invitation } from '../data/types';
 import Clipboard from '@react-native-clipboard/clipboard';
 import QRCode from 'react-native-qrcode-svg';
@@ -41,10 +42,10 @@ export default function InvitationGenerator() {
     void generate();
   }, [generate]);
 
-  // Must match the deep-link prefixes registered in navigation/AppNavigator.
+  // Shareable App Link / Universal Link (see src/data/inviteLink.ts).
   const inviteLink = useMemo(() => {
     if (!invitation) return '';
-    return `chat://invite/${invitation.token}`;
+    return buildInviteUrl(invitation.token);
   }, [invitation]);
 
   const onRegenerate = generate;

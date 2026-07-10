@@ -22,6 +22,20 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<!-- Custom-scheme fallback: chat://invite/<token> (see
+			     src/data/inviteLink.ts). Universal Links use the
+			     associated-domains entitlement, not this. -->
+			<key>CFBundleURLName</key>
+			<string>org.sereus.chat</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>chat</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>

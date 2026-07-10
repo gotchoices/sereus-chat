@@ -1,13 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useT } from '../i18n';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import { EmptyState } from '../components';
+import { parseInviteToken } from '../data/inviteLink';
 import { useTheme, typography, spacing, radius } from '../theme';
 
 export default function QrScanner() {
   const t = useT();
   const theme = useTheme();
+  const navigation: any = useNavigation();
   const [value, setValue] = useState('');
   const [permission, setPermission] = useState<'authorized' | 'denied' | 'not-determined'>('not-determined');
   const device = useCameraDevice('back');
@@ -35,10 +38,9 @@ export default function QrScanner() {
     return () => { mounted = false; };
   }, []);
 
-  const valid = useMemo(() => {
-    if (!value) return false;
-    return /^sereus:\/\/invite\/[A-Za-z0-9_-]+(\?.*)?$/.test(value.trim());
-  }, [value]);
+  // Accepts both the https App Link and the chat:// fallback (inviteLink.ts).
+  const token = useMemo(() => parseInviteToken(value), [value]);
+  const valid = token !== null;
 
   const cameraReady = permission === 'authorized' && device && !isSimulator;
 
@@ -82,7 +84,7 @@ export default function QrScanner() {
         style={[styles.openBtn, { backgroundColor: theme.accent }, !valid && styles.openBtnDisabled]}
         disabled={!valid}
         onPress={() => {
-          // In future: navigate to InvitationAcceptance with parsed token
+          if (token) navigation.navigate('InvitationAcceptance', { token });
         }}
         accessibilityLabel="Open invite"
         testID="qr-open"
