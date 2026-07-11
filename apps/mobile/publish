@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+DEST="root@gotchoices.org:/var/www/sereus.org/chat/chat.apk"
+
+# Publish APK
+scp android/app/build/outputs/apk/release/app-release.apk $DEST
+echo "Published to $DEST"

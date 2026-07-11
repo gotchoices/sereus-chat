@@ -1,0 +1,2 @@
+json_key_file(ENV["GOOGLE_PLAY_API_FILE"]) # Path to the JSON key file (for future Play Store uploads)
+package_name("org.sereus.chat")

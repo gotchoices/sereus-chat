@@ -1,0 +1,172 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+# ---------------------------------------------------------------------------
+# Lanes (run from apps/mobile/ios, e.g. `bundle exec fastlane build_ipa`):
+#
+#   build_simulator  Debug build for the iOS Simulator. No signing / no Apple
+#                    account required — use for CI smoke builds ("does it build?").
+#
+#   build_ipa        Signed Release .ipa for manual distribution. Mirrors the
+#                    Android `build_app_bundle` lane: builds the artifact and
+#                    prints upload instructions (does not upload).
+#
+#   beta             Signed Release build uploaded to TestFlight via the App
+#                    Store Connect API. Requires the ASC API-key env vars below.
+#
+# Required environment variables
+#   Signing (build_ipa, beta):
+#     SEREUS_IOS_TEAM_ID          Apple Developer Team ID (10 chars, e.g. ABCDE12345)
+#   Optional:
+#     SEREUS_IOS_EXPORT_METHOD    export method for build_ipa: app-store (default),
+#                                 ad-hoc, development, or enterprise
+#   TestFlight upload (beta) — App Store Connect API key:
+#     SEREUS_IOS_APPLE_ID         Apple Developer account email
+#     ASC_KEY_ID                  App Store Connect API Key ID
+#     ASC_ISSUER_ID               App Store Connect API Issuer ID
+#     ASC_KEY_FILEPATH            path to the .p8 API key file
+#
+# Note: fastlane requires a UTF-8 locale. If you see a locale warning, run with
+#   LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 bundle exec fastlane <lane>
+# ---------------------------------------------------------------------------
+
+default_platform(:ios)
+
+WORKSPACE = "mobile.xcworkspace"
+SCHEME    = "mobile"
+OUTPUT_DIR = File.expand_path("../build")   # apps/mobile/ios/build (git-ignored)
+
+platform :ios do
+  desc "Debug build for the iOS Simulator (no code signing, no Apple account needed)"
+  lane :build_simulator do
+    xcodebuild(
+      workspace: WORKSPACE,
+      scheme: SCHEME,
+      configuration: "Debug",
+      sdk: "iphonesimulator",
+      destination: "generic/platform=iOS Simulator",
+      xcargs: "CODE_SIGNING_ALLOWED=NO",
+      build: true
+    )
+
+    UI.important("")
+    UI.important("📱 iOS SIMULATOR BUILD SUCCEEDED 📱")
+    UI.important("------------------------------------------")
+    UI.important("Unsigned Debug build compiled for the simulator.")
+    UI.important("Run it with:  yarn ios")
+    UI.important("------------------------------------------")
+  end
+
+  desc "Build a signed Release .ipa for manual distribution"
+  lane :build_ipa do
+    team_id = require_team_id!
+    export_method = ENV["SEREUS_IOS_EXPORT_METHOD"] || "app-store"
+
+    ipa_path = build_signed_release(team_id, export_method)
+
+    if ipa_path && File.exist?(ipa_path)
+      UI.important("")
+      UI.important("📱 iOS IPA CREATED SUCCESSFULLY 📱")
+      UI.important("------------------------------------------")
+      UI.important("IPA File: #{ipa_path}")
+      UI.important("Export method: #{export_method}")
+      UI.important("")
+      UI.important("Manual Upload Instructions:")
+      UI.important("1. Open Transporter.app (Mac App Store) or use `xcrun altool`")
+      UI.important("2. Sign in with your Apple Developer account")
+      UI.important("3. Upload this .ipa, then manage the build in App Store Connect:")
+      UI.important("   https://appstoreconnect.apple.com/")
+      UI.important("   (Or run `bundle exec fastlane beta` to upload to TestFlight automatically.)")
+      UI.important("------------------------------------------")
+    else
+      UI.error("Could not find .ipa at expected location: #{ipa_path.inspect}")
+      raise "IPA build failed"
+    end
+  end
+
+  desc "Build a signed Release .ipa and upload it to TestFlight"
+  lane :beta do
+    team_id = require_team_id!
+    api_key = testflight_api_key!
+
+    ipa_path = build_signed_release(team_id, "app-store")
+
+    upload_to_testflight(
+      api_key: api_key,
+      ipa: ipa_path,
+      skip_waiting_for_build_processing: true
+    )
+
+    UI.important("")
+    UI.important("🚀 UPLOADED TO TESTFLIGHT 🚀")
+    UI.important("------------------------------------------")
+    UI.important("Build uploaded. Processing on App Store Connect:")
+    UI.important("  https://appstoreconnect.apple.com/apps")
+    UI.important("------------------------------------------")
+  end
+
+  # -------------------------------------------------------------------------
+  # Helpers
+  # -------------------------------------------------------------------------
+
+  # Build a signed Release archive and export an .ipa. Uses automatic signing
+  # keyed off the Team ID (no `match` certificate repo required — Xcode manages
+  # the signing assets, creating them via -allowProvisioningUpdates if needed).
+  def build_signed_release(team_id, export_method)
+    build_app(
+      workspace: WORKSPACE,
+      scheme: SCHEME,
+      configuration: "Release",
+      clean: true,
+      output_directory: OUTPUT_DIR,
+      output_name: "mobile.ipa",
+      export_method: export_method,
+      xcargs: "DEVELOPMENT_TEAM=#{team_id} -allowProvisioningUpdates",
+      export_options: {
+        teamID: team_id,
+        signingStyle: "automatic",
+        method: export_method
+      }
+    )
+    lane_context[SharedValues::IPA_OUTPUT_PATH] || File.join(OUTPUT_DIR, "mobile.ipa")
+  end
+
+  def require_team_id!
+    team_id = ENV["SEREUS_IOS_TEAM_ID"]
+    if team_id.nil? || team_id.empty?
+      UI.error("SEREUS_IOS_TEAM_ID environment variable is not set")
+      UI.error("Set this to your Apple Developer Team ID (10 chars, e.g. ABCDE12345)")
+      UI.error("Find it at https://developer.apple.com/account under Membership details")
+      raise "Missing SEREUS_IOS_TEAM_ID"
+    end
+    team_id
+  end
+
+  def testflight_api_key!
+    %w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_FILEPATH].each do |var|
+      if ENV[var].nil? || ENV[var].empty?
+        UI.error("#{var} environment variable is not set")
+        UI.error("TestFlight upload needs an App Store Connect API key.")
+        UI.error("Create one at https://appstoreconnect.apple.com/access/api and set")
+        UI.error("  ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_FILEPATH (path to the .p8 file)")
+        raise "Missing #{var}"
+      end
+    end
+    unless File.exist?(ENV["ASC_KEY_FILEPATH"])
+      UI.error("App Store Connect API key file not found at: #{ENV["ASC_KEY_FILEPATH"]}")
+      raise "ASC key file not found"
+    end
+
+    app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_filepath: ENV["ASC_KEY_FILEPATH"]
+    )
+  end
+end

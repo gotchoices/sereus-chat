@@ -1,0 +1,6 @@
+app_identifier("org.sereus.chat")                  # bundle identifier (matches Android package_name)
+
+# Apple Developer account + team.  Kept in env vars so no personal credentials
+# live in the repo (mirrors the Android Appfile's GOOGLE_PLAY_API_FILE pattern).
+apple_id(ENV["SEREUS_IOS_APPLE_ID"])               # Apple Developer account email (for TestFlight/App Store uploads)
+team_id(ENV["SEREUS_IOS_TEAM_ID"])                 # Apple Developer Portal Team ID (10-char, e.g. ABCDE12345)

@@ -1,0 +1,97 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+# ---------------------------------------------------------------------------
+# Lanes (run from apps/mobile/android, e.g. `bundle exec fastlane build_apk`):
+#
+#   build_apk         Signed Release .apk for manual/side-load distribution
+#                     (this is what apps/mobile/publish uploads to sereus.org/chat).
+#   build_app_bundle  Signed Release .aab for Play Store submission.
+#
+# Required environment variables (both lanes):
+#   SEREUS_STORE_FILE      path to your release keystore file
+#   SEREUS_STORE_PASSWORD  keystore (and key) password
+#   SEREUS_KEY_ALIAS       optional; defaults to org.sereus.chat (see android/app/build.gradle)
+# ---------------------------------------------------------------------------
+
+default_platform(:android)
+
+platform :android do
+  desc "Build release APK"
+  lane :build_apk do
+    require_signing_env!
+
+    gradle(
+      task: "assembleRelease"
+    )
+
+    apk_path = lane_context[SharedValues::GRADLE_APK_OUTPUT_PATH] ||
+               File.expand_path("../app/build/outputs/apk/release/app-release.apk")
+
+    if File.exist?(apk_path)
+      UI.important("")
+      UI.important("📱 ANDROID APK CREATED SUCCESSFULLY 📱")
+      UI.important("------------------------------------------")
+      UI.important("APK File: #{apk_path}")
+      UI.important("Publish it with:  (from apps/mobile)  ./publish")
+      UI.important("------------------------------------------")
+    else
+      UI.error("Could not find APK file at expected location: #{apk_path}")
+    end
+  end
+
+  desc "Build app bundle for Play Store submission"
+  lane :build_app_bundle do
+    require_signing_env!
+
+    gradle(
+      task: "bundleRelease"
+    )
+
+    aab_path = lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH] ||
+               File.expand_path("../app/build/outputs/bundle/release/app-release.aab")
+
+    if File.exist?(aab_path)
+      UI.important("")
+      UI.important("📱 ANDROID APP BUNDLE CREATED SUCCESSFULLY 📱")
+      UI.important("------------------------------------------")
+      UI.important("AAB File: #{aab_path}")
+      UI.important("")
+      UI.important("Manual Upload Instructions:")
+      UI.important("1. Use Google Play Console: https://play.google.com/console/")
+      UI.important("2. Go to Your app > 'Production' (or desired track)")
+      UI.important("3. Create a new release and upload this bundle")
+      UI.important("------------------------------------------")
+    else
+      UI.error("Could not find AAB file at expected location: #{aab_path}")
+    end
+  end
+
+  # -------------------------------------------------------------------------
+  # Helpers
+  # -------------------------------------------------------------------------
+
+  def require_signing_env!
+    unless ENV["SEREUS_STORE_FILE"]
+      UI.error("SEREUS_STORE_FILE environment variable is not set")
+      UI.error("Set this to the path of your release keystore file")
+      raise "Missing SEREUS_STORE_FILE"
+    end
+
+    unless ENV["SEREUS_STORE_PASSWORD"]
+      UI.error("SEREUS_STORE_PASSWORD environment variable is not set")
+      raise "Missing SEREUS_STORE_PASSWORD"
+    end
+
+    unless File.exist?(ENV["SEREUS_STORE_FILE"])
+      UI.error("Keystore file not found at: #{ENV["SEREUS_STORE_FILE"]}")
+      raise "Keystore file not found"
+    end
+  end
+end
