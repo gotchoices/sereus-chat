@@ -41,7 +41,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // sAppId }) call before ensureStarted, so the cadre layer is a clean
 // candidate for `@sereus/cadre-rn-ui` extraction.
 import { CHAT_SAPP_ID } from '../data/chat-sapp';
-import { withTimeout, AUTHORITY_GENESIS_TIMEOUT_MS } from './async';
+import { withTimeout, OWNER_GENESIS_TIMEOUT_MS } from './async';
 
 type OptimysticDb = ReturnType<typeof openOptimysticRNDb>;
 type EventHandler<T> = (payload: T) => void;
@@ -131,40 +131,42 @@ class CadreServiceImpl {
   }
 
   /**
-   * Run authority genesis.  Idempotent, and safe to call on every start.
+   * Run owner genesis (cadre-core 0.10).  Idempotent, safe on every start.
    *
-   * cadre-core 0.8 uses a SINGLE-KEY model: the cadre's authority key is
-   * *derived from the node identity* (`authorityKeyFromLibp2p`), not an
-   * independent keypair.  `publishStrand`, `publishFormationInvite` and
-   * `registerSelf` all sign with `getSelfSigningKey()`, which refuses to
-   * sign unless the derived public key matches the control node's PeerId.
+   * SINGLE-KEY model: the cadre's owner key IS the node identity
+   * (`getIdentityOwnerKey`), not an independent keypair.  `publishStrand`,
+   * `publishFormationInvite` and `registerSelf` all sign with the self key,
+   * which refuses to sign unless the derived public key matches the control
+   * node's PeerId — so there is nothing separate to "create".
    *
-   * So generating a *separate* random authority key — what this service did
-   * against cadre-core 0.7 — puts a key in `CadreControl.AuthorityKey` that
-   * nothing will ever sign with.  Don't.
+   * `ensureOwnerKey` inserts the founding `CadreControl.OwnerKey` row only when
+   * the table is empty (bootstrap insert — no existing owners required), then
+   * `initializeSeedBootstrap` arms the seed/enrolment flows with the private
+   * half.  Mirrors `runOwnerGenesis` in reference-app-rn/src/cadre-phone.ts.
    *
-   * `ensureAuthorityKey` is idempotent: it inserts only when the table is
-   * empty, which also subsumes the old `reestablishAuthorityKeyRow()`
-   * workaround for solo-mode control-DB writes not surviving a restart.
+   * Logs elapsed time: the reference documents the solo (cadre-of-one) control
+   * path completing in milliseconds (`control-database-solo.spec.ts`).  This is
+   * chat's independent check of that on a real device.
    */
-  private async runAuthorityGenesis(): Promise<string> {
+  private async runOwnerGenesis(): Promise<string> {
     if (!this.node) throw new Error('CadreNode not running');
+    const t0 = Date.now();
 
     // Throws on an ephemeral libp2p identity; we always pass an explicit
     // Ed25519 `privateKey`, so the identity is resolved and Ed25519.
-    const { privateKeyB64, publicKeyB64 } = this.node.getIdentityAuthorityKey();
+    const { privateKeyB64, publicKeyB64 } = this.node.getIdentityOwnerKey();
 
     const controlDb = this.node.getControlDatabase();
     if (!controlDb) throw new Error('Control database not available');
 
-    const inserted = await controlDb.ensureAuthorityKey(publicKeyB64);
+    const inserted = await controlDb.ensureOwnerKey(publicKeyB64);
     this.node.initializeSeedBootstrap(privateKeyB64);
     this._authorityPublicKey = publicKeyB64;
 
     console.info(
-      inserted
-        ? '[CadreService] ✓ authority genesis: inserted founding key, seed flows enabled'
-        : '[CadreService] ✓ authority key already present, seed flows enabled',
+      `[CadreService] ✓ owner genesis in ${Date.now() - t0}ms — ` +
+        (inserted ? 'inserted founding OwnerKey' : 'OwnerKey already present') +
+        ', seed flows enabled',
     );
     return publicKeyB64;
   }
@@ -177,7 +179,7 @@ class CadreServiceImpl {
    */
   async createAuthorityKey(): Promise<{ publicKey: string }> {
     await this.ensureStarted();
-    const publicKey = await this.runAuthorityGenesis();
+    const publicKey = await this.runOwnerGenesis();
     return { publicKey };
   }
 
@@ -193,7 +195,7 @@ class CadreServiceImpl {
     await this.ensureStarted();
     if (!this.node) return null;
     try {
-      return this.node.getIdentityAuthorityKey().privateKeyB64;
+      return this.node.getIdentityOwnerKey().privateKeyB64;
     } catch (err) {
       console.warn('[CadreService] exportAuthorityPrivateKey failed:', err);
       return null;
@@ -345,15 +347,17 @@ class CadreServiceImpl {
           // RN cannot listen for inbound connections.
           listenAddrs: [],
         },
-        // cadre-core 0.8 verifies the sApp schema signature fail-closed
-        // (`requireSignedSchemas ?? true` in strand-instance-manager).  Our
-        // sApp config carries `signature: ''` and its `id` is a name
+        // cadre-core verifies the sApp schema signature fail-closed.  Our sApp
+        // config carries `signature: ''` and its `id` is a name
         // (`org.sereus.chat`) rather than an ed25519 author public key, so it
         // cannot be verified — every addStrand() would throw
-        // SchemaVerificationError('missing signature').
+        // SchemaVerificationError.  The reference app relaxes the policy for
+        // exactly this reason.  Flip this back on once the schema is signed.
         //
-        // The reference app relaxes the policy for exactly this reason.  Flip
-        // this back on once the chat sApp schema is signed with an author key.
+        // trustedOwners / bootstrapPeers are omitted → cadre-core defaults them
+        // to in-memory stores (fine for a session; not persisted across restart,
+        // unlike the reference's Persistent*Store — chat uses the `privateKey`
+        // identity path, so there is no expo-secure-store slot to hang them off).
         requireSignedSchemas: false,
       };
 
@@ -366,57 +370,39 @@ class CadreServiceImpl {
         this.node.peerId?.toString(),
       );
 
-      // Arm authority genesis + the formation responder OFF the boot path.
+      // Owner genesis + formation responder, INLINE (reference-app-rn pattern).
       //
-      // Both touch the control network.  On a SOLO node (no control cohort) a
-      // control-DB read blocks indefinitely: the control DB registers
-      // optimystic with `default_transactor: 'network'`, and a consistent read
-      // (e.g. the `hasAuthorityKey()` query inside `ensureAuthorityKey`) has no
-      // quorum to answer it.  Awaiting genesis here froze `doStart` before the
-      // default chat strand could attach — the whole app hung on a fresh boot.
-      //
-      // Strand reads/writes are unaffected (they run in bootstrap mode against
-      // the strand's own LevelDB), so the app is fully usable locally without
-      // genesis.  Genesis/formation are best-effort and complete once a cohort
-      // exists.  See armCadreServicesInBackground.
-      this.armCadreServicesInBackground();
-    } catch (err) {
-      this._startError = err instanceof Error ? err.message : String(err);
-      console.error('[CadreService] doStart failed:', this._startError);
-      throw err;
-    }
-  }
-
-  /**
-   * Best-effort background bring-up of the control-network services that must
-   * NOT gate boot.  Fired (not awaited) from doStart.
-   *
-   * Authority genesis is time-boxed: on a solo node its control-DB read never
-   * returns, so we cap the wait, log, and move on.  The formation responder is
-   * a synchronous install (no control-DB read) but is kept here so both live
-   * off the boot path.
-   */
-  private armCadreServicesInBackground(): void {
-    void (async () => {
+      // At cadre-core 0.10 / optimystic 0.22 the solo (cadre-of-one) control
+      // path completes in milliseconds (`control-database-solo.spec.ts`), so —
+      // unlike the 0.8 stack chat previously ran, where a solo control-DB read
+      // blocked forever and forced these off the boot path — we await genesis
+      // here, fail-soft.  A generous diagnostic timeout keeps a regression from
+      // silently wedging boot: if genesis ever fails to settle we log it and the
+      // node still comes up (seed/invite flows just stay un-armed).  This inline
+      // await is exactly chat's independent test of whether phone genesis works
+      // on-device at 0.10.
       try {
-        await withTimeout(
-          this.runAuthorityGenesis(),
-          AUTHORITY_GENESIS_TIMEOUT_MS,
-          'authority genesis',
-        );
+        await withTimeout(this.runOwnerGenesis(), OWNER_GENESIS_TIMEOUT_MS, 'owner genesis');
       } catch (err) {
         console.warn(
-          '[CadreService] authority genesis deferred (solo node / no control cohort yet):',
+          '[CadreService] owner genesis did not complete:',
           err instanceof Error ? err.message : err,
         );
       }
 
+      // Formation responder — a SECURITY GATE: createOpenInvitation/formStrand
+      // lazily spin up a solicitation service with NO usage recorder otherwise,
+      // which accepts every token.  Synchronous (no control-DB read).
       try {
         this.initializeFormationResponder();
       } catch (err) {
         console.warn('[CadreService] formation responder init failed:', err);
       }
-    })();
+    } catch (err) {
+      this._startError = err instanceof Error ? err.message : String(err);
+      console.error('[CadreService] doStart failed:', this._startError);
+      throw err;
+    }
   }
 
   /**

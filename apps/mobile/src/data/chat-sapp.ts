@@ -20,7 +20,6 @@ import type {
   SAppConfig,
   StrandRow,
 } from '@serfab/cadre-core';
-import { withTimeout, CONTROL_OP_TIMEOUT_MS } from '../cadre/async';
 
 // Raw .qsql contents, imported as a string by the Metro transformer.
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -62,27 +61,19 @@ export function getChatSAppConfig(): SAppConfig {
 }
 
 /**
- * Create a new open chat strand on the given cadre node.
+ * Create a new open chat strand on the given cadre node — the reference-app
+ * order (reference-app-rn/src/chat-strand.ts, cadre-core 0.10):
+ *   1. `publishStrand(id, 'o')` — the owner-signed `Strand` row in the control
+ *      DB.  Published FIRST so a publish failure surfaces as a thrown error and
+ *      we never start a local-only island no peer could ever join.
+ *   2. `addStrand({ founder: true })` — start the LOCAL strand instance; the
+ *      founder bootstrap writes `Strand.Header`.  `mode` is left unset so
+ *      CadreNode infers bootstrap→networked from cohort membership.
  *
- * Order matters, and it is the REVERSE of the sereus reference app.  The
- * reference publishes first (authority-signed `Strand` row in the control DB)
- * so it never starts a local-only island.  Chat is offline-first: the default
- * "My Notes" strand must attach and be usable on a solo device with no cohort,
- * and a control-DB write blocks on the network transactor until a cohort
- * exists (see CadreService.armCadreServicesInBackground).  So we:
- *   1. `addStrand` — start the LOCAL strand instance (`founder: true` runs the
- *      one-time membership bootstrap).  This works solo: the strand DB runs in
- *      bootstrap mode against its own LevelDB, no control network required.
- *   2. `publishStrand` — best-effort, in the BACKGROUND, to make the strand
- *      discoverable once the cadre has other members.  A failure/timeout here
- *      means "not shareable yet", never "boot hung".
- *
- * `mode: 'bootstrap'` is pinned deliberately.  If it is omitted, 0.8 INFERS the
- * mode from cohort membership — which reads `CadrePeer` from the control DB,
- * and that read blocks forever on a solo node (the network transactor has no
- * quorum).  Bootstrap mode skips the cohort read and runs the strand purely
- * against its own LevelDB.  A strand that needs `networked` mode (once a cohort
- * exists) is restarted then — a future step; see STATUS.md "First remote node".
+ * At 0.10 the solo control path completes in ms, so — unlike the 0.8 stack chat
+ * previously ran — neither step needs a timeout or backgrounding.  (Requires
+ * owner genesis to have run so publishStrand has a signing key; CadreService
+ * awaits genesis before this is reached.)
  */
 export async function createChatStrand(
   cadreNode: CadreNode,
@@ -94,50 +85,26 @@ export async function createChatStrand(
     Type: 'o', // open — strand type is the user's choice; default to open
   };
 
-  // `addStrand` is time-boxed: on 0.8 it ALWAYS reads `CadrePeer` from the
-  // control DB (launchStrand → resolveCohortSeed → queryCadrePeers) to resolve
-  // the cohort seed, even with `mode: 'bootstrap'`, and that read blocks on a
-  // solo node.  The timeout keeps a solo attempt from hanging the caller
-  // forever; it resolves promptly once the cadre has a reachable peer.
-  const instance = await withTimeout(
-    cadreNode.addStrand({
-      mode: 'bootstrap',
-      strandRow,
-      sAppConfig: getChatSAppConfig(),
-      founder: true,
-    }),
-    CONTROL_OP_TIMEOUT_MS,
-    'addStrand',
-  );
+  await cadreNode.publishStrand(strandId, 'o');
 
-  // Best-effort publish, off the attach path.  Time-boxed so a solo control
-  // write (which never acknowledges without a cohort) can't leave a dangling
-  // await; the strand is already attached and usable regardless.
-  void withTimeout(cadreNode.publishStrand(strandId, 'o'), CONTROL_OP_TIMEOUT_MS, 'publishStrand').catch(
-    err =>
-      console.warn(
-        `[chat-sapp] publishStrand(${strandId}) deferred — strand is local-only until ` +
-          'authority genesis completes and a cohort is reachable:',
-        err instanceof Error ? err.message : err,
-      ),
-  );
-
-  return instance;
+  return cadreNode.addStrand({
+    strandRow,
+    sAppConfig: getChatSAppConfig(),
+    founder: true,
+  });
 }
 
 /**
  * Join an existing chat strand that surfaced via the control network.
  *
  * No `founder` — a joiner writes no membership rows; it receives them via
- * Optimystic sync.  `mode: 'bootstrap'` for the same reason as createChatStrand
- * (avoid the solo-hanging cohort read).
+ * Optimystic sync.  `mode` unset — inferred from cohort membership.
  */
 export async function joinChatStrand(
   cadreNode: CadreNode,
   strandRow: StrandRow,
 ): Promise<StrandInstance> {
   return cadreNode.addStrand({
-    mode: 'bootstrap',
     strandRow,
     sAppConfig: getChatSAppConfig(),
   });

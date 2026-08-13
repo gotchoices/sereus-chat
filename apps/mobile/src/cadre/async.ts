@@ -7,11 +7,11 @@
  */
 
 /**
- * How long to wait for authority genesis before giving up for this session.
- * On a solo node the underlying control-DB read never returns; this only bounds
- * the background attempt and never affects boot (boot never awaits genesis).
+ * Diagnostic bound on owner genesis.  At 0.10 the solo control path completes in
+ * milliseconds, so this should never fire — it exists only so a regression can't
+ * silently wedge boot on an unsettled control call (we log + continue instead).
  */
-export const AUTHORITY_GENESIS_TIMEOUT_MS = 20_000;
+export const OWNER_GENESIS_TIMEOUT_MS = 30_000;
 
 /** How long to wait on a one-off control-network operation before failing fast. */
 export const CONTROL_OP_TIMEOUT_MS = 15_000;

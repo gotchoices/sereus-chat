@@ -82,14 +82,14 @@ pj_path = os.path.join(APP_DIR, 'package.json')
 # `in_deps` packages appear in `dependencies`; `in_res` packages appear in
 # `resolutions` in BOTH modes so a single version wins tree-wide.
 PACKAGES = collections.OrderedDict([
-    ('@optimystic/db-core',                  ('../../../optimystic/packages/db-core',                  '^0.14.1', True,  True)),
-    ('@optimystic/db-p2p',                   ('../../../optimystic/packages/db-p2p',                   '^0.14.1', True,  True)),
-    ('@optimystic/db-p2p-storage-rn',        ('../../../optimystic/packages/db-p2p-storage-rn',        '^0.14.1', True,  True)),
-    ('@optimystic/quereus-plugin-crypto',    ('../../../optimystic/packages/quereus-plugin-crypto',    '^0.14.1', True,  True)),
+    ('@optimystic/db-core',                  ('../../../optimystic/packages/db-core',                  '^0.22.0', True,  True)),
+    ('@optimystic/db-p2p',                   ('../../../optimystic/packages/db-p2p',                   '^0.22.0', True,  True)),
+    ('@optimystic/db-p2p-storage-rn',        ('../../../optimystic/packages/db-p2p-storage-rn',        '^0.22.0', True,  True)),
+    ('@optimystic/quereus-plugin-crypto',    ('../../../optimystic/packages/quereus-plugin-crypto',    '^0.22.0', True,  True)),
     ('@optimystic/quereus-plugin-optimystic',('../../../optimystic/packages/quereus-plugin-optimystic','^0.14.1', True,  True)),
-    ('@quereus/quereus',                     ('../../../quereus/packages/quereus',                     '^4.3.1',  True,  True)),
-    ('@serfab/cadre-core',                   ('../../../sereus/packages/cadre-core',                   '^0.8.1',  True,  True)),
-    ('@serfab/strand-proto',                 ('../../../sereus/packages/strand-proto',                 '^0.8.1',  False, True)),
+    ('@quereus/quereus',                     ('../../../quereus/packages/quereus',                     '^4.11.0', True,  True)),
+    ('@serfab/cadre-core',                   ('../../../sereus/packages/cadre-core',                   '^0.10.0', True,  True)),
+    ('@serfab/strand-proto',                 ('../../../sereus/packages/strand-proto',                 '^0.10.0', False, True)),
     ('p2p-fret',                             ('../../../fret/packages/fret',                           '^0.6.0',  True,  True)),
 ])
 NAMES = set(PACKAGES)
@@ -112,10 +112,10 @@ SENTINEL = '@serfab/cadre-core'  # its spec tells us the current mode
 #     pins for type identity.  The `npm` values track what the published
 #     0.8.x/4.x stack resolves to (same set health/apps/mobile uses).
 COMPAT_PINS = collections.OrderedDict([
-    ('@libp2p/interface',        ('npm:3.1.0',  'npm:3.2.4')),
-    ('@libp2p/peer-id',          ('npm:6.0.4',  'npm:6.0.11')),
+    ('@libp2p/interface',        ('npm:3.1.0',  'npm:3.2.5')),
+    ('@libp2p/peer-id',          ('npm:6.0.4',  'npm:6.0.14')),
     ('@multiformats/multiaddr',  ('npm:13.0.1', None)),
-    ('libp2p',                   ('npm:3.1.3',  'npm:3.3.4')),
+    ('libp2p',                   ('npm:3.1.3',  'npm:3.3.8')),
     ('@noble/hashes',            ('npm:2.0.1',  'npm:2.2.0')),
 ])
 PIN_NAMES = set(COMPAT_PINS)
