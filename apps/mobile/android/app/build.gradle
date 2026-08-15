@@ -93,16 +93,16 @@ android {
             keyPassword 'android'
         }
         release {
-            // Production keystore, supplied via environment variables (matches
-            // ser/health/apps/mobile and the fastlane `build_apk` / `build_app_bundle`
-            // lanes). Set:
-            //   SEREUS_STORE_FILE     path to your keystore file
-            //   SEREUS_STORE_PASSWORD keystore (and key) password
-            //   SEREUS_KEY_ALIAS      optional; defaults to org.sereus.chat
-            keyAlias System.getenv("SEREUS_KEY_ALIAS") ?: "org.sereus.chat"
-            storeFile file(System.getenv("SEREUS_STORE_FILE") ?: "release.keystore")
-            storePassword System.getenv("SEREUS_STORE_PASSWORD") ?: "not_set"
-            keyPassword System.getenv("SEREUS_STORE_PASSWORD") ?: "not_set"
+            // Production keystore, supplied via per-app environment variables
+            // (matches ser/health/apps/mobile's STORE_FILE_HEALTH pattern and the
+            // fastlane `build_apk` / `build_app_bundle` lanes). Set:
+            //   STORE_FILE_CHAT     path to your keystore file
+            //   STORE_PASSWORD_CHAT keystore (and key) password
+            //   KEY_ALIAS_CHAT      optional; defaults to org.sereus.chat
+            keyAlias System.getenv("KEY_ALIAS_CHAT") ?: "org.sereus.chat"
+            storeFile file(System.getenv("STORE_FILE_CHAT") ?: "release.keystore")
+            storePassword System.getenv("STORE_PASSWORD_CHAT") ?: "not_set"
+            keyPassword System.getenv("STORE_PASSWORD_CHAT") ?: "not_set"
         }
     }
     buildTypes {

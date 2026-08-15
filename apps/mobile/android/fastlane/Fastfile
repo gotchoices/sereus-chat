@@ -15,9 +15,9 @@
 #   build_app_bundle  Signed Release .aab for Play Store submission.
 #
 # Required environment variables (both lanes):
-#   SEREUS_STORE_FILE      path to your release keystore file
-#   SEREUS_STORE_PASSWORD  keystore (and key) password
-#   SEREUS_KEY_ALIAS       optional; defaults to org.sereus.chat (see android/app/build.gradle)
+#   STORE_FILE_CHAT      path to your release keystore file
+#   STORE_PASSWORD_CHAT  keystore (and key) password
+#   KEY_ALIAS_CHAT       optional; defaults to org.sereus.chat (see android/app/build.gradle)
 # ---------------------------------------------------------------------------
 
 default_platform(:android)
@@ -78,19 +78,19 @@ platform :android do
   # -------------------------------------------------------------------------
 
   def require_signing_env!
-    unless ENV["SEREUS_STORE_FILE"]
-      UI.error("SEREUS_STORE_FILE environment variable is not set")
+    unless ENV["STORE_FILE_CHAT"]
+      UI.error("STORE_FILE_CHAT environment variable is not set")
       UI.error("Set this to the path of your release keystore file")
-      raise "Missing SEREUS_STORE_FILE"
+      raise "Missing STORE_FILE_CHAT"
     end
 
-    unless ENV["SEREUS_STORE_PASSWORD"]
-      UI.error("SEREUS_STORE_PASSWORD environment variable is not set")
-      raise "Missing SEREUS_STORE_PASSWORD"
+    unless ENV["STORE_PASSWORD_CHAT"]
+      UI.error("STORE_PASSWORD_CHAT environment variable is not set")
+      raise "Missing STORE_PASSWORD_CHAT"
     end
 
-    unless File.exist?(ENV["SEREUS_STORE_FILE"])
-      UI.error("Keystore file not found at: #{ENV["SEREUS_STORE_FILE"]}")
+    unless File.exist?(ENV["STORE_FILE_CHAT"])
+      UI.error("Keystore file not found at: #{ENV["STORE_FILE_CHAT"]}")
       raise "Keystore file not found"
     end
   end
