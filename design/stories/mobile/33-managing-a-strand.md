@@ -61,7 +61,17 @@ it. He wants to tidy up, and does not want to discover afterwards that he threw 
 4.2. Leaving it now ends it, because nobody is left to carry it. He is told that this is what is
      about to happen, rather than finding out afterwards.
 
-### Alternative Path E: a member who keeps talking
+### Alternative Path E: put out by somebody else
+
+1.1. Bob is removed from a strand by one of the people who can do that. He did not choose this and
+     was not asked.
+1.2. He is told it happened, rather than left to work it out from a conversation that quietly stops.
+1.3. Nothing further reaches him. What he already held, he still holds — being removed does not
+     reach back into what he has read or kept.
+1.4. This is a risk of any strand where somebody holds that ability, and it is one of the things the
+     strand's status is telling him ([31](31-whos-in-this-strand.md)).
+
+### Alternative Path F: a member who keeps talking
 
 6.1. Dave carries on sending messages after Bob has left.
 6.2. They do not reach Bob, and he is not troubled by them. Dave is not told he has been left; he
@@ -81,6 +91,8 @@ it. He wants to tidy up, and does not want to discover afterwards that he threw 
       costs: a later return is as a new member, and earlier messages stay attributed to who the user
       was
 - [ ] The remaining members are not notified when someone leaves
+- [ ] A member who is removed by someone else is told, rather than left to infer it
+- [ ] Removal stops anything further reaching them and does not reach back into what they hold
 - [ ] A user leaving a strand where they are the last member is told that this ends it
 - [ ] The user can keep content that matters to them before forgetting a strand
 - [ ] Nothing offered here reaches another member's copy

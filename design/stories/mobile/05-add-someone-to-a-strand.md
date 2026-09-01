@@ -57,26 +57,44 @@ Bob also has a strand with his brother that he closed for good, and will find ou
 ### Alternative Path C: not depending on Bob
 
 2.1. The group is growing and Bob does not want it waiting on him.
-2.2. He invites the next rider with the ability to invite passed on, so there is more than one
-     person who can bring someone in.
-2.3. Everyone can see that this strand now has more people who can add to it, because that is the
-     thing worth knowing about it.
+2.2. He gives an existing member the same ability he has, without their having to leave and come
+     back. He can also pass it on to somebody at the moment he invites them.
+2.3. He is told what he is handing over, and it is more than convenience. That person will be able
+     to bring people in and to put people out — **including Bob**. Everyone holding this ability
+     holds it over everyone else who does; there is no seniority, and nothing protects the person
+     who started the strand.
+2.4. Bob decides that is fine, because it is Priya. That is the actual basis for the decision, and
+     the app presents it as such rather than as an administrative setting.
 
 ### Alternative Path D: closing it once everyone is in
 
 8.1. The group has who it is going to have, and the members would rather it stayed that way.
-8.2. Bob gives up his ability to invite. That is not enough on its own — Priya can still add people,
-     and the strand still says so.
-8.3. Priya gives hers up too. Now nobody can add anyone, the strand is settled for good, and
-     everyone can see it. Neither of them can reverse it.
+8.2. Bob gives up his ability. That is not enough on its own — Priya still has hers, and the strand
+     still says so.
+8.3. He is told the position he has just put himself in, plainly and once: he can no longer remove
+     anyone, and Priya still can, including him. Between his act and hers, he is there on her
+     goodwill. Somebody has to go first, and the app does not pretend otherwise.
+8.4. Priya gives hers up too. Now the membership is fixed in both directions: nobody can be added
+     and nobody can be put out. Everyone in it is there for good, on equal terms, and can see that
+     they are. Neither Bob nor Priya can reverse it.
 
-### Alternative Path E: an invitation that reaches the wrong hands
+### Alternative Path E: a strand that needs no invitation
+
+1.1. The strand Bob wants Tom in is a public one — anybody holding its link can join.
+1.2. There is nothing for Bob to do. Nobody is invited here, because nobody has to be, and there is
+     no ability to hold. He passes on the link and Tom joins on his own.
+1.3. Nor could Bob put anyone out. Nobody is in charge of a public strand, and that cuts both ways:
+     no stranger can be excluded, and neither can any member.
+
+### Alternative Path F: an invitation that reaches the wrong hands
 
 5.1. Bob leaves the invitation somewhere less careful than he meant to, and a stranger takes it up.
-5.2. They are in. Everyone sees them arrive, and nobody can put them out — there is no power to
-     remove a member, only each member's own ability to leave.
-5.3. What the group has already said is theirs now. The honest remedy is to start again elsewhere,
-     and the app should say so rather than offering a control that would not work.
+5.2. Everyone sees them arrive. Bob can put them out again, because the ability to bring people in
+     is the same ability that removes them.
+5.3. He does, and is told plainly what that achieves and what it cannot. Nothing further reaches
+     them. Everything they could already read, they hold — ejecting somebody is not un-telling them.
+5.4. Whether the group carries on here or starts again elsewhere is a judgement the members make.
+     The app does not pretend the removal undid anything.
 
 ## Acceptance Criteria
 
@@ -91,10 +109,19 @@ Bob also has a strand with his brother that he closed for good, and will find ou
 - [ ] A strand nobody can add to reads as settled rather than broken, with no way around it offered
 - [ ] Including someone in a settled strand means starting a new one, and the old history does not
       follow
-- [ ] A strand is settled only when nobody at all can invite; one person giving up the ability is
-      not enough while another retains it
-- [ ] Giving up the ability to invite is permanent
-- [ ] No member can be removed by anyone else
+- [ ] A member holding the ability may pass it to an existing member, not only to someone being invited
+- [ ] Passing it on is described as conferring both adding and removing, not merely convenience
+- [ ] A member holding the ability may remove another member, including one who also holds it
+- [ ] Passing the ability on is described as conferring power over the giver as well; nothing
+      privileges whoever started the strand
+- [ ] A member giving up the ability while another retains it is told they are now removable by them
+- [ ] In a public strand nobody is invited and nobody can be removed, and the app offers neither
+- [ ] Removal is described accurately: it stops anything further reaching them and undoes nothing
+      they could already read
+- [ ] A strand is settled only when nobody at all holds the ability; one person giving it up is not
+      enough while another retains it
+- [ ] A settled strand is fixed in both directions — nobody can be added, and nobody can be removed
+- [ ] Giving up the ability is permanent
 
 ## Variants
 
@@ -104,10 +131,9 @@ Bob also has a strand with his brother that he closed for good, and will find ou
 
 ## Open
 
-Whether an **existing** member can be given the ability to invite after the fact, or only at the
-moment they are invited, is unconfirmed — the upstream account describes invitations carrying it
-(`STATUS.md` Appendix). Alt C assumes the latter and works either way.
+Whether two managers can give up the ability **together**, so neither is exposed to the other in
+between, or whether somebody must always go first on trust. Alt D assumes the latter and says so
+honestly; if the platform can coordinate it, that path gets kinder.
 
-Alt E assumes **no member can be removed by anyone**, which follows from the permission model being
-only the granting of invite rights, but is worth confirming. If removal ever existed it would change
-this story materially.
+Whether a removed member can be invited back, and whether they return as themselves, is unsettled —
+it likely turns on the same key question as leaving and returning ([33](33-managing-a-strand.md)).

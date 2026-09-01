@@ -75,14 +75,21 @@ Bob: Membership isn't exposure. That's the part the other apps get backwards.
 
 Susan: Who decides who's in a group?
 
-Bob: It's either private — only people who get invited — or open to anyone with the link. And
-somebody has to be able to bring people in. Me, to start with. I can pass that on to whoever I
-invite, or keep it, or give it up entirely.
+Bob: It's either private — only people who get invited — or open to anyone with the link. If it's
+open, nobody's in charge of it at all: anyone can wander in, and nobody can be thrown out. If it's
+private, somebody has to be able to bring people in. Me, to start with. I can pass that on to
+whoever I invite, or keep it, or give it up entirely.
 
 Susan: And if you give it up?
 
-Bob: Then it's whoever's already in, forever. Nobody can add anyone, including me. It can't be
-undone either, so it's not a mood I can change later.
+Bob: Then it's whoever's already in, forever. Nobody can add anyone, including me. Nobody can put
+anyone out, either. It can't be undone, so it's not a mood I can change later.
+
+Susan: Put out?
+
+Bob: Same ability. Whoever can bring people in can remove them — each other included, so it's not
+like there's a boss. While anybody in a strand still has it, you're in there at their discretion. In
+one where nobody has it, you're just in there.
 
 Susan: And I'm supposed to take your word for that?
 
@@ -133,10 +140,12 @@ Susan: Fine. Show me the code.
   controls for a channel that does not exist.
 - **Membership is not an address.** Being in a group strand with someone gives no private route to
   them. A one-to-one conversation takes a new strand and their acceptance, like any other.
-- **A strand is private or public, and either can still grow or cannot.** Growth is possible while
-  anyone in it can invite; that ability can be given up, permanently, which settles the membership
-  for good. Because a new member holds the whole history, whether a strand can still grow is a
-  confidentiality fact, and one every member can see at any time.
+- **A strand is private or public, and its membership either can still change or cannot.** While
+  anyone in it holds the ability, they can add people and remove people; that ability can be passed
+  on, and can be given up permanently, which settles the membership in both directions. Because a
+  new member holds the whole history, and because removal is possible, whether a strand is still
+  managed is both a confidentiality fact and a tenure fact — and one every member can see at any
+  time.
 - **The agreement governing a strand, including confidentiality and any enforcement, is sereus's**
   to define. Stories show a user encountering it; they never specify it.
 - **"Strand" is the word**, in the app as much as in the specs. This page is where it is

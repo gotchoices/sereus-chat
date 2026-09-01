@@ -65,7 +65,7 @@ and accepted it) → **revised** (changed after review).
 | 02 | [Start a strand](02-start-a-strand.md) | revised | review — private/public, invite rights per invitation, resignation seals it |
 | 03 | [Respond to an invitation](03-respond-to-an-invitation.md) | revised | review — invitee inspects the strand, may ask for it to be closed |
 | 04 | [Our first conversation](04-our-first-conversation.md) | revised | review — no delivery or read reporting |
-| 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | drafted | review — refusals, passing on invite rights, no removal |
+| 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | revised | review — refusals, promotion, removal |
 | 10 | [Catching up](10-catching-up.md) | revised | review — hard and soft mute; no receipts |
 | 11 | [Writing a message](11-writing-a-message.md) | stub | draft |
 | 12 | [Replying and mentioning](12-replying-and-mentioning.md) | stub | draft |
@@ -76,7 +76,7 @@ and accepted it) → **revised** (changed after review).
 | 30 | [My strands](30-my-strands.md) | renamed | reframe from contacts to strands; drop the email-disclosure claim |
 | 31 | [Who's in this strand](31-whos-in-this-strand.md) | stub | draft |
 | 32 | [Finding something](32-finding-something.md) | renamed | reconcile with "no global index" |
-| 33 | [Managing a strand](33-managing-a-strand.md) | revised | review — mute / leave / forget ladder |
+| 33 | [Managing a strand](33-managing-a-strand.md) | revised | review — mute / leave / forget, plus being removed |
 | 40 | [My profile](40-my-profile.md) | drafted | review |
 | 41 | [Settings](41-settings.md) | stub | draft |
 | 42 | [Staying connected](42-staying-connected.md) | stub | draft, briefly |
@@ -376,6 +376,20 @@ that already exist.
 
 ### The strand status indicator
 
+Public and private-managed are not two settings but two different worlds, and settling a private
+strand produces a third. There is no such thing as a managed public strand, so this is **one
+three-valued status, not two flags**:
+
+| State | Who can join | Who can remove | What a member can count on |
+|-------|--------------|----------------|----------------------------|
+| **Public** | anyone holding the link | nobody | nothing about who reads it — but nobody can put them out |
+| **Private, managed** | whoever a manager invites | any manager, including other managers | nothing; they are here at somebody's discretion |
+| **Private, settled** | nobody | nobody | everything — who is here is who will ever be here |
+
+Read down the last column and the trade is plain: public strands offer the safest tenure and no
+confidentiality at all; managed strands offer neither guarantee; only a settled strand offers both.
+That is what the indicator has to convey, and it is why three states beat a pair of flags.
+
 New, cross-cutting, and load-bearing for the confidentiality story (02, 03, 31). Every strand
 carries a visible indication of what it is — private or public, and whether anyone in it can still
 add people — which a member can read at a glance and which updates when the strand changes. It has
@@ -400,6 +414,11 @@ that somebody is no longer a manager — they remain an ordinary member.
 So the indicator must never soften a managed strand into a settled one on the strength of
 inactivity. A strand whose only manager has vanished reads as it truly is: still able to grow, by
 someone who may never come back.
+
+Note that "managed" now carries **two** consequences for a member, not one: the strand can gain
+people who will read everything, and the member can be put out of it. A settled strand is fixed in
+both directions. The indicator is therefore telling a member about their confidentiality *and* their
+tenure, and both belong in how it reads.
 
 ### Component impact
 
@@ -516,6 +535,29 @@ Group support breaks one thing outright, which should be fixed before stories ar
       stories make it intuitive rather than assuming it (§A). One word across app, stories and
       specs, which also propagates the sereus vocabulary instead of translating it away.
 
+### Open questions for sereus
+
+Raised by the story work and not answerable here. Worth taking upstream together.
+
+1. **Can two managers give up the ability together?** Whoever resigns first can no longer remove
+   the other, while the other can still remove them. Somebody must go first on trust unless the
+   platform can coordinate it. Story 05 Alt D says so honestly; this would soften it.
+2. **Can a manager be demoted by another manager**, as distinct from removed? Resignation is
+   self-demotion, and promotion exists, so the missing half is whether the ability can be taken
+   rather than given up. Removal is the blunt substitute and costs the member their place.
+3. **Is removal recorded and visible**, the way arrival and resignation are? Story 05 assumes every
+   member sees somebody put out, as they see somebody arrive.
+4. **Can a removed member be invited back, and do they return as themselves?** Probably the same
+   question as leaving and returning: it turns on whether they kept the key. Affects 05 and 33.
+5. **Can a removed member be told they were removed?** Story 33 says they should be, rather than
+   inferring it from a conversation that stops. Whether the platform can deliver that notice to
+   somebody it has just cut off is a real question.
+6. **Can a member leave a public strand, and rejoin?** Nobody can remove them, but leaving should
+   still be their own act, and rejoining is presumably open to anyone holding the link.
+7. **Does a sole manager have any protection?** With one manager nobody can remove them and everyone
+   else is at their discretion; promoting a second makes the first removable. Adding a manager
+   therefore reduces your own security, which is worth confirming is really the intent.
+
 ## H. Explicitly not in scope
 
 Recorded so they read as decisions rather than gaps:
@@ -545,7 +587,14 @@ upstream except where marked.
 
 - A strand is 2–N parties, backed by a replicated database. Being a member means holding it.
 - A private strand has **no owner**. It has *n* **managers**.
-- A manager may grant permission to invite members and managers. That is the whole permission model.
+- A manager may grant permission to invite members and managers, including to an **existing** member
+  (promotion), not only to someone being invited.
+- A manager can **remove** members from a strand, **including other managers**. Managers are
+  symmetric: nothing privileges the creator, and any two managers can each remove the other. Removal
+  stops anything further reaching that member; it does not reach what they already hold.
+- **A public strand has no managers at all.** Nobody can be invited, because anyone holding the link
+  may join, and nobody can be removed, because nobody holds the ability. It is open in both
+  directions and nobody is in charge of it.
 - A strand cannot be deleted, only left, unless you are its last member.
 - Leaving is always available; the strand continues without you. Nothing happens at the strand
   level when you leave — your cadre simply stops taking part, on your instruction.

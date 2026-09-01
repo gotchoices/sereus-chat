@@ -6,6 +6,13 @@
 
 - The member list, and telling a manager from a member — including a strand where nobody is a manager, which means its membership is settled for good.
 - Resigning as manager: what it gives up, and that it cannot be taken back.
+- That a manager can promote an existing member, and can remove members — **including other
+  managers**, since nothing privileges whoever started the strand. Being in a managed strand means
+  being there at somebody's discretion. This is the tenure half of what the strand's status says.
+- The three states a member needs to tell apart: public (anyone joins, nobody can be removed),
+  private and managed (somebody decides, including about them), private and settled (fixed both
+  ways). See `STATUS.md` §E.
+- Being removed, and what it does and does not reach ([33](33-managing-a-strand.md)).
 - Asking another member to resign, and their freedom to say no. The app carries the request; it does
   not press either party.
 - The strand's visible status, which reports what is recorded and never what is inferred.

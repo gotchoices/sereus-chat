@@ -20,8 +20,9 @@ cubicle. Bob's brother Mike is not.
 
 1. Bob starts a strand. He is not asked to look anybody up — there is no directory — only to say
    what kind of thing he is making.
-2. He chooses **private**: only people he invites can be in it. The alternative is public, which
-   anyone holding the link can join.
+2. He chooses **private**: only people he invites can be in it, and somebody — him, to begin with —
+   decides who those are. The alternative is public, which anyone holding the link can join and from
+   which nobody can be removed, because nobody is in charge of it.
 3. He creates an invitation for the person he has in mind, and decides one thing about it: whether
    the person who takes it up can invite others, as he can.
 4. This is his brother, so he does not pass that on.
@@ -42,7 +43,8 @@ cubicle. Bob's brother Mike is not.
 9.2. He gives up his own ability to add people. He is told exactly what he is giving up and that it
      cannot be taken back — not by him, not by anybody, not ever.
 9.3. He does it. What the strand is has changed, and both of them can see it: nobody here can add
-     anyone, so its membership is settled for good. → [31](31-whos-in-this-strand.md)
+     anyone or remove anyone, so its membership is settled for good and they are in it on equal
+     terms. → [31](31-whos-in-this-strand.md)
 9.4. If he had wanted a group of four instead, he would have invited three people first and given
      it up afterwards. The act is the same; when he does it is what fixes the size.
 
@@ -79,7 +81,8 @@ cubicle. Bob's brother Mike is not.
 - [ ] That indication reflects the strand as it is now, and changes when the strand changes
 - [ ] A member who can add people may give that ability up
 - [ ] Giving it up is described as permanent, and is permanent
-- [ ] When nobody can add anyone, the strand reads as settled — its membership can never change
+- [ ] When nobody holds the ability, the strand reads as settled — nobody can be added or removed,
+      and every member is there on the same footing
 - [ ] The user is told that anyone added later holds everything said before they arrived
 - [ ] An invitation is available as both a scannable code and a shareable link
 - [ ] The invitation can be shared through any channel the user already has; the app does not send it
