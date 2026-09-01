@@ -29,21 +29,33 @@ the app. Mike is across town and already does — he was experimenting with it e
    she can see no account is being created. She enters the handle her coworkers know her by.
    → [01](01-first-run.md)
 4. She still has to get the invitation to the app she now has. She scans the code again.
-5. She is shown what she is being asked to join: who invited her, and whether this strand is
-   permanently between the two of them or can take more people later. She can accept or decline.
-6. She accepts. The strand exists from this moment; before it, there was nothing.
+5. She is shown what she is being asked to join, and can tell the important thing without having to
+   ask Bob: this is a private strand, and Bob can still add people to it. That is not hidden or
+   softened. It means what she says here might one day be read by somebody she has never met.
+6. She can accept on those terms, decline, or ask Bob to close it first. She accepts — it is Bob,
+   and she can see the situation rather than having to trust a claim about it.
+7. The strand exists from this moment; before it, there was nothing.
    → [04](04-our-first-conversation.md)
 
-### Alternative Path A: the app is already installed
+### Alternative Path A: asking for it to be closed
+
+6.1. Susan would rather this stayed between the two of them, so she asks Bob to give up his ability
+     to add people before she says anything she would not want a stranger reading.
+6.2. Bob does it. What she sees changes: nobody here can add anyone, so the membership is settled.
+     → [02](02-start-a-strand.md)
+6.3. Had he not, that would have been his answer, and hers to weigh. Neither of them is forced, and
+     the app does not take a side.
+
+### Alternative Path B: the app is already installed
 
 1.1. Mike is driving when Bob's text arrives with a link in it. He fires back a canned "what's up?"
      and then opens the link out of curiosity.
 1.2. He recognises it as a Sereus Chat link, because he installed the app last week.
 1.3. It takes him straight into the app with the invitation in hand — no web page, no second scan.
-1.4. He sees who is inviting him and what kind of strand it is, and accepts.
+1.4. He sees who is inviting him and on what terms, and accepts.
      → [04](04-our-first-conversation.md)
 
-### Alternative Path B: an invitation already used
+### Alternative Path C: an invitation already used
 
 1.1. Later that day Mike is going through his email and finds the same invitation Bob also sent
      there.
@@ -52,7 +64,7 @@ the app. Mike is across town and already does — he was experimenting with it e
 1.3. He is not left wondering whether something is broken, and he is not offered a way to "try
      again" that could not work.
 
-### Alternative Path C: declining
+### Alternative Path D: declining
 
 5.1. Susan does not want this strand after all, and declines.
 5.2. Nothing is created. Bob is not told who declined, because nobody has disclosed anything to him
@@ -63,7 +75,11 @@ the app. Mike is across town and already does — he was experimenting with it e
 - [ ] With the app installed, an invitation opens directly in it and presents accept or decline
 - [ ] Without the app installed, the user is told what they have received and how to proceed
 - [ ] Getting started requires a name only; no account, login or password is created, and this is visible
-- [ ] Before accepting, the user sees who is inviting them and whether the strand can ever grow
+- [ ] Before accepting, the user sees who is inviting them, whether the strand is private, and
+      whether anyone in it can still add people
+- [ ] An invitee can tell whether the membership is settled or could still grow, without asking
+- [ ] An invitee may accept, decline, or ask the inviter to close the strand first
+- [ ] Whether the inviter agrees is left to them; the app does not press either party
 - [ ] Declining creates nothing
 - [ ] An invitation that has already been used says so plainly
 - [ ] Trust rests on the person who sent the invitation, not on a brand or company
@@ -76,6 +92,7 @@ the app. Mike is across town and already does — he was experimenting with it e
 
 ## Open
 
-Whether the invitation can survive the install, so a first-time user does not have to scan a second
-time (step 4), is a deferred-deep-link question — `STATUS.md` §C. As written, this story requires the
-inviter to still be standing there.
+Nothing. The second scan at step 4 is **deliberate**: carrying an invitation through an app install
+would mean a third-party attribution service — a host in the middle, which is the thing this app
+exists to avoid. The friction is accepted. In person the code is still on the inviter's screen;
+remotely, the link is still sitting in the message that carried it.

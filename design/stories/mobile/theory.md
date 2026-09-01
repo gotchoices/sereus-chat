@@ -75,8 +75,20 @@ Bob: Membership isn't exposure. That's the part the other apps get backwards.
 
 Susan: Who decides who's in a group?
 
-Bob: That's settled when the strand is made — just the two of us and never more, or something that
-can grow, and who's allowed to grow it. Anyone joining knows which kind they're in.
+Bob: It's either private — only people who get invited — or open to anyone with the link. And
+somebody has to be able to bring people in. Me, to start with. I can pass that on to whoever I
+invite, or keep it, or give it up entirely.
+
+Susan: And if you give it up?
+
+Bob: Then it's whoever's already in, forever. Nobody can add anyone, including me. It can't be
+undone either, so it's not a mood I can change later.
+
+Susan: And I'm supposed to take your word for that?
+
+Bob: No — that's the whole point. You can see it. Before you accept, and any time afterwards, you
+can see whether anyone in here can still add somebody. If they can, then what you say might one day
+be read by a person neither of us has met. If nobody can, it's settled.
 
 Susan: Why would I care up front?
 
@@ -86,9 +98,9 @@ year can read what we say today.
 Susan: That sounds bad.
 
 Bob: It's honest, and it's how it works at all with no company holding our messages for us. It's
-also exactly why the agreement matters. If this is a strand that agreed to be two people forever,
-then you know today who will ever read it. None of your six can tell you that, because there it's
-the company's call, not yours.
+also why being able to see the difference matters. If nobody in here can add anyone, then you know
+today who will ever read this. None of your six can tell you that, because there it's the company's
+call, not yours.
 
 Susan: You keep saying agreement. Like terms of service?
 
@@ -121,8 +133,10 @@ Susan: Fine. Show me the code.
   controls for a channel that does not exist.
 - **Membership is not an address.** Being in a group strand with someone gives no private route to
   them. A one-to-one conversation takes a new strand and their acceptance, like any other.
-- **A strand's shape is settled when it is made** — two forever, or growable and by whom — because
-  a new member holds the whole history. This is a confidentiality decision, not a convenience one.
+- **A strand is private or public, and either can still grow or cannot.** Growth is possible while
+  anyone in it can invite; that ability can be given up, permanently, which settles the membership
+  for good. Because a new member holds the whole history, whether a strand can still grow is a
+  confidentiality fact, and one every member can see at any time.
 - **The agreement governing a strand, including confidentiality and any enforcement, is sereus's**
   to define. Stories show a user encountering it; they never specify it.
 - **"Strand" is the word**, in the app as much as in the specs. This page is where it is

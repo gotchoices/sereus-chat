@@ -5,7 +5,9 @@
 ## Must cover
 
 - Inviting into an **existing** strand — a different act from starting one ([02](02-start-a-strand.md)).
-- The two refusal shapes, which are how the strand's terms become visible without the app explaining them: the strand does not allow growth ("this one was set up for two"), and the member is not permitted to grow it (they are not a manager).
+- The two refusal shapes, which are how the strand's terms become visible without the app explaining them: the member is not a manager and so cannot invite anyone, and the strand has no managers left at all — nobody can add to it, ever, and that is deliberate rather than broken.
+- A manager inviting someone **and** deciding whether that person becomes a manager too.
+- Resigning as a manager, and what it forecloses.
 - That whoever joins can read everything already said, stated before the invitation goes out, not after.
 - An invitation scoped to a strand rather than to a person.
 - Watching someone arrive, from the point of view of members who did not invite them.

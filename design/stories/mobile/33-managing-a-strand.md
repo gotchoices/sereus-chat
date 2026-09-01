@@ -2,87 +2,98 @@
 
 ## Story Overview
 
-As a Sereus Chat user  
-I want to Remove or archive strands I no longer need  
-So that my strand list stays organized and focused on active relationships.
+As someone whose list has filled up with strands  
+I want to quiet, step away from, or be rid of a strand I no longer want  
+So that my list reflects the conversations I actually have, and I know what each of those acts costs me.
 
-Context: Bob connected with someone at a conference 6 months ago to exchange contact info.
-They exchanged a few polite messages but never developed an ongoing relationship.
-Bob would like to clean up his strand list by removing strands that are no longer relevant.
-Susan has a former coworker she no longer works with and would prefer not to have that chat visible.
-Mike accidentally created a duplicate invitation to the same person and wants to clean it up.
+Context: Bob exchanged a few polite messages with Dave after a conference six months ago and it
+never went anywhere. He is also in a cycling group strand that is far busier than his interest in
+it. He wants to tidy up, and does not want to discover afterwards that he threw something away.
+
+## Roles
+
+| Role | Who | Note |
+|------|-----|------|
+| The one tidying up | Bob | acts only for himself; nothing he does here reaches anyone else |
+| Other members | Dave, the cycling group | carry on regardless |
 
 ## Sequence
-1. Bob opens his strand list.
-2. He sees the chat with the person from the conference (Dave).
-3. He selects the chat with Dave.
-4. He chooses the option to delete/remove the strand.
-5. He's asked to confirm: "Delete this conversation? This cannot be undone."
-6. He confirms the deletion.
-7. The chat is removed from his strand list.
-8. All messages in that conversation are deleted from his device.
 
-### Alternative Path A: Archive Instead of Delete
-4. Bob chooses to archive the strand instead of deleting it.
-5. The strand is moved to an "Archived" section.
-6. It no longer appears in his main strand list.
-7. Bob can still access archived strands if needed.
-8. He can unarchive it later if he wants to reconnect.
+1. Bob finds the strand with Dave in his list and looks at what he can do about it.
+2. He is offered three things, and told what each one costs before he picks. There is no fourth
+   option that removes the strand from the world — it is not his to remove.
+3. **Mute.** He stays in the strand and his machines carry on taking part. Messages still arrive; he
+   simply is not told about them. He can find them whenever he looks.
+4. **Leave.** His machines stop taking part. Nothing more reaches him, and the strand carries on
+   without him for everyone still in it. He keeps what identifies him in that strand, so if Dave
+   ever invites him back he returns as himself, with what was said before still his.
+5. **Forget it entirely.** Leaving, and then discarding what identifies him and what he holds of the
+   strand. This one cannot be undone. He is told the specific consequence rather than a generic
+   warning: if he is ever invited back he arrives as a stranger — a new member — and the messages he
+   sent before stay attributed to who he used to be.
+6. Bob picks leave. Dave's strand is gone from his list; Dave is not told, and sees only that Bob
+   has gone quiet.
+7. Nothing about this touched Dave's copy, or anyone else's. → [31](31-whos-in-this-strand.md)
 
-### Alternative Path B: Other Party Still Has Access
-7. The chat is removed from Bob's list.
-8. Dave still has the strand in his strand list.
-9. If Dave sends Bob a message, Bob receives a notification.
-10. Bob can choose to ignore, block, or reopen the strand.
+### Alternative Path A: too noisy, not unwanted
 
-### Alternative Path C: Blocking Connection
-4. Instead of just deleting, Bob chooses to block Dave.
-5. He confirms the block action.
-6. The strand is removed and Dave can no longer send Bob messages.
-7. Dave will not be notified that he was blocked.
-8. If Dave tries to send a message, it appears to send from his perspective but Bob never receives it.
+1.1. It is the cycling group Bob wants quieted, not ended — he still wants to read it when he
+     chooses.
+1.2. He mutes it. It stops interrupting him and stays exactly where it was, with everything still
+     arriving. → [10](10-catching-up.md)
 
-### Alternative Path D: Accidental Deletion Recovery
-6. Bob accidentally confirms deletion.
-7. He immediately realizes his mistake.
-8. He uses an "Undo" option that appears briefly.
-9. The strand is restored with all messages intact.
+### Alternative Path B: coming back
 
-### Alternative Path E: Deleting with Important Content
-3. Bob notices this strand contains important documents or photos.
-4. Before deleting, he exports/saves the important content.
-5. Once content is saved, he proceeds with deletion.
+6.1. A year later Dave invites Bob to that same strand again.
+6.2. Because Bob only left, and kept what identified him, he comes back as himself. The
+     conversation picks up where it stopped rather than starting over.
 
-### Alternative Path F: Mutual Strand Deletion
-1. Bob and Dave mutually agree to close their strand.
-2. Bob deletes the strand on his end.
-3. Dave deletes it on his end.
-4. Both users' strand lists are cleaned up.
-5. If either wants to reconnect, they'll need to exchange a new invitation.
+### Alternative Path C: making sure first
+
+5.1. Before forgetting a strand for good, Bob realises it holds documents and photos he may want.
+5.2. He is able to keep what matters to him before the rest goes. → [21](21-receiving-media.md)
+
+### Alternative Path D: the last one there
+
+4.1. Everyone else has already left a strand and Bob is the only member remaining.
+4.2. Leaving it now ends it, because nobody is left to carry it. He is told that this is what is
+     about to happen, rather than finding out afterwards.
+
+### Alternative Path E: a member who keeps talking
+
+6.1. Dave carries on sending messages after Bob has left.
+6.2. They do not reach Bob, and he is not troubled by them. Dave is not told he has been left; he
+     sees somebody who has stopped answering, which is what has in fact happened.
 
 ## Acceptance Criteria
 
-- [ ] Users can delete strands from their strand list.
-- [ ] Deletion requires confirmation to prevent accidents.
-- [ ] Users can archive strands instead of permanently deleting them.
-- [ ] Archived strands can be accessed and unarchived if needed.
-- [ ] Deleting a strand removes messages from the user's device.
-- [ ] Users can block someone to prevent future messages.
-- [ ] Blocked users are not notified they were blocked.
-- [ ] Users may have a brief window to undo accidental deletions.
-- [ ] Users can export content before deleting strands with important information.
+- [ ] The user is offered muting, leaving, and forgetting entirely, and is told what each costs
+      before choosing
+- [ ] No option claims to delete a strand for its other members
+- [ ] Muting keeps the user fully in the strand; only notification stops
+- [ ] Leaving stops the user's machines taking part, and the strand continues for everyone else
+- [ ] Leaving preserves what identifies the user in that strand, so returning later is returning as
+      the same person
+- [ ] Forgetting entirely is permanent, is marked as permanent, and is described in terms of what it
+      costs: a later return is as a new member, and earlier messages stay attributed to who the user
+      was
+- [ ] The remaining members are not notified when someone leaves
+- [ ] A user leaving a strand where they are the last member is told that this ends it
+- [ ] The user can keep content that matters to them before forgetting a strand
+- [ ] Nothing offered here reaches another member's copy
 
 ## Variants
-- happy: a quiet strand archived
-- empty: nothing to tidy up
-- error: leaving does not take effect, or the act is confused with deleting
+
+- happy: a dead strand left, list tidied
+- empty: a list with nothing worth tidying
+- error: forgetting a strand the user meant only to leave
 
 ## Open
 
-A strand cannot be deleted, only left, unless you are its last member (`STATUS.md` Appendix). This
-story is still written around deletion and needs revising to make leaving the primitive.
+Whether **archiving** — merely hiding a strand from the main list while everything continues — is
+worth keeping as a fourth, purely cosmetic act, or whether muting covers the need. The earlier
+version of this story offered archiving and blocking; blocking is gone, since leaving is what stops
+messages arriving.
 
-Someone who leaves and is later invited back most likely returns as a *new* member rather than the
-same one, leaving their earlier messages attributed to who they were before. Worth confirming
-upstream. It is a presentation question for the member list and for old messages — not a path this
-story needs before that answer arrives.
+Someone who forgets a strand and is later invited back returns as a new member. Confirming that
+upstream would settle how the member list and old messages present them.

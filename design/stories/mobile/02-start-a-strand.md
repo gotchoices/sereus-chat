@@ -18,52 +18,69 @@ cubicle. Bob's brother Mike is not.
 
 ## Sequence
 
-1. Bob starts a strand. He is not asked to look anybody up — there is no directory — only to
-   decide what kind of strand this is and then get the invitation to a person himself.
-   <!--EC The act of deciding whether it is "just two" probably happens upon inviting someone to the strand, not necessarily upon creation.  If, in the UX, this is a single action, then fine.  Else we should tweak.
-   
-   Under the hood, we need to mark a strand as public or private.  And when we invite people, we need to either make them managers or not.  How does that translate to the UX? -->
-2. He is asked whether this strand is just the two of them, permanently, or whether it can grow
-   later. He is told what the choice means in the only terms that matter: who will ever be able to
-   read what is said in it. He is also told it is settled now, because anyone added later holds the
-   whole history.
-3. He picks just the two of them, since this is his brother.
-4. He gets an invitation he can hand over: a QR code on screen, and a link for when the other
-   person is not in front of him.
-5. He can share the link however he would normally reach the person — message, email, print,
-   anything. The app does not send it for him, because it has no way to reach anyone.
-6. Susan is right there, so he simply holds up his phone and says "scan this".
-7. He can see the invitation is outstanding, and that nothing exists yet — there is no strand until
+1. Bob starts a strand. He is not asked to look anybody up — there is no directory — only to say
+   what kind of thing he is making.
+2. He chooses **private**: only people he invites can be in it. The alternative is public, which
+   anyone holding the link can join.
+3. He creates an invitation for the person he has in mind, and decides one thing about it: whether
+   the person who takes it up can invite others, as he can.
+4. This is his brother, so he does not pass that on.
+5. He can see what the strand is, plainly and without asking: private, and open to growing, because
+   Bob himself can still add people. The app does not treat this as a problem — it is simply what is
+   true right now, and he can see it at a glance.
+6. He gets the invitation as a QR code on screen, and as a link for when the person is not in front
+   of him.
+7. He can share the link however he would normally reach that person — message, email, print. The
+   app does not send it for him, because it has no way to reach anyone.
+8. Susan is right there, so he holds up his phone and says "scan this".
+9. He can see the invitation is outstanding, and that nothing exists yet — there is no strand until
    someone accepts. → [03](03-respond-to-an-invitation.md)
 
-### Alternative Path A: someone who is not in the room
+### Alternative Path A: closing it for good
 
-6.1. Bob wants to invite his brother Mike, who is across town. He sends the link by text.
-6.2. He gets impatient and sends the same link by email as well.
-6.3. Mike responds to the text one. Later he opens the emailed copy and is told it is no longer
+9.1. Susan has joined, and Bob wants this to stay between the two of them permanently.
+9.2. He gives up his own ability to add people. He is told exactly what he is giving up and that it
+     cannot be taken back — not by him, not by anybody, not ever.
+9.3. He does it. What the strand is has changed, and both of them can see it: nobody here can add
+     anyone, so its membership is settled for good. → [31](31-whos-in-this-strand.md)
+9.4. If he had wanted a group of four instead, he would have invited three people first and given
+     it up afterwards. The act is the same; when he does it is what fixes the size.
+
+### Alternative Path B: someone who is not in the room
+
+7.1. Bob wants to invite his brother Mike, who is across town. He sends the link by text.
+7.2. He gets impatient and sends the same link by email as well.
+7.3. Mike responds to the text one. Later he opens the emailed copy and is told it is no longer
      good — an invitation is spent once it is used. He learns this from the app rather than being
      left to guess.
 
-### Alternative Path B: nobody responds
+### Alternative Path C: nobody responds
 
-7.1. Bob sends an invitation and hears nothing.
-7.2. He can see it is still outstanding, and can share it again or abandon it. It does not sit there
+9.1. Bob sends an invitation and hears nothing.
+9.2. He can see it is still outstanding, and can share it again or abandon it. It does not sit there
      looking like a conversation.
 
-### Alternative Path C: a strand that can grow
+### Alternative Path D: a strand meant to grow
 
-2.1. Bob is setting up something for his cycling group rather than one person.
-2.2. He chooses a strand that can grow, and is told plainly that whoever joins later can read
-     everything said before they arrived.
-2.3. He shares the invitation the same way. Each person who accepts joins the same strand.
-     → [05](05-add-someone-to-a-strand.md)
+3.1. Bob is setting up something for his cycling group rather than for one person.
+3.2. He passes on the ability to invite, to one friend he trusts, so the group does not depend on
+     Bob being awake.
+3.3. Everybody in it can see the same thing Bob can: this is a strand that can still grow, and
+     whoever joins later will be able to read everything said before they arrived.
+3.4. Each person who accepts joins the same strand. → [05](05-add-someone-to-a-strand.md)
 
 ## Acceptance Criteria
 
 - [ ] Starting a strand never involves looking a person up; there is no directory or search
-- [ ] The user chooses at creation whether the strand is permanently two-party or can grow
-- [ ] That choice is explained in terms of who will ever be able to read the strand
-- [ ] The user is told the choice is permanent, and why: later members hold the whole history
+- [ ] At creation the user chooses whether the strand is private or public
+- [ ] Each invitation decides whether the person taking it up can invite others
+- [ ] A member can see, without asking, whether their strand is private and whether anyone in it can
+      still add people
+- [ ] That indication reflects the strand as it is now, and changes when the strand changes
+- [ ] A member who can add people may give that ability up
+- [ ] Giving it up is described as permanent, and is permanent
+- [ ] When nobody can add anyone, the strand reads as settled — its membership can never change
+- [ ] The user is told that anyone added later holds everything said before they arrived
 - [ ] An invitation is available as both a scannable code and a shareable link
 - [ ] The invitation can be shared through any channel the user already has; the app does not send it
 - [ ] Outstanding invitations are visible, distinguishable from strands, and can be re-shared or abandoned
@@ -72,13 +89,13 @@ cubicle. Bob's brother Mike is not.
 
 ## Variants
 
-- happy: invitation shared in person, accepted shortly after
+- happy: invitation shared in person, accepted, then closed for good
 - empty: the user's first-ever strand — nothing else in the list
 - error: an invitation that is never answered, or one used twice
 
 ## Open
 
-Invitation expiry, revocation and single-use semantics are sereus's (`STATUS.md` Appendix). This
-story states only what the user sees. Whether a permanently-two-party strand is visibly declared at
-formation, or is merely the result of nobody holding invite rights, is the open question in
-`STATUS.md` §G — step 2 assumes the former.
+Public strands are offered at creation but not developed this round (`STATUS.md` Appendix). An
+invitation lost before anyone takes it up leaves a strand that cannot be added to; the practical
+answer is to abandon it and start another, which this story should make an easy thing to do rather
+than a dead end to discover.

@@ -62,21 +62,21 @@ and accepted it) → **revised** (changed after review).
 | # | Story | State | Next |
 |---|-------|-------|------|
 | 01 | [First run](01-first-run.md) | drafted | review |
-| 02 | [Start a strand](02-start-a-strand.md) | drafted | review; carries the fixed-vs-growable choice |
-| 03 | [Respond to an invitation](03-respond-to-an-invitation.md) | drafted | review |
+| 02 | [Start a strand](02-start-a-strand.md) | revised | review — private/public, invite rights per invitation, resignation seals it |
+| 03 | [Respond to an invitation](03-respond-to-an-invitation.md) | revised | review — invitee inspects the strand, may ask for it to be closed |
 | 04 | [Our first conversation](04-our-first-conversation.md) | drafted | review |
 | 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | stub | draft |
 | 10 | [Catching up](10-catching-up.md) | stub | draft — **the largest gap** |
 | 11 | [Writing a message](11-writing-a-message.md) | stub | draft |
 | 12 | [Replying and mentioning](12-replying-and-mentioning.md) | stub | draft |
-| 13 | [Correcting a message](13-correcting-a-message.md) | renamed | revise per §B: delete is real, permanence is not |
+| 13 | [Correcting a message](13-correcting-a-message.md) | revised | review — no edit history, no time limit, no tombstone |
 | 20 | [Sending media](20-sending-media.md) | renamed | trim; pair with 21 |
 | 21 | [Receiving media](21-receiving-media.md) | stub | draft |
 | 22 | [Forwarding a message](22-forwarding-a-message.md) | stub | draft |
 | 30 | [My strands](30-my-strands.md) | renamed | reframe from contacts to strands; drop the email-disclosure claim |
 | 31 | [Who's in this strand](31-whos-in-this-strand.md) | stub | draft |
 | 32 | [Finding something](32-finding-something.md) | renamed | reconcile with "no global index" |
-| 33 | [Managing a strand](33-managing-a-strand.md) | renamed | rebuild around **leaving**, not deleting |
+| 33 | [Managing a strand](33-managing-a-strand.md) | revised | review — mute / leave / forget ladder |
 | 40 | [My profile](40-my-profile.md) | drafted | review |
 | 41 | [Settings](41-settings.md) | stub | draft |
 | 42 | [Staying connected](42-staying-connected.md) | stub | draft, briefly |
@@ -162,7 +162,7 @@ Concrete defects, worth fixing regardless of the restructure.
       responsive even with extensive conversation history"; `specs/domain/interfaces.md` says search
       iterates attached strand DBs with "no global index", and cold strands fault in on demand. The
       story needs to acknowledge a progressive/scoped search, or the domain contract needs an index.
-- [ ] **Edit and delete: the operation is sound, the reassurance is not.** Delete is an ordinary
+- [x] **Edit and delete: the operation is sound, the reassurance is not.** *(Applied to story 13.)* Delete is an ordinary
       table mutation — removing a `Message` or `Attachment` row propagates as shared strand state
       and every member's app stops showing it. So 13-correcting-a-message.md Alt B (removing a photo from
       a sent message) is implementable as written. What must be rewritten is the promise around it:
@@ -171,7 +171,7 @@ Concrete defects, worth fixing regardless of the restructure.
       cannot deliver. A growable strand adds a second reason not to sell deletion as containment —
       the audience for anything already said can widen after the fact. A member may delete only
       their own content; there is no moderation reach over anyone else's messages.
-- [ ] **Deleting a strand is a different act from deleting a message**, and 33-managing-a-strand.md
+- [x] **Deleting a strand is a different act from deleting a message** *(applied to story 33)*, and the old story
       blurs three things: leaving a strand, discarding my local copy, and removing content for
       every member. Its "all messages deleted from his device" is a local act and unproblematic;
       its brief Undo is implementable as a re-insert, but should be specified rather than assumed.
@@ -263,11 +263,9 @@ sereus internals.
     `specs/mobile/STATUS.md`), language (`global/i18n.md` exists), notification preferences —
     including per-strand notification level, which groups make necessary rather than nice.
 
-14. **Leaving vs. deleting, and the missing middle.** 33-managing-a-strand.md is built on an act
-    that does not exist: a strand cannot be deleted unless you are its last member — you **leave**
-    it, and it carries on without you. So story 33's primitive is leaving, plus discarding my local
-    copy, plus archiving; and *muting*, the everyday middle ground a busy group demands, is absent
-    from a set that currently offers only delete, archive and block.
+14. ~~**Leaving vs. deleting, and the missing middle.**~~ **Done.** Story 33 is rebuilt on the
+    three-level ladder — mute, leave, forget entirely — with blocking removed and each rung stating
+    its cost. Whether archiving survives as a fourth, cosmetic act is the story's one Open item.
 
 15. **Presence / typing.** `components/index.md` already specifies a Badge with "success for
     online". No story. Sereus-adjacent, but the presentation question is ours.
@@ -372,10 +370,24 @@ that already exist.
 - **SearchInterface** — scoping and progressive results once reconciled with "no global index";
   results need a strand label now that a match may come from a group.
 
+### The strand status indicator
+
+New, cross-cutting, and load-bearing for the confidentiality story (02, 03, 31). Every strand
+carries a visible indication of what it is — private or public, and whether anyone in it can still
+add people — which a member can read at a glance and which updates when the strand changes. It has
+to appear wherever a member decides whether to say something: the strand list, the strand header,
+the strand detail, and the invitation-acceptance screen *before* the user commits.
+
+Two states that are mechanically identical must not read identically: a strand deliberately closed
+("settled — nobody can add anyone") and one *stranded* by the loss of its last manager are the same
+condition, but the first is an achievement and the second is an accident.
+
 ### Component impact
 
-`components/index.md` mostly anticipated this. **MessageBubble** already reserves an "optional
-sender name (group)". **Avatar** does not — it needs a group form (composite or named), and the
+`components/index.md` mostly anticipated this. The **strand status indicator** above is a new
+component, and the one most likely to need its own spec file, since its states carry meaning rather
+than decoration. **MessageBubble** already reserves an "optional sender name (group)". **Avatar**
+does not — it needs a group form (composite or named), and the
 name→color hash needs to behave for strand titles as well as people. **Badge** needs a mention
 state distinct from unread count.
 
@@ -447,11 +459,31 @@ Group support breaks one thing outright, which should be fixed before stories ar
       **stranded**: no new members or managers can be added, but everyone still in it carries on
       using it normally. Milder than we assumed — not inoperable. See the Appendix.
       Corrects stories 31 and 33 and the §F contract items.
-- [ ] **Is "just us two, forever" a declared property, visible at formation?** The manager model
-      supplies the *mechanism* (nobody holds invite rights), but the upstream answer did not
-      confirm that members can *see* a strand is permanently two-party when they join. This is
-      load-bearing: theory.md's central claim — "you know today who will ever read this" — depends
-      on it. Worth a github issue before stories 02 and 03 are drafted.
+- [x] ~~Is "just us two, forever" a declared property, visible at formation?~~ — **it is achieved,
+      not declared.** There is no size setting. A strand is private or public at creation; a manager
+      may invite at any time; each invitation says whether its holder also becomes a manager; and a
+      manager may resign. "Just us two, forever" is: create, invite one non-manager, resign. With
+      nobody holding manager rights the strand can never grow. theory.md's claim survives, but the
+      mechanism is different from what was written — see the two open items below.
+- [x] ~~How is that expressed to a user who has never heard of a manager?~~ — **through a visible,
+      live status on the strand itself.** Every strand shows what it is: private or public, and
+      whether anyone in it can still add people. It is inspectable before accepting an invitation
+      and at any time after, and it changes when the strand changes. The mechanism is not hidden —
+      it is made legible, so a member can *see* the difference rather than trust a claim about it.
+- [x] ~~Resign before or after the invitation is taken up?~~ — **neither; resignation is manual and
+      can happen at any time.** It is not bound to invitation processing and is never automatic.
+      Either party may prompt it: an invitee can ask the inviter to close the strand before saying
+      anything sensitive, and an inviter can do it proactively. This is a known training hurdle and
+      is accepted rather than designed around.
+- [x] ~~Does blocking exist?~~ — **no.** Leaving is what stops messages arriving; muting is what
+      stops notifications. Story 33 no longer offers blocking.
+- [x] ~~Undo on leaving?~~ — **superseded by a three-level model.** Mute (still participating, no
+      notifications) → leave (cadre stops participating, identity kept, return possible) → forget
+      entirely (identity and data discarded, permanent, a later return is as a new member). Story 33
+      is built on this ladder. No undo is offered, because each rung states its cost up front.
+- [x] ~~Should an invitation survive app installation?~~ — **no.** Deferred deep linking would mean
+      a third-party attribution service, and no third party is being introduced. The second scan
+      stands as a deliberate cost.
 - [x] ~~User-facing vocabulary~~ — **"strand", user-facing included**, on the condition that the
       stories make it intuitive rather than assuming it (§A). One word across app, stories and
       specs, which also propagates the sereus vocabulary instead of translating it away.
@@ -487,7 +519,22 @@ upstream except where marked.
 - A private strand has **no owner**. It has *n* **managers**.
 - A manager may grant permission to invite members and managers. That is the whole permission model.
 - A strand cannot be deleted, only left, unless you are its last member.
-- Leaving is always available; the strand continues without you.
+- Leaving is always available; the strand continues without you. Nothing happens at the strand
+  level when you leave — your cadre simply stops taking part, on your instruction.
+- Keeping the key that identifies you in a strand lets you return as the same member later.
+  Discarding it is permanent: a later return is as a new member, and your earlier messages stay
+  attributed to who you were.
+- A strand is public (anyone with the link may join) or private (only invitees).
+- There is **no maximum-member setting**. Membership is bounded only by whether a manager exists.
+- A manager may invite anyone at any time, and each invitation decides whether its holder becomes a
+  manager too.
+- A manager may **resign**, at any time, as a manual act. It is never automatic and is not bound to
+  invitation processing. A strand with no managers can never gain another member — the same
+  condition as being *stranded*, reached deliberately instead of by accident, and irreversible
+  either way.
+- So a permanently two-party strand is made, not declared: create, invite one non-manager, resign.
+  Inviting three and then resigning fixes the strand at four. Resignation can happen before or
+  after an invitation is taken up.
 - If the last manager leaves or loses their keys the strand is **stranded** — no new members or
   managers can be added — but everyone still in it keeps using it normally.
 - A new member holds the whole history, including what was said before they joined.

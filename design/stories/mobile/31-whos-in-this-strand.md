@@ -4,7 +4,12 @@
 
 ## Must cover
 
-- The member list, and telling a manager from a member.
+- The member list, and telling a manager from a member — including a strand where nobody is a manager, which means its membership is settled for good.
+- Resigning as manager: what it gives up, and that it cannot be taken back.
+- Asking another member to resign, and their freedom to say no. The app carries the request; it does
+  not press either party.
+- The strand's visible status, and the difference between a strand deliberately settled and one
+  stranded by the loss of its last manager.
 - Whether this strand can grow and who may grow it.
 - Leaving a strand — the only act with reach over the strand. There is no deleting it unless you are the last member.
 - That a new member holds the whole history: the story's job is to make that unsurprising, not to offer controls over it.
