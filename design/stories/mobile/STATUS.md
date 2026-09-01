@@ -52,21 +52,35 @@ Settled positions:
 
 ## Where the set actually stands
 
-Every story is **drafted, none reviewed**. The previous version of this file marked all nine
-"Completed", which overstated things — they were written before the sereus vocabulary landed and
-have not been reconciled with it. None of them contemplate a strand with more than two people.
+The restructure in §D is **done**: files renumbered, splits made, stubs created, index rewritten
+(§A). No story is human-reviewed yet, and the seven carried-over stories still hold their
+pre-sereus content.
 
-| Story | State | Verdict |
-|-------|-------|---------|
-| [discovery.md](discovery.md) | drafted | Solid narrative; keep, renumber, fix step numbering |
-| [responding.md](responding.md) | drafted | Best story in the set; split — its tail is a separate story |
-| [managing-connections.md](managing-connections.md) | drafted | Reframe: it is a *strand* list, not a contact list |
-| [sending-media.md](sending-media.md) | drafted | Good breadth; needs a receiving counterpart |
-| [searching-messages.md](searching-messages.md) | drafted | Keep; reconcile with "no global index" |
-| [editing-messages.md](editing-messages.md) | drafted | Over-promises mutability; needs honest rewrite |
-| [deleting-channels.md](deleting-channels.md) | drafted | Same over-promise; add leave/mute for groups |
-| [video-call.md](video-call.md) | drafted | Over-specified for a deferred feature; trim and park |
-| [profile-management.md](profile-management.md) | drafted | Off-template; too narrow (photo only) |
+States: **stub** (topic only) → **drafted** (written, not reviewed) → **reviewed** (human has read
+and accepted it) → **revised** (changed after review).
+
+| # | Story | State | Next |
+|---|-------|-------|------|
+| 01 | [First run](01-first-run.md) | drafted | review |
+| 02 | [Start a strand](02-start-a-strand.md) | drafted | review; carries the fixed-vs-growable choice |
+| 03 | [Respond to an invitation](03-respond-to-an-invitation.md) | drafted | review |
+| 04 | [Our first conversation](04-our-first-conversation.md) | drafted | review |
+| 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | stub | draft |
+| 10 | [Catching up](10-catching-up.md) | stub | draft — **the largest gap** |
+| 11 | [Writing a message](11-writing-a-message.md) | stub | draft |
+| 12 | [Replying and mentioning](12-replying-and-mentioning.md) | stub | draft |
+| 13 | [Correcting a message](13-correcting-a-message.md) | renamed | revise per §B: delete is real, permanence is not |
+| 20 | [Sending media](20-sending-media.md) | renamed | trim; pair with 21 |
+| 21 | [Receiving media](21-receiving-media.md) | stub | draft |
+| 22 | [Forwarding a message](22-forwarding-a-message.md) | stub | draft |
+| 30 | [My strands](30-my-strands.md) | renamed | reframe from contacts to strands; drop the email-disclosure claim |
+| 31 | [Who's in this strand](31-whos-in-this-strand.md) | stub | draft |
+| 32 | [Finding something](32-finding-something.md) | renamed | reconcile with "no global index" |
+| 33 | [Managing a strand](33-managing-a-strand.md) | renamed | rebuild around **leaving**, not deleting |
+| 40 | [My profile](40-my-profile.md) | drafted | review |
+| 41 | [Settings](41-settings.md) | stub | draft |
+| 42 | [Staying connected](42-staying-connected.md) | stub | draft, briefly |
+| 90 | [Voice and video call](90-voice-and-video-call.md) | parked | after messaging |
 
 **Coverage assessment (non-sereus content only):** the set covers the *sender's* side of a classic
 messaging feature list at moderate depth, and largely skips the *receiving and reading* half of the
@@ -82,25 +96,27 @@ not personally invite.
 
 The set does not currently conform to what appeus expects. All of these are mechanical.
 
-- [ ] **Number the files.** `agent-rules/stories.md` states the rule plainly: "Stories: numbered for
+- [x] **Number the files.** `agent-rules/stories.md` states the rule plainly: "Stories: numbered for
       order (`01-browsing.md`)". We use unnumbered kebab-case and carry ordering in index.md
       instead. Adopt gapped numbering (see §D) so stories can be inserted without renaming.
-- [ ] **Add a `## Variants` section to every story** (`happy` / `empty` / `error`). No story has one.
+- [x] **Add a `## Variants` section to every story** (`happy` / `empty` / `error`). No story has one.
       The template requires it and appeus's scenario lane consumes it, so its absence blocks
       downstream generation.
-- [ ] **Normalize section headings** to the template: `## Story Overview`, `## Sequence`,
+- [x] **Normalize section headings** to the template: `## Story Overview`, `## Sequence`,
       `## Acceptance Criteria`. We currently use `## Primary Sequence Path`, and
-      profile-management.md is off-template entirely (`# Story:`, `## Context / Triggers`,
+      40-my-profile.md is off-template entirely (`# Story:`, `## Context / Triggers`,
       `## Sequence (Primary)`, `## Alternative Paths`).
-- [ ] **Drop bracketed titles.** `# User Story: [Discovery]` → `# User Story: Discovery`.
-- [ ] **Normalize the As-a/I-want/So-that block** to the template's plain form; drop the `**As a**`
+- [x] **Drop bracketed titles.** `# User Story: [Discovery]` → `# User Story: Discovery`.
+- [x] **Normalize the As-a/I-want/So-that block** to the template's plain form; drop the `**As a**`
       bolding and trailing commas.
 - [ ] **Make alternative-path numbering mean something.** The template distinguishes dotted
       sub-steps (return to the next main step) from renumbered main steps (replace a segment). We
       mix both without signalling which, and several paths never state where they rejoin.
-      sending-media.md Alt B ends "Continue to 6" but its own step 6 is a different action.
-- [ ] **Fix discovery.md's skipped step** — the primary sequence runs 3 → 5.
-- [ ] **Adopt "strand" as the user-facing word**, replacing "connection", "channel" and "chat",
+      20-sending-media.md Alt B ends "Continue to 6" but its own step 6 is a different action.
+      **Partly done:** alternative paths are now `### Alternative Path X: name` headings throughout,
+      but the return points still need settling story by story, during revision.
+- [x] **Fix 01-first-run.md's skipped step** — the primary sequence runs 3 → 5.
+- [x] **Adopt "strand" as the user-facing word**, replacing "connection", "channel" and "chat",
       which are used interchangeably today. With groups, "connection" is actively misleading — a
       strand is not a person. Using one word in the app, the stories and the specs also removes the
       translation layer between what a user says and what the platform calls it, and propagates the
@@ -113,7 +129,9 @@ The set does not currently conform to what appeus expects. All of these are mech
       what a strand is without opening help.
       Apply to prose, acceptance criteria, screen and route names, and the Home header's
       contact-flavored "Add Friends" label.
-- [ ] **Rewrite index.md** to carry grouping and *deliberate deferrals*, not just an ordered list.
+      **Done in the stories.** The five carried-over files still read as contact-era prose in
+      places; that clears when each is revised. Screen and route names are §E, not done here.
+- [x] **Rewrite index.md** to carry grouping and *deliberate deferrals*, not just an ordered list.
       Add `theory.md` to its excluded-files line alongside `AGENTS.md`, `README.md` and `STATUS.md`.
 
 ### Conventions worth adopting from taleus
@@ -121,11 +139,11 @@ The set does not currently conform to what appeus expects. All of these are mech
 Not required by the template, but they have earned their place in
 `ser/taleus/packages/taleus-app/design/stories/mobile/`:
 
-- [ ] **`## Roles` table.** Previously suggested for two-party stories; with groups it matters more,
+- [x] **`## Roles` table.** Previously suggested for two-party stories; with groups it matters more,
       because a story now has a manager, a member who may invite, and a member who may not.
-- [ ] **`## Open` section** naming known-unknowns and pointing at the ticket or upstream decision
+- [x] **`## Open` section** naming known-unknowns and pointing at the ticket or upstream decision
       that settles them. This is exactly where "waiting on sereus" belongs, per story.
-- [ ] **State + reason tracking in this file** (`revised — dropped X because Y`) rather than a
+- [x] **State + reason tracking in this file** (`revised — dropped X because Y`) rather than a
       checkbox.
 
 ---
@@ -134,33 +152,33 @@ Not required by the template, but they have earned their place in
 
 Concrete defects, worth fixing regardless of the restructure.
 
-- [ ] **Profile disclosure contradiction.** managing-connections.md Alt D says Bob "sees the profile
+- [ ] **Profile disclosure contradiction.** 30-my-strands.md Alt D says Bob "sees the profile
       information Sarah shared (name, email)". `specs/domain/schema.md` shares only `Name` and
       `AvatarUri` via `Member`; email/phone/notes are device-local and never leave the device.
       Either the schema grows a disclosure model or the story loses the claim. **Recommend the
       latter** — and solve the real need (telling two Sarahs apart) with local nicknames (§C.10).
       Groups sharpen this: in a group my name and avatar are visible to people I never invited.
-- [ ] **Search performance contradiction.** searching-messages.md requires search that is "fast and
+- [ ] **Search performance contradiction.** 32-finding-something.md requires search that is "fast and
       responsive even with extensive conversation history"; `specs/domain/interfaces.md` says search
       iterates attached strand DBs with "no global index", and cold strands fault in on demand. The
       story needs to acknowledge a progressive/scoped search, or the domain contract needs an index.
 - [ ] **Edit and delete: the operation is sound, the reassurance is not.** Delete is an ordinary
       table mutation — removing a `Message` or `Attachment` row propagates as shared strand state
-      and every member's app stops showing it. So editing-messages.md Alt B (removing a photo from
+      and every member's app stops showing it. So 13-correcting-a-message.md Alt B (removing a photo from
       a sent message) is implementable as written. What must be rewritten is the promise around it:
       in a distributed world a node may have cached or backed the content up, and we have no reach
       over that. Prefer "removed from the conversation" to "deleted"; never offer a permanence we
       cannot deliver. A growable strand adds a second reason not to sell deletion as containment —
       the audience for anything already said can widen after the fact. A member may delete only
       their own content; there is no moderation reach over anyone else's messages.
-- [ ] **Deleting a strand is a different act from deleting a message**, and deleting-channels.md
+- [ ] **Deleting a strand is a different act from deleting a message**, and 33-managing-a-strand.md
       blurs three things: leaving a strand, discarding my local copy, and removing content for
       every member. Its "all messages deleted from his device" is a local act and unproblematic;
       its brief Undo is implementable as a re-insert, but should be specified rather than assumed.
 - [ ] **`Status: sent/delivered/read`** exists as a column in schema.md with no story behind it.
       In a group, "delivered" and "read" are per-member, not per-message. Either write the story
       (§C.3) or drop the column.
-- [ ] **video-call.md is over-specified** for something we're deferring — mid-call video upgrade and
+- [ ] **90-voice-and-video-call.md is over-specified** for something we're deferring — mid-call video upgrade and
       screen sharing are asserted as free. Trim to the objective and mark the dependencies. Note
       that group calling is a further question, not assumed.
 
@@ -189,7 +207,7 @@ sereus internals.
    conversation stays legible, and `@`-mentions become the mechanism that makes notifications
    bearable. Full threading remains out.
 
-4. **Reactions.** responding.md step 7.3 mentions emoji in passing; sending-media.md has Mike
+4. **Reactions.** 03-respond-to-an-invitation.md step 7.3 mentions emoji in passing; 20-sending-media.md has Mike
    answering with a thumbs-up. Neither says whether that's a reaction or just a message containing
    an emoji. Reactions scale better than messages in a group — worth promoting out of "future".
 
@@ -215,7 +233,7 @@ sereus internals.
 7. **Receiving media.** Sending is covered in six alternative paths; receiving is one line ("Mike
    plays the video"). Nothing on full-screen viewing, zoom, swiping between images in a
    conversation, saving to the camera roll, or a per-conversation media gallery — the last of which
-   searching-messages.md Alt B already gestures at.
+   32-finding-something.md Alt B already gestures at.
 
 8. **Forwarding between strands.** Confirmed in scope. Pick a message, choose one or more other
    strands, send it on — with the question of whether the original sender is attributed, and what
@@ -227,7 +245,7 @@ sereus internals.
    `components/index.md` ("optional sender name (group)") but never storied.
 
 10. **Local nicknames.** Susan calls herself "Su-Z". Can Bob file her as "Susan (work)"? Purely
-    local, no disclosure implications, and it's the honest fix for managing-connections.md's "is
+    local, no disclosure implications, and it's the honest fix for 30-my-strands.md's "is
     this the right Sarah?" problem. Extends to naming a group strand that has no natural title.
 
 11. **Alerts is an orphan screen.** `apps/mobile/src/screens/Alerts.tsx` is coded and routed
@@ -235,7 +253,7 @@ sereus internals.
     `specs/mobile/STATUS.md`. It realizes the "notifications queue" idea. Write the story or remove
     the screen.
 
-12. **Outstanding invitations are invisible.** discovery.md mints an invitation and moves on. There
+12. **Outstanding invitations are invisible.** 01-first-run.md mints an invitation and moves on. There
     is nowhere in the app to see that you sent three and nobody has answered, or that one expired.
     Keep the *mechanics* (single-use, expiry, revocation) at sereus's level; the story only needs
     to establish that pending invitations are visible, attributable to a strand, and can be
@@ -245,7 +263,7 @@ sereus internals.
     `specs/mobile/STATUS.md`), language (`global/i18n.md` exists), notification preferences —
     including per-strand notification level, which groups make necessary rather than nice.
 
-14. **Leaving vs. deleting, and the missing middle.** deleting-channels.md is built on an act
+14. **Leaving vs. deleting, and the missing middle.** 33-managing-a-strand.md is built on an act
     that does not exist: a strand cannot be deleted unless you are its last member — you **leave**
     it, and it carries on without you. So story 33's primitive is leaving, plus discarding my local
     copy, plus archiving; and *muting*, the everyday middle ground a busy group demands, is absent
@@ -258,7 +276,11 @@ sereus internals.
 
 ## D. Proposed structure
 
-Renumbered with gaps, grouped by theme. **9 revised, 11 new, 1 parked — 21 stories.**
+Renumbered with gaps, grouped by theme. The Source column is provenance only — the former
+filenames no longer exist (see [index.md](index.md)).
+
+Renumbered with gaps, grouped by theme. **20 stories** — 11 descended from the original nine
+(two of which split in two), 9 genuinely new. **Done:** files renumbered, splits made, stubs written.
 
 [`theory.md`](theory.md) sits alongside them, on the taleus precedent — plain language on what is
 wrong with host-based messaging and what a strand is, which the numbered stories then assume.
@@ -323,9 +345,9 @@ that already exist.
 
 | Screen | Driven by | Note |
 |--------|-----------|------|
-| **StrandDetail** | 30, 31, 33 | Member list, managers, whether it can grow, add-member entry, mute, leave, archive. Replaces the never-built "view Sarah's profile details" of managing-connections.md Alt D, generalized from a person to a strand. Tapping a member must not imply a private chat *or a direct invitation* — neither exists. There is no "Delete strand" unless you are the last member. |
+| **StrandDetail** | 30, 31, 33 | Member list, managers, whether it can grow, add-member entry, mute, leave, archive. Replaces the never-built "view Sarah's profile details" of 30-my-strands.md Alt D, generalized from a person to a strand. Tapping a member must not imply a private chat *or a direct invitation* — neither exists. There is no "Delete strand" unless you are the last member. |
 | **MediaViewer** | 21 | Full-screen attachment view, zoom, swipe, save. `MediaPicker` is only a *source chooser* — it does not cover consumption. |
-| **StrandMedia** | 21, 32 | Per-strand media grid, already implied by searching-messages.md Alt B. Could be a tab within StrandDetail rather than its own route. |
+| **StrandMedia** | 21, 32 | Per-strand media grid, already implied by 32-finding-something.md Alt B. Could be a tab within StrandDetail rather than its own route. |
 | **ForwardTo** | 22 | Multi-select strand picker. |
 | **Settings** | 41 | Nothing exists. Push from Profile, or promote Profile to sit under it. |
 | **Alerts** | C.11 | Already coded and routed; needs story + spec + an entry in `screens/index.md` to stop being an orphan. |
@@ -336,7 +358,7 @@ that already exist.
   "a person I'm connected to". A row needs a title that may be a group name rather than a partner
   name, an avatar that may represent several people, and a subtitle whose message preview now needs
   a sender prefix. Gains unread triage and mark-unread, a pending-invitations section, an archived
-  section (deleting-channels.md already promises archiving with no screen state for it), mute
+  section (33-managing-a-strand.md already promises archiving with no screen state for it), mute
   indicators, and mention badges distinct from plain unread. Its header "Add Friends" button is
   contact-language and needs the same terminology pass as `navigation.md`'s route titles.
 - **ChatInterface** — sender name + avatar on incoming bubbles for groups, header showing member
@@ -388,9 +410,8 @@ Group support breaks one thing outright, which should be fixed before stories ar
 - [ ] **Delete is supported — say so.** `Message` and `Attachment` rows can be deleted and the
       deletion propagates. Neither `ops.md` (no delete operation) nor `schema.md` records this.
       Specify it as removal from the table, with no claim about copies held elsewhere.
-- [ ] **Decide whether edit retains prior versions.** editing-messages.md Alt F has a user reading
-      the original alongside the edit. Whether that is possible is a schema choice — a version
-      chain versus overwrite in place — and it should be settled before story 13 is drafted.
+- [x] ~~Decide whether edit retains prior versions.~~ — **no history; edit in place.** The schema
+      needs no version chain, and story 13 no longer offers to show an earlier version.
 - [ ] **There is no "delete strand" operation** except for a last remaining member; leaving is the
       primitive (Appendix). `ops.md` should carry leave, not delete, and the UI must not offer one
       member a control that would act on everyone.
@@ -413,8 +434,13 @@ Group support breaks one thing outright, which should be fixed before stories ar
       matters: committing up front to two parties forever is the only way either party can know
       the audience will not widen. Stories say this once where the choice is made; no per-member
       scoping is to be designed or implied.
-- [x] ~~Whose messages may I delete?~~ — **my own content only.** No member, manager included, has
-      moderation reach over anyone else's messages. Affects stories 13 and 33.
+- [x] ~~Whose messages may I delete?~~ — **my own content only**, with **no time limit**. No member,
+      manager included, has moderation reach over anyone else's messages. Story 13 is revised
+      accordingly.
+- [x] ~~What is left behind by an edit or a delete?~~ — **nothing.** Edits happen in place with no
+      history; a deleted message leaves no tombstone or "message deleted" marker. The app does not
+      track whether anyone saw the original — instead, removing an attachment tells the user plainly
+      that copies already seen cannot be reached.
 - [x] ~~What happens if the owner deletes the whole strand?~~ — **answered upstream; the premise
       was wrong.** There is no owner, and a strand cannot be deleted at all unless you are its last
       member — you *leave* it. If the last manager leaves or loses their keys the strand becomes
