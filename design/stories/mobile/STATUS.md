@@ -64,9 +64,9 @@ and accepted it) → **revised** (changed after review).
 | 01 | [First run](01-first-run.md) | drafted | review |
 | 02 | [Start a strand](02-start-a-strand.md) | revised | review — private/public, invite rights per invitation, resignation seals it |
 | 03 | [Respond to an invitation](03-respond-to-an-invitation.md) | revised | review — invitee inspects the strand, may ask for it to be closed |
-| 04 | [Our first conversation](04-our-first-conversation.md) | drafted | review |
+| 04 | [Our first conversation](04-our-first-conversation.md) | revised | review — no delivery or read reporting |
 | 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | stub | draft |
-| 10 | [Catching up](10-catching-up.md) | stub | draft — **the largest gap** |
+| 10 | [Catching up](10-catching-up.md) | revised | review — hard and soft mute; no receipts |
 | 11 | [Writing a message](11-writing-a-message.md) | stub | draft |
 | 12 | [Replying and mentioning](12-replying-and-mentioning.md) | stub | draft |
 | 13 | [Correcting a message](13-correcting-a-message.md) | revised | review — no edit history, no time limit, no tombstone |
@@ -175,9 +175,9 @@ Concrete defects, worth fixing regardless of the restructure.
       blurs three things: leaving a strand, discarding my local copy, and removing content for
       every member. Its "all messages deleted from his device" is a local act and unproblematic;
       its brief Undo is implementable as a re-insert, but should be specified rather than assumed.
-- [ ] **`Status: sent/delivered/read`** exists as a column in schema.md with no story behind it.
-      In a group, "delivered" and "read" are per-member, not per-message. Either write the story
-      (§C.3) or drop the column.
+- [x] **`Status: sent/delivered/read` — drop the column.** Decided: no delivery or read state is
+      tracked at all. A reply is the evidence a message was read; beyond that the app claims
+      nothing. Stories 04 and 10 are written this way. The schema change is in §F.
 - [ ] **90-voice-and-video-call.md is over-specified** for something we're deferring — mid-call video upgrade and
       screen sharing are asserted as free. Trim to the objective and mark the dependencies. Note
       that group calling is a further question, not assumed.
@@ -189,7 +189,7 @@ Concrete defects, worth fixing regardless of the restructure.
 Ordered by how much they hurt. All are ordinary chat UX; none require deciding anything about
 sereus internals.
 
-1. **Receiving and catching up — no story exists.** Every current story is authored from the
+1. ~~**Receiving and catching up — no story exists.**~~ **Done — story 10 is drafted.** Every current story is authored from the
    sender's chair. Nothing covers opening the app to three unread conversations: where do I land,
    how do I triage, what does unread look like, where's the unread divider in a long thread, how do
    I jump to the latest, can I mark something unread again to deal with later. This is the largest
@@ -244,9 +244,13 @@ sereus internals.
    design. Groups add sender names and avatars on incoming bubbles — already anticipated by
    `components/index.md` ("optional sender name (group)") but never storied.
 
-10. **Local nicknames.** Susan calls herself "Su-Z". Can Bob file her as "Susan (work)"? Purely
-    local, no disclosure implications, and it's the honest fix for 30-my-strands.md's "is
-    this the right Sarah?" problem. Extends to naming a group strand that has no natural title.
+10. **Local nicknames — surfaced, not invented.** Susan calls herself "Su-Z"; Bob wants to file her
+    as "Susan (work)". Sereus provides this: a user may name a partner privately, and the partner
+    need not know. It is the honest fix for 30-my-strands.md's "is this the right Sarah?" problem,
+    and it is what a mention resolves against (§C.3). Sereus intends eventually to group a user's
+    strands across sApps by that private name — every strand with "Bobaroo", chat or otherwise —
+    which is the seed of crossing from a chat strand to a tally with the same person. Not required
+    now; worth not obstructing. Naming a group strand that has no natural title is still ours.
 
 11. **Alerts is an orphan screen.** `apps/mobile/src/screens/Alerts.tsx` is coded and routed
     (`AppNavigator.tsx`), with no story, no spec, and no entry in `screens/index.md` — flagged in
@@ -378,9 +382,24 @@ add people — which a member can read at a glance and which updates when the st
 to appear wherever a member decides whether to say something: the strand list, the strand header,
 the strand detail, and the invitation-acceptance screen *before* the user commits.
 
-Two states that are mechanically identical must not read identically: a strand deliberately closed
-("settled — nobody can add anyone") and one *stranded* by the loss of its last manager are the same
-condition, but the first is an achievement and the second is an accident.
+The indicator must report **recorded state, never inferred state**, because the two look nothing
+alike underneath:
+
+- **Resignation is recorded on the strand.** "No manager" is therefore a fact any member can read,
+  whoever happens to be online. This is the only thing that produces a verifiably settled strand,
+  and it is what the confidentiality story rests on.
+- **Abandonment is invisible.** A manager who walks away, or loses their keys, is still recorded as a
+  manager. Nobody can tell whether they discarded the key or will reappear next year. The strand
+  goes on showing that someone can add people — which is the honest answer, because that is all
+  anyone knows.
+
+And there is no notion of a person being *gone* at all: an absence may be an hour or forever, and
+nothing can tell the difference, so the app should not offer a word for it. Resignation records only
+that somebody is no longer a manager — they remain an ordinary member.
+
+So the indicator must never soften a managed strand into a settled one on the strength of
+inactivity. A strand whose only manager has vanished reads as it truly is: still able to grow, by
+someone who may never come back.
 
 ### Component impact
 
@@ -419,6 +438,9 @@ Group support breaks one thing outright, which should be fixed before stories ar
 - [ ] **Do not model per-member history visibility.** A member holds the strand database, so
       history is whole-strand by construction. Nothing in schema, ops or the UI should imply
       otherwise; confidentiality is bounded by the contract at creation, not by read filters.
+- [ ] **Remove `Message.Status` from `schema.md`**, and make sure nothing in `ops.md` or the UI
+      reports delivery or read state. The only distinction the app draws is whether a message has
+      left the device.
 - [ ] **Delete is supported — say so.** `Message` and `Attachment` rows can be deleted and the
       deletion propagates. Neither `ops.md` (no delete operation) nor `schema.md` records this.
       Specify it as removal from the table, with no claim about copies held elsewhere.
@@ -470,6 +492,12 @@ Group support breaks one thing outright, which should be fixed before stories ar
       whether anyone in it can still add people. It is inspectable before accepting an invitation
       and at any time after, and it changes when the strand changes. The mechanism is not hidden —
       it is made legible, so a member can *see* the difference rather than trust a claim about it.
+- [x] ~~Are read receipts wanted?~~ — **no, and the column goes.** No delivered or read state is
+      tracked. A reply is the evidence a message was read. The app distinguishes only whether a
+      message has left the device.
+- [x] ~~Should a mute let mentions through?~~ — **the user chooses.** Muting comes in two flavors:
+      quiet unless somebody names you, or quiet regardless. Both honor the instruction, because the
+      user gave it. Stories 10 and 33 carry it.
 - [x] ~~Resign before or after the invitation is taken up?~~ — **neither; resignation is manual and
       can happen at any time.** It is not bound to invitation processing and is never automatic.
       Either party may prompt it: an invitee can ask the inviter to close the strand before saying
@@ -529,9 +557,15 @@ upstream except where marked.
 - A manager may invite anyone at any time, and each invitation decides whether its holder becomes a
   manager too.
 - A manager may **resign**, at any time, as a manual act. It is never automatic and is not bound to
-  invitation processing. A strand with no managers can never gain another member — the same
-  condition as being *stranded*, reached deliberately instead of by accident, and irreversible
-  either way.
+  invitation processing. Resignation is **recorded on the strand**, so any member can see that a
+  strand has no manager, whoever is currently online. It is irreversible.
+- **Abandonment is not resignation.** A manager who stops participating, or loses their keys, remains
+  recorded as a manager. Nothing distinguishes that from a manager who is merely quiet, and nothing
+  can — so a strand in that state still shows that it can grow.
+- Resignation removes the *role*, not the person: a resigned manager stays an ordinary member. There
+  is no recorded notion of anyone being gone, temporarily or permanently.
+- Private nicknames for strand partners are provided by sereus; the named partner need not know.
+  Grouping a user's strands across sApps by that private name is intended but not yet available.
 - So a permanently two-party strand is made, not declared: create, invite one non-manager, resign.
   Inviting three and then resigning fixes the strand at four. Resignation can happen before or
   after an invitation is taken up.

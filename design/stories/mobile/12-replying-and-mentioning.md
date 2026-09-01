@@ -5,7 +5,8 @@
 ## Must cover
 
 - Quote-reply — decided in favour over threading, because a group conversation needs it to stay legible.
-- `@`-mentions, which are what make notification in a busy strand bearable, and which feed triage in [10](10-catching-up.md).
+- `@`-mentions, which are what make notification in a busy strand bearable, and which feed triage in [10](10-catching-up.md). A mention is also what a soft mute lets through ([33](33-managing-a-strand.md)), so the two features define each other.
+- Naming someone uses the nickname the user has for them, which sereus supplies and which the named person may never see — so a mention must resolve to a member, not to a piece of text.
 - Reactions, which scale in a group where extra messages do not.
 - `specs/mobile/screens/chat-interface.md` already specifies the long-press reply menu; no story does.
 

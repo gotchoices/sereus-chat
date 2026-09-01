@@ -75,3 +75,10 @@ Susan has 30+ strands and is getting overwhelmed trying to find specific people.
 
 How a group strand is titled and pictured when it has no single partner. `ops.md` still returns one
 partner name and avatar per strand — see `STATUS.md` §F.
+
+Nicknames for strand partners are **provided by sereus**, not invented here: a user may name a
+partner privately, and the partner need not ever know. This story should surface them rather than
+build its own. Sereus also intends, eventually, to group a user's strands across sApps by that same
+private name — every strand with the person the user calls "Bobaroo", chat and otherwise — which is
+what would one day let a user cross from a chat strand to a tally with the same person. Nothing is
+required of this story now beyond not making that harder.

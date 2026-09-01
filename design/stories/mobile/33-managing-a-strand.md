@@ -23,7 +23,8 @@ it. He wants to tidy up, and does not want to discover afterwards that he threw 
 2. He is offered three things, and told what each one costs before he picks. There is no fourth
    option that removes the strand from the world — it is not his to remove.
 3. **Mute.** He stays in the strand and his machines carry on taking part. Messages still arrive; he
-   simply is not told about them. He can find them whenever he looks.
+   simply is not told about them. He chooses how quiet: silent unless somebody names him, or silent
+   whatever happens. Either way he finds everything when he looks. → [10](10-catching-up.md)
 4. **Leave.** His machines stop taking part. Nothing more reaches him, and the strand carries on
    without him for everyone still in it. He keeps what identifies him in that strand, so if Dave
    ever invites him back he returns as himself, with what was said before still his.
@@ -39,8 +40,9 @@ it. He wants to tidy up, and does not want to discover afterwards that he threw 
 
 1.1. It is the cycling group Bob wants quieted, not ended — he still wants to read it when he
      chooses.
-1.2. He mutes it. It stops interrupting him and stays exactly where it was, with everything still
-     arriving. → [10](10-catching-up.md)
+1.2. He mutes it, choosing to still hear it if anyone names him directly — he wants out of the tyre
+     pressure argument, not out of the group. It stops interrupting him otherwise and stays exactly
+     where it was, with everything still arriving.
 
 ### Alternative Path B: coming back
 
@@ -71,6 +73,7 @@ it. He wants to tidy up, and does not want to discover afterwards that he threw 
       before choosing
 - [ ] No option claims to delete a strand for its other members
 - [ ] Muting keeps the user fully in the strand; only notification stops
+- [ ] The user chooses whether a mute still lets through messages that name them
 - [ ] Leaving stops the user's machines taking part, and the strand continues for everyone else
 - [ ] Leaving preserves what identifies the user in that strand, so returning later is returning as
       the same person

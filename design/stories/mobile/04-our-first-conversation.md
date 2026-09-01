@@ -21,8 +21,8 @@ invitation; Mike has accepted his in the car.
    does not try to be.
 2. She can see who she is talking to, a place to type, and a way to attach things.
 3. She types "Hi!" and sends it.
-4. She can tell her message has gone out, and later that it has arrived. The two are different, and
-   the app does not claim the second when it only knows the first.
+4. She can tell her message has left her phone. That is the extent of what the app tells her, and
+   it does not invent more — nothing reports back what happened at Bob's end.
 5. Bob's phone gets her message and he finally puts his arm down.
 6. He replies. Susan sees it arrive without doing anything to fetch it.
 7. Both of them now have a strand in an app that was empty an hour ago, and it is obvious how to
@@ -38,8 +38,9 @@ invitation; Mike has accepted his in the car.
 ### Alternative Path B: the other person is not there
 
 4.1. Mike accepted Bob's invitation from the car and then drove into a tunnel.
-4.2. Bob's messages sit undelivered. The app does not pretend otherwise, and does not lose them.
-4.3. When Mike surfaces, they arrive.
+4.2. Bob's messages leave his phone. Whether Mike has them yet is not something Bob is shown,
+     because it is not tracked, and the app does not guess on his behalf.
+4.3. When Mike surfaces they reach him, and he answers. The answer is how Bob knows.
 
 ### Alternative Path C: a voice message instead
 
@@ -51,10 +52,12 @@ invitation; Mike has accepted his in the car.
 
 - [ ] A newly formed strand opens into a conversation that is immediately familiar
 - [ ] The user can see who they are talking to, type a message, and send it
-- [ ] Sent and arrived are distinguishable, and the app never claims arrival it cannot know
+- [ ] A message that has not left the device is distinguishable from one that has
+- [ ] Nothing further is claimed about a message's fate: there is no delivered or read state, and a
+      reply is the only evidence a message was read
 - [ ] Incoming messages appear without the user fetching them
 - [ ] A message that has not gone out is visibly unsent, and can be retried or abandoned
-- [ ] Messages to someone unreachable are neither lost nor falsely reported as delivered
+- [ ] Messages to someone unreachable are not lost, and are not reported as delivered
 - [ ] Returning to the strand later is obvious
 
 ## Variants
@@ -65,6 +68,6 @@ invitation; Mike has accepted his in the car.
 
 ## Open
 
-What "arrived" can honestly mean, and where an undelivered message rests in the meantime, depend on
-sereus delivery behavior — `STATUS.md` §H. This story states only what the user should be able to
-tell, not the mechanism.
+Where a message rests while its recipient is unreachable depends on sereus delivery behavior
+(`STATUS.md` §H). This story states only what the user can tell — that it left their device — and
+deliberately claims nothing further.
