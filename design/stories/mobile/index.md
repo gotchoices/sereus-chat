@@ -27,7 +27,7 @@ planned story; it states the topic and what it must cover.
 | 02 | [Start a strand](02-start-a-strand.md) | drafted, revised |
 | 03 | [Respond to an invitation](03-respond-to-an-invitation.md) | drafted, revised |
 | 04 | [Our first conversation](04-our-first-conversation.md) | drafted |
-| 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | stub |
+| 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | drafted |
 | 10 | [Catching up](10-catching-up.md) | drafted |
 | 11 | [Writing a message](11-writing-a-message.md) | stub |
 | 12 | [Replying and mentioning](12-replying-and-mentioning.md) | stub |

@@ -65,7 +65,7 @@ and accepted it) → **revised** (changed after review).
 | 02 | [Start a strand](02-start-a-strand.md) | revised | review — private/public, invite rights per invitation, resignation seals it |
 | 03 | [Respond to an invitation](03-respond-to-an-invitation.md) | revised | review — invitee inspects the strand, may ask for it to be closed |
 | 04 | [Our first conversation](04-our-first-conversation.md) | revised | review — no delivery or read reporting |
-| 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | stub | draft |
+| 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | drafted | review — refusals, passing on invite rights, no removal |
 | 10 | [Catching up](10-catching-up.md) | revised | review — hard and soft mute; no receipts |
 | 11 | [Writing a message](11-writing-a-message.md) | stub | draft |
 | 12 | [Replying and mentioning](12-replying-and-mentioning.md) | stub | draft |
@@ -222,7 +222,7 @@ sereus internals.
    must answer: if invitations are single-use, the wrong member can take one meant for someone
    else. The permission *rules* are sereus's; what the user sees and can attempt is ours.
 
-6. **Adding someone to an existing strand.** Distinct flow from starting a new one, and the point
+6. ~~**Adding someone to an existing strand.**~~ **Done — story 05 is drafted.** Distinct flow from starting a new one, and the point
    where the user meets the strand's own limits. Two refusal shapes are worth showing, since they
    are how the contract becomes visible without our explaining it: the strand itself does not allow
    growth ("this conversation was set up for two"), and the member is not permitted to grow it
