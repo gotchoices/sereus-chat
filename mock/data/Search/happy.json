@@ -1,0 +1,6 @@
+{ "strandsSearched": 14, "strandsTotal": 14, "strandsSkipped": 2,
+  "results": [
+    { "strandId": "s-mike", "strandTitle": "Mike", "messageId": "m-88", "senderName": "Mike", "snippet": "that place we went — Bella Vista, the Italian one", "matchRange": [22, 33], "timestamp": "2026-08-11T18:22:00Z" },
+    { "strandId": "s-cycling", "strandTitle": "Saturday Riders", "messageId": "m-04", "senderName": "Bob", "snippet": "Susan sent me one — Bella Vista Cycles on Fifth", "matchRange": [21, 32], "timestamp": "2026-09-02T08:09:00Z" },
+    { "strandId": "s-susan", "strandTitle": "Susan", "messageId": "m-51", "senderName": "Su-Z", "snippet": "Bella Vista do repairs too, ask for Marco", "matchRange": [0, 11], "timestamp": "2026-08-28T12:04:00Z" }
+  ] }

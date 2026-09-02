@@ -21,40 +21,53 @@
 
 ## Screen/Component Slicing (mobile)
 
+Legend: **spec** = human screen spec · **cons** = consolidation · **code** = app code.
+
 ### Chat surface
 
-Legend: spec = human screen spec exists · cons = generated consolidation exists ·
-code = app code exists.
+All 13 active routes have a spec and a consolidation as of 2026-09-02, regenerated from the
+19-story set. No route has code yet under the new map.
 
-- [x] ConnectionsList — spec ✓ cons ✓ code ✓
-- [x] ChatInterface — spec ✓ cons ✓ code ✓
-- [x] InvitationGenerator — spec ✓ cons ✓ code ✓
-- [x] MediaPicker — spec ✓ cons ✓ code ✓
-- [x] ProfileSetup — spec ✓ cons ✓ code ✓
-- [ ] SearchInterface spec — cons ✓ code ✓ but **no human spec** (inverted lane)
-- [ ] QrScanner spec — code ✓ (stub) but **no spec, no consolidation**
-- [ ] InvitationAcceptance spec — code ✓ (stub) but **no spec, no consolidation**
-- [ ] VideoCallActive spec — **index-only: no spec, no consolidation, no code**
-- [ ] VoiceCallOverlay spec — **index-only: no spec, no consolidation, no code**
-- [ ] Alerts — orphan: code ✓ + routed, but **no story/spec/consolidation and not in
-      `screens/index.md`** (it realises the "notifications queue" future story)
+| Route | spec | cons | code | Note |
+|-------|------|------|------|------|
+| StrandList | ✓ | ✓ | — | replaces ConnectionsList |
+| ChatInterface | ✓ | ✓ | ~ | code exists, predates the rewrite |
+| StrandDetail | ✓ | ✓ | — | new |
+| StrandMedia | ✓ | ✓ | — | new |
+| MediaViewer | ✓ | ✓ | — | new |
+| MediaPicker | ✓ | ✓ | ~ | code exists, predates |
+| SearchInterface | ✓ | ✓ | ~ | spec written; search is now progressive |
+| InvitationGenerator | ✓ | ✓ | ~ | gains strand kind + invite rights |
+| InvitationAcceptance | ✓ | ✓ | ~ | gains the strand's terms before accepting |
+| QrScanner | ✓ | ✓ | ~ | stub code |
+| Profile | ✓ | ✓ | — | replaces ProfileSetup |
+| Settings | ✓ | ✓ | — | new |
+| CadreManager | ✓ | ✓ | ✓ | component-provided; integration only |
+| VideoCallActive | — | — | — | **parked**, story 90 |
+| VoiceCallOverlay | — | — | — | **parked**, story 90 |
 
-### Cadre surface (target for upstream extraction as `@sereus/cadre-rn-ui`)
+### Code lane — what has to go
 
-The screen itself is component-provided; only the integration touch-points
-live in chat's app specs.
+- `src/screens/ConnectionsList.tsx` → StrandList (rename plus reframe: rows are strands)
+- `src/screens/ProfileSetup.tsx` → Profile
+- `src/screens/Alerts.tsx` → **delete**; it has no story, spec or index entry, and the strand list
+  is the inbox
+- `MessageBubble`'s delivery-status tick → remove; no status is tracked
 
-- [x] CadreManager component lives under `apps/mobile/src/cadre-ui/`, with
-      its own `SPEC.md` (layout, sections, JIT key, add-node sheet, exclusions)
-- [x] Chat integration: `navigation.md` route + "Manage devices" row in
-      `screens/profile-setup.md`
-- [x] AddGuest is **not** part of the component — chat uses its own invitation
-      flow (`InvitationGenerator` / `InvitationAcceptance`); other apps may
-      add their own equivalent on the same page
+### Domain contract (shared)
 
-Note: `src/cadre/CadreService.ts` still imports `CHAT_SAPP_ID` from the data
-layer (for `strandFilter`). That single chat→cadre coupling must become a
-`configure({ sAppId })` call before extraction.
+- [x] `overview.md` — terminology, partial locality, strand isolation, data ownership
+- [x] `schema.md` — local profile + per-strand schema; `Message.Status` removed; ordering placeholder
+- [x] `ops.md` — needs the strand-shaped rewrite noted in stories `STATUS.md` §F
+- [x] `interfaces.md` — op→sereus mapping, error surfaces incl. fetch/unreachable/capacity
+- [x] `sereus.md` — integration boundary
+- [ ] `rules.md` — not yet needed
+
+### Mock data
+
+`mock/data/` namespaces: Strands · Messages · Members · Invitations · StrandMedia · StrandState ·
+Search · Prefs · StorageUsage · Profile. Each with happy/empty/error where meaningful. Media mocks
+deliberately include `fetching` and `unreachable` items so the third content state is exercisable.
 
 ## Scenario / Peer Review (optional)
 - [ ] Scenario docs/images under `design/generated/mobile/`

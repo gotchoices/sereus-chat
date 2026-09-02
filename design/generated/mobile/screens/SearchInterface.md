@@ -1,50 +1,70 @@
 ---
 provides: ["screen:mobile:SearchInterface"]
-needs: ["domain:Op:Strands.search", "domain:Entity:Strand", "domain:Entity:Message"]
+needs: ["domain:Op:Strands.search", "domain:Entity:Message"]
 dependsOn:
+  - design/specs/mobile/screens/search-interface.md
   - design/specs/mobile/navigation.md
   - design/specs/mobile/global/ui.md
-  - design/specs/mobile/components/index.md
-  - design/stories/mobile/searching-messages.md
-  - design/stories/mobile/managing-connections.md
+  - design/specs/domain/overview.md
+  - design/specs/domain/interfaces.md
+  - design/stories/mobile/32-finding-something.md
+  - design/stories/mobile/10-catching-up.md
 ---
 
 # Consolidation: SearchInterface
 
 ## Purpose
 
-Global search across people (connections) and message content. Selecting a result opens the corresponding strand.
+Progressive search over one strand or all of them.
 
 ## Route
 
-- `SearchInterface` (push from Home)
+- `SearchInterface` — push from the home header (all) or the chat header (this strand)
+- Params: `{ strandId? }` — presence selects the scope
+- Mock: `sereus://screen/SearchInterface?variant={happy|empty|error}`
 
 ## UI States
 
 | State | Trigger | Mock variant |
 |-------|---------|--------------|
-| happy | Results found | happy |
-| empty | No results | empty |
-| error | Search failure | error |
+| idle | No query yet | — |
+| searching | Sweep running, some results in | happy (streamed) |
+| happy | Sweep complete, results found | happy |
+| partial | Complete except unreachable strands | happy + `skipped` |
+| empty | Complete, nothing matched | empty |
+| error | Search could not run | error |
+
+**`partial` is not an error state.** It renders results plus a line naming how many strands could
+not be reached.
 
 ## Data Requirements
 
-- `Strands.search(query)` → `SearchResult[]`
-- SearchResult: `{ strandId, partnerName, avatarUrl?, matchedText, timestamp }`
+The adapter must expose search as a **stream, not a promise**:
 
-## Component Inventory
+```
+Strands.search(query, { strandId?, kinds?, from?, to?, senderId? })
+  → AsyncIterable<SearchBatch>
+SearchBatch { results: SearchHit[], strandsSearched, strandsTotal, strandsSkipped }
+SearchHit { strandId, strandTitle, messageId, senderName, snippet, matchRange, timestamp }
+```
 
-Shared component layer (`src/components/`); theme tokens throughout.
-
-- SearchInput: themed TextInput (surfaceAlt, textMuted placeholder), debounced
-- ResultsList: FlatList of `ListRow` (leading `Avatar`, title=name, subtitle=matched preview)
-- `EmptyState`: distinct copy for "start searching" vs "no results"
+This shape exists because of the platform, not by preference: there is no cross-strand index, and
+most strands are hibernating (`STATUS.md` §G). A promise-shaped API would force the screen to block
+on the slowest strand and would make partial results impossible to show.
 
 ## Implementation Notes
 
-- Debounce input (~300ms) before searching
-- Highlight matched text in preview
-- Tap result → navigate to ChatInterface with strandId, optionally scroll to matched message
-- Filter tabs (future): People / Messages / Media
-- Case-insensitive matching
+- Render each batch as it arrives; keep a stable sort within what has arrived, and do not reorder
+  earlier results when later ones land — a moving list is unusable while it is being read.
+- Progress line: "searched 6 of 14". On completion it becomes either nothing, or the skipped count.
+- Filters are passed **into** the query so they narrow the sweep, not applied client-side afterwards.
+- In-strand scope skips the sweep entirely and is fast; make it the default entry from a conversation.
+- Debounce input ~300 ms; cancel the in-flight iterator on a new query — an abandoned sweep must not
+  keep waking strands.
+- Result rows lead with the strand title in cross-strand scope, omit it in in-strand scope.
+- Tapping a hit routes to ChatInterface with `{ strandId, anchorMessageId }`.
 
+## Libraries
+
+- `FlatList` with incremental append
+- `AbortController` (or equivalent) threaded through the adapter for cancellation

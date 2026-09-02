@@ -1,66 +1,42 @@
 ---
 provides: ["screen:mobile:MediaPicker"]
-needs: []
+needs: ["domain:Entity:Attachment"]
 dependsOn:
   - design/specs/mobile/screens/media-picker.md
   - design/specs/mobile/navigation.md
   - design/specs/mobile/global/ui.md
-  - design/specs/mobile/components/index.md
-  - design/stories/mobile/sending-media.md
-  - design/stories/mobile/profile-management.md
+  - design/stories/mobile/20-sending-media.md
+  - design/stories/mobile/40-my-profile.md
 ---
 
 # Consolidation: MediaPicker
 
 ## Purpose
 
-Toast-style chooser overlay to select attachment source (Camera, Gallery, File, Location).
+Sheet over the conversation choosing an attachment source. Also serves Profile's avatar change.
 
 ## Route
 
-- `MediaPicker` (toast/overlay from ChatInterface or ProfileSetup)
+- `MediaPicker` — sheet from the composer "+", or from Profile
+- Params: `{ purpose: 'attachment'|'avatar' }`
+- Mock: `sereus://screen/MediaPicker?variant={happy|error}`
 
-## UI States
+## Options
 
-| State | Trigger | Mock variant |
-|-------|---------|--------------|
-| happy | Options visible | happy |
-| permission_error | OS permission denied | error |
-
-## Component Inventory
-
-- Container: toast/sheet with minimal backdrop dim
-- Container: themed bottom sheet (`surface`, rounded top, `overlay` backdrop) — shared conventions
-- OptionRows (×4): `ListRow` — Camera, Gallery, File, Location (accent-tinted leading icon)
-- CloseButton: `IconButton` in the sheet header
-- ErrorNotice: `Banner` for permission/size errors
+Camera · Library · Files. **Location is not offered** and no story calls for it. Voice is the
+composer's microphone, not a picker option.
 
 ## Implementation Notes
 
-- Camera/Gallery: `react-native-image-picker`
-  - iOS: PHPicker (iOS 14+) or UIImagePickerController
-  - Android: camera intent + media picker
-- File: `@react-native-documents/picker` (use `pick`, `keepLocalCopy`)
-- Permissions: `react-native-permissions`; handle denied/limited gracefully
-- Location: optional; `react-native-geolocation-service` + map sheet if enabled
+- Multi-select for `attachment`, single for `avatar`.
+- Selections return as staged chips above the composer; removable; nothing leaves the device until
+  the message is sent (story 11 — an unsent draft never leaves the phone).
+- Per-option permission handling: inline message beneath the refused option, sheet stays open, other
+  options still work.
+- Oversized files are checked against the **user's own ceiling** from Settings, not a constant, and
+  offer downscaling or a different file rather than refusal.
+- `avatar` purpose routes through a crop step before returning.
 
-## Return Payload
+## Libraries
 
-```ts
-type ProvisionalAttachment = {
-  id: string;
-  type: 'image' | 'video' | 'file' | 'location';
-  uri?: string;
-  mimeType?: string;
-  name?: string;
-  size?: number;
-  thumbnailUri?: string;
-  location?: { lat: number; lon: number; label?: string };
-};
-```
-
-## Platform Notes
-
-- iOS: Prefer PHPicker; handle "Limited Photos" with inline notice
-- Android: Use ACTION_OPEN_DOCUMENT with persistable URI permissions
-
+- `react-native-image-picker`, `@react-native-documents/picker`
