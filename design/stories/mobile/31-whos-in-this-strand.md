@@ -25,8 +25,9 @@ people; the rest cannot. Tom joined last month. Susan is a member with a request
 3. That is two facts about him rather than one, and the app does not soften either. People he has
    never met may yet be brought in and read what he says here. And he can be put out of it, by
    either of the two people who hold that ability — one of whom is himself.
-4. He looks at Tom's entry. He can see Tom is a member and when he joined, and nothing Tom has not
-   chosen to show. There is no address here, and nothing that would let Bob reach him elsewhere.
+4. He looks at Tom's entry. He can see that Tom belongs to the strand, along with whatever else the
+   platform can tell him, and nothing Tom has not chosen to show. There is no address here, and
+   nothing that would let Bob reach him elsewhere.
 5. Half expecting to message Tom privately, Bob taps him. He cannot. No private conversation between
    them exists, and none can be started from here — Tom is a member of this strand, not an address.
    A conversation of their own would take a new strand and Tom accepting it
@@ -38,9 +39,12 @@ people; the rest cannot. Tom joined last month. Susan is a member with a request
 
 ### Alternative Path A: asking somebody else to give it up
 
-7.1. The group would rather nobody could bring anyone else in. Bob asks Priya to give up hers too.
-7.2. She is free to refuse, and the app carries the ask without chasing her, counting votes, or
-     presenting her decision as overdue.
+7.1. The group would rather nobody could bring anyone else in. Bob asks Priya to give up hers too —
+     by saying so, in the conversation, like anything else he might say.
+7.2. There is nothing else to it. No request to raise, nothing pending, nothing counting who agrees,
+     and nothing reminding Priya she has not answered. She can reply, ignore it, or say no, and none
+     of those is a state the app tracks. It is a conversation among people who can already talk to
+     each other.
 7.3. She agrees. Now nobody can add anyone and nobody can remove anyone: the membership is settled
      for good, everyone is here on the same footing, and everyone can see it.
      → [05](05-add-someone-to-a-strand.md)
@@ -95,13 +99,15 @@ people; the rest cannot. Tom joined last month. Susan is a member with a request
 - [ ] Tapping a member offers neither a private conversation nor a direct invitation; neither exists
 - [ ] A member holding the ability may give it up, is told it is permanent, and it is
 - [ ] Giving it up changes what the strand is, visibly, for every member at once
-- [ ] A member may ask another to give up the ability; refusal is a legitimate answer and is not
-      chased, counted or presented as outstanding
+- [ ] Asking another member to give up the ability is an ordinary message and nothing more: no
+      request to raise, no pending state, no tally of who agrees, no reminder that it is unanswered
 - [ ] Somebody who has stopped participating is still shown as holding what they hold; the app never
       infers that a person is gone
 - [ ] Posting an invitation into a strand is described as handing every member a one-off ability to
       admit somebody
-- [ ] Membership changes are noticed by every member, not only by whoever caused them
+- [ ] A member can see who belongs to the strand, together with whatever else the platform can tell
+      them about it
+- [ ] A member notices when the membership has changed
 
 ## Variants
 
@@ -111,11 +117,13 @@ people; the rest cannot. Tom joined last month. Susan is a member with a request
 
 ## Open
 
-**Sereus records membership as state, not as history** — the current member and manager sets are
-replicated, but who admitted whom, who removed whom, and when are not reconstructible from the
-strand. The last acceptance criterion, and [05](05-add-someone-to-a-strand.md)'s "everyone sees who
-let them in", therefore need the **app** to keep its own record in the chat schema. Worth deciding
-deliberately rather than discovering late.
+How much of a strand's past is knowable — who admitted whom, who removed whom, when somebody joined
+— is **the platform's to say**, and this story is deliberately vague about it. Sereus replicates the
+current member and manager sets; whether anything further is reachable is not settled, though the
+layers underneath are log-structured and may well hold it. The app does **not** keep its own record:
+one participant's private account of who did what would be unverifiable by anyone else and would
+drift between members, which is worse than not having it. If some detail turns out to be genuinely
+needed, that is an issue to raise upstream rather than something to reconstruct here.
 
 Private nicknames for members are roadmap rather than present (`STATUS.md` §C.10); until they exist,
 everyone sees the same display name.

@@ -32,7 +32,7 @@ Bob also has a strand with his brother that he closed for good, and will find ou
 5. He shares the invitation with Tom the way he would reach him anyway, and directly, because
    whoever holds it can use it.
 6. Tom takes it up and joins.
-7. Everyone in the strand sees Tom arrive — not just Bob — and can see who let him in.
+7. Everyone in the strand sees that Tom is now here — not just Bob.
 8. Nothing about what the strand *is* has changed. It could grow before and it can grow now, and it
    still says so. → [31](31-whos-in-this-strand.md)
 
@@ -105,7 +105,7 @@ Bob also has a strand with his brother that he closed for good, and will find ou
 - [ ] The inviter decides whether the person joining may invite others
 - [ ] Before an invitation is issued, the inviter is shown that the newcomer will hold everything
       already said, and how much that is
-- [ ] Every member sees a newcomer arrive, and who invited them
+- [ ] Every member can see that somebody new has arrived, not only whoever invited them
 - [ ] A strand nobody can add to reads as settled rather than broken, with no way around it offered
 - [ ] Including someone in a settled strand means starting a new one, and the old history does not
       follow

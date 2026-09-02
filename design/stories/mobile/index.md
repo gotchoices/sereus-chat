@@ -33,7 +33,7 @@ planned story; it states the topic and what it must cover.
 | 12 | [Replying and mentioning](12-replying-and-mentioning.md) | drafted |
 | 13 | [Correcting a message](13-correcting-a-message.md) | drafted |
 | 20 | [Sending media](20-sending-media.md) | renamed, awaiting revision |
-| 21 | [Receiving media](21-receiving-media.md) | stub |
+| 21 | [Receiving media](21-receiving-media.md) | drafted |
 | 22 | [Forwarding a message](22-forwarding-a-message.md) | stub |
 | 30 | [My strands](30-my-strands.md) | renamed, awaiting revision |
 | 31 | [Who's in this strand](31-whos-in-this-strand.md) | drafted |

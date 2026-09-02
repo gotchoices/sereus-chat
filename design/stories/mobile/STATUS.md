@@ -71,7 +71,7 @@ and accepted it) → **revised** (changed after review).
 | 12 | [Replying and mentioning](12-replying-and-mentioning.md) | drafted | review — quote-reply, mentions resolve to members, reactions |
 | 13 | [Correcting a message](13-correcting-a-message.md) | revised | review — no edit history, no time limit, no tombstone |
 | 20 | [Sending media](20-sending-media.md) | renamed | trim; pair with 21 |
-| 21 | [Receiving media](21-receiving-media.md) | stub | draft |
+| 21 | [Receiving media](21-receiving-media.md) | drafted | review — viewing, keeping, the strand's collection, storage cost |
 | 22 | [Forwarding a message](22-forwarding-a-message.md) | stub | draft |
 | 30 | [My strands](30-my-strands.md) | renamed | reframe from contacts to strands; drop the email-disclosure claim |
 | 31 | [Who's in this strand](31-whos-in-this-strand.md) | drafted | review — the membership hub; state is legible, history is not recorded |
@@ -230,7 +230,7 @@ sereus internals.
    to a person, and where the user should understand that whoever joins can read what was already
    said.
 
-7. **Receiving media.** Sending is covered in six alternative paths; receiving is one line ("Mike
+7. ~~**Receiving media.**~~ **Done — story 21 is drafted.** Sending is covered in six alternative paths; receiving is one line ("Mike
    plays the video"). Nothing on full-screen viewing, zoom, swiping between images in a
    conversation, saving to the camera roll, or a per-conversation media gallery — the last of which
    32-finding-something.md Alt B already gestures at.
