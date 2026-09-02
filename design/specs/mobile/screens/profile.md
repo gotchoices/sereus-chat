@@ -1,23 +1,44 @@
-# Profile Setup
+---
+id: profile
+route: Profile
+variants: [happy, error]
+description: What other people see of me, and the way through to settings and my machines.
+---
 
-Edit profile details: avatar, name, and optional contact info.
+# Profile
+
+Story 40.
+
+## Purpose
+
+Control what other people see, and reach the two things that sit behind it.
 
 ## Layout
 
-- **Header**: Back, "Profile" title, Save
-- **Avatar**: Large image with edit pencil → opens media picker
-- **Fields**: Name (required), Email, Phone, Notes/Bio
-- **Manage devices**: Row with chevron → pushes CadreManager (sereus-bundled component, see `navigation.md`)
-- **Privacy notice**: Inline text about data sharing with peers
+- **Avatar** — large, with a way to change it
+- **Name** — what others see; a display name, not a username, nothing reserved or unique
+- **Shared / not shared** — plainly marked: name and picture go to the people in your strands;
+  anything else stays on this device
+- **Rows**: Settings · My machines (CadreManager)
 
-## Behaviors
+## Behaviours
 
-- Save → validates name is present, persists changes, returns
-- Back with unsaved changes → confirm discard dialog
-- Edit avatar → media picker for camera/gallery/files
-- Tap "Manage devices" → push CadreManager (cadre/identity surface; not chat-specific)
+- Change the picture from camera, library or files; remove it and fall back to initials
+- An image too large offers a way forward rather than a refusal
+- Saving updates the user's appearance wherever they are shown
+- Leaving with unsaved changes confirms
+- The screen states, once, that in a strand which can still grow, people the user has never met may
+  come to see this
 
 ## States
 
-- **No avatar**: Shows initials
-- **Validation error**: Highlights name field if empty on save
+- **happy**: a profile with a name, with or without a picture
+- **error**: changes cannot be saved; the user's input is kept
+
+## Acceptance
+
+- [ ] It is clear which fields other people see and which never leave the device
+- [ ] Removing the picture falls back to initials
+- [ ] The name reads as a display name, with no suggestion of uniqueness or registration
+- [ ] Unsaved changes are never lost silently
+- [ ] Cadre management is reachable but is not designed here

@@ -1,0 +1,6 @@
+{ "totalBytes": 1873400000, "byStrand": [
+  { "strandId": "s-cycling", "title": "Saturday Riders", "bytes": 1402000000 },
+  { "strandId": "s-family", "title": "Bateman Family", "bytes": 388000000 },
+  { "strandId": "s-susan", "title": "Susan", "bytes": 61400000 },
+  { "strandId": "s-mike", "title": "Mike", "bytes": 22000000 }
+] }
