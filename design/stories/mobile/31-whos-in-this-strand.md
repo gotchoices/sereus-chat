@@ -1,32 +1,121 @@
 # User Story: Who's in this strand
 
-**Status: stub.** Seeing who is here, and what can and cannot be done about it.
+## Story Overview
 
-## Must cover
+As a member of a conversation with other people in it  
+I want to see who is here and what any of us can do about that  
+So that I know who is reading what I say, and on whose sufferance I am here.
 
-- The member list, and telling a manager from a member — including a strand where nobody is a manager, which means its membership is settled for good.
-- Resigning as manager: what it gives up, and that it cannot be taken back.
-- That a manager can promote an existing member, and can remove members — **including other
-  managers**, since nothing privileges whoever started the strand. Being in a managed strand means
-  being there at somebody's discretion. This is the tenure half of what the strand's status says.
-- The three states a member needs to tell apart: public (anyone joins, nobody can be removed),
-  private and managed (somebody decides, including about them), private and settled (fixed both
-  ways). See `STATUS.md` §E.
-- Being removed, and what it does and does not reach ([33](33-managing-a-strand.md)).
-- Asking another member to resign, and their freedom to say no. The app carries the request; it does
-  not press either party.
-- The strand's visible status, which reports what is recorded and never what is inferred.
-  Resignation records that somebody is **no longer a manager**; they remain a member like anyone
-  else. There is no notion of a person being *gone* — an absence may be an hour or forever, and
-  nothing can tell the difference, so the app does not offer a word for it.
-- Whether this strand can grow and who may grow it.
-- Leaving a strand — the only act with reach over the strand. There is no deleting it unless you are the last member.
-- That a new member holds the whole history: the story's job is to make that unsurprising, not to offer controls over it.
-- **Membership is not an address.** Tapping a fellow member opens no private chat, because none exists, and generally offers no way to invite them either — there is no route to them. What is left is posting an invitation into the strand for everyone to see, which raises its own problem: if invitations are single-use, the wrong member can take one meant for someone else. The story must answer that.
+Context: The cycling group ([05](05-add-someone-to-a-strand.md)). Bob and Priya can add and remove
+people; the rest cannot. Tom joined last month. Susan is a member with a request.
 
-## Notes
+## Roles
 
-Planned in `STATUS.md` §D; the hole it fills is STATUS.md §C.5. Write to
-`appeus/templates/stories/story-template.md`: Story Overview, Roles where more than one party acts,
-Sequence, Alternative Paths, Acceptance Criteria, Variants, and Open for anything still waiting on
-sereus. Background all these stories assume: [theory.md](theory.md).
+| Role | Who | Can add and remove |
+|------|-----|--------------------|
+| Manager | Bob, Priya | yes — including each other |
+| Member | Susan, Tom, the rest | no |
+
+## Sequence
+
+1. Bob looks at who is in the strand. He sees everyone, and can tell at a glance which of them can
+   add and remove people and which cannot.
+2. He can see what the strand *is*, in terms he does not have to interpret: private, and still able
+   to change, because he and Priya can both add and remove.
+3. That is two facts about him rather than one, and the app does not soften either. People he has
+   never met may yet be brought in and read what he says here. And he can be put out of it, by
+   either of the two people who hold that ability — one of whom is himself.
+4. He looks at Tom's entry. He can see Tom is a member and when he joined, and nothing Tom has not
+   chosen to show. There is no address here, and nothing that would let Bob reach him elsewhere.
+5. Half expecting to message Tom privately, Bob taps him. He cannot. No private conversation between
+   them exists, and none can be started from here — Tom is a member of this strand, not an address.
+   A conversation of their own would take a new strand and Tom accepting it
+   ([02](02-start-a-strand.md)).
+6. Bob decides he would rather not be one of the people who can add and remove. He gives it up, and
+   is told plainly what he is giving up and that it cannot be taken back — not by him, not by anyone.
+7. What the strand is has changed, and it changes for everyone at once. Priya alone can now add and
+   remove; the strand still says it can change, because it still can.
+
+### Alternative Path A: asking somebody else to give it up
+
+7.1. The group would rather nobody could bring anyone else in. Bob asks Priya to give up hers too.
+7.2. She is free to refuse, and the app carries the ask without chasing her, counting votes, or
+     presenting her decision as overdue.
+7.3. She agrees. Now nobody can add anyone and nobody can remove anyone: the membership is settled
+     for good, everyone is here on the same footing, and everyone can see it.
+     → [05](05-add-someone-to-a-strand.md)
+
+### Alternative Path B: the one who stopped showing up
+
+7.1. Instead, Priya stops appearing. Months pass.
+7.2. She is still shown as able to add and remove, because that is what is recorded. Whether she lost
+     her phone, gave up cycling, or is simply quiet is not something anybody can know, and the app
+     does not guess — there is no notion here of a person being *gone*.
+7.3. So the strand still reads as able to change, which is the honest answer even though in practice
+     nobody is going to change it.
+7.4. Had Bob kept his own ability he could have taken hers, leaving her a member like anyone else.
+     He gave his up first, so nobody can. That is the cost of going first, and the group is left
+     waiting on somebody who may never come back.
+
+### Alternative Path C: what a newcomer already knows
+
+4.1. Tom can read everything the group said before he arrived, including the parts from a year ago.
+4.2. This surprises nobody, because it was said plainly when he was invited, to the person doing the
+     inviting, before the invitation went out ([05](05-add-someone-to-a-strand.md)).
+4.3. The member list is not where anybody learns this for the first time, and there is nothing here
+     to switch it off.
+
+### Alternative Path D: getting somebody in when you cannot invite
+
+1.1. Susan wants her partner in the group. She cannot invite, and cannot reach Bob or Priya privately
+     from here either.
+1.2. So she asks in the strand, in front of everyone. That is the ordinary way, and it works.
+1.3. Bob can hand her an invitation to pass on. If he posts it into the strand he is told what that
+     really does: an invitation is good for whoever holds it, so posting it hands **every** member a
+     one-off ability to bring somebody in. That is a real transfer of the thing he holds, not a
+     convenience.
+1.4. Given any other way of reaching Susan, he uses it. Posting into the strand is the fallback, and
+     the app describes it as one.
+
+### Alternative Path E: put out
+
+7.1. A member is removed by somebody who can do that.
+7.2. Everybody sees they are no longer here. What reaches the removed member, and what it cannot
+     undo, is [33](33-managing-a-strand.md).
+
+## Acceptance Criteria
+
+- [ ] A member can see everybody in the strand, and which of them can add and remove people
+- [ ] The strand's state is legible without interpretation: public, private and able to change, or
+      private and settled
+- [ ] A member is told both consequences of a strand that can change — who may yet read this, and
+      that they themselves may be put out
+- [ ] A member's entry shows only what that member has disclosed, and offers no way to reach them
+      elsewhere
+- [ ] Tapping a member offers neither a private conversation nor a direct invitation; neither exists
+- [ ] A member holding the ability may give it up, is told it is permanent, and it is
+- [ ] Giving it up changes what the strand is, visibly, for every member at once
+- [ ] A member may ask another to give up the ability; refusal is a legitimate answer and is not
+      chased, counted or presented as outstanding
+- [ ] Somebody who has stopped participating is still shown as holding what they hold; the app never
+      infers that a person is gone
+- [ ] Posting an invitation into a strand is described as handing every member a one-off ability to
+      admit somebody
+- [ ] Membership changes are noticed by every member, not only by whoever caused them
+
+## Variants
+
+- happy: a member reads the room, then gives up what they hold
+- empty: a two-party strand, where the list is short and the question barely arises
+- error: a strand waiting on somebody who has stopped appearing
+
+## Open
+
+**Sereus records membership as state, not as history** — the current member and manager sets are
+replicated, but who admitted whom, who removed whom, and when are not reconstructible from the
+strand. The last acceptance criterion, and [05](05-add-someone-to-a-strand.md)'s "everyone sees who
+let them in", therefore need the **app** to keep its own record in the chat schema. Worth deciding
+deliberately rather than discovering late.
+
+Private nicknames for members are roadmap rather than present (`STATUS.md` §C.10); until they exist,
+everyone sees the same display name.

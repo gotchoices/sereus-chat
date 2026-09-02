@@ -100,7 +100,3 @@ Each reader seeing their own name for a mentioned member depends on private nick
 roadmap rather than present (`STATUS.md` §C.10). Until they exist, a mention falls back to the
 member's shared display name, which is the same for everyone — the story's behaviour is correct, the
 distinction simply has nothing to bite on yet.
-
-Whether the set of reactions is fixed or open to any emoji is undecided, and is a smaller question
-than it looks: an open set means an arbitrary string on a message, which is a message by another
-name.

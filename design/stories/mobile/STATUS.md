@@ -74,7 +74,7 @@ and accepted it) → **revised** (changed after review).
 | 21 | [Receiving media](21-receiving-media.md) | stub | draft |
 | 22 | [Forwarding a message](22-forwarding-a-message.md) | stub | draft |
 | 30 | [My strands](30-my-strands.md) | renamed | reframe from contacts to strands; drop the email-disclosure claim |
-| 31 | [Who's in this strand](31-whos-in-this-strand.md) | stub | draft |
+| 31 | [Who's in this strand](31-whos-in-this-strand.md) | drafted | review — the membership hub; state is legible, history is not recorded |
 | 32 | [Finding something](32-finding-something.md) | renamed | reconcile with "no global index" |
 | 33 | [Managing a strand](33-managing-a-strand.md) | revised | review — mute / leave / forget, plus being removed |
 | 40 | [My profile](40-my-profile.md) | drafted | review |
@@ -211,7 +211,7 @@ sereus internals.
    answering with a thumbs-up. Neither says whether that's a reaction or just a message containing
    an emoji. Reactions scale better than messages in a group — worth promoting out of "future".
 
-5. **Membership — who is in this strand.** Entirely absent, and now required. Seeing the member
+5. ~~**Membership — who is in this strand.**~~ **Done — story 31 is drafted.** Entirely absent, and now required. Seeing the member
    list, telling a manager from a member, understanding whether this strand can grow and who may
    grow it, watching someone join, and leaving a strand yourself. A new member sees the whole
    history, so the story's job is to make that unsurprising — not to offer controls over it. It is
@@ -517,6 +517,10 @@ Group support breaks one thing outright, which should be fixed before stories ar
 - [x] ~~Are read receipts wanted?~~ — **no, and the column goes.** No delivered or read state is
       tracked. A reply is the evidence a message was read. The app distinguishes only whether a
       message has left the device.
+- [x] ~~Reaction palette?~~ — **implementation, not story.** Leaning: supply no pre-programmed emoji
+      set. Allow standard character sets (which already carry emoji) and, as far as we can manage,
+      arbitrary images and files. Recorded here so the leaning is not lost; story 12 says nothing
+      about it.
 - [x] ~~Should a mute let mentions through?~~ — **the user chooses.** Muting comes in two flavors:
       quiet unless somebody names you, or quiet regardless. Both honor the instruction, because the
       user gave it. Stories 10 and 33 carry it.

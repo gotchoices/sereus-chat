@@ -36,7 +36,7 @@ planned story; it states the topic and what it must cover.
 | 21 | [Receiving media](21-receiving-media.md) | stub |
 | 22 | [Forwarding a message](22-forwarding-a-message.md) | stub |
 | 30 | [My strands](30-my-strands.md) | renamed, awaiting revision |
-| 31 | [Who's in this strand](31-whos-in-this-strand.md) | stub |
+| 31 | [Who's in this strand](31-whos-in-this-strand.md) | drafted |
 | 32 | [Finding something](32-finding-something.md) | renamed, awaiting revision |
 | 33 | [Managing a strand](33-managing-a-strand.md) | drafted |
 | 40 | [My profile](40-my-profile.md) | drafted |
