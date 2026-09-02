@@ -71,3 +71,7 @@ invitation; Mike has accepted his in the car.
 Where a message rests while its recipient is unreachable depends on sereus delivery behavior
 (`STATUS.md` §H). This story states only what the user can tell — that it left their device — and
 deliberately claims nothing further.
+
+**There is no authority on message timing.** Each party logs its own content to the strand; nothing
+is watching, and no clock is trusted. Stories deliberately do not go into ordering — see
+`specs/domain/schema.md` for the placeholder and the two routes open to us.

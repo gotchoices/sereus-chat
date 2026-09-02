@@ -33,11 +33,42 @@ Every chat strand carries this schema. Each participant inserts itself into `Mem
 
 | Column | Type | Notes |
 |--------|------|-------|
-| Id | integer | Strand-unique, monotonic |
+| Id | text | Client-generated UUID. Not a sequence — see *Ordering* below |
 | MemberId | text | FK → Member.Id |
 | Content | text | Message text |
-| Timestamp | datetime | When sent (UTC) |
-| Status | text | sent / delivered / read (advisory; computed where possible) |
+| Timestamp | datetime | Asserted by the sender. Not authoritative — see *Ordering* below |
+
+No delivery or read status is tracked. A reply is the evidence a message was read; the app claims
+nothing further, and reports nothing back to a sender. (Decision recorded in
+`design/stories/mobile/STATUS.md` §G.)
+
+### Ordering — placeholder, unresolved
+
+**There is no authority on message timing.** Each party logs its own content to the strand; nothing
+is watching, and no clock is trusted. `Timestamp` is the sender's assertion about their own clock and
+nothing more. A strict sequence is not available either — the retired upstream `schemas/chat.qsql`
+attempted one and it cannot hold under concurrent writers, which is why `chat-simple.qsql` moved to
+client-generated UUIDs.
+
+This is recorded so that no part of the app quietly assumes an authoritative order exists. Stories
+deliberately do not go into it.
+
+Two routes are open, and the choice is deferred until sereus answers
+[gotchoices/sereus#5](https://github.com/gotchoices/sereus/issues/5):
+
+1. **Lean on the stack.** Optimystic states that within a collection, transactions are totally
+   ordered by a monotonic commit revision, and that wall-clock timestamps are metadata that do not
+   affect correctness (`optimystic/docs/correctness.md` §6.3). If that order is reachable from an
+   sApp through Quereus, it is a consensus order and we should use it in preference to any timestamp.
+2. **Build it here.** A hash-linked causal history in this schema: each message records the hashes of
+   the messages its author had already seen. That does not establish absolute time, but it
+   establishes what an author had seen when they posted, makes back-dated insertion detectable, and
+   lets honest participants bound a dishonest clock from both sides. Established prior art — Matrix's
+   `prev_events` DAG, Secure Scuttlebutt's per-feed hash chains, Merkle-CRDTs.
+
+Either way the app must not present a message order as authoritative when it is not. If a trail of
+causal references does end up existing, that is a benefit — but nothing here is designed in order to
+manufacture one.
 
 ### Attachment
 

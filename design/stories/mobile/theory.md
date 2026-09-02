@@ -148,5 +148,8 @@ Susan: Fine. Show me the code.
   time.
 - **The agreement governing a strand, including confidentiality and any enforcement, is sereus's**
   to define. Stories show a user encountering it; they never specify it.
+- **Nobody is keeping the minutes.** Each party writes its own messages to the strand; there is no
+  authority watching, and no clock anybody has to trust. Stories should not imply an official record
+  or an authoritative order — see `specs/domain/schema.md`.
 - **"Strand" is the word**, in the app as much as in the specs. This page is where it is
   introduced; the numbered stories assume it.

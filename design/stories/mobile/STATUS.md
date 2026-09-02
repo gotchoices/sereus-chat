@@ -639,6 +639,16 @@ as though this were all operative and will mislead anyone who reads it alone.
 Narrowed twice: first by the source review, then by confirming that leaderless strands and private
 nicknames are both coming. What remains are things nothing in the source or the roadmap yet covers.
 
+**Filed upstream 2026-09-01** — `gotchoices/sereus` issues
+[#3](https://github.com/gotchoices/sereus/issues/3) (MinOneManager local-count floor now that
+deliberate rotation to zero is coming, and telling a deliberate seal from an accidental one),
+[#4](https://github.com/gotchoices/sereus/issues/4) (what removal actually prevents),
+[#5](https://github.com/gotchoices/sereus/issues/5) (is per-collection revision order available to
+sApps),
+[#6](https://github.com/gotchoices/sereus/issues/6) (no home for party-private per-user state),
+[#7](https://github.com/gotchoices/sereus/issues/7) (`schemas/chat.qsql` superseded and broken).
+Questions 1–4 below correspond to #4, #6, #5 and the unfiled attachments question.
+
 **Blocking a story we have drafted**
 
 1. **Does removal revoke read access, in the intended design?** Today it cannot — the read gate is a
@@ -651,9 +661,11 @@ nicknames are both coming. What remains are things nothing in the source or the 
    replicate across a party's own devices and be invisible to other members. The control DB has
    exactly those properties and a closed schema; an sApp table has the wrong audience. Nothing else
    fits.
-3. **Is message ordering ours to solve?** No HLC, no causal delivery, no server clock — and
-   timestamps are self-asserted. Every messaging story assumes a conversation has an order. This is
-   the most fundamental thing a chat app needs that the platform does not offer.
+3. **Is message ordering ours to solve?** ([#5](https://github.com/gotchoices/sereus/issues/5).)
+   Reframed by a find: Optimystic already totally orders transactions within a collection by commit
+   revision, and treats wall-clock timestamps as metadata (`optimystic/docs/correctness.md` §6.3).
+   The question is whether that order is reachable from an sApp through Quereus. A placeholder spec
+   with both routes is recorded in `specs/domain/schema.md`; **stories stay out of it**.
 4. **Is there a plan for attachments?** No chunking, resumability or dedup; media would be rows
    replicated as ordinary blocks. [20](20-sending-media.md) and [21](21-receiving-media.md) assume
    media works.

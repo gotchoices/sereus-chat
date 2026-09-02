@@ -48,8 +48,9 @@ Susan typed a long message to Bob but autocorrect changed several words making i
 
 1. Bob sends a message to Susan and realises it was meant for Mike.
 2. He deletes it.
-3. It goes from the conversation. Nothing is left in its place — no tombstone, no "message
-   deleted" marker.
+3. It goes from the conversation. The app does not put a marker in its place — no "message deleted"
+   placeholder manufactured for the sake of it. If the underlying record happens to leave a trace,
+   that is no bad thing and nothing here works to hide it.
 
 ### Alternative Path D: Text and attachment together
 
@@ -69,7 +70,9 @@ Susan typed a long message to Bob but autocorrect changed several words making i
 - [ ] A member can add or remove attachments on a message they sent
 - [ ] An edited message is marked as edited
 - [ ] An edit replaces what was there; earlier versions are not kept or shown
-- [ ] A member can delete their own message, and it leaves nothing behind
+- [ ] A member can delete their own message, and the app puts no marker in its place
+- [ ] Nothing is built to erase evidence that something was there; the app simply does not
+      manufacture a placeholder
 - [ ] There is no time limit on correcting or deleting one's own content
 - [ ] A member cannot edit or delete anyone else's content
 - [ ] Removing content is described as removing it from the conversation, never as making it
