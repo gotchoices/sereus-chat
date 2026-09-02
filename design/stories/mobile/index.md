@@ -29,7 +29,7 @@ planned story; it states the topic and what it must cover.
 | 04 | [Our first conversation](04-our-first-conversation.md) | drafted |
 | 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | drafted |
 | 10 | [Catching up](10-catching-up.md) | drafted |
-| 11 | [Writing a message](11-writing-a-message.md) | stub |
+| 11 | [Writing a message](11-writing-a-message.md) | drafted |
 | 12 | [Replying and mentioning](12-replying-and-mentioning.md) | stub |
 | 13 | [Correcting a message](13-correcting-a-message.md) | drafted |
 | 20 | [Sending media](20-sending-media.md) | renamed, awaiting revision |

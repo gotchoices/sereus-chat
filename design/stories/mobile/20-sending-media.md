@@ -85,6 +85,13 @@ Mike wants to send a quick video message to Bob while he's in a noisy airport.
 - [ ] Recipients can view, play, and download received media and files.
 - [ ] Users can add captions or text to media messages.
 
+## Open
+
+Any size limit on an attachment is the **user's setting**, not a rule handed down — there is no
+platform boss to decide one, and what is reasonable depends on whose machines are carrying it. The
+current acceptance criterion about files being "too large" should be rewritten in those terms when
+this story is revised.
+
 ## Variants
 - happy: a photo sent with a caption and viewed
 - empty: a strand with no media in it yet

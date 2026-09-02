@@ -67,7 +67,7 @@ and accepted it) → **revised** (changed after review).
 | 04 | [Our first conversation](04-our-first-conversation.md) | revised | review — no delivery or read reporting |
 | 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | revised | review — refusals, promotion, removal |
 | 10 | [Catching up](10-catching-up.md) | revised | review — hard and soft mute; no receipts |
-| 11 | [Writing a message](11-writing-a-message.md) | stub | draft |
+| 11 | [Writing a message](11-writing-a-message.md) | drafted | review — drafts, unsent messages, no link fetching |
 | 12 | [Replying and mentioning](12-replying-and-mentioning.md) | stub | draft |
 | 13 | [Correcting a message](13-correcting-a-message.md) | revised | review — no edit history, no time limit, no tombstone |
 | 20 | [Sending media](20-sending-media.md) | renamed | trim; pair with 21 |
@@ -196,7 +196,7 @@ sereus internals.
    single gap and it is pure UX. Groups add the case that actually drives triage — a busy strand I
    am not personally addressed in, versus one where I was mentioned.
 
-2. **Composing beyond one line.** No story covers drafts preserved when you leave a chat and come
+2. ~~**Composing beyond one line.**~~ **Done — story 11 is drafted.** No story covers drafts preserved when you leave a chat and come
    back, multi-line entry, pasting, links, copying message text, or what a message that hasn't gone
    out yet looks like and how to retry it. `screens/chat-interface.md` already promises an
    "Error: inline banner with retry" that no story describes. Drafts matter more with many strands.
@@ -625,6 +625,7 @@ as though this were all operative and will mislead anyone who reads it alone.
 | Concurrent same-PK insert silently last-writer-wins, **both writers told they succeeded** | `tickets/blocked/optimystic-concurrent-same-pk-insert-silent-lww.md`, repro verified | Message loss. `chat-simple.qsql` uses client UUIDs to dodge it |
 | A block written while only one machine holds it can be unreadable by others | `tickets/blocked/block-held-by-only-one-machine-is-unreadable.md`, verified, still ~1-in-5 as of 2026-08-24 | Two phones, no always-on node = messages can vanish |
 | No store-and-forward; sync is pull-on-read | `architecture.md:713` | If both parties are asleep phones, nothing moves. [04](04-our-first-conversation.md) Alt B assumes it eventually arrives |
+| Sending while unreachable **is** meant to be a local write, not an outbox — the phone holds the strand. Optimystic short-circuits consensus for a solo node and `strand-backfill.ts` catches up blocks written alone. But `CadreNode` hardcodes a cluster size that makes the solo path unreachable | `optimystic/docs/optimystic.md:40-50`, `cadre-consistency.md:26-28`, [sereus#2](https://github.com/gotchoices/sereus/issues/2) | Stories [04](04-our-first-conversation.md) and [11](11-writing-a-message.md) are written for the intended behaviour: no pending state, no outbox. If #2 and the single-holder-block defect do not clear, the failure path becomes the common one |
 | No message ordering, no HLC or causal delivery for sApp data; timestamps self-asserted | `chat-simple.qsql`, `cadre-consistency.md` (unimplemented) | Ordering is ours to solve and cannot be solved well |
 | Every strand is a separate libp2p node; `realtime` latency hint means never hibernating | `architecture.md:735-750, 724-733` | 50 strands = 50 nodes. Responsiveness and battery are in direct tension |
 | No cross-strand search, and most strands hibernate | `architecture.md:690, 735-750` | [32](32-finding-something.md) must wake every strand, not merely iterate |

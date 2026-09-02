@@ -21,25 +21,26 @@ invitation; Mike has accepted his in the car.
    does not try to be.
 2. She can see who she is talking to, a place to type, and a way to attach things.
 3. She types "Hi!" and sends it.
-4. She can tell her message has left her phone. That is the extent of what the app tells her, and
-   it does not invent more — nothing reports back what happened at Bob's end.
+4. Her message is in the conversation. That is the extent of what the app tells her, and it does not
+   invent more — nothing reports back what happened at Bob's end.
 5. Bob's phone gets her message and he finally puts his arm down.
 6. He replies. Susan sees it arrive without doing anything to fetch it.
 7. Both of them now have a strand in an app that was empty an hour ago, and it is obvious how to
    get back to it. → [30](30-my-strands.md)
 
-### Alternative Path A: a message that has not gone anywhere yet
+### Alternative Path A: sending with nothing reachable
 
 3.1. Susan sends hers while riding the lift, with no signal.
-3.2. The message is visibly not sent yet, rather than silently pending or falsely delivered.
-3.3. When she has signal again it goes. She did not have to do anything, and could have retried or
-     abandoned it if she wanted to. → [11](11-writing-a-message.md)
+3.2. It takes its place in the conversation anyway — her phone holds the conversation, so there is
+     nothing to wait for and no outbox to sit in.
+3.3. It reaches Bob when their machines can next reach each other, without her doing anything.
+     → [11](11-writing-a-message.md)
 
 ### Alternative Path B: the other person is not there
 
 4.1. Mike accepted Bob's invitation from the car and then drove into a tunnel.
-4.2. Bob's messages leave his phone. Whether Mike has them yet is not something Bob is shown,
-     because it is not tracked, and the app does not guess on his behalf.
+4.2. Bob's messages are in the conversation. Whether Mike has them yet is not something Bob is
+     shown, because it is not tracked, and the app does not guess on his behalf.
 4.3. When Mike surfaces they reach him, and he answers. The answer is how Bob knows.
 
 ### Alternative Path C: a voice message instead
@@ -52,9 +53,10 @@ invitation; Mike has accepted his in the car.
 
 - [ ] A newly formed strand opens into a conversation that is immediately familiar
 - [ ] The user can see who they are talking to, type a message, and send it
-- [ ] A message that has not left the device is distinguishable from one that has
-- [ ] Nothing further is claimed about a message's fate: there is no delivered or read state, and a
-      reply is the only evidence a message was read
+- [ ] A sent message takes its place in the conversation immediately, whether or not anything else
+      is reachable
+- [ ] Nothing is claimed about a message's fate beyond that: there is no delivered or read state,
+      and a reply is the only evidence a message was read
 - [ ] Incoming messages appear without the user fetching them
 - [ ] A message that has not gone out is visibly unsent, and can be retried or abandoned
 - [ ] Messages to someone unreachable are not lost, and are not reported as delivered
