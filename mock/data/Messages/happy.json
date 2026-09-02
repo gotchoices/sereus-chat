@@ -1,7 +1,8 @@
 [
-  { "id": "m1", "strandId": "t-susan", "sender": "Susan", "text": "Hey! How's your day going?", "timestamp": "2025-11-13T21:00:00Z" },
-  { "id": "m2", "strandId": "t-susan", "sender": "Me", "text": "Pretty good, shipped the Appeus slice.", "timestamp": "2025-11-13T21:01:00Z", "outgoing": true },
-  { "id": "m3", "strandId": "t-susan", "sender": "Susan", "text": "Nice! Let's test variants.", "timestamp": "2025-11-13T21:02:00Z" }
+  { "id": "m-01", "memberId": "p-priya", "content": "Anyone know a shop that still stocks 9-speed chains?", "timestamp": "2026-09-02T07:58:00Z", "replyToId": null, "editedAt": null, "attachments": [], "reactions": [] },
+  { "id": "m-02", "memberId": "p-tom", "content": "Derailleur finally gave up on Saturday", "timestamp": "2026-09-02T08:01:00Z", "replyToId": null, "editedAt": null, "attachments": [], "reactions": [{ "memberId": "p-priya", "symbol": "😬" }] },
+  { "id": "m-03", "memberId": "p-tom", "content": "Second time this year", "timestamp": "2026-09-02T08:01:40Z", "replyToId": null, "editedAt": null, "attachments": [], "reactions": [] },
+  { "id": "m-04", "memberId": "p-bob", "content": "Susan sent me one — Bella Vista Cycles on Fifth", "timestamp": "2026-09-02T08:09:00Z", "replyToId": "m-01", "editedAt": null, "attachments": [], "reactions": [{ "memberId": "p-priya", "symbol": "👍" }, { "memberId": "p-tom", "symbol": "👍" }] },
+  { "id": "m-05", "memberId": "p-priya", "content": "@Tom that's the one near the bridge", "timestamp": "2026-09-02T08:12:00Z", "replyToId": null, "editedAt": null, "attachments": [], "reactions": [] },
+  { "id": "m-06", "memberId": "p-tom", "content": "Route for Saturday, if anyone wants it", "timestamp": "2026-09-02T08:20:00Z", "replyToId": null, "editedAt": "2026-09-02T08:21:10Z", "attachments": [{ "id": "a-01", "type": "image", "uri": "mock://route-map.jpg", "mimeType": "image/jpeg", "name": "route-map.jpg", "byteSize": 842000, "durationMs": null }], "reactions": [] }
 ]
-
-

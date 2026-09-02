@@ -1,66 +1,86 @@
 # Navigation Spec
 
-Single-stack navigation (no tabs).
+Single-stack navigation (no tabs). Home is the strand list; everything else is pushed, presented, or
+overlaid from it.
 
 ## Sitemap
 
 ```
-HOME (ConnectionsList) ← Root
-├── Profile (push)
-│   └── CadreManager (push) — provided by `src/cadre-ui/` (sereus-bundled)
-├── Search (push)
-├── Invite (modal)
-├── QR Scanner (modal)
-└── Strand (push)
-    ├── Media Picker (toast/overlay)
-    ├── Voice Call (overlay)
-    └── Video Call (full-screen)
+StrandList  ← root
+├── Profile (push)                    ← footer avatar
+│   ├── Settings (push)
+│   └── CadreManager (push)           ← shared component, src/cadre-ui/
+├── SearchInterface (push)            ← header search
+├── InvitationGenerator (modal)       ← header "New strand", or from StrandDetail
+├── QrScanner (modal)                 ← footer scan
+├── InvitationAcceptance (modal)      ← deep link only
+└── ChatInterface (push)              ← tap a strand row
+    ├── StrandDetail (push)           ← tap the header
+    │   └── StrandMedia (push)
+    ├── MediaPicker (sheet)           ← composer "+"
+    ├── MediaViewer (full-screen)     ← tap an attachment
+    ├── VoiceCallOverlay (overlay)    ← parked, story 90
+    └── VideoCallActive (full-screen) ← parked, story 90
 ```
 
 ## Screen Roles
 
 | Screen | Route | Entry | Transition |
 |--------|-------|-------|------------|
-| ConnectionsList | ConnectionsList | App launch | Root |
-| ProfileSetup | ProfileSetup | Home footer avatar | Push |
-| CadreManager | CadreManager | Profile "Manage devices" row | Push |
-| SearchInterface | SearchInterface | Home header search | Push |
-| InvitationGenerator | InvitationGenerator | Home header "Add Friends" | Modal |
-| QrScanner | QrScanner | Home footer QR icon | Modal |
-| ChatInterface | ChatInterface | Tap strand row | Push |
-| MediaPicker | MediaPicker | Chat "+" button | Toast/overlay |
-| VoiceCallOverlay | VoiceCallOverlay | Chat phone icon | Overlay |
-| VideoCallActive | VideoCallActive | Chat camera icon | Full-screen |
-| InvitationAcceptance | InvitationAcceptance | Deep link | Modal over Home |
+| StrandList | StrandList | App launch | Root |
+| ChatInterface | ChatInterface | Tap a strand row | Push |
+| StrandDetail | StrandDetail | Chat header (title / member count) | Push |
+| StrandMedia | StrandMedia | StrandDetail, or a search result | Push |
+| MediaViewer | MediaViewer | Tap an attachment, in chat or StrandMedia | Full-screen |
+| MediaPicker | MediaPicker | Composer "+" | Sheet |
+| SearchInterface | SearchInterface | Home header, or chat header for in-strand | Push |
+| InvitationGenerator | InvitationGenerator | Home header, or StrandDetail "add someone" | Modal |
+| InvitationAcceptance | InvitationAcceptance | Deep link or scan | Modal over Home |
+| QrScanner | QrScanner | Home footer | Modal |
+| Profile | Profile | Home footer avatar | Push |
+| Settings | Settings | Profile row | Push |
+| CadreManager | CadreManager | Profile "My machines" row | Push |
+| VideoCallActive | VideoCallActive | Chat header camera — parked | Full-screen |
+| VoiceCallOverlay | VoiceCallOverlay | Chat header phone — parked | Overlay |
 
-## Onboarding
+## First run
 
 ```
-First Launch
-└── ProfileSetup (modal, name required)
-    └── → Home (ConnectionsList)
+First launch
+└── Name prompt (modal over StrandList; name only, no account)
+    └── StrandList, empty and explaining itself → InvitationGenerator
 ```
 
-## Deep Links
+Story 01: the empty StrandList is where "strand" is introduced, attached to something the user is
+looking at. The most prominent action is starting one. A returning user with still no strands is not
+nagged.
+
+## Deep links
 
 - Scheme: `sereus://`
-- Invitation: `sereus://invite/{token}` → InvitationAcceptance modal
-- Future: `sereus://strand/{id}` → ChatInterface
+- Invitation: `sereus://invite/{token}` → InvitationAcceptance
+- Strand: `sereus://strand/{id}` → ChatInterface
+- Mock variants (mock builds only): `sereus://screen/{Route}?variant={happy|empty|error}`
 
-## Transition Types
+An invitation link opened without the app installed lands on a web page; after installing, the user
+scans or opens the link again (story 03 — deliberate, no third-party deferred-link service).
 
-| Type | Animation | Back Behavior |
-|------|-----------|---------------|
-| Push | Slide from right | Pop to previous |
+## Transitions
+
+| Type | Animation | Back behaviour |
+|------|-----------|----------------|
+| Push | Slide from right | Pop |
 | Modal | Slide up | Dismiss |
-| Overlay/Toast | Fade in | Tap outside to dismiss |
+| Sheet | Slide up, partial height | Tap outside to dismiss |
+| Full-screen | Fade | Explicit close |
+| Overlay | Fade, floating | Tap outside to dismiss |
 
-## Route Options (titles)
+## Route titles
 
-- ConnectionsList: "Home"
-- ProfileSetup: "Profile"
-- CadreManager: "My Devices" (or component default)
+- StrandList: "Strands"
+- ChatInterface: strand title (dynamic) with member count beneath for groups
+- StrandDetail: strand title (dynamic)
+- StrandMedia: "Shared here"
 - SearchInterface: "Search"
-- InvitationGenerator: "Invite Friends"
-- ChatInterface: Partner name (dynamic)
-- VideoCallActive: Partner name (dynamic)
+- InvitationGenerator: "New strand" or "Add someone" depending on entry
+- Profile: "Profile" · Settings: "Settings" · CadreManager: "My machines"

@@ -1,0 +1,6 @@
+[
+  { "id": "p-bob", "name": "Bob", "avatarUri": null, "isManager": true, "isMe": true },
+  { "id": "p-priya", "name": "Priya", "avatarUri": null, "isManager": true, "isMe": false },
+  { "id": "p-tom", "name": "Tom", "avatarUri": null, "isManager": false, "isMe": false },
+  { "id": "p-susan", "name": "Su-Z", "avatarUri": null, "isManager": false, "isMe": false }
+]

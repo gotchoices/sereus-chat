@@ -1,0 +1,4 @@
+[
+  { "id": "i-sarah", "direction": "outgoing", "label": "Sarah (work)", "strandId": null, "createdAt": "2026-09-01T14:00:00Z", "expiresAt": "2026-09-08T14:00:00Z", "spent": false },
+  { "id": "i-club", "direction": "incoming", "label": "Invitation from an unknown sender", "strandId": null, "createdAt": "2026-09-02T07:30:00Z", "expiresAt": "2026-09-03T07:30:00Z", "spent": false }
+]

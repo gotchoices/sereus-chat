@@ -1,10 +1,20 @@
 [
-  { "id": "t-susan", "displayName": "Susan", "avatarUrl": null, "lastMessage": { "previewText": "Looking forward to it!", "timestamp": "2025-11-12T14:30:00Z" }, "unreadCount": 2 },
-  { "id": "t-mike", "displayName": "Mike", "avatarUrl": null, "lastMessage": { "previewText": "Hey you found this app too. Pretty cool!", "timestamp": "2025-11-11T09:00:00Z" }, "unreadCount": 0 },
-  { "id": "t-sarah", "displayName": "Sarah", "avatarUrl": null, "lastMessage": { "previewText": "Thanks for sharing that", "timestamp": "2025-11-11T08:00:00Z" }, "unreadCount": 0 },
-  { "id": "t-martha", "displayName": "Martha", "avatarUrl": null, "lastMessage": { "previewText": "No messages yet", "timestamp": null }, "unreadCount": 0 },
-  { "id": "t-alex", "displayName": "Alex", "avatarUrl": null, "lastMessage": { "previewText": "Let's sync later today", "timestamp": "2025-11-10T10:00:00Z" }, "unreadCount": 1 },
-  { "id": "t-team", "displayName": "Team Group", "avatarUrl": null, "lastMessage": { "previewText": "Design notes updated", "timestamp": "2025-11-09T15:00:00Z" }, "unreadCount": 0 }
+  { "id": "s-susan", "title": "Susan", "avatarUri": null, "isGroup": false, "memberCount": 2,
+    "lastMessage": { "previewText": "Did you get the shop address?", "senderName": null, "timestamp": "2026-09-02T08:41:00Z" },
+    "unreadCount": 2, "mentioned": false, "muted": "none", "draftPreview": null, "archived": false, "pending": false },
+  { "id": "s-cycling", "title": "Saturday Riders", "avatarUri": null, "isGroup": true, "memberCount": 9,
+    "lastMessage": { "previewText": "Bob — which shop was it?", "senderName": "Priya", "timestamp": "2026-09-02T08:12:00Z" },
+    "unreadCount": 41, "mentioned": true, "muted": "soft", "draftPreview": null, "archived": false, "pending": false },
+  { "id": "s-mike", "title": "Mike", "avatarUri": null, "isGroup": false, "memberCount": 2,
+    "lastMessage": { "previewText": "Hey you found this app too. Pretty cool!", "senderName": null, "timestamp": "2026-09-01T19:05:00Z" },
+    "unreadCount": 0, "mentioned": false, "muted": "none", "draftPreview": "About the tunnel thing — I meant", "archived": false, "pending": false },
+  { "id": "s-tom", "title": "Tom", "avatarUri": null, "isGroup": false, "memberCount": 2,
+    "lastMessage": { "previewText": "Thanks for the invite", "senderName": null, "timestamp": "2026-08-30T11:20:00Z" },
+    "unreadCount": 0, "mentioned": false, "muted": "none", "draftPreview": null, "archived": false, "pending": false },
+  { "id": "s-family", "title": "Bateman Family", "avatarUri": null, "isGroup": true, "memberCount": 5,
+    "lastMessage": { "previewText": "Emma scored! 📹", "senderName": "Bob", "timestamp": "2026-08-29T16:44:00Z" },
+    "unreadCount": 0, "mentioned": false, "muted": "none", "draftPreview": null, "archived": false, "pending": false },
+  { "id": "s-dave", "title": "Dave", "avatarUri": null, "isGroup": false, "memberCount": 2,
+    "lastMessage": { "previewText": "Good to meet you at the conference", "senderName": null, "timestamp": "2026-03-14T09:00:00Z" },
+    "unreadCount": 0, "mentioned": false, "muted": "hard", "draftPreview": null, "archived": true, "pending": false }
 ]
-
-
