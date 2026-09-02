@@ -15,9 +15,9 @@ Screens call a stable internal adapter (`DataAdapter` in `src/data/`). No screen
 
 | Domain op (see `ops.md`) | Source |
 |--------------------------|--------|
-| `listStrands()` | Control DB (`CadreControl.Strand` joined with locally cached chat metadata) |
+| `Strands.list()` | Control DB (`CadreControl.Strand`) joined with locally cached chat metadata. Strand titles, mute, archive, drafts and read position are all app-side and device-local |
 | `listMessages(strandId)` | Live `StrandInstance.database` for that strand (`select … from App.Message`) |
-| `searchStrands(query)` | Iterate attached strand DBs; no global index (small N expected for chat) |
+| `Strands.search(query)` | Iterate attached strand DBs; **no global index**. Streams batches as strands are visited, reports strands skipped, and honours cancellation — see `ops.md` |
 | `getProfile()` / `saveProfile()` | Local key-value store. Not stored in any sereus DB |
 | `createInvitation()` | `cadreNode.createOpenInvitation({ sAppId })` → encode for QR / deep link |
 | `acceptInvitation(token)` | `formStrand(token, disclosure)` → `registerMember(...)` |

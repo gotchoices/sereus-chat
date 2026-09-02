@@ -4,7 +4,11 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DataAdapter } from '../adapter';
-import type { Profile, StrandSummary, ChatMessage, Invitation } from '../types';
+import type {
+  Profile, StrandSummary, StrandState, Member, Message, Attachment,
+  SearchBatch, SearchOptions, Invitation, InvitationPreview,
+  Prefs, StorageUsage, SendInput,
+} from '../types';
 import { ensureDefaultChatStrand, getDefaultChatStrand, syncProfileNameToStrands } from '../chat-strand';
 import { queryMessages, insertMessage } from '../chat-operations';
 import { CHAT_SAPP_ID } from '../chat-sapp';
@@ -30,35 +34,39 @@ export class SereusAdapter implements DataAdapter {
   // wired (step 5).  Until then every chat screen reads/writes the single
   // default strand.
 
-  async listMessages(_strandId: string): Promise<ChatMessage[]> {
+  async listMessages(_strandId: string, _opts?: { before?: string; limit?: number }): Promise<Message[]> {
     const strand = await ensureDefaultChatStrand();
     const rows = await queryMessages(strand);
-    const myPeerId = cadreService.peerId ?? '';
+    // No status is read: none is tracked (design/specs/domain/schema.md).
     return rows.map(r => ({
       id: String(r.Id),
-      strandId: strand.strandId,
-      sender: r.MemberName ?? r.MemberId.slice(0, 12),
-      text: r.Content,
+      memberId: r.MemberId,
+      content: r.Content,
       timestamp: r.Timestamp,
-      outgoing: r.MemberId === myPeerId,
-      status: (r.Status as ChatMessage['status']) ?? 'sent',
+      replyToId: null,
+      editedAt: null,
+      attachments: [],
+      reactions: [],
     }));
   }
 
-  async sendMessage(_strandId: string, text: string): Promise<ChatMessage> {
+  async send(_strandId: string, input: SendInput): Promise<Message> {
     const strand = await ensureDefaultChatStrand();
     const peerId = cadreService.peerId;
     if (!peerId) throw new Error('Peer ID not available; cadre may not be running');
 
-    const row = await insertMessage(strand, peerId, text);
+    // A local write.  There is no pending state to surface — the phone holds
+    // the strand, so this either lands or genuinely fails.
+    const row = await insertMessage(strand, peerId, input.content);
     return {
       id: String(row.Id),
-      strandId: strand.strandId,
-      sender: peerId.slice(0, 12),
-      text: row.Content,
+      memberId: peerId,
+      content: row.Content,
       timestamp: row.Timestamp,
-      outgoing: true,
-      status: 'sent',
+      replyToId: input.replyToId ?? null,
+      editedAt: null,
+      attachments: [],
+      reactions: [],
     };
   }
 
@@ -88,19 +96,26 @@ export class SereusAdapter implements DataAdapter {
         const msgs = await queryMessages(strand, 1);
         const last = msgs[msgs.length - 1];
         if (last) {
-          preview = { previewText: last.Content, timestamp: last.Timestamp };
+          preview = { previewText: last.Content, senderName: null, timestamp: last.Timestamp };
         }
       } catch (err) {
         console.warn('[SereusAdapter] last-message preview failed for', id, err);
       }
       summaries.push({
         id,
-        // Solo placeholder until partner metadata exists.  When step 8 wires
-        // up cross-party strands, this becomes the partner's display name.
-        displayName: id === defaultId ? 'My Notes' : `Strand ${id.slice(0, 8)}`,
-        avatarUrl: null,
+        // Solo placeholder until partner metadata exists.  Strand titles are
+        // the app's to own — sereus has no title slot (domain/schema.md).
+        title: id === defaultId ? 'My Notes' : `Strand ${id.slice(0, 8)}`,
+        avatarUri: null,
+        isGroup: false,
+        memberCount: 1,
         lastMessage: preview,
         unreadCount: 0,
+        mentioned: false,
+        muted: 'none',
+        draftPreview: null,
+        archived: false,
+        pending: false,
       });
     }
     return summaries;
@@ -108,50 +123,48 @@ export class SereusAdapter implements DataAdapter {
 
   // ── Step 5+ ────────────────────────────────────────────────────────────
 
-  async searchStrands(query: string): Promise<StrandSummary[]> {
-    // Non-blocking: search over already-attached strands; don't wait on the
-    // default-strand attach (see listStrands).
+  /**
+   * Streaming search over already-attached strands.  Batched per strand so the
+   * UI can render progressively and report what it could not reach — there is
+   * no cross-strand index, and hibernating strands are not woken here.
+   */
+  async *search(query: string, opts?: SearchOptions): AsyncIterable<SearchBatch> {
     void ensureDefaultChatStrand().catch(() => {});
-    const defaultId = getDefaultChatStrand()?.strandId ?? null;
     const q = query.trim().toLowerCase();
+    const entries = [...cadreService.getStrands()].filter(
+      ([id]) => !opts?.strandId || id === opts.strandId,
+    );
+    const total = entries.length;
+    let searched = 0;
+    let skipped = 0;
 
-    const out: StrandSummary[] = [];
-    for (const [id, strand] of cadreService.getStrands()) {
-      if (!strand.database) continue;
-      let preview: StrandSummary['lastMessage'] = null;
+    for (const [id, strand] of entries) {
+      if (opts?.signal?.aborted) return;
+      searched++;
+      if (!strand.database) { skipped++; continue; }
+      let results: SearchBatch['results'] = [];
       try {
         const msgs = await queryMessages(strand);
-        if (q === '') {
-          // Empty query → behave like listStrands: return everything with
-          // its last message as preview.
-          const last = msgs[msgs.length - 1];
-          preview = last ? { previewText: last.Content, timestamp: last.Timestamp } : null;
-        } else {
-          // Newest matching message wins as the preview.
-          for (let i = msgs.length - 1; i >= 0; i--) {
-            if (msgs[i].Content.toLowerCase().includes(q)) {
-              preview = { previewText: msgs[i].Content, timestamp: msgs[i].Timestamp };
-              break;
-            }
-          }
-          if (!preview) continue; // no match in this strand
-        }
-      } catch (err) {
-        console.warn('[SereusAdapter] search failed for', id, err);
-        continue;
+        results = msgs
+          .filter(m => q !== '' && m.Content.toLowerCase().includes(q))
+          .map(m => {
+            const at = m.Content.toLowerCase().indexOf(q);
+            return {
+              strandId: id,
+              strandTitle: `Strand ${id.slice(0, 8)}`,
+              messageId: String(m.Id),
+              senderName: m.MemberName ?? m.MemberId.slice(0, 12),
+              snippet: m.Content,
+              matchRange: [at, at + q.length] as [number, number],
+              timestamp: m.Timestamp,
+            };
+          });
+      } catch {
+        skipped++;
       }
-      out.push({
-        id,
-        displayName: id === defaultId ? 'My Notes' : `Strand ${id.slice(0, 8)}`,
-        avatarUrl: null,
-        lastMessage: preview,
-        unreadCount: 0,
-      });
+      yield { results, strandsSearched: searched, strandsTotal: total, strandsSkipped: skipped };
     }
-    return out;
   }
-
-  // ── Profile (device-local; not stored in any sereus DB) ──────────────
 
   async getProfile(): Promise<Profile> {
     const raw = await AsyncStorage.getItem(PROFILE_KEY);
@@ -203,7 +216,11 @@ export class SereusAdapter implements DataAdapter {
    * a prompt, explanatory failure and shows its retry Banner instead of
    * hanging on "Generating…".
    */
-  async createInvitation(): Promise<Invitation> {
+  async createInvitation(input: {
+    strandId?: string;
+    visibility?: 'public' | 'private';
+    grantsInviteRight: boolean;
+  }): Promise<Invitation> {
     const node = cadreService.cadreNode;
     if (!node) throw new Error('Cadre is not running.');
 
@@ -231,11 +248,19 @@ export class SereusAdapter implements DataAdapter {
       'publishFormationInvite',
     );
 
+    const token = node.encodeInvitation(invitation);
     return {
-      token: node.encodeInvitation(invitation),
+      id: token.slice(0, 12),
+      token,
+      url: `sereus://invite/${token}`,
+      qrPayload: `sereus://invite/${token}`,
       strandId: strand.strandId,
-      createdAt: new Date().toISOString(),
       expiresAt: invitation.expiration.toISOString(),
+      // The platform seats a member from a bearer invitation; invite rights
+      // are conferred by a separate signed act (see STATUS.md §G).
+      grantsInviteRight: input.grantsInviteRight,
+      spent: false,
+      direction: 'outgoing',
     };
   }
 
@@ -249,4 +274,26 @@ export class SereusAdapter implements DataAdapter {
   async acceptInvitation(_token: string): Promise<{ strandId: string }> {
     this.notImplemented('acceptInvitation');
   }
+
+  // ── Not yet wired ──────────────────────────────────────────────────────
+  // Each of these needs cadre-core surface that does not exist or is not
+  // reachable from a solo device.  See design/stories/mobile/STATUS.md §G.
+
+  async getStrandState(_strandId: string): Promise<StrandState> { this.notImplemented('getStrandState'); }
+  async listMembers(_strandId: string): Promise<Member[]> { this.notImplemented('listMembers'); }
+  async listAttachments(_strandId: string): Promise<Attachment[]> { this.notImplemented('listAttachments'); }
+  async editMessage(_id: string, _content: string): Promise<void> { this.notImplemented('editMessage'); }
+  async deleteMessage(_id: string): Promise<void> { this.notImplemented('deleteMessage'); }
+  async react(_id: string, _symbol: string): Promise<void> { this.notImplemented('react'); }
+  async unreact(_id: string, _symbol: string): Promise<void> { this.notImplemented('unreact'); }
+  async leaveStrand(_id: string, _o: { keepIdentity: boolean }): Promise<void> { this.notImplemented('leaveStrand'); }
+  async resignManager(_id: string): Promise<void> { this.notImplemented('resignManager'); }
+  async removeMember(_s: string, _m: string): Promise<void> { this.notImplemented('removeMember'); }
+  async listOutstandingInvitations(): Promise<Invitation[]> { this.notImplemented('listOutstandingInvitations'); }
+  async cancelInvitation(_id: string): Promise<void> { this.notImplemented('cancelInvitation'); }
+  async inspectInvitation(_t: string): Promise<InvitationPreview> { this.notImplemented('inspectInvitation'); }
+  async getPrefs(): Promise<Prefs> { this.notImplemented('getPrefs'); }
+  async setPrefs(_p: Partial<Prefs>): Promise<Prefs> { this.notImplemented('setPrefs'); }
+  async storageUsage(): Promise<StorageUsage> { this.notImplemented('storageUsage'); }
+  async trimStorage(): Promise<{ bytesFreed: number }> { this.notImplemented('trimStorage'); }
 }
