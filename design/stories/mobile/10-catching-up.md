@@ -100,6 +100,11 @@ is no delivered or read state, and none is tracked. A reply is the evidence that
 that is the whole of it. `specs/domain/schema.md`'s `Status` column is to be removed (`STATUS.md`
 §F).
 
+Reading back far enough may reach content this device is not holding, which is then fetched from the
+strand (`specs/domain/overview.md`). Nothing is missing, but the scroll may pause where it has always
+been instant, and while the device is cut off the older past may not be reachable at all. Either
+state must read as such — never as the beginning of the conversation.
+
 Keeping read position consistent across a user's own devices is treated here as a plain expectation,
 and it currently has **nowhere to live**: an sApp table would publish it to every member, and the
 party-private store that has the right audience has a closed schema (`STATUS.md` §G, question 2).

@@ -67,6 +67,20 @@ Mike is trying to find a specific photo Bob sent showing Emma's soccer uniform n
 - [ ] Search is fast and responsive even with extensive conversation history.
 - [ ] Search handles variations in spelling and capitalization.
 
+## Open
+
+Search is **complete but not necessarily quick**. Quereus queries find everything in the table; what
+partial locality costs is retrieval — blocks not cached here are fetched from the cohort, so a search
+across a long history may take real time, and cannot finish at all while the device is cut off
+(`specs/domain/overview.md`). Compounding it, there is no index across strands and most strands are
+not running until something wakes them (`STATUS.md` §G), so searching everything means waking
+everything.
+
+The consequence for this story is that searching is a **progressive** act with a cost, not an instant
+one: show what has been found so far, keep going, and say plainly when the rest cannot be reached
+rather than presenting a partial sweep as a finished answer. The existing acceptance criteria are
+written for a conventional local index and need revising against that.
+
 ## Variants
 - happy: the term is found and the strand opens at that message
 - empty: nothing matches

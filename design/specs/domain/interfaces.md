@@ -53,4 +53,7 @@ Sereus on RN requires a fixed set of polyfills (Hermes globals, Node-module shim
 | Cadre not connected | `CadreNode.start()` failure | Connection banner in Settings, retry |
 | Strand not ready | `StrandInstance.status !== 'started'` | Per-strand loading, auto-recover on attach |
 | Cohort offline | No reachable peers in strand cohort | Inline banner; writes stay local until cohort returns |
+| Read blocks on fetch | Blocks not cached locally; being fetched from the cohort | Show as *fetching*, not as empty. Queries are complete — the wait is retrieval, not absence |
+| Read cannot complete | Blocks not cached and nothing holding them is reachable | Say the past cannot be reached right now. **Never** render as an empty result or as deleted content |
+| Local capacity reached | Device storage limit for the strand | Surface as a condition with an action: trim, or add a machine to the cadre. Never a silent drop |
 | Invitation invalid / expired | `formStrand` rejection | Friendly message on the acceptance screen |

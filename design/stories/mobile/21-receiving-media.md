@@ -64,7 +64,20 @@ posts photographs constantly.
      all-or-nothing choice ([33](33-managing-a-strand.md)). What other members hold is theirs and is
      unaffected.
 
-### Alternative Path E: a voice message
+### Alternative Path E: bigger than this phone
+
+5.1. The cycling group's whole history is larger than Mike's phone is prepared to give it.
+5.2. His phone keeps what it can and leans on the rest of the strand for the remainder. That is how
+     the platform works rather than a fault, and nothing is lost by it.
+5.3. What it means for Mike is **waiting**, not absence. Asking for something old fetches it, so it
+     may take a moment where everything else has been instant. Nothing has gone missing.
+5.4. If he is cut off, or the strand is carried only by two phones that between them do not hold it,
+     the fetch cannot happen. He is told the past cannot be reached at the moment — never shown an
+     empty gallery as though nothing were there.
+5.5. He can trim deliberately instead of having it decided for him, and can see that adding a machine
+     of his own would let him keep more. → [42](42-staying-connected.md)
+
+### Alternative Path F: a voice message
 
 1.1. Mike gets a voice message rather than something to look at.
 1.2. He can play it, move around inside it, and carry on doing something else while it plays.
@@ -81,6 +94,12 @@ posts photographs constantly.
 - [ ] An attachment can be passed out of the app through the device's ordinary sharing, and the app
       makes no claim to govern it afterwards
 - [ ] An attachment still arriving is distinguishable from one that has failed, and blocks nothing
+- [ ] Fetching older content shows as waiting, and is never presented as an empty result
+- [ ] Content that cannot be fetched is reported as unreachable, and never as deleted or absent
+- [ ] A strand whose history exceeds what the user's machines can hold surfaces that as a condition
+      they can act on, never as silent loss
+- [ ] The user can trim deliberately, and is told that a more capable machine in their cadre would
+      let them keep more
 - [ ] One that cannot be completed says so, and can be asked for again
 - [ ] A file the device cannot display is handed to something that can, or plainly reported as
       unopenable — never shown as broken
@@ -108,6 +127,8 @@ until it does.
 Alt D assumes a member can drop media they are holding without weakening the strand for everybody
 else. Since members are also replicas, that may not be true — whether an app can free space without
 degrading what the strand can still serve is a platform question worth asking before this is built.
+It is the same question Alt E raises from the other side: a phone that keeps less is a phone the
+strand can lean on less. Partial locality is recorded in `specs/domain/overview.md`.
 
 Any limit on the size of an attachment is the **user's setting**, not a rule handed down
 ([20](20-sending-media.md)).

@@ -442,6 +442,10 @@ into StrandDetail. The larger change is that the root screen stops being a conta
 
 ## F. Domain contract impact
 
+**Done:** `overview.md` gained a *Partial locality* section and `interfaces.md` two error surfaces
+(*content not held locally*, *local capacity reached*). `schema.md` gained the ordering placeholder
+and lost `Message.Status`.
+
 Group support breaks one thing outright, which should be fixed before stories are drafted against it.
 
 - [ ] **`ops.md` `Strands.list()` assumes exactly one partner.** It returns `displayName: partner's
@@ -632,6 +636,7 @@ as though this were all operative and will mislead anyone who reads it alone.
 | Sending while unreachable **is** meant to be a local write, not an outbox — the phone holds the strand. Optimystic short-circuits consensus for a solo node and `strand-backfill.ts` catches up blocks written alone. But `CadreNode` hardcodes a cluster size that makes the solo path unreachable | `optimystic/docs/optimystic.md:40-50`, `cadre-consistency.md:26-28`, [sereus#2](https://github.com/gotchoices/sereus/issues/2) | Stories [04](04-our-first-conversation.md) and [11](11-writing-a-message.md) are written for the intended behaviour: no pending state, no outbox. If #2 and the single-holder-block defect do not clear, the failure path becomes the common one |
 | No message ordering, no HLC or causal delivery for sApp data; timestamps self-asserted | `chat-simple.qsql`, `cadre-consistency.md` (unimplemented) | Ordering is ours to solve and cannot be solved well |
 | Every strand is a separate libp2p node; `realtime` latency hint means never hibernating | `architecture.md:735-750, 724-733` | 50 strands = 50 nodes. Responsiveness and battery are in direct tension |
+| **Partial locality** — a device holds only what it can and leans on the cohort for the rest; strand blocks replicate to a subset by design | `cadre-consistency.md:22` | **Not a correctness problem** — Quereus queries find everything; partial locality costs latency and availability. Reads may block while blocks are fetched, or fail when nothing holding them is reachable, and must never render as an empty result. A strand carried only by phones may not hold its whole history between them. Recorded in `specs/domain/overview.md`; affects [10](10-catching-up.md), [21](21-receiving-media.md), [32](32-finding-something.md), [42](42-staying-connected.md) |
 | No cross-strand search, and most strands hibernate | `architecture.md:690, 735-750` | [32](32-finding-something.md) must wake every strand, not merely iterate |
 | Deleting the control `Strand` row destroys the party's only copy of `MemberPrivateKey` | `architecture.md:1433`, `debt-strand-tombstone-reap.md` | [33](33-managing-a-strand.md)'s "forget entirely" needs the same guard `cadre strand remove --yes` has |
 | Cross-party strand discovery is unsolved; cohorts today are one party's machines | `strands.md:115-129` | Replication breadth buys machine redundancy, not party redundancy |
