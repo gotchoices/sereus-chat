@@ -44,8 +44,10 @@ Settled positions:
   library, and likely requires at least one participant to run a full-time cadre node. The story
   stays in the set (numbered `90`) so the objective isn't lost, but it is not developed until the
   messaging surface is done.
-- **Forwarding between strands is in scope.** Cross-strand by nature, and the natural payoff of
-  managing many strands.
+- **Forwarding between strands is out of scope**, having been drafted and then dropped. A strand
+  boundary is a real boundary and the app builds no door through it; copy and paste is the crossing,
+  and it makes the carrier the author. The app does not police a strand's contract and does not nag
+  — it declines to *facilitate*, which is a different thing. See index.md's deferrals.
 - **Cadre management — out of scope as a story subject.** Chat renders a sereus-provided component
   (`src/cadre-ui/`). One brief story (`42`) covers only what a chat user perceives; it must not
   specify cadre UI.
@@ -72,7 +74,6 @@ and accepted it) → **revised** (changed after review).
 | 13 | [Correcting a message](13-correcting-a-message.md) | revised | review — no edit history, no time limit, no tombstone |
 | 20 | [Sending media](20-sending-media.md) | renamed | trim; pair with 21 |
 | 21 | [Receiving media](21-receiving-media.md) | drafted | review — viewing, keeping, the strand's collection, storage cost |
-| 22 | [Forwarding a message](22-forwarding-a-message.md) | stub | draft |
 | 30 | [My strands](30-my-strands.md) | renamed | reframe from contacts to strands; drop the email-disclosure claim |
 | 31 | [Who's in this strand](31-whos-in-this-strand.md) | drafted | review — the membership hub; state is legible, history is not recorded |
 | 32 | [Finding something](32-finding-something.md) | renamed | reconcile with "no global index" |
@@ -235,7 +236,10 @@ sereus internals.
    conversation, saving to the camera roll, or a per-conversation media gallery — the last of which
    32-finding-something.md Alt B already gestures at.
 
-8. **Forwarding between strands.** Confirmed in scope. Pick a message, choose one or more other
+8. ~~**Forwarding between strands.**~~ **Dropped.** Drafted as story 22, then cut — the app builds
+   no door across a strand boundary. The insight worth keeping is now in
+   `specs/domain/overview.md`: attribution cannot survive the crossing. Original scope was to pick
+   a message, choose one or more other
    strands, send it on — with the question of whether the original sender is attributed, and what
    the user is told about re-sharing something from a private conversation.
 
@@ -313,7 +317,6 @@ without re-explaining it. Excluded from the index, like taleus's.
 |---|-------|--------|
 | 20 | Sending media | revise `sending-media.md` (trim, add Variants) |
 | 21 | Receiving media | **new** — viewer, save, conversation gallery (C.7) |
-| 22 | Forwarding a message | **new** — cross-strand, attribution, re-sharing (C.8) |
 
 ### 30–33 Strands and housekeeping
 | # | Story | Source |
@@ -350,7 +353,6 @@ that already exist.
 | **StrandDetail** | 30, 31, 33 | Member list, managers, whether it can grow, add-member entry, mute, leave, archive. Replaces the never-built "view Sarah's profile details" of 30-my-strands.md Alt D, generalized from a person to a strand. Tapping a member must not imply a private chat *or a direct invitation* — neither exists. There is no "Delete strand" unless you are the last member. |
 | **MediaViewer** | 21 | Full-screen attachment view, zoom, swipe, save. `MediaPicker` is only a *source chooser* — it does not cover consumption. |
 | **StrandMedia** | 21, 32 | Per-strand media grid, already implied by 32-finding-something.md Alt B. Could be a tab within StrandDetail rather than its own route. |
-| **ForwardTo** | 22 | Multi-select strand picker. |
 | **Settings** | 41 | Nothing exists. Push from Profile, or promote Profile to sit under it. |
 | **Alerts** | C.11 | Already coded and routed; needs story + spec + an entry in `screens/index.md` to stop being an orphan. |
 
@@ -366,7 +368,8 @@ that already exist.
 - **ChatInterface** — sender name + avatar on incoming bubbles for groups, header showing member
   count with an entry to StrandDetail, `@`-mention entry and highlighting, quote-reply bar,
   reactions, unread divider, jump-to-latest, date separators and sender grouping, draft
-  persistence, failed-send affordance, selection mode for forwarding.
+  persistence, failed-send affordance, and text selection — for copying
+  ([11](11-writing-a-message.md)), not for forwarding.
 - **InvitationGenerator** — an invitation now belongs to a strand: either a new one (with its
   two-party-vs-growable choice) or an existing one being grown. Also lists outstanding invitations.
 - **ProfileSetup** — broadened by 40; unchanged with respect to cadre, which stays a pushed
@@ -483,7 +486,10 @@ Group support breaks one thing outright, which should be fixed before stories ar
 - [x] ~~Group strands~~ — **supported from inception.** Permission structure comes from sereus:
       *n* managers per private strand, a manager may grant invite rights (Appendix). Stories show a
       user meeting these rules; they do not define them.
-- [x] ~~Forwarding~~ — **in scope**, story 22.
+- [x] ~~Forwarding~~ — **dropped after drafting.** The app builds no door across a strand boundary;
+      copy and paste is the crossing, and it makes the carrier the author. Not policing the
+      contract, not nagging — declining to facilitate. Sharing onward for its own sake belongs to a
+      future social capability.
 - [x] ~~Reply vs. threading~~ — **quote-reply plus `@`-mentions**; threading out of scope. Groups
       make quote-reply necessary and threading a different screen model than we want.
 - [x] ~~Does a new member see history from before they joined?~~ — **yes**, and it is not a

@@ -36,6 +36,24 @@ Consequences the app must be built for, not around:
   increases what they can keep, and so how much is reachable without waiting on anybody. This is one
   of the few places where the cadre becomes concretely worth having.
 
+## Strands do not connect to each other
+
+A strand is its own database, its own network and its own set of members. Nothing is shared between
+two strands, including by a person who is in both.
+
+The consequence that matters for design: **attribution cannot survive a crossing.** Inside its own
+strand a message is signed by its author and checkable by every member. Copied into another strand
+it is not — the people there cannot resolve who the author is, hold no membership in common with
+them, and share nothing that would let them verify anything. What arrives is one member's claim
+about what somebody elsewhere said.
+
+The app therefore provides no mechanism for moving content between strands. Carrying something
+across is done by hand — copy the text, paste it, say where it came from — which makes the carrier
+the author and the claim visibly theirs. This is not the app policing a strand's contract, which may
+pledge confidentiality in human language nothing here can read; it is the app declining to build a
+one-tap path for something it means to be deliberate. Attachments cross the same way: saved out to
+the device, attached in.
+
 ## Data Ownership
 
 - **Local (device/cadre)**: Profile data (name, avatar, notes). Not shared by default.

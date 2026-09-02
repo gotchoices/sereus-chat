@@ -34,7 +34,6 @@ planned story; it states the topic and what it must cover.
 | 13 | [Correcting a message](13-correcting-a-message.md) | drafted |
 | 20 | [Sending media](20-sending-media.md) | renamed, awaiting revision |
 | 21 | [Receiving media](21-receiving-media.md) | drafted |
-| 22 | [Forwarding a message](22-forwarding-a-message.md) | stub |
 | 30 | [My strands](30-my-strands.md) | renamed, awaiting revision |
 | 31 | [Who's in this strand](31-whos-in-this-strand.md) | drafted |
 | 32 | [Finding something](32-finding-something.md) | renamed, awaiting revision |
@@ -58,6 +57,16 @@ Decisions, not gaps:
   non-sereus library, and likely needs at least one participant running a full-time cadre node.
   Group calling is a further question and is not assumed.
 - **Threading** — quote-reply and `@`-mentions instead (12). Threading is a different screen model.
+- **Forwarding between strands** (was 22, drafted then dropped) — **a strand boundary is a real
+  boundary, and the app builds no door through it.** Carrying something across is done by hand:
+  select the text, paste it, say where it came from. It then reads as what it is — your claim, in
+  your words. Two reasons. A strand's contract may pledge confidentiality in human language the app
+  cannot read, so any warning it offered would imply an assessment it is not qualified to make, and
+  its silence would imply an all-clear. And the app should not build a one-tap path for the very
+  thing it exists to make deliberate. It does not police the contract and does not nag; it declines
+  to *facilitate*, which is a different thing. Attachments cross the same way — save out, attach in
+  ([21](21-receiving-media.md), [20](20-sending-media.md)). Sharing things onward for its own sake
+  belongs to a future social capability, not to this app.
 - **Cadre management** — sereus's to design. The app renders a component it does not own; story 42
   covers only what a user perceives.
 - **Web and desktop** — stories are per-target. `design/stories/web/` is a separate future effort.
