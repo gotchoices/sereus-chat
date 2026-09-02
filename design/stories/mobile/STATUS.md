@@ -79,7 +79,7 @@ and accepted it) → **revised** (changed after review).
 | 32 | [Finding something](32-finding-something.md) | renamed | reconcile with "no global index" |
 | 33 | [Managing a strand](33-managing-a-strand.md) | revised | review — mute / leave / forget, plus being removed |
 | 40 | [My profile](40-my-profile.md) | drafted | review |
-| 41 | [Settings](41-settings.md) | stub | draft |
+| 41 | [Settings](41-settings.md) | drafted | review — short by design; per-device; no privacy section |
 | 42 | [Staying connected](42-staying-connected.md) | stub | draft, briefly |
 | 90 | [Voice and video call](90-voice-and-video-call.md) | parked | after messaging |
 
@@ -267,7 +267,7 @@ sereus internals.
     to establish that pending invitations are visible, attributable to a strand, and can be
     re-shared or abandoned.
 
-13. **Settings has no story and no screen.** Theme (light/dark is fully implemented per
+13. ~~**Settings has no story and no screen.**~~ **Story done (41); the screen is still §E.** Theme (light/dark is fully implemented per
     `specs/mobile/STATUS.md`), language (`global/i18n.md` exists), notification preferences —
     including per-strand notification level, which groups make necessary rather than nice.
 

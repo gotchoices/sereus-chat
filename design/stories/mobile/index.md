@@ -39,7 +39,7 @@ planned story; it states the topic and what it must cover.
 | 32 | [Finding something](32-finding-something.md) | renamed, awaiting revision |
 | 33 | [Managing a strand](33-managing-a-strand.md) | drafted |
 | 40 | [My profile](40-my-profile.md) | drafted |
-| 41 | [Settings](41-settings.md) | stub |
+| 41 | [Settings](41-settings.md) | drafted |
 | 42 | [Staying connected](42-staying-connected.md) | stub |
 | 90 | [Voice and video call](90-voice-and-video-call.md) | parked |
 
