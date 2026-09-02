@@ -68,7 +68,7 @@ and accepted it) → **revised** (changed after review).
 | 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | revised | review — refusals, promotion, removal |
 | 10 | [Catching up](10-catching-up.md) | revised | review — hard and soft mute; no receipts |
 | 11 | [Writing a message](11-writing-a-message.md) | drafted | review — drafts, unsent messages, no link fetching |
-| 12 | [Replying and mentioning](12-replying-and-mentioning.md) | stub | draft |
+| 12 | [Replying and mentioning](12-replying-and-mentioning.md) | drafted | review — quote-reply, mentions resolve to members, reactions |
 | 13 | [Correcting a message](13-correcting-a-message.md) | revised | review — no edit history, no time limit, no tombstone |
 | 20 | [Sending media](20-sending-media.md) | renamed | trim; pair with 21 |
 | 21 | [Receiving media](21-receiving-media.md) | stub | draft |
@@ -201,13 +201,13 @@ sereus internals.
    out yet looks like and how to retry it. `screens/chat-interface.md` already promises an
    "Error: inline banner with retry" that no story describes. Drafts matter more with many strands.
 
-3. **Reply, quote, and mentions.** `screens/chat-interface.md` already specifies "Long-press others'
+3. ~~**Reply, quote, and mentions.**~~ **Done — story 12 is drafted.** `screens/chat-interface.md` already specifies "Long-press others'
    message → reply/copy menu". The screen has it; no story does. Groups settle the open question in
    favor of **quote-reply** — with several people talking, replying to a specific message is how a
    conversation stays legible, and `@`-mentions become the mechanism that makes notifications
    bearable. Full threading remains out.
 
-4. **Reactions.** 03-respond-to-an-invitation.md step 7.3 mentions emoji in passing; 20-sending-media.md has Mike
+4. ~~**Reactions.**~~ **Done — covered by story 12.** 03-respond-to-an-invitation.md step 7.3 mentions emoji in passing; 20-sending-media.md has Mike
    answering with a thumbs-up. Neither says whether that's a reaction or just a message containing
    an emoji. Reactions scale better than messages in a group — worth promoting out of "future".
 

@@ -30,7 +30,7 @@ planned story; it states the topic and what it must cover.
 | 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | drafted |
 | 10 | [Catching up](10-catching-up.md) | drafted |
 | 11 | [Writing a message](11-writing-a-message.md) | drafted |
-| 12 | [Replying and mentioning](12-replying-and-mentioning.md) | stub |
+| 12 | [Replying and mentioning](12-replying-and-mentioning.md) | drafted |
 | 13 | [Correcting a message](13-correcting-a-message.md) | drafted |
 | 20 | [Sending media](20-sending-media.md) | renamed, awaiting revision |
 | 21 | [Receiving media](21-receiving-media.md) | stub |
