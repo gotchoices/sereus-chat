@@ -80,7 +80,7 @@ and accepted it) → **revised** (changed after review).
 | 33 | [Managing a strand](33-managing-a-strand.md) | revised | review — mute / leave / forget, plus being removed |
 | 40 | [My profile](40-my-profile.md) | drafted | review |
 | 41 | [Settings](41-settings.md) | drafted | review — short by design; per-device; no privacy section |
-| 42 | [Staying connected](42-staying-connected.md) | stub | draft, briefly |
+| 42 | [Staying connected](42-staying-connected.md) | drafted | review — deliberately vague; the screen is a shared component |
 | 90 | [Voice and video call](90-voice-and-video-call.md) | parked | after messaging |
 
 **Coverage assessment (non-sereus content only):** the set covers the *sender's* side of a classic
