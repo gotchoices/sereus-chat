@@ -102,3 +102,8 @@ Public strands are offered at creation but not developed this round (`STATUS.md`
 invitation lost before anyone takes it up leaves a strand that cannot be added to; the practical
 answer is to abandon it and start another, which this story should make an easy thing to do rather
 than a dead end to discover.
+
+Step 3's choice is user-observable and stands, but the platform seats a member from a bearer
+invitation and confers the ability to invite by a separate signed act. Whether "invited as someone
+who can invite" can be applied without a manager being present at the moment they join is worth
+checking — if not, the grant may lag the arrival, which the story would have to show.

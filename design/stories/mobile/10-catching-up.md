@@ -100,6 +100,7 @@ is no delivered or read state, and none is tracked. A reply is the evidence that
 that is the whole of it. `specs/domain/schema.md`'s `Status` column is to be removed (`STATUS.md`
 §F).
 
-Keeping read position consistent across a user's own devices is treated here as a plain expectation.
-Whether that is cheap or expensive depends on where such state lives — see
-[42](42-staying-connected.md).
+Keeping read position consistent across a user's own devices is treated here as a plain expectation,
+and it currently has **nowhere to live**: an sApp table would publish it to every member, and the
+party-private store that has the right audience has a closed schema (`STATUS.md` §G, question 2).
+The expectation stands; the home for it is an open question.

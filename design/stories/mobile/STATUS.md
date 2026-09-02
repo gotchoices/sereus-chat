@@ -501,7 +501,10 @@ Group support breaks one thing outright, which should be fixed before stories ar
       using it normally. Milder than we assumed — not inoperable. See the Appendix.
       Corrects stories 31 and 33 and the §F contract items.
 - [x] ~~Is "just us two, forever" a declared property, visible at formation?~~ — **it is achieved,
-      not declared.** There is no size setting. A strand is private or public at creation; a manager
+      not declared**, by every manager giving up the ability. Briefly reopened by the source review,
+      which found the last manager cannot currently resign (`MinOneManager`); the capability is
+      confirmed as coming, so the design stands. Re-check the *verifiability* of zero managers when
+      it lands — that is the part our stories lean on. There is no size setting. A strand is private or public at creation; a manager
       may invite at any time; each invitation says whether its holder also becomes a manager; and a
       manager may resign. "Just us two, forever" is: create, invite one non-manager, resign. With
       nobody holding manager rights the strand can never grow. theory.md's claim survives, but the
@@ -535,28 +538,146 @@ Group support breaks one thing outright, which should be fixed before stories ar
       stories make it intuitive rather than assuming it (§A). One word across app, stories and
       specs, which also propagates the sereus vocabulary instead of translating it away.
 
+### Findings from reading the sereus source (2026-09-01)
+
+Reviewed `ser/sereus` at `Optimystic & Quereus upgrade` (2026-08-31): `docs/`, `schemas/*.qsql`,
+`packages/cadre-core`, `tickets/`. Evidence order: schema and implementation over prose docs.
+`packages/strand-proto` is deprecated and stale — ignore it.
+
+#### Confirmed as roadmap, not blockers
+
+Two of the findings below were checked with the maintainer and are **coming**, though absent from
+the current source. We are designing chat around the platform as intended, not as it stands today,
+so the stories that depend on them **stand as written**:
+
+- **Zero managers as a deliberate, verifiable state.** The settled strand survives, and with it
+  theory.md's central claim, [02](02-start-a-strand.md) Alt A, [05](05-add-someone-to-a-strand.md)
+  Alt D, and the three-state indicator in §E.
+- **Private nicknames**, and eventually cross-sApp grouping by screen name (§C.10).
+
+The finding below is recorded as it was found, against today's source.
+
+#### The constraint in today's source
+
+**A closed strand can never deliberately reach zero managers.** `schemas/strand.qsql:393-395`
+(`Manager.MinOneManager`) rejects any delete leaving no managers — including the sole manager's own
+resignation. The last manager cannot resign; managership is a permanent obligation for at least one
+person. Zero managers is reachable **only by accident** (see below), and is indistinguishable from
+one.
+
+**Resolved as roadmap** (above): the capability is coming, so the settled strand stays in our
+design. Worth re-checking when it lands, since the shape of the guarantee — in particular whether an
+invitee can *verify* zero managers before joining — is what our stories lean on.
+
+Two further findings compound it:
+
+- **Removal does not actually cut anyone off.** A closed strand's read gate is a single shared
+  `MemberPrivateKey` handed to every joiner (`schemas/control.qsql:130-131`). A removed member keeps
+  it and keeps everything already replicated; `docs/strands.md:285-288` concedes that rotating the
+  gate "currently means re-forming the strand" — new id, new network, no history. So "put the
+  stranger out" ([05](05-add-someone-to-a-strand.md) Alt F) has no implementation behind it.
+- **A removed member holding an unspent invitation re-admits itself.** Invitations are bearer
+  tokens, removal does not cancel them, and no gate checks that the issuer is still a manager
+  (`docs/strands.md:302-304`, `schemas/strand.qsql:80-103`).
+
+#### The layer our stories assume is not switched on
+
+The whole `Member`/`Manager`/`Invite` model is implemented and tested but **unused by any production
+path**. Every joiner of a closed strand is handed the *founding* member key, so all parties present
+the same identity (`tickets/backlog/feat-strand-party-identity.md`;
+`packages/reference-app-rn/src/chat-strand.ts:179-198`). Today there is no per-party identity, no
+real distinction between a manager and a member, and no sender attribution. `docs/strands.md` reads
+as though this were all operative and will mislead anyone who reads it alone.
+
+#### What was confirmed as we assumed
+
+- Any manager can remove any other manager; **no generation gate, nothing privileges the founder**
+  (`strand.qsql:340-345, 450-460`).
+- A manager can promote an existing member (`addManager`), and can demote without removing.
+- A sole manager is unremovable; promoting a second makes the first removable immediately.
+- Open strands have **no managers and no members at all** — by schema, `Member`/`Manager`/`Invite`
+  are all `OnlyClosed`. No invitations, no removal, no leaving, no rejoining; the concepts do not
+  exist. (Stronger than we assumed, and consistent with our story.)
+- Invitations are single-use bearer tokens, optionally expiring, cancellable.
+- No delivery or read status anywhere — our decision to drop the column matches the platform.
+- No per-member history scoping; every member holds everything.
+- Strand titles are the app's to own; sereus has no metadata slot for them.
+
+#### What we assumed that is not so
+
+- **An invitation cannot carry manager status.** There is no "join as manager" invite. Manager
+  status is conferred only by a live manager signing a promotion, though `admitManager` does
+  admit-and-promote in one transaction. Story [02](02-start-a-strand.md) step 3 and
+  [05](05-add-someone-to-a-strand.md) need rewording — the *effect* is reachable, the mechanism is
+  not what we wrote.
+- ~~Private nicknames are not in sereus~~ — **confirmed as roadmap**; not in the current source.
+  §C.10 stands.
+- **There is no home for private per-user state.** Read position ([10](10-catching-up.md)) would be
+  public in an sApp table, and the control DB — which has exactly the right replication, party-wide
+  and private — has a **fixed, closed schema with no app-extension table**. Story 10's "the same
+  wherever I'm looking from" has nowhere to live.
+
+#### Hazards a chat app inherits
+
+| Issue | Evidence | Bearing on us |
+|-------|----------|---------------|
+| Zero-manager permanent freeze via partition — `MinOneManager` counts *locally visible* rows, so two partitioned nodes each removing a different manager converge to zero, unrecoverably | `strand.qsql:389-392`, `strands.md:291-297` | The accidental version of the state we *want* deliberately |
+| Concurrent same-PK insert silently last-writer-wins, **both writers told they succeeded** | `tickets/blocked/optimystic-concurrent-same-pk-insert-silent-lww.md`, repro verified | Message loss. `chat-simple.qsql` uses client UUIDs to dodge it |
+| A block written while only one machine holds it can be unreadable by others | `tickets/blocked/block-held-by-only-one-machine-is-unreadable.md`, verified, still ~1-in-5 as of 2026-08-24 | Two phones, no always-on node = messages can vanish |
+| No store-and-forward; sync is pull-on-read | `architecture.md:713` | If both parties are asleep phones, nothing moves. [04](04-our-first-conversation.md) Alt B assumes it eventually arrives |
+| No message ordering, no HLC or causal delivery for sApp data; timestamps self-asserted | `chat-simple.qsql`, `cadre-consistency.md` (unimplemented) | Ordering is ours to solve and cannot be solved well |
+| Every strand is a separate libp2p node; `realtime` latency hint means never hibernating | `architecture.md:735-750, 724-733` | 50 strands = 50 nodes. Responsiveness and battery are in direct tension |
+| No cross-strand search, and most strands hibernate | `architecture.md:690, 735-750` | [32](32-finding-something.md) must wake every strand, not merely iterate |
+| Deleting the control `Strand` row destroys the party's only copy of `MemberPrivateKey` | `architecture.md:1433`, `debt-strand-tombstone-reap.md` | [33](33-managing-a-strand.md)'s "forget entirely" needs the same guard `cadre strand remove --yes` has |
+| Cross-party strand discovery is unsolved; cohorts today are one party's machines | `strands.md:115-129` | Replication breadth buys machine redundancy, not party redundancy |
+| Strand contracts are design-stage, nothing implemented, no ticket | `docs/strand-contracts.md:3` | theory.md's "agreements can carry consequences" has nothing behind it yet |
+| No attachment/blob strategy — no chunking, resumability or dedup | no ticket found | [20](20-sending-media.md)/[21](21-receiving-media.md) assume media works |
+| `docs/api.md` §§1–2 stale; `push-network.md`, `cadre-consistency.md`, `strand-contracts.md` all design-stage | each says so at the top | Do not treat these as descriptions of what exists |
+
 ### Open questions for sereus
 
-Raised by the story work and not answerable here. Worth taking upstream together.
+Narrowed twice: first by the source review, then by confirming that leaderless strands and private
+nicknames are both coming. What remains are things nothing in the source or the roadmap yet covers.
 
-1. **Can two managers give up the ability together?** Whoever resigns first can no longer remove
-   the other, while the other can still remove them. Somebody must go first on trust unless the
-   platform can coordinate it. Story 05 Alt D says so honestly; this would soften it.
-2. **Can a manager be demoted by another manager**, as distinct from removed? Resignation is
-   self-demotion, and promotion exists, so the missing half is whether the ability can be taken
-   rather than given up. Removal is the blunt substitute and costs the member their place.
-3. **Is removal recorded and visible**, the way arrival and resignation are? Story 05 assumes every
-   member sees somebody put out, as they see somebody arrive.
-4. **Can a removed member be invited back, and do they return as themselves?** Probably the same
-   question as leaving and returning: it turns on whether they kept the key. Affects 05 and 33.
-5. **Can a removed member be told they were removed?** Story 33 says they should be, rather than
-   inferring it from a conversation that stops. Whether the platform can deliver that notice to
-   somebody it has just cut off is a real question.
-6. **Can a member leave a public strand, and rejoin?** Nobody can remove them, but leaving should
-   still be their own act, and rejoining is presumably open to anyone holding the link.
-7. **Does a sole manager have any protection?** With one manager nobody can remove them and everyone
-   else is at their discretion; promoting a second makes the first removable. Adding a manager
-   therefore reduces your own security, which is worth confirming is really the intent.
+**Blocking a story we have drafted**
+
+1. **Does removal revoke read access, in the intended design?** Today it cannot — the read gate is a
+   single shared member key the removed party keeps, and rotating it means re-forming the strand.
+   [05](05-add-someone-to-a-strand.md) Alt F says "nothing further reaches them", which is the
+   evident intent of having ejection at all. Does per-member keying arrive with the leaderless work,
+   or separately? Related: a removed member holding an unspent bearer invitation currently re-admits
+   itself, since removal cancels nothing.
+2. **Where does private per-user state live?** Read position ([10](10-catching-up.md)) needs to
+   replicate across a party's own devices and be invisible to other members. The control DB has
+   exactly those properties and a closed schema; an sApp table has the wrong audience. Nothing else
+   fits.
+3. **Is message ordering ours to solve?** No HLC, no causal delivery, no server clock — and
+   timestamps are self-asserted. Every messaging story assumes a conversation has an order. This is
+   the most fundamental thing a chat app needs that the platform does not offer.
+4. **Is there a plan for attachments?** No chunking, resumability or dedup; media would be rows
+   replicated as ordinary blocks. [20](20-sending-media.md) and [21](21-receiving-media.md) assume
+   media works.
+
+**Shapes a decision, not blocking**
+
+5. **When does per-party identity land** (`feat-strand-party-identity`)? Until it does there is no
+   sender attribution at all, so no group story is testable end to end. Presumably the same wave as
+   the leaderless work — worth confirming they ship together.
+6. **Are strand contracts on the roadmap?** Design-stage, no ticket. theory.md says agreements can
+   carry consequences; nothing backs that yet.
+7. **Can a removed member be told they were removed?** Still uncontemplated, and entangled with
+   question 1.
+8. **Is cross-party strand discovery coming?** Cohorts today are one party's machines, so
+   replication breadth buys machine redundancy and no party redundancy — which is what
+   [04](04-our-first-conversation.md) Alt B and [42](42-staying-connected.md) quietly rely on.
+
+**Known and accepted for now**
+
+Reliability hazards from the review — silent last-writer-wins on concurrent same-PK inserts,
+single-holder blocks that can be unreadable, no store-and-forward — are platform defects with
+verified repros rather than design questions. They do not change any story. They do mean the app
+cannot be trusted end to end until they clear, and they strengthen the case
+[42](42-staying-connected.md) makes for a party having something always on.
 
 ## H. Explicitly not in scope
 
