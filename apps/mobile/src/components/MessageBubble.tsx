@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   quoteGone: { fontStyle: 'italic' },
   attachment: { marginBottom: 2 },
   metaRow: { flexDirection: 'row', gap: spacing[1], alignSelf: 'flex-end' },
-  reactions: { flexDirection: 'row', gap: 4, marginTop: 2 },
+  reactions: { flexDirection: 'row', gap: 4, marginTop: -6, paddingHorizontal: spacing[1] },
   reaction: {
     paddingHorizontal: 6,
     paddingVertical: 1,

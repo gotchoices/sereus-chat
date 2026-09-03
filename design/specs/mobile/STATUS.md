@@ -30,21 +30,52 @@ All 13 active routes have a spec and a consolidation as of 2026-09-02, regenerat
 
 | Route | spec | cons | code | Note |
 |-------|------|------|------|------|
-| StrandList | ✓ | ✓ | — | replaces ConnectionsList |
-| ChatInterface | ✓ | ✓ | ~ | code exists, predates the rewrite |
-| StrandDetail | ✓ | ✓ | — | new |
-| StrandMedia | ✓ | ✓ | — | new |
-| MediaViewer | ✓ | ✓ | — | new |
-| MediaPicker | ✓ | ✓ | ~ | code exists, predates |
-| SearchInterface | ✓ | ✓ | ~ | spec written; search is now progressive |
-| InvitationGenerator | ✓ | ✓ | ~ | gains strand kind + invite rights |
-| InvitationAcceptance | ✓ | ✓ | ~ | gains the strand's terms before accepting |
-| QrScanner | ✓ | ✓ | ~ | stub code |
-| Profile | ✓ | ✓ | — | replaces ProfileSetup |
-| Settings | ✓ | ✓ | — | new |
+| StrandList | ✓ | ✓ | ✓ | renders: sections, precedence, sort, empty + error |
+| ChatInterface | ✓ | ✓ | ✓ | renders: grouping, quote-reply, reactions, attachments |
+| StrandDetail | ✓ | ✓ | ✓ | renders: status card, members, the ladder |
+| StrandMedia | ✓ | ✓ | ✓ | renders: grid, filters, all three localities |
+| MediaViewer | ✓ | ✓ | ✓ | built, not yet examined on device |
+| MediaPicker | ✓ | ✓ | ✓ | pre-existing; two type defects fixed |
+| SearchInterface | ✓ | ✓ | ✓ | streaming consumer; renders idle |
+| InvitationGenerator | ✓ | ✓ | ✓ | renders: private/public, invite-rights |
+| InvitationAcceptance | ✓ | ✓ | ✓ | pre-existing; route names fixed |
+| QrScanner | ✓ | ✓ | ✓ | pre-existing; permission mapping fixed |
+| Profile | ✓ | ✓ | ✓ | renders: shared vs device-local |
+| Settings | ✓ | ✓ | ✓ | renders: four sections |
 | CadreManager | ✓ | ✓ | ✓ | component-provided; integration only |
 | VideoCallActive | — | — | — | **parked**, story 90 |
 | VoiceCallOverlay | — | — | — | **parked**, story 90 |
+
+### Reviewed on device (Android emulator, mocks, 2026-09-02)
+
+Found and fixed while looking at real screens:
+
+- **A mention could not surface a soft-muted strand.** The "muted strands are not promoted by
+  traffic" rule was over-applied: a soft mute exists precisely to let a mention through, so only a
+  *hard* mute now holds its place regardless.
+- **Local files and voice notes were labelled "Not reachable right now"** in the media grid — the
+  exact confusion `overview.md` forbids. A local item with no thumbnail is simply here.
+- **Attachments were not rendered in the conversation at all.**
+- **The footer was not pinned** when the list was replaced by a banner or empty state.
+- **A variant deep link changed the variant but nothing re-read it.** The navigator is now keyed on
+  the variant, so a mock deep link remounts the tree without screens knowing variants exist.
+- Draft was announced twice (badge and preview); the badge went.
+- Media filter chips showed raw keys (`image`, `video`).
+
+Still to examine on device: MediaViewer, InvitationAcceptance, QrScanner, CadreManager, and the
+error/empty variants of the strand-scoped screens.
+
+### Deep links for review
+
+The manifest registers `chat://` (and now `sereus://`, which needs a native rebuild to take effect).
+Variants work on any route:
+
+```
+chat://strands?variant={happy|empty|error}
+chat://strand/s-cycling            chat://strand/s-cycling/about
+chat://strand/s-cycling/shared     chat://search
+chat://invite    chat://profile    chat://settings    chat://scan
+```
 
 ### Code lane — what has to go
 

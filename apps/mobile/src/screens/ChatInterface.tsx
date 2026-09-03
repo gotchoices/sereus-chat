@@ -12,14 +12,15 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, FlatList, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, FlatList, Pressable, Image, StyleSheet, Alert,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import {
   listMessages, listMembers, getStrandState, send, deleteMessage, react,
 } from '../data/adapter';
-import type { Message, Member, StrandState } from '../data/types';
+import type { Message, Member, StrandState, Attachment } from '../data/types';
 import { useT } from '../i18n';
 import {
   MessageBubble, EmptyState, Banner, IconButton, Avatar, StrandStatus,
@@ -33,6 +34,32 @@ const GROUP_GAP_MS = 5 * 60 * 1000;
 const dayOf = (iso: string) => new Date(iso).toDateString();
 const clock = (iso: string) =>
   new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+/**
+ * An attachment in a bubble.  `fetching` and `unreachable` are distinct states
+ * and neither is a broken image — a null uri never means the thing is absent
+ * (design/specs/domain/overview.md).
+ */
+function AttachmentView({ a, onPress }: { a: Attachment; onPress: () => void }) {
+  const theme = useTheme();
+  if (a.locality === 'local' && a.uri && (a.type === 'image' || a.type === 'video')) {
+    return (
+      <Pressable onPress={onPress}>
+        <Image source={{ uri: a.uri }} style={styles.attachImage} />
+      </Pressable>
+    );
+  }
+  const label =
+    a.locality === 'fetching' ? 'Coming…'
+      : a.locality === 'unreachable' ? 'Not reachable right now'
+        : a.name ?? a.type;
+  return (
+    <Pressable onPress={onPress}
+      style={[styles.attachChip, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
+      <Text style={[typography.small, { color: theme.textMuted }]} numberOfLines={1}>{label}</Text>
+    </Pressable>
+  );
+}
 
 type Row =
   | { kind: 'message'; msg: Message; showSender: boolean; showMeta: boolean }
@@ -187,6 +214,15 @@ export default function ChatInterface() {
             : null
         }
         reactions={Object.entries(grouped).map(([symbol, v]) => ({ symbol, ...v }))}
+        attachment={
+          m.attachments.length
+            ? m.attachments.map(a => (
+                <AttachmentView key={a.id} a={a}
+                  onPress={() => navigation.navigate('MediaViewer',
+                    { strandId, attachmentId: a.id, setFilter: 'all', title })} />
+              ))
+            : undefined
+        }
         onLongPress={() => messageActions(m)}
       />
     );
@@ -277,4 +313,6 @@ const styles = StyleSheet.create({
   flex1: { flex: 1 },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[1], padding: spacing[2], borderTopWidth: StyleSheet.hairlineWidth },
   input: { flex: 1, maxHeight: 120, minHeight: 38, borderRadius: radius.control, paddingHorizontal: spacing[2], paddingVertical: spacing[1] },
+  attachImage: { width: 200, height: 140, borderRadius: radius.control },
+  attachChip: { paddingHorizontal: spacing[2], paddingVertical: spacing[1], borderRadius: radius.control, borderWidth: StyleSheet.hairlineWidth },
 });

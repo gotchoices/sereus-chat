@@ -31,6 +31,9 @@
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="chat" />
+            <!-- Canonical scheme (design/specs/mobile/navigation.md).  `chat`
+                 is kept as an alias so existing links keep working. -->
+            <data android:scheme="sereus" />
         </intent-filter>
 
         <!-- Android App Link: https://sereus.org/chat/invite/<token>.  With

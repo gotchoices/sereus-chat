@@ -1,8 +1,68 @@
 [
-  { "id": "a-01", "messageId": "m-06", "type": "image", "uri": "mock://route-map.jpg", "mimeType": "image/jpeg", "name": "route-map.jpg", "byteSize": 842000, "durationMs": null, "locality": "local" },
-  { "id": "a-02", "messageId": "m-11", "type": "image", "uri": "mock://emma-goal-still.jpg", "mimeType": "image/jpeg", "name": "emma-goal-still.jpg", "byteSize": 1204000, "durationMs": null, "locality": "local" },
-  { "id": "a-03", "messageId": "m-14", "type": "video", "uri": null, "mimeType": "video/mp4", "name": "saturday-descent.mp4", "byteSize": 48200000, "durationMs": 94000, "locality": "fetching" },
-  { "id": "a-04", "messageId": "m-19", "type": "file", "uri": "mock://proposal-v3.pdf", "mimeType": "application/pdf", "name": "proposal-v3.pdf", "byteSize": 320000, "durationMs": null, "locality": "local" },
-  { "id": "a-05", "messageId": "m-22", "type": "voice", "uri": "mock://note.m4a", "mimeType": "audio/m4a", "name": "Voice message", "byteSize": 180000, "durationMs": 14000, "locality": "local" },
-  { "id": "a-06", "messageId": "m-31", "type": "image", "uri": null, "mimeType": "image/jpeg", "name": "spring-ride-2025.jpg", "byteSize": 990000, "durationMs": null, "locality": "unreachable" }
+  {
+    "id": "a-01",
+    "messageId": "m-06",
+    "type": "image",
+    "uri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAcCAIAAACcd2qBAAAAKklEQVR4nO3NQQkAAAgEsMvtwyhmNYYIg/2Xmj4RsVgsFovFYrFYLP4TL3QQ8JseZMZNAAAAAElFTkSuQmCC",
+    "mimeType": "image/jpeg",
+    "name": "route-map.jpg",
+    "byteSize": 842000,
+    "durationMs": null,
+    "locality": "local"
+  },
+  {
+    "id": "a-02",
+    "messageId": "m-11",
+    "type": "image",
+    "uri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAcCAIAAACcd2qBAAAAKklEQVR4nO3NQQkAAAgEsEtpMDMZzBgiDPZfputExGKxWCwWi8VisfhPvHPBUOoHmYg+AAAAAElFTkSuQmCC",
+    "mimeType": "image/jpeg",
+    "name": "emma-goal-still.jpg",
+    "byteSize": 1204000,
+    "durationMs": null,
+    "locality": "local"
+  },
+  {
+    "id": "a-03",
+    "messageId": "m-14",
+    "type": "video",
+    "uri": null,
+    "mimeType": "video/mp4",
+    "name": "saturday-descent.mp4",
+    "byteSize": 48200000,
+    "durationMs": 94000,
+    "locality": "fetching"
+  },
+  {
+    "id": "a-04",
+    "messageId": "m-19",
+    "type": "file",
+    "uri": "mock://proposal-v3.pdf",
+    "mimeType": "application/pdf",
+    "name": "proposal-v3.pdf",
+    "byteSize": 320000,
+    "durationMs": null,
+    "locality": "local"
+  },
+  {
+    "id": "a-05",
+    "messageId": "m-22",
+    "type": "voice",
+    "uri": "mock://note.m4a",
+    "mimeType": "audio/m4a",
+    "name": "Voice message",
+    "byteSize": 180000,
+    "durationMs": 14000,
+    "locality": "local"
+  },
+  {
+    "id": "a-06",
+    "messageId": "m-31",
+    "type": "image",
+    "uri": null,
+    "mimeType": "image/jpeg",
+    "name": "spring-ride-2025.jpg",
+    "byteSize": 990000,
+    "durationMs": null,
+    "locality": "unreachable"
+  }
 ]

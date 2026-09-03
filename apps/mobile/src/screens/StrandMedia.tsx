@@ -16,6 +16,10 @@ import { Banner, EmptyState, ListRow } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
 type Kind = 'all' | Attachment['type'];
+
+const KIND_LABEL: Record<Kind, string> = {
+  all: 'All', image: 'Photos', video: 'Videos', file: 'Files', voice: 'Voice',
+};
 const MB = 1024 * 1024;
 const size = (b?: number | null) => (b ? (b >= 1024 * MB ? `${(b / (1024 * MB)).toFixed(1)} GB` : `${Math.round(b / MB)} MB`) : '');
 
@@ -48,14 +52,17 @@ export default function StrandMedia() {
     if (a.locality === 'local' && a.uri && (a.type === 'image' || a.type === 'video')) {
       return <Image source={{ uri: a.uri }} style={styles.thumb} />;
     }
-    // Fetching and unreachable are DIFFERENT, and neither is a broken image or
-    // an empty tile.
+    // Three distinct states, and a fourth case that is NOT a state: a local
+    // file or voice note is simply here — it just has no thumbnail.  Labelling
+    // it "not reachable" would tell the user something false.
+    const label =
+      a.locality === 'fetching' ? t('screens.media.fetching', 'Coming…')
+        : a.locality === 'unreachable' ? t('screens.media.unreachable', 'Not reachable right now')
+          : a.name ?? KIND_LABEL[a.type];
     return (
       <View style={[styles.thumb, styles.placeholder, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
-        <Text style={[typography.small, { color: theme.textMuted }]} numberOfLines={2}>
-          {a.locality === 'fetching'
-            ? t('screens.media.fetching', 'Coming…')
-            : t('screens.media.unreachable', 'Not reachable right now')}
+        <Text style={[typography.small, { color: theme.textMuted }]} numberOfLines={3}>
+          {label}
         </Text>
       </View>
     );
@@ -68,7 +75,7 @@ export default function StrandMedia() {
           <Pressable key={k} onPress={() => setKind(k)}
             style={[styles.filter, { borderColor: kind === k ? theme.accent : theme.border }]}>
             <Text style={[typography.small, { color: kind === k ? theme.accent : theme.textMuted }]}>
-              {t(`screens.media.kind.${k}`, k === 'all' ? 'All' : k)}
+              {t(`screens.media.kind.${k}`, KIND_LABEL[k])}
             </Text>
           </Pressable>
         ))}

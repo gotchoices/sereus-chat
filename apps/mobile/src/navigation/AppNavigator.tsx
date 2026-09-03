@@ -73,7 +73,14 @@ export default function AppNavigator() {
       <Stack.Navigator screenOptions={screenOptions}>
         <Stack.Screen name="StrandList" component={StrandList} options={{ title: 'Strands' }} />
         <Stack.Screen name="SearchInterface" component={SearchInterface} options={{ title: 'Search' }} />
-        <Stack.Screen name="InvitationGenerator" component={InvitationGenerator} options={{ title: 'Invite' }} />
+        <Stack.Screen
+          name="InvitationGenerator"
+          component={InvitationGenerator}
+          options={({ route }: any) => ({
+            // Two jobs, one screen — the title says which (navigation.md).
+            title: route?.params?.strandId ? 'Add someone' : 'New strand',
+          })}
+        />
         <Stack.Screen name="InvitationAcceptance" component={InvitationAcceptance} options={{ title: 'Accept Invite' }} />
         <Stack.Screen name="Profile" component={Profile} options={{ title: 'Profile' }} />
         <Stack.Screen name="Settings" component={Settings} options={{ title: 'Settings' }} />

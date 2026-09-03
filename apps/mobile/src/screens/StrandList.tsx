@@ -34,7 +34,8 @@ function when(iso?: string | null): string {
 function indicatorFor(s: StrandSummary): React.ReactNode {
   if (s.mentioned) return <Badge mode="mention" />;
   if (s.unreadCount > 0 && s.muted === 'none') return <Badge mode="count" count={s.unreadCount} />;
-  if (s.draftPreview) return <Badge mode="draft" />;
+  // No draft badge: the row's preview already reads "Draft: …", and saying it
+  // twice is noise.  The slot goes to the mute state instead.
   if (s.muted !== 'none') return <Badge mode="muted" />;
   return undefined;
 }
@@ -77,11 +78,16 @@ export default function StrandList() {
         const bv = b.mentioned ? 1e9 : b.unreadCount;
         return bv - av || a.title.localeCompare(b.title);
       }
-      // Muted strands are NOT promoted by new traffic — they keep their place
-      // rather than jumping the list every time somebody talks.
-      const at = a.muted === 'none' ? Date.parse(a.lastMessage?.timestamp ?? '0') : 0;
-      const bt = b.muted === 'none' ? Date.parse(b.lastMessage?.timestamp ?? '0') : 0;
-      return bt - at;
+      // Muted strands are not promoted by ordinary traffic — they keep their
+      // place rather than jumping the list every time somebody talks.  Being
+      // NAMED is not ordinary traffic: a soft mute exists precisely to let a
+      // mention through, so it must be able to surface the row.  Only a hard
+      // mute stays put no matter what, because that is what was asked for.
+      const rank = (x: StrandSummary) =>
+        x.muted === 'hard' ? 0 : x.mentioned || x.muted === 'none'
+          ? Date.parse(x.lastMessage?.timestamp ?? '0')
+          : 0;
+      return rank(b) - rank(a);
     });
 
     const out: Array<{ title: string | null; data: any[] }> = [];
@@ -120,6 +126,7 @@ export default function StrandList() {
           onPress={() => setSortMode(p => (p === 'recent' ? 'alpha' : p === 'alpha' ? 'unread' : 'recent'))} />
       </View>
 
+      <View style={styles.flex1}>
       {error ? (
         <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: load }} />
       ) : isEmpty ? (
@@ -193,6 +200,7 @@ export default function StrandList() {
           }}
         />
       )}
+      </View>
 
       <View style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.divider }]}>
         <IconButton name="qr-code-outline" size={22} style={styles.flex1}
