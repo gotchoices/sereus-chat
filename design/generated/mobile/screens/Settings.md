@@ -13,6 +13,10 @@ dependsOn:
 
 # Consolidation: Settings
 
+> The human spec (`specs/mobile/screens/settings.md`) **is silent** on this screen: everything
+> below is generation's inference from the stories, and may be overridden there at any
+> time.
+
 ## Purpose
 
 Appearance, language, notification default and storage. Device-scoped.

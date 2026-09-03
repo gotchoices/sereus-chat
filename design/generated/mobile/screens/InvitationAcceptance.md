@@ -12,6 +12,10 @@ dependsOn:
 
 # Consolidation: InvitationAcceptance
 
+> The human spec (`specs/mobile/screens/invitation-acceptance.md`) **is silent** on this screen: everything
+> below is generation's inference from the stories, and may be overridden there at any
+> time.
+
 ## Purpose
 
 Show what an invitation is for, and take accept or decline.

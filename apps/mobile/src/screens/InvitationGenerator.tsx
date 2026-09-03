@@ -7,7 +7,9 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Share, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, Switch, StyleSheet, Share, Alert } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
+import QRCode from 'react-native-qrcode-svg';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { createInvitation, listOutstandingInvitations, cancelInvitation } from '../data/adapter';
 import type { Invitation } from '../data/types';
@@ -28,6 +30,7 @@ export default function InvitationGenerator() {
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [outstanding, setOutstanding] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showQr, setShowQr] = useState(true);   // human spec: default on
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -113,11 +116,28 @@ export default function InvitationGenerator() {
       {invitation ? (
         <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
           <Text style={[typography.small, { color: theme.textMuted }]} selectable>{invitation.url}</Text>
+
+          <View style={styles.qrToggleRow}>
+            <Text style={[typography.small, { color: theme.textPrimary }]}>
+              {t('screens.invite.showQr', 'Show QR code')}
+            </Text>
+            <Switch value={showQr} onValueChange={setShowQr} />
+          </View>
+          {showQr ? (
+            <View style={styles.qr}>
+              <QRCode value={invitation.qrPayload} size={180}
+                backgroundColor={theme.surfaceAlt} color={theme.textPrimary} />
+            </View>
+          ) : null}
+
           <Text style={[typography.small, { color: theme.textMuted }]}>
             {t('screens.invite.nothingYet', 'Nothing exists yet — there is no strand until somebody accepts.')}
           </Text>
           <View style={styles.shareRow}>
-            <IconButton name="copy-outline" size={20} accessibilityLabel={t('common.copy', 'Copy')} onPress={() => {}} />
+            <IconButton name="copy-outline" size={20} accessibilityLabel={t('common.copy', 'Copy')}
+              onPress={() => { Clipboard.setString(invitation.url); Alert.alert(t('common.copied', 'Copied')); }} />
+            <IconButton name="refresh-outline" size={20}
+              accessibilityLabel={t('screens.invite.regenerate', 'Make a new one')} onPress={generate} />
             <IconButton name="share-outline" size={20} accessibilityLabel={t('common.share', 'Share')}
               onPress={() => Share.share({ message: invitation.url })} />
             {addingToExisting ? (
@@ -160,6 +180,8 @@ const styles = StyleSheet.create({
   cardTitle: { fontWeight: '600' },
   actions: { alignItems: 'center', paddingVertical: spacing[2] },
   shareRow: { flexDirection: 'row', gap: spacing[1], paddingTop: spacing[1] },
+  qrToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing[1] },
+  qr: { alignItems: 'center', paddingVertical: spacing[2] },
   rows: { gap: spacing[1] },
   dim: { opacity: 0.5 },
 });

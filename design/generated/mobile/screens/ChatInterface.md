@@ -78,6 +78,20 @@ should not trust. See `domain/schema.md` → Ordering, and sereus#5.
    styling** — there is nothing to be pending on.
 3. Only a genuine write failure surfaces: keep the composer text, show a retry, do not clear.
 
+## Composer (fixed by the human spec)
+
+- Text input expands to about four lines.
+- **The trailing control is a mic when the composer is empty and a send button once there is
+  content.** Voice recording is not built; the mic must say so plainly rather than appear inert.
+- Attach (+) opens the media picker; selections return as removable chips above the composer.
+
+## Message menus (fixed by the human spec)
+
+- Long-press own message → **edit** / delete / copy
+- Long-press another's → reply / copy / react
+
+Editing puts the message into the composer with save and cancel replacing send.
+
 ## Component Inventory
 
 - `MessageBubble` — outgoing (accent) / incoming (surfaceAlt); optional sender name (groups);

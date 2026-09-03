@@ -49,6 +49,14 @@ signed act** — there is no "join as manager" invitation upstream ([sereus.md](
 this; if the grant cannot be applied at admission without a manager present, that surfaces as the
 grant landing late, and the screen must not promise it as instantaneous.
 
+## Surface (fixed by the human spec)
+
+- Read-only link with a **copy icon**; copying shows a brief "Copied" toast
+- **QR toggle**, default **on**, with a scannable preview beneath it
+- **Share** via the native sheet — link text always, QR image when the toggle is on
+- **Regenerate** mints a new token and updates both link and QR
+- The screen can simply be held up for a direct scan
+
 ## Implementation Notes
 
 - The private/public choice is two labelled cards with consequences as body text, not a switch.

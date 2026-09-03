@@ -10,6 +10,10 @@ dependsOn:
 
 # Consolidation: QrScanner
 
+> The human spec (`specs/mobile/screens/qr-scanner.md`) **is silent** on this screen: everything
+> below is generation's inference from the stories, and may be overridden there at any
+> time.
+
 ## Purpose
 
 Read an invitation from somebody's screen.

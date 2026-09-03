@@ -11,6 +11,10 @@ dependsOn:
 
 # Consolidation: MediaViewer
 
+> The human spec (`specs/mobile/screens/media-viewer.md`) **is silent** on this screen: everything
+> below is generation's inference from the stories, and may be overridden there at any
+> time.
+
 ## Purpose
 
 Full-screen presentation of one attachment, with the surrounding set swipeable.

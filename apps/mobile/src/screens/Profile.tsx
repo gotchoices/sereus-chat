@@ -92,17 +92,21 @@ export default function Profile() {
       {!firstRun ? (
         <>
           <SectionHeader label={t('screens.profile.private', 'Stays on this device')} />
-          <View style={[styles.field, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
-            <Text style={[typography.small, { color: theme.textMuted }]}>
-              {t('screens.profile.notesLabel', 'Notes to yourself')}
-            </Text>
-            <TextInput
-              value={profile.notes ?? ''}
-              onChangeText={v => update({ notes: v })}
-              multiline
-              style={[typography.body, { color: theme.textPrimary }]}
-            />
-          </View>
+          {([
+            ['email', t('screens.profile.emailLabel', 'Email'), false],
+            ['phone', t('screens.profile.phoneLabel', 'Phone'), false],
+            ['notes', t('screens.profile.notesLabel', 'Notes / bio'), true],
+          ] as Array<[keyof ProfileT, string, boolean]>).map(([key, label, multi]) => (
+            <View key={key} style={[styles.field, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
+              <Text style={[typography.small, { color: theme.textMuted }]}>{label}</Text>
+              <TextInput
+                value={(profile[key] as string) ?? ''}
+                onChangeText={v => update({ [key]: v } as Partial<ProfileT>)}
+                multiline={multi}
+                style={[typography.body, { color: theme.textPrimary }]}
+              />
+            </View>
+          ))}
           <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
             {t('screens.profile.privateNote', 'This never leaves your phone and is never sent to anyone.')}
           </Text>

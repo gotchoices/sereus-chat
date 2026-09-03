@@ -15,6 +15,10 @@ dependsOn:
 
 # Consolidation: StrandDetail
 
+> The human spec (`specs/mobile/screens/strand-detail.md`) **is silent** on this screen: everything
+> below is generation's inference from the stories, and may be overridden there at any
+> time.
+
 ## Purpose
 
 The membership and disposition of one strand. Hub for muting, leaving, adding, and giving up

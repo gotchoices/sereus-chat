@@ -16,9 +16,10 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import {
-  listMessages, listMembers, getStrandState, send, deleteMessage, react,
+  listMessages, listMembers, getStrandState, send, deleteMessage, react, editMessage,
 } from '../data/adapter';
 import type { Message, Member, StrandState, Attachment } from '../data/types';
 import { useT } from '../i18n';
@@ -82,6 +83,7 @@ export default function ChatInterface() {
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [editing, setEditing] = useState<Message | null>(null);
   const [readCursor, setReadCursor] = useState<string | null>(null);
   const [atEnd, setAtEnd] = useState(true);
 
@@ -148,6 +150,20 @@ export default function ChatInterface() {
   const doSend = async () => {
     const text = draft.trim();
     if (!text) return;
+    if (editing) {
+      // Edit in place — no version chain, no history (story 13).
+      const target = editing;
+      setEditing(null); setDraft('');
+      try {
+        await editMessage(target.id, text);
+        setMessages(prev => prev.map(m => (m.id === target.id
+          ? { ...m, content: text, editedAt: new Date().toISOString() } : m)));
+      } catch (e: any) {
+        setDraft(text); setEditing(target);
+        setError(e?.message ?? 'That change could not be saved');
+      }
+      return;
+    }
     setDraft('');
     const pendingReply = replyTo?.id ?? null;
     setReplyTo(null);
@@ -164,15 +180,19 @@ export default function ChatInterface() {
 
   const messageActions = (m: Message) => {
     const mine = m.memberId === me?.id;
+    // Human spec: own → edit / delete / copy;  another's → reply / copy / react.
     Alert.alert(nameOf(m.memberId), m.content, [
-      { text: t('actions.reply', 'Reply'), onPress: () => setReplyTo(m) },
-      { text: t('actions.react', 'React 👍'), onPress: () => react(m.id, '👍').then(load).catch(() => {}) },
       ...(mine
-        ? [{
-            text: t('actions.delete', 'Delete'), style: 'destructive' as const,
-            onPress: () => deleteMessage(m.id).then(load).catch(() => {}),
-          }]
-        : []),
+        ? [
+            { text: t('actions.edit', 'Edit'), onPress: () => { setEditing(m); setReplyTo(null); setDraft(m.content); } },
+            { text: t('actions.delete', 'Delete'), style: 'destructive' as const,
+              onPress: () => deleteMessage(m.id).then(load).catch(() => {}) },
+          ]
+        : [
+            { text: t('actions.reply', 'Reply'), onPress: () => setReplyTo(m) },
+            { text: t('actions.react', 'React 👍'), onPress: () => react(m.id, '👍').then(load).catch(() => {}) },
+          ]),
+      { text: t('actions.copy', 'Copy'), onPress: () => Clipboard.setString(m.content) },
       { text: t('common.cancel', 'Cancel'), style: 'cancel' as const },
     ]);
   };
@@ -272,6 +292,18 @@ export default function ChatInterface() {
         </Pressable>
       ) : null}
 
+      {editing ? (
+        <View style={[styles.replyBar, { backgroundColor: theme.surfaceAlt, borderTopColor: theme.divider }]}>
+          <View style={styles.flex1}>
+            <Text style={[typography.small, { color: theme.textMuted }]}>
+              {t('screens.chat.editing', 'Editing — this replaces what you said')}
+            </Text>
+          </View>
+          <IconButton name="close-outline" size={18} accessibilityLabel={t('common.cancel', 'Cancel')}
+            onPress={() => { setEditing(null); setDraft(''); }} />
+        </View>
+      ) : null}
+
       {replyTo ? (
         <View style={[styles.replyBar, { backgroundColor: theme.surfaceAlt, borderTopColor: theme.divider }]}>
           <View style={styles.flex1}>
@@ -296,8 +328,18 @@ export default function ChatInterface() {
           placeholderTextColor={theme.textMuted}
           style={[typography.body, styles.input, { color: theme.textPrimary, backgroundColor: theme.surfaceAlt }]}
         />
-        <IconButton name="send-outline" size={22} variant="accent"
-          accessibilityLabel={t('actions.send', 'Send')} onPress={doSend} />
+        {draft.trim() ? (
+          <IconButton name={editing ? 'checkmark-outline' : 'send-outline'} size={22} variant="accent"
+            accessibilityLabel={editing ? t('common.save', 'Save') : t('actions.send', 'Send')}
+            onPress={doSend} />
+        ) : (
+          // Empty composer shows the mic (human spec).  Recording is not built,
+          // and says so rather than sitting there inert.
+          <IconButton name="mic-outline" size={22}
+            accessibilityLabel={t('actions.record', 'Record a voice message')}
+            onPress={() => Alert.alert(t('screens.chat.micTitle', 'Voice messages are not built yet'),
+              t('screens.chat.micBody', 'You can type for now.'))} />
+        )}
       </View>
     </KeyboardAvoidingView>
   );

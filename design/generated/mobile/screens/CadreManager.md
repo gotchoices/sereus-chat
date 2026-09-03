@@ -38,6 +38,9 @@ component is untouched; chat only decides whether to mount it.
 
 ## Constraints
 
+- The human spec is explicit: this screen is **oriented to cadre management only**. Strand
+  invitations, members and guests must not appear on it.
+
 - **Do not regenerate the component from this repo's specs.** Its contract is
   `apps/mobile/src/cadre-ui/SPEC.md`, and it is destined for extraction as a shared sereus package.
 - Do not add strand membership, invitations or guests to it — chat has its own invitation flow.

@@ -116,6 +116,14 @@ export default function StrandList() {
 
   const sortIcon = sortMode === 'recent' ? 'time-outline' : sortMode === 'alpha' ? 'text-outline' : 'mail-unread-outline';
 
+  const chooseSort = () =>
+    Alert.alert(t('screens.strands.sortTitle', 'Order by'), undefined, [
+      { text: t('screens.strands.sortRecent', 'Recent'), onPress: () => setSortMode('recent') },
+      { text: t('screens.strands.sortAlpha', 'Alphabetical'), onPress: () => setSortMode('alpha') },
+      { text: t('screens.strands.sortUnread', 'Unread first'), onPress: () => setSortMode('unread') },
+      { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+    ]);
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.controls}>
@@ -124,8 +132,7 @@ export default function StrandList() {
         <IconButton name="add-outline" size={20} variant="accent" style={styles.flex2}
           accessibilityLabel={t('actions.newStrand', 'New strand')} onPress={() => navigation.navigate('InvitationGenerator')} />
         <IconButton name={sortIcon} size={20} variant="bordered" style={styles.flex1}
-          accessibilityLabel={t('actions.sort', 'Sort')}
-          onPress={() => setSortMode(p => (p === 'recent' ? 'alpha' : p === 'alpha' ? 'unread' : 'recent'))} />
+          accessibilityLabel={t('actions.sort', 'Sort')} onPress={chooseSort} />
       </View>
 
       <View style={styles.flex1}>

@@ -13,6 +13,10 @@ dependsOn:
 
 # Consolidation: SearchInterface
 
+> The human spec (`specs/mobile/screens/search-interface.md`) **is silent** on this screen: everything
+> below is generation's inference from the stories, and may be overridden there at any
+> time.
+
 ## Purpose
 
 Progressive search over one strand or all of them.

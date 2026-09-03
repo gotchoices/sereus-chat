@@ -64,13 +64,14 @@ Notes for the adapter:
 ## Ordering and sectioning
 
 1. Partition: `pending` → Pending section; `archived` → Archived (collapsed); rest → main list.
-2. Sort the main list by the persisted preference (`recent` default, `unread`, `alpha`).
+2. Sort the main list by the persisted preference. The human spec fixes the surface: **tapping the
+   sort icon opens an overlay** offering Recent (default), Alphabetical, Unread first — not a
+   cycling button.
 3. **Muted strands are not promoted by ordinary traffic** — under `recent` they sort by last *read*
    activity, not last message. This is the one place sort order is deliberately not literal.
-4. **Being named is not ordinary traffic.** A soft mute exists precisely to let a mention through,
-   so `mentioned` restores a strand to its real recency. Only a **hard** mute holds its place
-   regardless, because that is what was asked for. Verified on device: without this, a strand with
-   an active mention sank below quiet ones.
+4. **Being named is not ordinary traffic** — story 10, step 4. A mention restores a strand to its
+   real recency even when softly muted; a hard mute holds its place regardless. Quieting a strand
+   stopped it interrupting, it did not mean the user wanted to miss being asked something.
 
 ## Row precedence
 

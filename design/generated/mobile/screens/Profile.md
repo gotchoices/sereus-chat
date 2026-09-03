@@ -36,6 +36,9 @@ CadreManager.
 `Profile.get()` / `Profile.save(data)` — `{ name, avatarUri, email?, phone?, notes? }`, device-local
 storage only (`domain/schema.md`).
 
+The human spec fixes the field list: **Name (required), Email, Phone, Notes/Bio**, with the avatar
+carrying an edit affordance. Email, phone and notes never leave the device.
+
 **Only `name` and `avatarUri` are shared** — they become the user's `Member` row in each strand.
 Everything else never leaves the device. The screen must mark this distinction visibly; it is the
 one place the user can see what they are disclosing.

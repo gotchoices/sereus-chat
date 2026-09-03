@@ -14,6 +14,10 @@ dependsOn:
 
 # Consolidation: StrandMedia
 
+> The human spec (`specs/mobile/screens/strand-media.md`) **is silent** on this screen: everything
+> below is generation's inference from the stories, and may be overridden there at any
+> time.
+
 ## Purpose
 
 Everything shared in one strand, filterable, with the storage it occupies and a way to trim.
