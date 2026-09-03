@@ -3,9 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "android": "react-native run-android",
+    "android": ". ./env-defaults.sh && react-native run-android --port \"$METRO_PORT\" --deviceId \"$DEVICE_SERIAL\"",
+    "emulator": ". ./env-defaults.sh && \"${ANDROID_HOME:-$HOME/Library/Android/sdk}/emulator/emulator\" -avd \"$AVD_NAME\" -port \"$EMULATOR_PORT\"",
     "ios": "react-native run-ios",
-    "start": "react-native start",
+    "start": ". ./env-defaults.sh && react-native start --port \"$METRO_PORT\"",
     "test": "jest",
     "lint": "eslint .",
     "build:android:apk": "cd android && bundle exec fastlane build_apk",
