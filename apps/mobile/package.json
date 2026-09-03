@@ -3,10 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "android": ". ./env-defaults.sh && react-native run-android --port \"$METRO_PORT\" --deviceId \"$DEVICE_SERIAL\"",
-    "emulator": ". ./env-defaults.sh && \"${ANDROID_HOME:-$HOME/Library/Android/sdk}/emulator/emulator\" -avd \"$AVD_NAME\" -port \"$EMULATOR_PORT\"",
+    "android": "sh -c '. ./env-defaults.sh && react-native run-android --port \"$METRO_PORT\" --deviceId \"$DEVICE_SERIAL\"'",
+    "emulator": "sh -c '. ./env-defaults.sh && \"${ANDROID_HOME:-$HOME/Library/Android/sdk}/emulator/emulator\" -avd \"$AVD_NAME\" -port \"$EMULATOR_PORT\"'",
     "ios": "react-native run-ios",
-    "start": ". ./env-defaults.sh && react-native start --port \"$METRO_PORT\"",
+    "start": "sh -c '. ./env-defaults.sh && react-native start --port \"$METRO_PORT\"'",
     "test": "jest",
     "lint": "eslint .",
     "build:android:apk": "cd android && bundle exec fastlane build_apk",
@@ -21,7 +21,7 @@
     "e2e:android": "yarn detox:build:android && yarn detox:test:android",
     "e2e:android:reuse": "yarn detox:test:android:reuse",
     "e2e:android:file": "DETOX_CONFIGURATION=android.emu.debug jest --config e2e/jest.config.js",
-    "launch:android": "sh -c 'adb -e shell am start -W -a android.intent.action.VIEW -d \"$DEEPLINK\" || adb shell am start -W -a android.intent.action.VIEW -d \"$DEEPLINK\"'",
+    "launch:android": "sh -c '. ./env-defaults.sh && adb -s \"$DEVICE_SERIAL\" shell am start -W -a android.intent.action.VIEW -d \"$DEEPLINK\"'",
     "launch:ios": "sh -c 'xcrun simctl openurl booted \"$DEEPLINK\"'"
   },
   "dependencies": {
