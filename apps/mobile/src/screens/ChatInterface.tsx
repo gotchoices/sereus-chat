@@ -22,6 +22,7 @@ import {
 } from '../data/adapter';
 import type { Message, Member, StrandState, Attachment } from '../data/types';
 import { useT } from '../i18n';
+import { useDataRevision } from '../mock/VariantContext';
 import {
   MessageBubble, EmptyState, Banner, IconButton, Avatar, StrandStatus,
 } from '../components';
@@ -71,6 +72,7 @@ export default function ChatInterface() {
   const route: any = useRoute();
   const { strandId, title } = route.params ?? {};
   const t = useT();
+  const rev = useDataRevision();
   const theme = useTheme();
   const listRef = useRef<FlatList<Row>>(null);
 
@@ -102,7 +104,7 @@ export default function ChatInterface() {
     getStrandState(strandId).then(setState).catch(() => {});
   }, [strandId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); }, [load, rev]);
 
   // Draft and read cursor are device-local.  Nothing unsent leaves the phone.
   useEffect(() => {

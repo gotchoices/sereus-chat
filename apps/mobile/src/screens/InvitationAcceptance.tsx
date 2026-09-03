@@ -14,6 +14,7 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { inspectInvitation, acceptInvitation } from '../data/adapter';
 import type { InvitationPreview } from '../data/types';
 import { useT } from '../i18n';
+import { useDataRevision } from '../mock/VariantContext';
 import { Avatar, Banner, IconButton, StrandStatus, strandStatusKind } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
@@ -21,6 +22,7 @@ export default function InvitationAcceptance() {
   const route: any = useRoute();
   const navigation: any = useNavigation();
   const t = useT();
+  const rev = useDataRevision();
   const theme = useTheme();
   const token: string = route?.params?.token || '';
 
@@ -33,7 +35,7 @@ export default function InvitationAcceptance() {
     catch (e: any) { setError(e?.message ?? 'That invitation could not be read'); }
   }, [token]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); }, [load, rev]);
 
   const accept = async () => {
     setBusy(true);

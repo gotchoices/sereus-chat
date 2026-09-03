@@ -75,7 +75,35 @@ Second pass (same day):
   *integration* now says plainly that machines live on the real network, rather than mounting a
   component with nothing behind it. The component itself is untouched.
 
-Still to examine on device: MediaViewer, and the error/empty variants of the strand-scoped screens.
+Third pass — MediaViewer and the strand-scoped variants:
+
+- **MediaViewer showed the same attachment on every page.** `renderItem` ignored the item it was
+  handed and rendered whatever was "current", so swiping only changed the content once the scroll
+  settled. Now renders per item.
+- **The viewer sat on a near-white page**, and once given a dark ground its chrome was dark-on-dark
+  and effectively invisible. Dark ground is now deliberate and not a theme token — media is the
+  subject, and the chrome is explicitly light against it.
+- **A regression of my own:** keying the navigator on the variant (added in the previous pass to
+  make variant deep links re-read) *reset navigation to the root*, so any deep link that also
+  changed the variant never reached its screen. Replaced with a neutral `useDataRevision()` signal:
+  screens list it as a load dependency, it never changes in production, and navigation is untouched.
+- **A stale locale string was silently overriding designed copy.** `screens.chat.empty` still read
+  "No messages yet. Say hello!" from the bundle, so the empty-conversation copy never appeared. The
+  bundle wins over a code fallback, which makes this class of bug invisible in review.
+- **Retired dead locale namespaces** (`connections`, `InvitationAcceptance`) describing screens that
+  no longer exist in that shape — they would have overridden new copy the same way.
+
+A "hooks called conditionally" red box during this pass was stale Fast Refresh after editing a
+context provider, not a code fault; a cold start cleared it.
+
+### i18n
+
+The bundle predates these screens. New keys fall back to the English written in the code, which is
+why the screens read correctly — but the bundle is the authority where a key exists, so
+**every new string still needs a home in `locales/*/screens.json`** before translation is meaningful.
+That is a separate pass.
+
+All thirteen routes and their happy/empty/error variants have now been seen on device.
 
 ### Deep links for review
 

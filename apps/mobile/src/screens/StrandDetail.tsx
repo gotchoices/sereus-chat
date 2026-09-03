@@ -15,6 +15,7 @@ import {
 } from '../data/adapter';
 import type { StrandState, Member, Attachment } from '../data/types';
 import { useT } from '../i18n';
+import { useDataRevision } from '../mock/VariantContext';
 import { Avatar, ListRow, Banner, SectionHeader, StrandStatus } from '../components';
 import { useTheme, typography, spacing } from '../theme';
 
@@ -23,6 +24,7 @@ export default function StrandDetail() {
   const route: any = useRoute();
   const { strandId, title } = route.params ?? {};
   const t = useT();
+  const rev = useDataRevision();
   const theme = useTheme();
 
   const [state, setState] = useState<StrandState | null>(null);
@@ -44,7 +46,7 @@ export default function StrandDetail() {
     listAttachments(strandId).then(setMedia).catch(() => {});
   }, [strandId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); }, [load, rev]);
 
   const memberActions = (m: Member) => {
     if (m.isMe) return;

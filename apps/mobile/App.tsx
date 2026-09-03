@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
-import { VariantProvider, useVariant } from './src/mock/VariantContext';
+import { VariantProvider } from './src/mock/VariantContext';
 import { I18nProvider } from './src/i18n';
 import { ThemeProvider, useThemeContext } from './src/theme';
 import { USE_SEREUS } from './src/data/config';
@@ -10,17 +10,13 @@ import { USE_SEREUS } from './src/data/config';
 /** Themed shell: safe-area background + status bar follow the active theme. */
 function ThemedShell() {
   const { theme, scheme } = useThemeContext();
-  const { variant } = useVariant();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
       <StatusBar
         barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={theme.background}
       />
-      {/* Keying on the variant remounts the tree when a mock deep link changes
-          it, so screens re-read without knowing variants exist.  Production
-          builds never change `variant`, so this is a no-op there. */}
-      <AppNavigator key={variant} />
+      <AppNavigator />
     </SafeAreaView>
   );
 }

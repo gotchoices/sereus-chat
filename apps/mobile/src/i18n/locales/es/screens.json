@@ -1,18 +1,7 @@
 {
-  "connections": {
-    "title": "Sereus Chat",
-    "empty": "No hay hebras todavía. Invita a un amigo para empezar."
-  },
-  "InvitationAcceptance": {
-    "title": "Aceptar invitación",
-    "summary": "Acepta la invitación para conectar y comenzar una hebra.",
-    "token": "Token",
-    "join": "Unirse",
-    "cancel": "Cancelar"
-  },
   "chat": {
     "title": "Chat",
-    "empty": "No hay mensajes todavía. ¡Saluda!",
+    "empty": "Di algo: sois solo vosotros dos hasta que se invite a alguien más.",
     "composerPlaceholder": "Mensaje",
     "attach": "Adjuntar",
     "record": "Grabar",
@@ -44,5 +33,3 @@
     "open": "Abrir"
   }
 }
-
-

@@ -7,11 +7,16 @@ export type Variant = 'happy' | 'empty' | 'error' | string;
 type VariantContextValue = {
   variant: Variant;
   setVariant: (v: Variant) => void;
+  /** Bumps whenever the underlying data source changes beneath the UI.
+   *  Screens list it as a dependency so they re-read; they never inspect it,
+   *  and in production builds it never changes. */
+  revision: number;
 };
 
 const VariantContext = createContext<VariantContextValue>({
   variant: 'happy',
   setVariant: () => {},
+  revision: 0,
 });
 
 function parseVariantFromUrl(url: string | null): Variant | null {
@@ -28,11 +33,16 @@ function parseVariantFromUrl(url: string | null): Variant | null {
 
 export function VariantProvider({ children }: { children: React.ReactNode }) {
   const [variant, setVariantState] = useState<Variant>('happy');
+  const [revision, setRevision] = useState(0);
 
-  // Sync variant to mock adapter whenever it changes
+  // Sync variant to mock adapter whenever it changes, and signal screens to
+  // re-read.  Deliberately NOT a remount: remounting the navigator would reset
+  // navigation, so a deep link that also changes the variant would never reach
+  // its screen.
   const setVariant = (v: Variant) => {
     setVariantState(v);
     setMockVariant(v);
+    setRevision(r => r + 1);
   };
 
   useEffect(() => {
@@ -60,10 +70,15 @@ export function VariantProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const value = useMemo(() => ({ variant, setVariant }), [variant]);
+  const value = useMemo(() => ({ variant, setVariant, revision }), [variant, revision]);
   return <VariantContext.Provider value={value}>{children}</VariantContext.Provider>;
 }
 
 export function useVariant() {
   return useContext(VariantContext);
+}
+
+/** Re-read signal for screens. Neutral by design — no variant awareness. */
+export function useDataRevision(): number {
+  return useContext(VariantContext).revision;
 }

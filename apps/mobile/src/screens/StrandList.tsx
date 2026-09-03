@@ -10,6 +10,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { listStrands, listOutstandingInvitations } from '../data/adapter';
 import type { StrandSummary, Invitation } from '../data/types';
 import { useT } from '../i18n';
+import { useDataRevision } from '../mock/VariantContext';
 import { Avatar, ListRow, Badge, EmptyState, Banner, IconButton, SectionHeader } from '../components';
 import { useTheme, spacing } from '../theme';
 
@@ -43,6 +44,7 @@ function indicatorFor(s: StrandSummary): React.ReactNode {
 export default function StrandList() {
   const navigation: any = useNavigation();
   const t = useT();
+  const rev = useDataRevision();
   const theme = useTheme();
   const [strands, setStrands] = useState<StrandSummary[]>([]);
   const [invites, setInvites] = useState<Invitation[]>([]);
@@ -65,7 +67,7 @@ export default function StrandList() {
   }, []);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); }, [load, rev]);
 
   const sections = useMemo(() => {
     const active = strands.filter(s => !s.archived && !s.pending);

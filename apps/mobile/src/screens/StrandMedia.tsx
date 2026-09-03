@@ -12,6 +12,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { listAttachments } from '../data/adapter';
 import type { Attachment } from '../data/types';
 import { useT } from '../i18n';
+import { useDataRevision } from '../mock/VariantContext';
 import { Banner, EmptyState, ListRow } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
@@ -28,6 +29,7 @@ export default function StrandMedia() {
   const route: any = useRoute();
   const { strandId, title } = route.params ?? {};
   const t = useT();
+  const rev = useDataRevision();
   const theme = useTheme();
 
   const [items, setItems] = useState<Attachment[]>([]);
@@ -39,7 +41,7 @@ export default function StrandMedia() {
     catch (e: any) { setError(e?.message ?? 'Could not list what was shared here'); }
   }, [strandId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); }, [load, rev]);
 
   const shown = useMemo(() => (kind === 'all' ? items : items.filter(i => i.type === kind)), [items, kind]);
   const totalBytes = useMemo(() => items.reduce((n, i) => n + (i.byteSize ?? 0), 0), [items]);
