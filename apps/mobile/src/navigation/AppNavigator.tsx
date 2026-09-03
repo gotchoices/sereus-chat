@@ -3,14 +3,17 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import type { LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, Text } from 'react-native';
-import ConnectionsList from '../screens/ConnectionsList';
+import StrandList from '../screens/StrandList';
 import SearchInterface from '../screens/SearchInterface';
 import InvitationGenerator from '../screens/InvitationGenerator';
 import InvitationAcceptance from '../screens/InvitationAcceptance';
 import { showToast } from '../ui/toast';
-import ProfileSetup from '../screens/ProfileSetup';
+import Profile from '../screens/Profile';
+import Settings from '../screens/Settings';
+import StrandDetail from '../screens/StrandDetail';
+import StrandMedia from '../screens/StrandMedia';
+import MediaViewer from '../screens/MediaViewer';
 import QrScanner from '../screens/QrScanner';
-import Alerts from '../screens/Alerts';
 import ChatInterface from '../screens/ChatInterface';
 import MediaPicker from '../screens/MediaPicker';
 import { CadreManager } from '../cadre-ui';
@@ -47,18 +50,20 @@ export default function AppNavigator() {
   } as const;
 
   const linking: LinkingOptions<any> = {
-    prefixes: ['chat://', 'https://sereus.org/chat'],
+    prefixes: ['sereus://', 'chat://', 'https://sereus.org/chat'],
     config: {
       screens: {
-        ConnectionsList: 'connections',
-        ChatInterface: 'chat/:strandId',
+        StrandList: 'strands',
+        ChatInterface: 'strand/:strandId',
+        StrandDetail: 'strand/:strandId/about',
+        StrandMedia: 'strand/:strandId/shared',
         SearchInterface: 'search',
         InvitationGenerator: 'invite',
         InvitationAcceptance: 'invite/:token',
-        ProfileSetup: 'profile',
-        CadreManager: 'cadre',
+        Profile: 'profile',
+        Settings: 'settings',
+        CadreManager: 'machines',
         QrScanner: 'scan',
-        Alerts: 'alerts',
       },
     },
   };
@@ -66,14 +71,25 @@ export default function AppNavigator() {
   return (
     <NavigationContainer linking={linking} theme={navTheme}>
       <Stack.Navigator screenOptions={screenOptions}>
-        <Stack.Screen name="ConnectionsList" component={ConnectionsList} options={{ title: 'Sereus Chat' }} />
+        <Stack.Screen name="StrandList" component={StrandList} options={{ title: 'Strands' }} />
         <Stack.Screen name="SearchInterface" component={SearchInterface} options={{ title: 'Search' }} />
         <Stack.Screen name="InvitationGenerator" component={InvitationGenerator} options={{ title: 'Invite' }} />
         <Stack.Screen name="InvitationAcceptance" component={InvitationAcceptance} options={{ title: 'Accept Invite' }} />
-        <Stack.Screen name="ProfileSetup" component={ProfileSetup} options={{ title: 'Profile' }} />
-        <Stack.Screen name="CadreManager" component={ThemedCadreManager} options={{ title: 'My Devices' }} />
+        <Stack.Screen name="Profile" component={Profile} options={{ title: 'Profile' }} />
+        <Stack.Screen name="Settings" component={Settings} options={{ title: 'Settings' }} />
+        <Stack.Screen
+          name="StrandDetail"
+          component={StrandDetail}
+          options={({ route }: any) => ({ title: route?.params?.title ?? 'About' })}
+        />
+        <Stack.Screen name="StrandMedia" component={StrandMedia} options={{ title: 'Shared here' }} />
+        <Stack.Screen
+          name="MediaViewer"
+          component={MediaViewer}
+          options={{ headerShown: false, presentation: 'fullScreenModal' as any }}
+        />
+        <Stack.Screen name="CadreManager" component={ThemedCadreManager} options={{ title: 'My machines' }} />
         <Stack.Screen name="QrScanner" component={QrScanner} options={{ title: 'Scan' }} />
-        <Stack.Screen name="Alerts" component={Alerts} options={{ title: 'Alerts' }} />
         <Stack.Screen
           name="MediaPicker"
           component={MediaPicker}
@@ -82,14 +98,14 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ChatInterface"
           component={ChatInterface}
-          options={({ route }) => {
+          options={({ route, navigation }: any) => {
             const params: any = route?.params ?? {};
-            const name: string = params.name || 'Chat';
+            const name: string = params.title || 'Strand';
             return {
               headerTitle: () => (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <View style={{ marginRight: 8 }}>
-                    <Avatar name={name} uri={params.avatarUrl} size="sm" />
+                    <Avatar name={name} uri={params.avatarUri} size="sm" />
                   </View>
                   <Text numberOfLines={1} style={{ maxWidth: 200, ...typography.title, color: theme.textPrimary }}>
                     {name}
@@ -98,9 +114,11 @@ export default function AppNavigator() {
               ),
               headerRight: () => (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <IconButton name="call-outline" size={20} accessibilityLabel="Voice call" onPress={() => showToast('Voice call not implemented')} />
-                  <IconButton name="videocam-outline" size={20} accessibilityLabel="Video call" onPress={() => showToast('Video call not implemented')} />
-                  <IconButton name="search-outline" size={20} accessibilityLabel="Search in strand" onPress={() => {}} />
+                  {/* Calls are parked (story 90) — kept visible so the objective
+                      is not forgotten, honest about not being built. */}
+                  <IconButton name="call-outline" size={20} accessibilityLabel="Voice call" onPress={() => showToast('Calls are not built yet')} />
+                  <IconButton name="search-outline" size={20} accessibilityLabel="Search in strand"
+                    onPress={() => navigation.navigate('SearchInterface', { strandId: params.strandId })} />
                 </View>
               ),
               headerBackTitleVisible: false,

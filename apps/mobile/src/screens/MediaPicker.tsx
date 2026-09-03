@@ -77,7 +77,7 @@ export default function MediaPicker(props: Props) {
         handlePicked({
           id: `att-${Date.now()}`,
           type: 'file',
-          uri: local?.uri ?? file.uri,
+          uri: (local && local.status === 'success' ? local.localUri : undefined) ?? file.uri,
           name: file.name ?? undefined,
           size: file.size ?? undefined,
           mimeType: file.type ?? undefined,

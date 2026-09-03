@@ -14,16 +14,18 @@ export interface ListRowProps {
   leading?: React.ReactNode;
   trailing?: React.ReactNode;
   onPress?: () => void;
+  onLongPress?: () => void;
   testID?: string;
 }
 
-export function ListRow({ title, subtitle, leading, trailing, onPress, testID }: ListRowProps) {
+export function ListRow({ title, subtitle, leading, trailing, onPress, onLongPress, testID }: ListRowProps) {
   const theme = useTheme();
   return (
     <TouchableOpacity
       testID={testID}
       activeOpacity={0.7}
       onPress={onPress}
+      onLongPress={onLongPress}
       style={[styles.row, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}
     >
       {leading ? <View style={styles.leading}>{leading}</View> : null}

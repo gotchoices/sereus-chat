@@ -2,38 +2,43 @@
  * MessageBubble — one chat message.
  *
  * ui.md: outgoing = accent / accentText; incoming = surfaceAlt / textPrimary;
- * radius 16; max width ~80%.  Optional sender name (group strands), delivery
- * status tick, and attachment preview slot.
+ * radius 16; max width ~80%.
+ *
+ * NO DELIVERY OR READ INDICATOR.  None is tracked anywhere in this app and none
+ * may be added: a reply is the only evidence a message was read
+ * (design/specs/domain/schema.md, stories 04 and 10).  The status tick this
+ * component used to render has been removed deliberately.
+ *
+ * Sender name appears on incoming messages ONLY in strands of more than two —
+ * in a two-party conversation there is no ambiguity to resolve.
  */
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTheme, typography, spacing, radius } from '../theme';
+
+export interface ReplyQuote {
+  /** null when the original has been removed — say so, do not hide it. */
+  senderName: string | null;
+  excerpt: string | null;
+  onPress?: () => void;
+}
 
 export interface MessageBubbleProps {
   text: string;
   outgoing?: boolean;
+  /** Pass only in strands of more than two. */
   senderName?: string | null;
   timestamp?: string | null;
-  status?: 'sent' | 'delivered' | 'read';
+  edited?: boolean;
+  replyTo?: ReplyQuote | null;
+  reactions?: Array<{ symbol: string; count: number; mine: boolean }>;
   attachment?: React.ReactNode;
+  onPress?: () => void;
   onLongPress?: () => void;
+  onReactionPress?: (symbol: string) => void;
   testID?: string;
   accessibilityLabel?: string;
-}
-
-function statusIcon(status?: MessageBubbleProps['status']): string | null {
-  switch (status) {
-    case 'sent':
-      return 'checkmark-outline';
-    case 'delivered':
-      return 'checkmark-done-outline';
-    case 'read':
-      return 'checkmark-done';
-    default:
-      return null;
-  }
 }
 
 export function MessageBubble({
@@ -41,9 +46,13 @@ export function MessageBubble({
   outgoing = false,
   senderName,
   timestamp,
-  status,
+  edited,
+  replyTo,
+  reactions,
   attachment,
+  onPress,
   onLongPress,
+  onReactionPress,
   testID,
   accessibilityLabel,
 }: MessageBubbleProps) {
@@ -51,49 +60,111 @@ export function MessageBubble({
   const bg = outgoing ? theme.accent : theme.surfaceAlt;
   const fg = outgoing ? theme.accentText : theme.textPrimary;
   const meta = outgoing ? theme.accentText : theme.textMuted;
-  const tick = statusIcon(status);
 
   return (
-    <Pressable
-      testID={testID}
-      accessible
-      accessibilityLabel={accessibilityLabel}
-      onLongPress={onLongPress}
-      style={[
-        styles.wrap,
-        outgoing ? styles.wrapOut : styles.wrapIn,
-        { backgroundColor: bg },
-      ]}
-    >
-      {senderName && !outgoing ? (
-        <Text style={[styles.sender, { color: theme.accent }]} numberOfLines={1}>
-          {senderName}
-        </Text>
+    <View style={[styles.row, outgoing ? styles.rowRight : styles.rowLeft]}>
+      <Pressable
+        testID={testID}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        accessibilityLabel={accessibilityLabel}
+        style={[styles.bubble, { backgroundColor: bg }]}
+      >
+        {senderName ? (
+          <Text style={[typography.small, styles.sender, { color: meta }]}>{senderName}</Text>
+        ) : null}
+
+        {replyTo ? (
+          <Pressable
+            onPress={replyTo.onPress}
+            style={[styles.quote, { borderLeftColor: meta, backgroundColor: theme.background + '22' }]}
+          >
+            {replyTo.excerpt === null ? (
+              <Text style={[typography.small, styles.quoteGone, { color: meta }]}>
+                The message this replies to is gone
+              </Text>
+            ) : (
+              <>
+                {replyTo.senderName ? (
+                  <Text style={[typography.small, styles.sender, { color: meta }]}>
+                    {replyTo.senderName}
+                  </Text>
+                ) : null}
+                <Text numberOfLines={2} style={[typography.small, { color: meta }]}>
+                  {replyTo.excerpt}
+                </Text>
+              </>
+            )}
+          </Pressable>
+        ) : null}
+
+        {attachment ? <View style={styles.attachment}>{attachment}</View> : null}
+        {text ? <Text style={[typography.body, { color: fg }]}>{text}</Text> : null}
+
+        {(timestamp || edited) && (
+          <View style={styles.metaRow}>
+            {timestamp ? (
+              <Text style={[typography.small, { color: meta }]}>{timestamp}</Text>
+            ) : null}
+            {edited ? (
+              <Text style={[typography.small, { color: meta }]}>edited</Text>
+            ) : null}
+          </View>
+        )}
+      </Pressable>
+
+      {reactions && reactions.length > 0 ? (
+        <View style={[styles.reactions, outgoing ? styles.rowRight : styles.rowLeft]}>
+          {reactions.map(r => (
+            <Pressable
+              key={r.symbol}
+              onPress={() => onReactionPress?.(r.symbol)}
+              style={[
+                styles.reaction,
+                {
+                  backgroundColor: theme.surfaceAlt,
+                  borderColor: r.mine ? theme.accent : theme.border,
+                },
+              ]}
+            >
+              <Text style={typography.small}>
+                {r.symbol}
+                {r.count > 1 ? ` ${r.count}` : ''}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       ) : null}
-      {attachment ? <View style={styles.attachment}>{attachment}</View> : null}
-      {text ? <Text style={[styles.text, { color: fg }]}>{text}</Text> : null}
-      <View style={styles.metaRow}>
-        {timestamp ? <Text style={[styles.meta, { color: meta }]}>{timestamp}</Text> : null}
-        {outgoing && tick ? <Ionicons name={tick} size={14} color={meta} style={styles.tick} /> : null}
-      </View>
-    </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    maxWidth: '80%',
-    paddingVertical: spacing[1],
-    paddingHorizontal: spacing[2],
+  row: { marginVertical: 2, maxWidth: '80%' },
+  rowLeft: { alignSelf: 'flex-start' },
+  rowRight: { alignSelf: 'flex-end' },
+  bubble: {
     borderRadius: radius.bubble,
-    marginVertical: 3,
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[1],
+    gap: 2,
   },
-  wrapOut: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
-  wrapIn: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
-  sender: { ...typography.small, fontWeight: '600', marginBottom: 2 },
-  text: { ...typography.body },
-  attachment: { marginBottom: spacing[0] },
-  metaRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 2 },
-  meta: { fontSize: 10 },
-  tick: { marginLeft: 3 },
+  sender: { fontWeight: '600' },
+  quote: {
+    borderLeftWidth: 3,
+    paddingLeft: spacing[1],
+    paddingVertical: 2,
+    marginBottom: 2,
+    borderRadius: 4,
+  },
+  quoteGone: { fontStyle: 'italic' },
+  attachment: { marginBottom: 2 },
+  metaRow: { flexDirection: 'row', gap: spacing[1], alignSelf: 'flex-end' },
+  reactions: { flexDirection: 'row', gap: 4, marginTop: 2 },
+  reaction: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
 });

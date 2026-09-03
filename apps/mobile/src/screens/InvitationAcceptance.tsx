@@ -28,7 +28,7 @@ export default function InvitationAcceptance() {
         <View style={styles.row}>
           <TouchableOpacity
             style={[styles.btn, { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }]}
-            onPress={() => navigation.navigate('ConnectionsList')}
+            onPress={() => navigation.navigate('StrandList')}
             accessibilityLabel={t('screens.InvitationAcceptance.cancel', 'Cancel')}
             testID="accept-cancel"
           >
@@ -38,7 +38,7 @@ export default function InvitationAcceptance() {
             style={[styles.btn, { backgroundColor: theme.accent }]}
             onPress={() => {
               // In a real app, call acceptInvitation(token); for now, go home.
-              navigation.navigate('ConnectionsList');
+              navigation.navigate('StrandList');
             }}
             accessibilityLabel={t('screens.InvitationAcceptance.join', 'Join')}
             testID="accept-join"

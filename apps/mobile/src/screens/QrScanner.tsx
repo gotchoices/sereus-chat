@@ -14,7 +14,7 @@ export default function QrScanner() {
   const [value, setValue] = useState('');
   const [permission, setPermission] = useState<'authorized' | 'denied' | 'not-determined'>('not-determined');
   const device = useCameraDevice('back');
-  const isSimulator = Platform.OS === 'ios' ? !Platform.constants?.isDevice : false;
+  const isSimulator = Platform.OS === 'ios' ? !(Platform.constants as any)?.isDevice : false;
   const handledRef = useRef<string | null>(null);
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
@@ -33,7 +33,9 @@ export default function QrScanner() {
     let mounted = true;
     (async () => {
       const status = await Camera.requestCameraPermission();
-      if (mounted) setPermission(status);
+      // vision-camera reports 'granted'; our state uses the older wording.
+      const mapped = status === 'granted' ? 'authorized' : status === 'denied' ? 'denied' : 'not-determined';
+      if (mounted) setPermission(mapped as 'authorized' | 'denied' | 'not-determined');
     })();
     return () => { mounted = false; };
   }, []);

@@ -1,373 +1,280 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity } from 'react-native';
-import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
-import { listMessages, sendMessage } from '../data/adapter';
-import type { ChatMessage } from '../data/types';
+/**
+ * ChatInterface — one strand's conversation.
+ * Spec: design/specs/mobile/screens/chat-interface.md
+ *
+ * Deliberately absent, and not to be added back:
+ *   · delivery / read indicators — none is tracked
+ *   · a pending or "sending" state — the phone holds the strand, so a send is
+ *     a local write; only a genuine write failure surfaces
+ *   · link previews — nothing is fetched from a pasted URL
+ *   · a manufactured "message deleted" placeholder
+ */
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  View, Text, TextInput, FlatList, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import {
+  listMessages, listMembers, getStrandState, send, deleteMessage, react,
+} from '../data/adapter';
+import type { Message, Member, StrandState } from '../data/types';
 import { useT } from '../i18n';
-import Ionicons from 'react-native-vector-icons/Ionicons';
-import { consumePendingAttachment } from '../data/attachmentDraft';
-import Clipboard from '@react-native-clipboard/clipboard';
-import { showToast } from '../ui/toast';
-import { MessageBubble, EmptyState, IconButton } from '../components';
+import {
+  MessageBubble, EmptyState, Banner, IconButton, Avatar, StrandStatus,
+} from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
-/**
- * Reconcile a poll result with prior state.  Keeps any optimistic ('pending-*')
- * messages still in flight so the user doesn't see them flash out and back in
- * between optimistic-append and sendMessage-resolve.
- */
-function mergePersisted(prev: ChatMessage[], next: ChatMessage[]): ChatMessage[] {
-  const persistedIds = new Set(next.map(m => m.id));
-  const pending = prev.filter(m => m.id.startsWith('pending-') && !persistedIds.has(m.id));
-  return [...next, ...pending];
-}
+const DRAFT_KEY = (id: string) => `@sereus.chat/draft/${id}`;
+const READ_KEY = (id: string) => `@sereus.chat/read/${id}`;
+const GROUP_GAP_MS = 5 * 60 * 1000;
+
+const dayOf = (iso: string) => new Date(iso).toDateString();
+const clock = (iso: string) =>
+  new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+type Row =
+  | { kind: 'message'; msg: Message; showSender: boolean; showMeta: boolean }
+  | { kind: 'day'; label: string }
+  | { kind: 'unread' };
 
 export default function ChatInterface() {
-  const route: any = useRoute();
   const navigation: any = useNavigation();
-  const strandId: string | undefined = route?.params?.strandId;
+  const route: any = useRoute();
+  const { strandId, title } = route.params ?? {};
   const t = useT();
   const theme = useTheme();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [text, setText] = useState<string>('');
-  const [attachments, setAttachments] = useState<Array<{ id: string; name: string; type: 'image' | 'file' }>>([]);
-  const [inputHeight, setInputHeight] = useState<number>(40);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingOriginalText, setEditingOriginalText] = useState<string>('');
-  const [menuForId, setMenuForId] = useState<string | null>(null);
+  const listRef = useRef<FlatList<Row>>(null);
 
-  useEffect(() => {
-    let alive = true;
-    const sid = strandId || 't-susan';
-    const load = async () => {
-      try {
-        const data = await listMessages(sid);
-        if (!alive) return;
-        // Only update state if the persisted set differs from what we have,
-        // so optimistic appends don't get reverted by an in-flight poll.
-        setMessages(prev => mergePersisted(prev, data));
-      } catch (err) {
-        console.warn('listMessages poll failed:', err);
-      }
-    };
-    void load();
-    // Sereus has no live subscriptions yet; poll while screen is mounted.
-    // Cadence per design/specs/domain/interfaces.md (~2s).
-    const timer = setInterval(load, 2000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, [strandId]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [state, setState] = useState<StrandState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [readCursor, setReadCursor] = useState<string | null>(null);
+  const [atEnd, setAtEnd] = useState(true);
 
-  const canSend = useMemo(() => text.trim().length > 0 || attachments.length > 0, [text, attachments]);
-  const isEditing = editingId != null;
-
-  const formatTime = (iso: string | null) => {
-    if (!iso) return '';
-    try {
-      const d = new Date(iso);
-      const hh = d.getHours().toString().padStart(2, '0');
-      const mm = d.getMinutes().toString().padStart(2, '0');
-      return `${hh}:${mm}`;
-    } catch {
-      return '';
-    }
-  };
-
-  const onPressAttach = () => {
-    navigation.navigate('MediaPicker');
-  };
-
-  const onRemoveAttachment = (id: string) => {
-    setAttachments(prev => prev.filter(a => a.id !== id));
-  };
-
-  const onSend = () => {
-    if (!canSend) return;
-    if (isEditing && editingId) {
-      setMessages(prev => prev.map(m => (m.id === editingId ? { ...m, text: text.trim() } : m)));
-      setEditingId(null);
-      setEditingOriginalText('');
-      setText('');
-      setAttachments([]);
-      setInputHeight(40);
-      return;
-    }
-    const trimmed = text.trim();
-    setText('');
-    setAttachments([]);
-    setInputHeight(40);
-    if (trimmed.length > 0) {
-      // Optimistic append; the persisted message replaces the optimistic
-      // one when sendMessage resolves (id may differ).
-      const tempId = `pending-${Date.now()}`;
-      const optimistic: ChatMessage = {
-        id: tempId,
-        strandId: strandId || 't-susan',
-        sender: 'Me',
-        text: trimmed,
-        timestamp: new Date().toISOString(),
-        outgoing: true,
-        status: 'sent',
-      };
-      setMessages(prev => [...prev, optimistic]);
-      (async () => {
-        try {
-          const persisted = await sendMessage(strandId || 't-susan', trimmed);
-          setMessages(prev => prev.map(m => (m.id === tempId ? persisted : m)));
-        } catch (err) {
-          console.warn('sendMessage failed:', err);
-          // Leave optimistic in place; future step adds explicit error UX.
-        }
-      })();
-    }
-  };
-
-  const onMicPress = () => {
-    showToast('Voice message not implemented');
-  };
-
-  const onCancelEdit = () => {
-    setEditingId(null);
-    setText('');
-    setEditingOriginalText('');
-  };
-
-  useFocusEffect(
-    React.useCallback(() => {
-      const att = consumePendingAttachment();
-      if (att) {
-        setAttachments(prev => [...prev, { id: att.id, name: att.name ?? 'attachment', type: att.type === 'file' ? 'file' : 'image' }]);
-      }
-    }, []),
+  const me = members.find(m => m.isMe);
+  const isGroup = members.length > 2;
+  const nameOf = useCallback(
+    (id: string) => members.find(m => m.id === id)?.name ?? id.slice(0, 8),
+    [members],
   );
 
+  const load = useCallback(async () => {
+    try {
+      const [msgs, mem] = await Promise.all([listMessages(strandId), listMembers(strandId)]);
+      setMessages(msgs);
+      setMembers(mem);
+      setError(null);
+    } catch (e: any) {
+      setError(e?.message ?? 'Could not reach this conversation right now');
+    }
+    getStrandState(strandId).then(setState).catch(() => {});
+  }, [strandId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  // Draft and read cursor are device-local.  Nothing unsent leaves the phone.
+  useEffect(() => {
+    AsyncStorage.getItem(DRAFT_KEY(strandId)).then(v => v && setDraft(v));
+    AsyncStorage.getItem(READ_KEY(strandId)).then(setReadCursor);
+  }, [strandId]);
+  useEffect(() => { AsyncStorage.setItem(DRAFT_KEY(strandId), draft).catch(() => {}); }, [draft, strandId]);
+
+  const rows = useMemo<Row[]>(() => {
+    const out: Row[] = [];
+    let lastDay = '';
+    let unreadPlaced = false;
+    messages.forEach((m, i) => {
+      const prev = messages[i - 1];
+      const day = dayOf(m.timestamp);
+      if (day !== lastDay) { out.push({ kind: 'day', label: day }); lastDay = day; }
+      if (!unreadPlaced && readCursor && m.id > readCursor && m.memberId !== me?.id) {
+        out.push({ kind: 'unread' });
+        unreadPlaced = true;
+      }
+      const grouped =
+        prev &&
+        prev.memberId === m.memberId &&
+        Date.parse(m.timestamp) - Date.parse(prev.timestamp) < GROUP_GAP_MS &&
+        dayOf(prev.timestamp) === day;
+      const next = messages[i + 1];
+      const lastOfGroup =
+        !next || next.memberId !== m.memberId ||
+        Date.parse(next.timestamp) - Date.parse(m.timestamp) >= GROUP_GAP_MS;
+      out.push({
+        kind: 'message',
+        msg: m,
+        // Sender name only in strands of more than two.
+        showSender: isGroup && m.memberId !== me?.id && !grouped,
+        showMeta: lastOfGroup,
+      });
+    });
+    return out.reverse();
+  }, [messages, readCursor, me?.id, isGroup]);
+
+  const doSend = async () => {
+    const text = draft.trim();
+    if (!text) return;
+    setDraft('');
+    const pendingReply = replyTo?.id ?? null;
+    setReplyTo(null);
+    try {
+      const msg = await send(strandId, { content: text, replyToId: pendingReply });
+      setMessages(prev => [...prev, msg]);
+      await AsyncStorage.setItem(READ_KEY(strandId), msg.id);
+    } catch (e: any) {
+      // A genuine write failure — keep what they wrote.
+      setDraft(text);
+      setError(e?.message ?? 'That message could not be written');
+    }
+  };
+
+  const messageActions = (m: Message) => {
+    const mine = m.memberId === me?.id;
+    Alert.alert(nameOf(m.memberId), m.content, [
+      { text: t('actions.reply', 'Reply'), onPress: () => setReplyTo(m) },
+      { text: t('actions.react', 'React 👍'), onPress: () => react(m.id, '👍').then(load).catch(() => {}) },
+      ...(mine
+        ? [{
+            text: t('actions.delete', 'Delete'), style: 'destructive' as const,
+            onPress: () => deleteMessage(m.id).then(load).catch(() => {}),
+          }]
+        : []),
+      { text: t('common.cancel', 'Cancel'), style: 'cancel' as const },
+    ]);
+  };
+
+  const renderRow = ({ item }: { item: Row }) => {
+    if (item.kind === 'day') {
+      return <Text style={[typography.small, styles.divider, { color: theme.textMuted }]}>{item.label}</Text>;
+    }
+    if (item.kind === 'unread') {
+      return (
+        <View style={styles.unreadRow}>
+          <View style={[styles.rule, { backgroundColor: theme.accent }]} />
+          <Text style={[typography.small, { color: theme.accent }]}>{t('screens.chat.unread', 'New')}</Text>
+          <View style={[styles.rule, { backgroundColor: theme.accent }]} />
+        </View>
+      );
+    }
+    const m = item.msg;
+    const mine = m.memberId === me?.id;
+    const parent = m.replyToId ? messages.find(x => x.id === m.replyToId) : undefined;
+    const grouped = m.reactions.reduce<Record<string, { count: number; mine: boolean }>>((acc, r) => {
+      const e = (acc[r.symbol] ||= { count: 0, mine: false });
+      e.count++; if (r.memberId === me?.id) e.mine = true;
+      return acc;
+    }, {});
+    return (
+      <MessageBubble
+        testID={`message-${m.id}`}
+        text={m.content}
+        outgoing={mine}
+        senderName={item.showSender ? nameOf(m.memberId) : null}
+        timestamp={item.showMeta ? clock(m.timestamp) : null}
+        edited={!!m.editedAt}
+        replyTo={
+          m.replyToId
+            ? {
+                senderName: parent ? nameOf(parent.memberId) : null,
+                // The original is gone — say so rather than hiding it.
+                excerpt: parent ? parent.content : null,
+              }
+            : null
+        }
+        reactions={Object.entries(grouped).map(([symbol, v]) => ({ symbol, ...v }))}
+        onLongPress={() => messageActions(m)}
+      />
+    );
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {messages.length === 0 ? (
-        <EmptyState
-          testID="chat-empty"
-          icon="chatbubbles-outline"
-          title={t('screens.chat.empty', 'No messages yet. Say hello!')}
-        />
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: theme.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={90}
+    >
+      {state ? (
+        <Pressable onPress={() => navigation.navigate('StrandDetail', { strandId, title })}
+          style={[styles.statusStrip, { borderBottomColor: theme.divider }]}>
+          <StrandStatus state={state} variant="compact" />
+        </Pressable>
+      ) : null}
+
+      {error ? <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: load }} /> : null}
+
+      {messages.length === 0 && !error ? (
+        <EmptyState icon="chatbubble-ellipses-outline"
+          title={t('screens.chat.emptyTitle', 'Nothing said yet')}
+          hint={t('screens.chat.empty', 'Say something — it is just the two of you until anyone else is invited.')} />
       ) : (
         <FlatList
+          ref={listRef}
+          testID="message-list"
+          data={rows}
+          inverted
+          keyExtractor={(r, i) => (r.kind === 'message' ? r.msg.id : `${r.kind}-${i}`)}
           contentContainerStyle={styles.list}
-          data={messages}
-          keyExtractor={(m) => m.id}
-          testID="chat-list"
-          accessibilityLabel="Messages list"
-          renderItem={({ item, index }) => {
-            const prev = index > 0 ? messages[index - 1] : undefined;
-            const sameSenderAsPrev = !!prev && (prev.outgoing === item.outgoing) && (prev.sender === item.sender);
-            const isOwn = !!item.outgoing;
-            return (
-              <View style={styles.rowWrap}>
-                <View style={[styles.row, { justifyContent: isOwn ? 'flex-end' : 'flex-start' }]}>
-                  <MessageBubble
-                    testID={`message-${item.id}`}
-                    text={item.text}
-                    outgoing={isOwn}
-                    senderName={!isOwn && !sameSenderAsPrev ? item.sender : undefined}
-                    timestamp={item.timestamp ? formatTime(item.timestamp) : undefined}
-                    status={item.status}
-                    accessibilityLabel={isOwn ? 'Outgoing message' : `Message from ${item.sender}`}
-                    onLongPress={() => {
-                      if (isOwn) {
-                        setEditingId(item.id);
-                        setEditingOriginalText(item.text || '');
-                        setText(item.text || '');
-                      }
-                    }}
-                  />
-                  <IconButton
-                    name="ellipsis-vertical"
-                    size={16}
-                    color={theme.textMuted}
-                    onPress={() => setMenuForId(prev => (prev === item.id ? null : item.id))}
-                    accessibilityLabel="Message actions"
-                    style={styles.kebabSlot}
-                  />
-                </View>
-                {menuForId === item.id && (
-                  <View style={[styles.menuPanel, styles.menuPanelAbs, isOwn ? styles.menuRight : styles.menuLeft, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                    {isOwn ? (
-                      <>
-                        <TouchableOpacity
-                          style={styles.menuItem}
-                          onPress={() => {
-                            setEditingId(item.id);
-                            setEditingOriginalText(item.text || '');
-                            setText(item.text || '');
-                            setMenuForId(null);
-                          }}
-                          accessibilityLabel={t('screens.chat.menu.edit', 'Edit')}
-                        >
-                          <Text style={{ color: theme.textPrimary }}>{t('screens.chat.menu.edit', 'Edit')}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.menuItem}
-                          onPress={() => {
-                            setMessages(prev => prev.filter(m => m.id !== item.id));
-                            setMenuForId(null);
-                          }}
-                          accessibilityLabel={t('screens.chat.menu.delete', 'Delete')}
-                        >
-                          <Text style={{ color: theme.danger }}>{t('screens.chat.menu.delete', 'Delete')}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.menuItem}
-                          onPress={() => {
-                            Clipboard.setString(item.text || '');
-                            setMenuForId(null);
-                          }}
-                          accessibilityLabel={t('screens.chat.menu.copy', 'Copy')}
-                        >
-                          <Text style={{ color: theme.textPrimary }}>{t('screens.chat.menu.copy', 'Copy')}</Text>
-                        </TouchableOpacity>
-                      </>
-                    ) : (
-                      <>
-                        <TouchableOpacity
-                          style={styles.menuItem}
-                          onPress={() => {
-                            const quote = item.text ? `> ${item.text}\n` : '';
-                            setText(prev => (prev ? `${prev}\n${quote}` : quote));
-                            setMenuForId(null);
-                          }}
-                          accessibilityLabel={t('screens.chat.menu.reply', 'Reply')}
-                        >
-                          <Text style={{ color: theme.textPrimary }}>{t('screens.chat.menu.reply', 'Reply')}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.menuItem}
-                          onPress={() => {
-                            Clipboard.setString(item.text || '');
-                            setMenuForId(null);
-                          }}
-                          accessibilityLabel={t('screens.chat.menu.copy', 'Copy')}
-                        >
-                          <Text style={{ color: theme.textPrimary }}>{t('screens.chat.menu.copy', 'Copy')}</Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
-                )}
-              </View>
-            );
-          }}
-          keyboardShouldPersistTaps="handled"
+          renderItem={renderRow}
+          onScroll={e => setAtEnd(e.nativeEvent.contentOffset.y < 40)}
+          scrollEventThrottle={64}
         />
       )}
-      {attachments.length > 0 && (
-        <View style={styles.attachStrip}>
-          <FlatList
-            horizontal
-            data={attachments}
-            keyExtractor={(a) => a.id}
-            renderItem={({ item }) => (
-              <View style={[styles.attachChip, { backgroundColor: theme.surfaceAlt }]}>
-                <Text style={[styles.attachName, { color: theme.textPrimary }]} numberOfLines={1}>{item.name}</Text>
-                <TouchableOpacity style={[styles.attachClose, { backgroundColor: theme.surface }]} onPress={() => onRemoveAttachment(item.id)} accessibilityLabel="Remove attachment">
-                  <Ionicons name="close" size={14} color={theme.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            )}
-            showsHorizontalScrollIndicator={false}
-          />
-        </View>
-      )}
-      <View style={[styles.composer, { backgroundColor: theme.surface, borderTopColor: theme.divider }]}>
-        <IconButton
-          name="add"
-          size={24}
-          onPress={onPressAttach}
-          accessibilityLabel={t('screens.chat.attach', 'Attach')}
-          testID="composer-attach"
-        />
-        <View style={styles.inputWrapper}>
-          <TextInput
-            style={[
-              styles.input,
-              { backgroundColor: theme.surfaceAlt, borderColor: theme.border, color: theme.textPrimary, height: Math.min(Math.max(40, inputHeight), 120) },
-            ]}
-            placeholder={t('screens.chat.composerPlaceholder', 'Message')}
-            placeholderTextColor={theme.textMuted}
-            value={text}
-            onChangeText={setText}
-            multiline
-            onContentSizeChange={(e) => setInputHeight(e.nativeEvent.contentSize.height)}
-            accessibilityLabel={t('screens.chat.composerPlaceholder', 'Message')}
-            testID="composer-input"
-          />
-        </View>
-        {isEditing ? (
-          <View style={styles.composeRightStack}>
-            <IconButton
-              name="close"
-              size={20}
-              color={theme.danger}
-              onPress={onCancelEdit}
-              accessibilityLabel={t('screens.chat.cancel', 'Cancel')}
-              testID="composer-cancel"
-            />
-            <IconButton
-              name="checkmark-outline"
-              size={20}
-              variant="accent"
-              onPress={onSend}
-              accessibilityLabel={t('screens.chat.save', 'Save')}
-              testID="composer-save"
-              style={styles.saveBtn}
-            />
+
+      {!atEnd ? (
+        <Pressable style={[styles.jump, { backgroundColor: theme.accent }]}
+          onPress={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}>
+          <Text style={[typography.small, { color: theme.accentText }]}>
+            {t('screens.chat.jump', 'Latest')}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {replyTo ? (
+        <View style={[styles.replyBar, { backgroundColor: theme.surfaceAlt, borderTopColor: theme.divider }]}>
+          <View style={styles.flex1}>
+            <Text style={[typography.small, { color: theme.textMuted }]}>
+              {t('screens.chat.replyingTo', 'Replying to {{name}}').replace('{{name}}', nameOf(replyTo.memberId))}
+            </Text>
+            <Text numberOfLines={1} style={[typography.small, { color: theme.textPrimary }]}>{replyTo.content}</Text>
           </View>
-        ) : (
-          <IconButton
-            name={canSend ? 'send-outline' : 'mic-outline'}
-            size={20}
-            variant={canSend ? 'accent' : 'plain'}
-            onPress={canSend ? onSend : onMicPress}
-            accessibilityLabel={canSend ? t('screens.chat.send', 'Send') : t('screens.chat.record', 'Record')}
-            testID={canSend ? 'composer-send' : 'composer-mic'}
-          />
-        )}
+          <IconButton name="close-outline" size={18} accessibilityLabel={t('common.cancel', 'Cancel')} onPress={() => setReplyTo(null)} />
+        </View>
+      ) : null}
+
+      <View style={[styles.composer, { borderTopColor: theme.divider, backgroundColor: theme.surface }]}>
+        <IconButton name="add-outline" size={22} accessibilityLabel={t('actions.attach', 'Attach')}
+          onPress={() => navigation.navigate('MediaPicker', { purpose: 'attachment', strandId })} />
+        <TextInput
+          testID="composer"
+          value={draft}
+          onChangeText={setDraft}
+          multiline
+          placeholder={t('screens.chat.placeholder', 'Message')}
+          placeholderTextColor={theme.textMuted}
+          style={[typography.body, styles.input, { color: theme.textPrimary, backgroundColor: theme.surfaceAlt }]}
+        />
+        <IconButton name="send-outline" size={22} variant="accent"
+          accessibilityLabel={t('actions.send', 'Send')} onPress={doSend} />
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  list: { paddingHorizontal: spacing[3], paddingTop: spacing[1], paddingBottom: spacing[5] },
-  rowWrap: { position: 'relative' },
-  row: { flexDirection: 'row', alignItems: 'flex-start' },
-  kebabSlot: { minWidth: 24, marginLeft: spacing[0] },
-  menuPanel: { borderWidth: 1, borderRadius: radius.control, paddingVertical: spacing[0], minWidth: 160, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6, elevation: 2 },
-  menuPanelAbs: { position: 'absolute', top: -4, zIndex: 5 },
-  menuLeft: { left: 0 },
-  menuRight: { right: 0 },
-  menuItem: { paddingHorizontal: spacing[2], paddingVertical: spacing[1] },
-  attachStrip: { paddingVertical: spacing[0], paddingHorizontal: spacing[3] },
-  attachChip: { borderRadius: radius.card, paddingVertical: spacing[0], paddingHorizontal: spacing[1], marginRight: spacing[1], position: 'relative' },
-  attachName: { maxWidth: 140 },
-  attachClose: { position: 'absolute', top: -6, right: -6, borderRadius: 10, padding: 2, elevation: 2 },
-  composer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: spacing[2],
-    paddingTop: spacing[1],
-    paddingBottom: spacing[1],
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  inputWrapper: { flex: 1, marginHorizontal: spacing[1] },
-  input: {
-    borderWidth: 1,
-    borderRadius: radius.control,
-    paddingHorizontal: spacing[2],
-    paddingVertical: spacing[1],
-    ...typography.body,
-  },
-  composeRightStack: { alignItems: 'center', justifyContent: 'flex-end' },
-  saveBtn: { marginTop: spacing[0] },
+  statusStrip: { paddingHorizontal: spacing[3], paddingVertical: spacing[1], borderBottomWidth: StyleSheet.hairlineWidth },
+  list: { padding: spacing[2] },
+  divider: { textAlign: 'center', paddingVertical: spacing[1] },
+  unreadRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], paddingVertical: spacing[1] },
+  rule: { flex: 1, height: StyleSheet.hairlineWidth },
+  jump: { position: 'absolute', right: spacing[3], bottom: 84, paddingHorizontal: spacing[2], paddingVertical: 6, borderRadius: radius.pill },
+  replyBar: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], padding: spacing[2], borderTopWidth: StyleSheet.hairlineWidth },
+  flex1: { flex: 1 },
+  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[1], padding: spacing[2], borderTopWidth: StyleSheet.hairlineWidth },
+  input: { flex: 1, maxHeight: 120, minHeight: 38, borderRadius: radius.control, paddingHorizontal: spacing[2], paddingVertical: spacing[1] },
 });

@@ -1,219 +1,165 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, Switch, Platform, ToastAndroid } from 'react-native';
-import { useT } from '../i18n';
-import { createInvitation } from '../data/adapter';
-import { buildInviteUrl } from '../data/inviteLink';
+/**
+ * InvitationGenerator — start a strand, or add somebody to one.
+ * Spec: design/specs/mobile/screens/invitation-generator.md
+ *
+ * Nothing here may render a not-yet-accepted invitation as though it were a
+ * strand: there is no strand until somebody accepts.
+ */
+
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, ScrollView, Pressable, StyleSheet, Share, Alert } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { createInvitation, listOutstandingInvitations, cancelInvitation } from '../data/adapter';
 import type { Invitation } from '../data/types';
-import Clipboard from '@react-native-clipboard/clipboard';
-import QRCode from 'react-native-qrcode-svg';
-import Ionicons from 'react-native-vector-icons/Ionicons';
-import { Banner, IconButton } from '../components';
+import { useT } from '../i18n';
+import { Banner, IconButton, ListRow, SectionHeader } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
 export default function InvitationGenerator() {
+  const navigation: any = useNavigation();
+  const route: any = useRoute();
+  const strandId: string | undefined = route?.params?.strandId;
+  const addingToExisting = !!strandId;
   const t = useT();
   const theme = useTheme();
-  const [includeQR, setIncludeQR] = useState(true);
-  const [invitation, setInvitation] = useState<Invitation | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const qrRef = useRef<QRCode | null>(null);
 
-  // Minting an invitation talks to the live cadre and can legitimately fail —
-  // e.g. `createOpenInvitation` throws "No multiaddrs available for
-  // invitation" until this device has a dialable address (it needs a node in
-  // its cadre to relay through).  Never let that surface as an unhandled
-  // rejection with the UI stuck on "Generating...".
+  const [visibility, setVisibility] = useState<'private' | 'public'>('private');
+  const [grantsInviteRight, setGrants] = useState(false);
+  const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const [outstanding, setOutstanding] = useState<Invitation[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(() => {
+    listOutstandingInvitations().then(setOutstanding).catch(() => {});
+  }, []);
+  useEffect(refresh, [refresh]);
+
   const generate = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
-      const inv = await createInvitation();
-      setInvitation(inv);
+      setInvitation(await createInvitation({
+        strandId,
+        visibility: addingToExisting ? undefined : visibility,
+        grantsInviteRight,
+      }));
+      refresh();
     } catch (err) {
       setInvitation(null);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [strandId, addingToExisting, visibility, grantsInviteRight, refresh]);
 
-  useEffect(() => {
-    void generate();
-  }, [generate]);
-
-  // Shareable App Link / Universal Link (see src/data/inviteLink.ts).
-  const inviteLink = useMemo(() => {
-    if (!invitation) return '';
-    return buildInviteUrl(invitation.token);
-  }, [invitation]);
-
-  const onRegenerate = generate;
-
-  const onShare = async () => {
-    if (!inviteLink) return;
-    try {
-      if (includeQR && qrRef.current && Platform.OS === 'ios') {
-        await Share.share({
-          message: `${t('screens.InvitationGenerator.sharePrefix', 'Join me on Sereus Chat')}: ${inviteLink}\n(${t('screens.InvitationGenerator.scanQRIfVisible', 'Scan QR if visible')})`,
-          url: undefined,
-        });
-      } else {
-        await Share.share({
-          message: `${t('screens.InvitationGenerator.sharePrefix', 'Join me on Sereus Chat')}: ${inviteLink}`,
-        });
-      }
-    } catch {}
-  };
-
-  const [toastVisible, setToastVisible] = useState(false);
-  const onCopy = () => {
-    if (!inviteLink) return;
-    Clipboard.setString(inviteLink);
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(t('screens.InvitationGenerator.toastCopied', 'Copied'), ToastAndroid.SHORT);
-    } else {
-      setToastVisible(true);
-      setTimeout(() => setToastVisible(false), 1200);
-    }
-  };
-  const shareIcon = Platform.select({ ios: 'share-outline', android: 'share-social-outline', default: 'share-outline' }) as string;
-
-  if (error) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <Text style={[styles.title, { color: theme.textPrimary }]}>{t('screens.InvitationGenerator.title', 'Invite Friends')}</Text>
-        <View style={[styles.card, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
-          <Text style={[styles.errorTitle, { color: theme.textPrimary }]} testID="invite-error-title">
-            {t('screens.InvitationGenerator.errorTitle', "Can't create an invitation yet")}
-          </Text>
-          <Banner
-            testID="invite-error"
-            variant="error"
-            message={error}
-            action={{ label: t('screens.InvitationGenerator.retry', 'Try again'), onPress: onRegenerate, testID: 'invite-retry' }}
-          />
-        </View>
-      </View>
+  const postIntoStrand = () =>
+    Alert.alert(
+      t('screens.invite.postTitle', 'Put it in the conversation?'),
+      // An invitation works for whoever holds it.
+      t('screens.invite.postBody',
+        'Everyone in this strand will be able to use it. That hands every member a one-off ability to bring somebody in. If you can reach the person another way, do that instead.'),
+      [{ text: t('common.cancel', 'Cancel'), style: 'cancel' }, { text: t('screens.invite.post', 'Post it') }],
     );
-  }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <Text style={[styles.title, { color: theme.textPrimary }]}>{t('screens.InvitationGenerator.title', 'Invite Friends')}</Text>
-      <View style={[styles.card, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
-        <Text style={[styles.label, { color: theme.textSecondary }]}>{t('screens.InvitationGenerator.labelLink', 'Invitation Link')}</Text>
-        <View style={[styles.linkRow, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text selectable style={[styles.link, { color: theme.textPrimary }]} numberOfLines={1} ellipsizeMode="middle" testID="invite-link">
-            {inviteLink || (loading ? t('screens.InvitationGenerator.generating', 'Generating...') : '')}
-          </Text>
-          <IconButton
-            name="copy-outline"
-            size={20}
-            onPress={onCopy}
-            disabled={!inviteLink}
-            accessibilityLabel="Copy link"
-            testID="invite-copy"
-          />
-        </View>
-        <View style={styles.toggleRow}>
-          <Switch
-            value={includeQR}
-            onValueChange={setIncludeQR}
-            trackColor={{ true: theme.accent, false: theme.border }}
-          />
-          <Text style={[styles.toggleLabel, { color: theme.textPrimary }]}>{t('screens.InvitationGenerator.includeQR', 'Include QR')}</Text>
-        </View>
-        {includeQR && inviteLink ? (
-          <View style={[styles.qrBox, { backgroundColor: theme.surface, borderColor: theme.border }]} accessible accessibilityLabel="Invitation QR code">
-            <QRCode
-              value={inviteLink}
-              size={200}
-              backgroundColor="#ffffff"
-              color="#000000"
-              getRef={(c) => (qrRef.current = c)}
-            />
-          </View>
-        ) : null}
-        <View style={styles.btnRow}>
-          <IconButton
-            name={shareIcon}
-            size={20}
-            variant="accent"
-            onPress={onShare}
-            accessibilityLabel="Share invite"
-            testID="invite-share"
-          />
-          <TouchableOpacity
-            style={[styles.regenBtn, { backgroundColor: theme.surface, borderColor: theme.border }]}
-            onPress={onRegenerate}
-            accessibilityLabel="Regenerate"
-            testID="invite-regen"
-          >
-            <Ionicons name="refresh-outline" size={18} color={theme.textPrimary} />
-            <Text style={[styles.regenText, { color: theme.textPrimary }]}>{t('screens.InvitationGenerator.regenerate', 'Regenerate')}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-      {toastVisible && (
-        <View style={styles.toast} accessibilityLabel="Toast">
-          <Text style={[styles.toastText, { backgroundColor: theme.surfaceAlt, borderColor: theme.border, color: theme.textPrimary }]}>
-            {t('screens.InvitationGenerator.toastCopied', 'Copied')}
-          </Text>
-        </View>
+    <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.content}>
+      {error ? <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: generate }} /> : null}
+
+      {!addingToExisting ? (
+        <>
+          <SectionHeader label={t('screens.invite.kind', 'What kind of strand')} />
+          {(['private', 'public'] as const).map(v => (
+            <Pressable key={v} onPress={() => setVisibility(v)}
+              style={[styles.card, { borderColor: visibility === v ? theme.accent : theme.border, backgroundColor: theme.surfaceAlt }]}>
+              <Text style={[typography.body, styles.cardTitle, { color: theme.textPrimary }]}>
+                {v === 'private' ? t('screens.invite.private', 'Private') : t('screens.invite.public', 'Open to anyone')}
+              </Text>
+              <Text style={[typography.small, { color: theme.textMuted }]}>
+                {v === 'private'
+                  ? t('screens.invite.privateBody', 'Only people you invite can be in it.')
+                  : t('screens.invite.publicBody', 'Anyone with the link can join, and nobody can be removed.')}
+              </Text>
+            </Pressable>
+          ))}
+        </>
+      ) : (
+        <Banner
+          variant="info"
+          message={t('screens.invite.historyWarning',
+            'Whoever takes this up will be able to read everything already said here, including what was said before they arrived.')}
+        />
       )}
-    </View>
+
+      <SectionHeader label={t('screens.invite.rights', 'On this invitation')} />
+      <Pressable onPress={() => setGrants(g => !g)}
+        style={[styles.card, { borderColor: grantsInviteRight ? theme.accent : theme.border, backgroundColor: theme.surfaceAlt }]}>
+        <Text style={[typography.body, styles.cardTitle, { color: theme.textPrimary }]}>
+          {grantsInviteRight
+            ? t('screens.invite.canInviteOn', 'They can add and remove people')
+            : t('screens.invite.canInviteOff', 'They cannot add or remove anyone')}
+        </Text>
+        <Text style={[typography.small, { color: theme.textMuted }]}>
+          {t('screens.invite.rightsBody',
+            'Passing this on gives them the same reach you have — including over you.')}
+        </Text>
+      </Pressable>
+
+      <View style={styles.actions}>
+        <IconButton name="qr-code-outline" size={22} variant="accent"
+          accessibilityLabel={t('screens.invite.generate', 'Make an invitation')}
+          onPress={generate} style={loading ? styles.dim : undefined} />
+      </View>
+
+      {invitation ? (
+        <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
+          <Text style={[typography.small, { color: theme.textMuted }]} selectable>{invitation.url}</Text>
+          <Text style={[typography.small, { color: theme.textMuted }]}>
+            {t('screens.invite.nothingYet', 'Nothing exists yet — there is no strand until somebody accepts.')}
+          </Text>
+          <View style={styles.shareRow}>
+            <IconButton name="copy-outline" size={20} accessibilityLabel={t('common.copy', 'Copy')} onPress={() => {}} />
+            <IconButton name="share-outline" size={20} accessibilityLabel={t('common.share', 'Share')}
+              onPress={() => Share.share({ message: invitation.url })} />
+            {addingToExisting ? (
+              <IconButton name="chatbubble-outline" size={20}
+                accessibilityLabel={t('screens.invite.post', 'Post into the strand')} onPress={postIntoStrand} />
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+
+      {outstanding.length ? (
+        <>
+          <SectionHeader label={t('screens.invite.outstanding', 'Still outstanding')} />
+          <View style={styles.rows}>
+            {outstanding.map(inv => (
+              <ListRow
+                key={inv.id}
+                title={inv.label ?? inv.url}
+                subtitle={inv.expiresAt
+                  ? t('screens.invite.expires', 'Runs out {{when}}').replace('{{when}}', new Date(inv.expiresAt).toLocaleDateString())
+                  : undefined}
+                onPress={() => Alert.alert(inv.label ?? t('screens.strands.invitation', 'Invitation'), undefined, [
+                  { text: t('common.share', 'Share again'), onPress: () => Share.share({ message: inv.url }) },
+                  { text: t('screens.invite.abandon', 'Abandon'), style: 'destructive',
+                    onPress: () => cancelInvitation(inv.id).then(refresh).catch(() => {}) },
+                  { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+                ])}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: spacing[4] },
-  title: { ...typography.title, marginBottom: spacing[2] },
-  card: { borderWidth: 1, borderRadius: radius.card, padding: spacing[3] },
-  label: { ...typography.small, marginBottom: spacing[1] },
-  errorTitle: { ...typography.body, fontWeight: '600', marginBottom: spacing[2] },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: radius.control,
-    paddingLeft: spacing[2],
-  },
-  link: { ...typography.body, flex: 1 },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing[2], marginBottom: spacing[1] },
-  toggleLabel: { ...typography.body, marginLeft: spacing[1] },
-  qrBox: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginTop: spacing[1],
-    marginBottom: spacing[1],
-    padding: spacing[2],
-    borderWidth: 1,
-    borderRadius: radius.card,
-  },
-  btnRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing[2], gap: spacing[2] },
-  regenBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing[1],
-    paddingHorizontal: spacing[2],
-    borderWidth: 1,
-    borderRadius: radius.control,
-  },
-  regenText: { ...typography.body, marginLeft: spacing[0] },
-  toast: {
-    position: 'absolute',
-    bottom: spacing[5],
-    left: spacing[4],
-    right: spacing[4],
-    alignItems: 'center',
-  },
-  toastText: {
-    ...typography.body,
-    borderWidth: 1,
-    paddingVertical: spacing[1],
-    paddingHorizontal: spacing[2],
-    borderRadius: radius.control,
-    overflow: 'hidden',
-  },
+  content: { padding: spacing[3], gap: spacing[1], paddingBottom: spacing[5] },
+  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.card, padding: spacing[2], gap: 4 },
+  cardTitle: { fontWeight: '600' },
+  actions: { alignItems: 'center', paddingVertical: spacing[2] },
+  shareRow: { flexDirection: 'row', gap: spacing[1], paddingTop: spacing[1] },
+  rows: { gap: spacing[1] },
+  dim: { opacity: 0.5 },
 });
