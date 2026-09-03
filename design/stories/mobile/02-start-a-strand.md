@@ -98,7 +98,7 @@ cubicle. Bob's brother Mike is not.
 
 ## Open
 
-Public strands are offered at creation but not developed this round (`STATUS.md` Appendix). An
+Public strands are offered at creation but not developed this round ([sereus.md](../../specs/domain/sereus.md)). An
 invitation lost before anyone takes it up leaves a strand that cannot be added to; the practical
 answer is to abandon it and start another, which this story should make an easy thing to do rather
 than a dead end to discover.

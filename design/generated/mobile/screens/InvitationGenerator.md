@@ -45,7 +45,7 @@ Invitations.cancel(id)
 ```
 
 **The platform seats a member from a bearer invitation and confers invite rights by a separate
-signed act** — there is no "join as manager" invitation upstream (`STATUS.md` §G). The adapter hides
+signed act** — there is no "join as manager" invitation upstream ([sereus.md](../../../specs/domain/sereus.md)). The adapter hides
 this; if the grant cannot be applied at admission without a manager present, that surfaces as the
 grant landing late, and the screen must not promise it as instantaneous.
 

@@ -1,202 +1,128 @@
 # Target STATUS: mobile
 
-## Bootstrap / Discovery (shared)
+Checklist for specs, screens and app code. Stories are tracked in
+[`stories/mobile/STATUS.md`](../../stories/mobile/STATUS.md). Platform facts, hazards and upstream
+questions live in [`domain/sereus.md`](../domain/sereus.md).
+
+## Phases
+
 - [x] `design/specs/project.md` complete
+- [x] Stories exist and are numbered (19, all drafted; none human-reviewed)
+- [x] `navigation.md` and `screens/index.md` reflect the story set
+- [x] `components/index.md` current, incl. the new `StrandStatus`
+- [x] Domain contract: `overview.md`, `schema.md`, `ops.md`, `interfaces.md`, `sereus.md`
+- [ ] `domain/rules.md` — not yet needed
+- [ ] Scenario docs and images under `design/generated/mobile/`
 
-## Story Generation (mobile)
-- [x] Stories exist under `design/stories/mobile/`
-- [x] Stories reviewed and STATUS trimmed
+## Routes
 
-## Navigation Planning (mobile)
-- [x] `design/specs/mobile/navigation.md` exists and reviewed
-- [x] `design/specs/mobile/screens/index.md` lists intended screens
+13 active routes; all have a human spec, a consolidation, code, and have been seen on device with
+their variants. Calls are parked (story 90).
 
-## Domain Contract (shared)
-- [x] `design/specs/domain/overview.md` — terminology and data ownership
-- [x] `design/specs/domain/schema.md` — local profile + per-strand chat sApp schema (sereus-owned data excluded)
-- [x] `design/specs/domain/ops.md` — domain operations
-- [x] `design/specs/domain/interfaces.md` — operation→sereus mapping, configuration axes, RN platform gate
-- [x] `design/specs/domain/sereus.md` — integration boundary, cadre lifecycle, cadre-vs-chat code split, pending decisions
-- [ ] `design/specs/domain/rules.md` — validation, permissions (as needed)
-
-## Screen/Component Slicing (mobile)
-
-Legend: **spec** = human screen spec · **cons** = consolidation · **code** = app code.
-
-### Chat surface
-
-All 13 active routes have a spec and a consolidation as of 2026-09-02, regenerated from the
-19-story set. No route has code yet under the new map.
-
-| Route | spec | cons | code | Note |
+| Route | spec | cons | code | seen |
 |-------|------|------|------|------|
-| StrandList | ✓ | ✓ | ✓ | renders: sections, precedence, sort, empty + error |
-| ChatInterface | ✓ | ✓ | ✓ | renders: grouping, quote-reply, reactions, attachments |
-| StrandDetail | ✓ | ✓ | ✓ | renders: status card, members, the ladder |
-| StrandMedia | ✓ | ✓ | ✓ | renders: grid, filters, all three localities |
-| MediaViewer | ✓ | ✓ | ✓ | built; reached from StrandMedia |
-| MediaPicker | ✓ | ✓ | ✓ | pre-existing; two type defects fixed |
-| SearchInterface | ✓ | ✓ | ✓ | streaming consumer; renders idle |
-| InvitationGenerator | ✓ | ✓ | ✓ | renders: private/public, invite-rights |
-| InvitationAcceptance | ✓ | ✓ | ✓ | **rebuilt to spec**: inviter, strand status, what you take on |
-| QrScanner | ✓ | ✓ | ✓ | renders; has a paste-link fallback for the emulator |
-| Profile | ✓ | ✓ | ✓ | renders: shared vs device-local |
-| Settings | ✓ | ✓ | ✓ | renders: four sections |
-| CadreManager | ✓ | ✓ | ✓ | component-provided; no longer hangs on mocks |
-| VideoCallActive | — | — | — | **parked**, story 90 |
-| VoiceCallOverlay | — | — | — | **parked**, story 90 |
+| StrandList | ✓ | ✓ | ✓ | happy · empty · error |
+| ChatInterface | ✓ | ✓ | ✓ | happy · empty · error |
+| StrandDetail | ✓ | ✓ | ✓ | happy · settled |
+| StrandMedia | ✓ | ✓ | ✓ | happy · empty |
+| MediaViewer | ✓ | ✓ | ✓ | image · fetching · unreachable |
+| MediaPicker | ✓ | ✓ | ✓ | — |
+| SearchInterface | ✓ | ✓ | ✓ | idle |
+| InvitationGenerator | ✓ | ✓ | ✓ | happy |
+| InvitationAcceptance | ✓ | ✓ | ✓ | live · dead |
+| QrScanner | ✓ | ✓ | ✓ | emulator fallback |
+| Profile | ✓ | ✓ | ✓ | happy |
+| Settings | ✓ | ✓ | ✓ | happy |
+| CadreManager | ✓ | ✓ | ✓ | mock-mode notice |
+| VideoCallActive | — | — | — | **parked** |
+| VoiceCallOverlay | — | — | — | **parked** |
 
-### Reviewed on device (Android emulator, mocks, 2026-09-02)
+## Done
 
-Found and fixed while looking at real screens:
+- [x] Regenerated all 13 specs and consolidations from the 19-story set
+- [x] `ConnectionsList` → `StrandList`, `ProfileSetup` → `Profile`; `Alerts` deleted
+- [x] Data layer rewritten to `ops.md`: strand-shaped summaries, streaming search, no status field
+- [x] `MessageBubble` status tick removed; `StrandStatus` added; `Badge` gained mention/draft/muted
+- [x] Mock namespaces: Strands · Messages · Members · Invitations · StrandMedia · StrandState ·
+      Search · Prefs · StorageUsage · Profile — with `fetching`/`unreachable` media so the third
+      content state is exercisable
+- [x] `USE_SEREUS = false` (mocks); live adapter adapted to the new interface, unwired ops grouped
+- [x] `sereus://` registered in AndroidManifest (needs a native rebuild to take effect)
+- [x] Retired dead locale namespaces; fixed a stale string that overrode designed copy
+- [x] Fixed on device: mention vs. mute sort, mislabelled local media, missing attachments,
+      unpinned footer, MediaViewer pager rendering one item for every page, viewer contrast
 
-- **A mention could not surface a soft-muted strand.** The "muted strands are not promoted by
-  traffic" rule was over-applied: a soft mute exists precisely to let a mention through, so only a
-  *hard* mute now holds its place regardless.
-- **Local files and voice notes were labelled "Not reachable right now"** in the media grid — the
-  exact confusion `overview.md` forbids. A local item with no thumbnail is simply here.
-- **Attachments were not rendered in the conversation at all.**
-- **The footer was not pinned** when the list was replaced by a banner or empty state.
-- **A variant deep link changed the variant but nothing re-read it.** The navigator is now keyed on
-  the variant, so a mock deep link remounts the tree without screens knowing variants exist.
-- Draft was announced twice (badge and preview); the badge went.
-- Media filter chips showed raw keys (`image`, `video`).
+## To do — write device decisions back into the **human** specs
 
-Second pass (same day):
+The generated consolidations are current as of 2026-09-03. These are the *human* specs in
+`screens/`, which remain behind the code — and being authoritative, a regeneration read from them
+would undo the fixes. Each line is a one-paragraph edit.
 
-- **InvitationAcceptance was still the old screen** — a token string and a Join button, with the
-  accept call stubbed out in a comment. Rebuilt to spec: who is inviting, the strand's status, what
-  you would be taking on, and only then the decision. This is the load-bearing placement of
-  `StrandStatus`; it is the one moment somebody can judge a strand before disclosing themselves.
-- **Its title said "Accept Invite"**, presuming the answer. Now "Invitation".
-- **The decision was two unlabelled icons** — a tick and a cross for the most consequential choice
-  in the app. Now "Join this strand" and "No thanks".
-- **CadreManager sat on "Loading…" forever** under mocks, which the consolidation forbids. The
-  *integration* now says plainly that machines live on the real network, rather than mounting a
-  component with nothing behind it. The component itself is untouched.
+- [ ] `screens/strand-list.md` — a **mention surfaces a soft-muted strand**; only a hard mute holds
+      its place (line ~45 still says muted strands are never reordered)
+- [ ] `screens/strand-list.md` — **draft is not a badge**; the preview says it (precedence is
+      mention → unread → muted)
+- [ ] `screens/media-viewer.md` — dark ground and light chrome are deliberate, not theme tokens
+- [ ] `screens/strand-media.md` — a local file or voice note with no thumbnail shows its **name**;
+      it is not a locality state
+- [ ] `screens/invitation-acceptance.md` — the decision carries words, and the title does not
+      presume the answer
+- [ ] `screens/cadre-manager.md` — integration shows an explanatory state under mocks rather than
+      mounting a component with nothing behind it
+- [x] ~~Record the `useDataRevision()` re-read seam in the consolidations~~ — done
+- [x] ~~Refresh the consolidations~~ — done 2026-09-03: StrandList, ChatInterface, StrandDetail,
+      StrandMedia, MediaViewer, InvitationAcceptance, CadreManager. Dep-hashes re-run; the 12
+      code-bearing routes are no longer stale (CadreManager reports "missing output" because the
+      screen is a component, not a generated `.tsx` — expected)
 
-Third pass — MediaViewer and the strand-scoped variants:
+## To do — behaviour the stories specify but no screen does yet
 
-- **MediaViewer showed the same attachment on every page.** `renderItem` ignored the item it was
-  handed and rendered whatever was "current", so swiping only changed the content once the scroll
-  settled. Now renders per item.
-- **The viewer sat on a near-white page**, and once given a dark ground its chrome was dark-on-dark
-  and effectively invisible. Dark ground is now deliberate and not a theme token — media is the
-  subject, and the chrome is explicitly light against it.
-- **A regression of my own:** keying the navigator on the variant (added in the previous pass to
-  make variant deep links re-read) *reset navigation to the root*, so any deep link that also
-  changed the variant never reached its screen. Replaced with a neutral `useDataRevision()` signal:
-  screens list it as a load dependency, it never changes in production, and navigation is untouched.
-- **A stale locale string was silently overriding designed copy.** `screens.chat.empty` still read
-  "No messages yet. Say hello!" from the bundle, so the empty-conversation copy never appeared. The
-  bundle wins over a code fallback, which makes this class of bug invisible in review.
-- **Retired dead locale namespaces** (`connections`, `InvitationAcceptance`) describing screens that
-  no longer exist in that shape — they would have overridden new copy the same way.
+- [ ] **Edit a message** (13) — long-press offers Reply, React, Delete; no Edit
+- [ ] **Soft vs. hard mute choice** (10, 33) — one undifferentiated "Mute" today
+- [ ] **Mark unread again** (10)
+- [ ] **Mention picker** (12) — typing `@` does nothing; mentions must resolve to a member
+- [ ] **Open reaction set** (12) — fixed 👍 only
+- [ ] **Promote a member** (05) — StrandDetail can resign but not confer
+- [ ] **Rename a member locally** (31) — offered in the sheet, no handler
+- [ ] **Trim storage** (21, 41) and an editable **storage ceiling** (41)
+- [ ] **Swipe-to-archive** (30) and **archive/unarchive** actions
+- [ ] **Search filters** — kind, date, sender (32); scope works
+- [ ] MediaViewer **save** is an Alert stub
 
-A "hooks called conditionally" red box during this pass was stale Fast Refresh after editing a
-context provider, not a code fault; a cold start cleared it.
+## To do — i18n
 
-### i18n
+- [ ] Every new string needs a home in `locales/*/screens.json`. They render today only via code
+      fallbacks, and the bundle **wins wherever a key exists** — so a stale bundle entry silently
+      replaces designed copy (this already happened once).
 
-The bundle predates these screens. New keys fall back to the English written in the code, which is
-why the screens read correctly — but the bundle is the authority where a key exists, so
-**every new string still needs a home in `locales/*/screens.json`** before translation is meaningful.
-That is a separate pass.
+## To do — assets
 
-All thirteen routes and their happy/empty/error variants have now been seen on device.
+- [ ] Brand mark / image asset (empty states and headers use Ionicons only). Logo exploration is
+      in `docs/`.
 
-### Deep links for review
+## Deep links for review
 
-The manifest registers `chat://` (and now `sereus://`, which needs a native rebuild to take effect).
-Variants work on any route:
+`chat://` works today; `sereus://` needs a native rebuild. Variants work on any route.
 
 ```
 chat://strands?variant={happy|empty|error}
 chat://strand/s-cycling            chat://strand/s-cycling/about
 chat://strand/s-cycling/shared     chat://search
-chat://invite    chat://profile    chat://settings    chat://scan
+chat://invite    chat://invite/<token>    chat://profile    chat://settings    chat://scan
 ```
-
-### Code lane — what has to go
-
-- `src/screens/ConnectionsList.tsx` → StrandList (rename plus reframe: rows are strands)
-- `src/screens/ProfileSetup.tsx` → Profile
-- `src/screens/Alerts.tsx` → **delete**; it has no story, spec or index entry, and the strand list
-  is the inbox
-- `MessageBubble`'s delivery-status tick → remove; no status is tracked
-
-### Domain contract (shared)
-
-- [x] `overview.md` — terminology, partial locality, strand isolation, data ownership
-- [x] `schema.md` — local profile + per-strand schema; `Message.Status` removed; ordering placeholder
-- [x] `ops.md` — needs the strand-shaped rewrite noted in stories `STATUS.md` §F
-- [x] `interfaces.md` — op→sereus mapping, error surfaces incl. fetch/unreachable/capacity
-- [x] `sereus.md` — integration boundary
-- [ ] `rules.md` — not yet needed
-
-### Mock data
-
-`mock/data/` namespaces: Strands · Messages · Members · Invitations · StrandMedia · StrandState ·
-Search · Prefs · StorageUsage · Profile. Each with happy/empty/error where meaningful. Media mocks
-deliberately include `fetching` and `unreachable` items so the third content state is exercisable.
-
-## Scenario / Peer Review (optional)
-- [ ] Scenario docs/images under `design/generated/mobile/`
-
-## Design System (`src/theme/`, `src/components/`)
-
-Driven by `global/ui.md` (semantic tokens, light+dark) and
-`components/index.md` (shared component layer).
-
-- [x] `src/theme/` — token-based `ThemeProvider` (system/light/dark, persisted),
-      `typography`/`spacing`/`radius` scales, name→color avatar hash
-- [x] `src/components/` — Avatar, ListRow, MessageBubble, Badge, EmptyState,
-      Banner, IconButton, SectionHeader
-- [x] All 9 chat screens converted to tokens + shared components; themed
-      navigator headers; CadreManager fed the app palette
-- [x] Dark mode works end-to-end (verified on emulator, both schemes)
-- [ ] Sign an image asset / brand mark (empty states + headers use Ionicons only)
 
 ## Stack
 
-Runs against the **published** sereus stack (npmjs), not local clones:
-cadre-core 0.8.1 · optimystic 0.14.1 · quereus 4.3.1 · p2p-fret 0.6.0.
+Runs against the **published** sereus stack (npmjs): cadre-core 0.8.1 · optimystic 0.14.1 ·
+quereus 4.3.1 · p2p-fret 0.6.0. Boot behaviour, hazards and upstream questions:
+[`domain/sereus.md`](../domain/sereus.md).
 
-Toggle with `apps/mobile/use-stack.sh {local|npm}` (metro.config.js follows
-package.json automatically). Note the clones under `ser/` are still on the
-0.7.x / quereus 3.x line — `local` and `npm` are **not** the same code until
-`ser/pull-stack.sh` is run.
+## Known defects (not stack-related)
 
-Verified: `tsc --noEmit` clean (3 pre-existing screen-level errors in
-QrScanner/MediaPicker, unrelated — vision-camera / picker types); Metro
-production bundle succeeds; `gradlew assembleDebug` succeeds; **app boots,
-themes, and navigates on the Android emulator** (live sereus mode).
-
-## Boot & control-network behaviour on 0.8.1 (READ THIS)
-
-**cadre-core 0.8.1 is not designed to run a fully solo phone.** The control DB
-registers optimystic with `default_transactor: 'network'`, so *every* control-DB
-read blocks until a cohort answers — and a solo phone has none. Confirmed on
-emulator: `hasAuthorityKey()` (authority genesis) and `queryCadrePeers()`
-(reached from `addStrand` → `launchStrand` → `resolveCohortSeed`, even in
-`mode: 'bootstrap'`) both hang indefinitely with no reachable peer. The 0.7
-clone the app was first built against did **not** read the cohort in `addStrand`,
-which is why solo used to work.
-
-Mitigation in place (so the app boots + stays responsive solo):
-- [x] Authority genesis + formation responder run **backgrounded + time-boxed**
-      (`CadreService.armCadreServicesInBackground`, `src/cadre/async.ts`), off
-      the boot path — `doStart` resolves as soon as the node is up.
-- [x] `createChatStrand` attaches the strand **first** (bootstrap mode),
-      time-boxes `addStrand`, publishes best-effort in the background.
-- [x] `listStrands`/`searchStrands` never block on the attach; an in-flight
-      guard collapses the concurrent boot+list calls.
-- [x] `createInvitation` checks the `getMultiaddrs()` precondition up front →
-      instant, actionable message instead of a hang.
-
-The real remedy is to give the phone a reachable peer (relay/drone) so the
-control network forms — see **Transports** below. Solo note-taking ("My Notes")
-does NOT persist across the control layer on 0.8.1 without a cohort.
+- [ ] `npx jest` fails 6/6 suites: bare `preset: 'react-native'` doesn't transform the ESM
+      dependency tree
+- [ ] `src/cadre/CadreService.ts` imports `CHAT_SAPP_ID` from the data layer; must become
+      `configure({ sAppId })` before the cadre UI can be extracted
 
 ## Final Wiring
 
@@ -358,65 +284,6 @@ Imports the cadre layer; must not import sereus internals directly.
 - [ ] `InvitationAcceptance.tsx` still imports `useVariant` / `mockMode` and never
       calls the adapter
 
-## Screen conformance gaps (code vs human spec)
-
-### Invite loop — deep-link scheme fixed; accept logic still pending
-- [x] Link shape unified in `src/data/inviteLink.ts` — one source of truth.
-      Primary form is the App Link / Universal Link
-      `https://sereus.org/chat/invite/<token>`; `chat://invite/<token>` kept as an
-      app-installed fallback. Generator emits it; scanner parses either form.
-- [x] `QrScanner` scheme mismatch fixed (was `sereus://`) and the "Open" button
-      now routes to `InvitationAcceptance` with the parsed token.
-- [x] OS deep-link registration: Android App-Link + `chat://` intent-filters
-      (`AndroidManifest.xml`, `autoVerify`); iOS `CFBundleURLTypes` +
-      `mobile.entitlements` (`applinks:sereus.org`) + `AppDelegate` handlers.
-      **Verified on emulator:** `chat://invite/<token>` cold-launches → Accept
-      Invite screen with the token.
-- [x] Web site + association files live in `web/` (chat repo root, modelled on
-      `ser/health/web`): `index.html`, `invite.html`, `.well-known/{assetlinks.json,
-      apple-app-site-association}`, `publish.sh` → `sereus.org/chat`.
-- [ ] Deploy `web/` to `sereus.org/chat` (`./web/publish.sh`, which merges chat's
-      entries into the shared apex `.well-known/`) and fill the release
-      SHA-256 + Apple Team ID placeholders so the `https` links verify.
-- [ ] iOS: add the Associated Domains capability to the Xcode target so
-      `mobile.entitlements` is compiled in (one manual step; see the well-known README).
-- [ ] `InvitationAcceptance` Join still just navigates home — the actual accept
-      (`formStrand(invitation, disclosure)` → attach with
-      `FormStrandResult.memberPrivateKey`) is unimplemented; `SereusAdapter.acceptInvitation`
-      is still a `notImplemented()` stub. Needs a reachable host (two-device).
-
-### Attachments / media (blocker cluster)
-- [ ] Attachments are picked (`MediaPicker` → `attachmentDraft`) and rendered as a
-      chip, but `onSend` sends text only — nothing writes `App.Attachment`
-- [ ] `ProfileSetup` avatar edit is a no-op: avatar hardcoded `uri={null}`,
-      `saveProfile` omits `avatarUri`, pending pick never consumed here
-- [ ] `MediaPicker` Location option is inert as a route (no `onPick` passed); no
-      permission-denied state (`react-native-permissions` unused)
-
-### Notable
-- [ ] Edit/Delete are local-state only and the 2s poll reverts them (no adapter
-      update/delete op)
-- [ ] In-strand search: header search button has an empty handler
-- [ ] Voice/video call buttons + mic recording are toasts ("not implemented")
-- [ ] `ProfileSetup` has no discard-changes confirmation on back
-- [ ] `ConnectionsList` sort is a cycling button, not the spec's overlay menu
-- [ ] `InvitationGenerator` share omits the QR image (`toDataURL` not called)
-
-## Consolidation drift (regenerate to match code)
-
-The generated consolidations under `design/generated/mobile/screens/` describe
-intent that predates `data/types.ts` settling; regenerate to realign:
-- [ ] `ChatInterface.md` — claims `inverted` FlatList (not used) and `senderId`
-      (type field is `sender`); "media via callback/context" is actually
-      `attachmentDraft`
-- [ ] `ConnectionsList.md` — nested `partner` shape (type is flat) and
-      AsyncStorage sort-persistence (not implemented)
-- [ ] `ProfileSetup.md` — lists a DiscardDialog that doesn't exist
-- [ ] `MediaPicker.md` — cites `react-native-permissions` / ErrorNotice (absent)
-- [ ] `InvitationGenerator.md` — claims QR-PNG share attachment (absent)
-- [ ] `SearchInterface.md` — stale `SearchResult` shape + "highlight matches"
-      (screen consumes `StrandSummary`, no highlight); also has no human spec
-
 ## Cadre vs. sereus reference (v0.8.1) — remaining gaps
 
 - [ ] **Transports** (see above) — the dominant gap
@@ -435,14 +302,3 @@ intent that predates `data/types.ts` settling; regenerate to realign:
       resume) — a suspended phone can't be woken on strand activity
 - [ ] `registerSelf()` never writes a `CadrePeer` row (root cause = empty
       `getMultiaddrs()`, i.e. Transports)
-
-## Tracking note
-
-This file (`design/specs/mobile/STATUS.md`) is the **canonical** status source.
-The other trackers are inconsistent and should not be trusted alone:
-`stories/STATUS.md` overclaims (marks Video Call "Completed" though it's absent);
-`appeus/scripts/check-stale.sh` / `status.json` are mtime-only — they never read
-`depHashes`, are blind to missing consolidations and stub code, and mis-flag
-`CadreManager` (path-relocated) and `Alerts` (orphan). `outputs.json` has uniform
-incomplete `dependsOn` and empty `depHashes` for 5 routes. Worth fixing the
-staleness script to read consolidations + hashes so the machine view matches.

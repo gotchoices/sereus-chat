@@ -73,7 +73,7 @@ Search is **complete but not necessarily quick**. Quereus queries find everythin
 partial locality costs is retrieval — blocks not cached here are fetched from the cohort, so a search
 across a long history may take real time, and cannot finish at all while the device is cut off
 (`specs/domain/overview.md`). Compounding it, there is no index across strands and most strands are
-not running until something wakes them (`STATUS.md` §G), so searching everything means waking
+not running until something wakes them ([sereus.md](../../specs/domain/sereus.md)), so searching everything means waking
 everything.
 
 The consequence for this story is that searching is a **progressive** act with a cost, not an instant

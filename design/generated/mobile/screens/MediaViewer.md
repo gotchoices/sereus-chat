@@ -39,7 +39,18 @@ The set is whatever the caller was showing — the strand's media under the acti
 rather than re-queried, so what the user swipes matches what they were looking at. Never silently
 widen it.
 
+## Presentation
+
+- **Dark ground, deliberately not a theme token** (`#0b0d0e`): the image is the subject, and a
+  near-white page competes with it in either theme.
+- Chrome is therefore explicitly light (`#e8eaec`) — theme-coloured icons render dark-on-dark and
+  vanish. Pass `color` to every `IconButton` on this screen.
+
 ## Implementation Notes
+
+- **`renderItem` must render the item it is handed**, not the screen's `current` state. Rendering
+  `current` for every page makes the pager show one attachment on all pages until the scroll
+  settles — this was a live bug found on device.
 
 - Chrome auto-hides on tap; always restore it before showing any message state, or the user is left
   with a bare screen and no way out.

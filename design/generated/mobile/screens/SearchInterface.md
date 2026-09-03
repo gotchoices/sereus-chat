@@ -49,7 +49,7 @@ SearchHit { strandId, strandTitle, messageId, senderName, snippet, matchRange, t
 ```
 
 This shape exists because of the platform, not by preference: there is no cross-strand index, and
-most strands are hibernating (`STATUS.md` §G). A promise-shaped API would force the screen to block
+most strands are hibernating ([sereus.md](../../../specs/domain/sereus.md)). A promise-shaped API would force the screen to block
 on the slowest strand and would make partial results impossible to show.
 
 ## Implementation Notes

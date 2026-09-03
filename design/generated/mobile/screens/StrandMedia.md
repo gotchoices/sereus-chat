@@ -51,6 +51,7 @@ screen must never infer absence from a null `uri`.
 | local | Thumbnail |
 | fetching | Skeleton tile with progress; grid stays scrollable |
 | unreachable | Labelled placeholder — "not reachable right now". Never a broken-image glyph and never an empty tile |
+| local, but no thumbnail | A file or voice note that *is* here: show its **name**. This is **not** a locality state, and labelling it "not reachable" tells the user something false — a live bug found on device |
 
 ## Implementation Notes
 
@@ -67,7 +68,7 @@ screen must never infer absence from a null `uri`.
 ## Open
 
 Whether dropping a local copy weakens what the strand can serve others is unresolved
-(`STATUS.md` §G). Until it is, trimming is offered without claiming it is free for the cohort.
+([sereus.md](../../../specs/domain/sereus.md)). Until it is, trimming is offered without claiming it is free for the cohort.
 
 ## Libraries
 

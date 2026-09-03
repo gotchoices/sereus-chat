@@ -73,8 +73,7 @@ Susan has 30+ strands and is getting overwhelmed trying to find specific people.
 
 ## Open
 
-How a group strand is titled and pictured when it has no single partner. `ops.md` still returns one
-partner name and avatar per strand — see `STATUS.md` §F.
+How a group strand is titled and pictured when it has no single partner. `ops.md` now returns a strand title and member count rather than a single partner.
 
 Nicknames for strand partners are **provided by sereus**, not invented here: a user may name a
 partner privately, and the partner need not ever know. This story should surface them rather than

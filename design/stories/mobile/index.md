@@ -73,7 +73,7 @@ Decisions, not gaps:
 
 ## Out of the app's hands
 
-Recorded so stories stay consistent and do not re-invent them — see `STATUS.md` Appendix for the
+Recorded so stories stay consistent and do not re-invent them — see [sereus.md](../../specs/domain/sereus.md) for the
 full set of assumptions:
 
 - There is no directory. Nobody can be looked up, and a strand carries a member's display identity,

@@ -69,6 +69,5 @@ wants that to be what people see.
 ## Open
 
 Only name and picture are shared today (`specs/domain/schema.md`); email, phone and notes stay
-local. If per-strand disclosure is ever wanted, it is a schema change, not a UI one —
-`STATUS.md` §B. Device and cadre management is reached from here but is not this story's subject:
+local. If per-strand disclosure is ever wanted, it is a schema change, not a UI one. Device and cadre management is reached from here but is not this story's subject:
 [42](42-staying-connected.md).

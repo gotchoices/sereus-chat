@@ -125,5 +125,5 @@ one participant's private account of who did what would be unverifiable by anyon
 drift between members, which is worse than not having it. If some detail turns out to be genuinely
 needed, that is an issue to raise upstream rather than something to reconstruct here.
 
-Private nicknames for members are roadmap rather than present (`STATUS.md` §C.10); until they exist,
+Private nicknames for members are roadmap rather than present ([sereus.md](../../specs/domain/sereus.md)); until they exist,
 everyone sees the same display name.

@@ -29,6 +29,13 @@ Nothing but the route registration and theme wiring:
 The component reads from the cadre engine singleton; no props are required beyond an optional
 `theme` subset.
 
+## When there is no cadre
+
+Under mocks (`USE_SEREUS = false`) there is no cadre to read and the component sits on its own
+loading state indefinitely — which this consolidation forbids. The **integration** therefore does
+not mount it at all in that case, and says plainly that machines live on the real network. The
+component is untouched; chat only decides whether to mount it.
+
 ## Constraints
 
 - **Do not regenerate the component from this repo's specs.** Its contract is

@@ -74,8 +74,8 @@ No delete-strand call exists in `ops.md` and none may be added.
 
 ## Member row
 
-- Tap → sheet with exactly two options: *Start a strand with them* (→ InvitationGenerator, new
-  strand) and *Rename for myself* (local).
+- Tap → sheet with *Start a strand with them* (→ InvitationGenerator, new strand) and *Rename for
+  myself* (local); a manager also gets *Remove from this strand*, confirmed.
 - **No message action.** The absence is deliberate and load-bearing; a developer adding one would
   break the model, so it is worth a comment in the code.
 
@@ -91,5 +91,5 @@ No delete-strand call exists in `ops.md` and none may be added.
 - Warnings are copy, not modals-upon-modals: the resign confirmation includes the remaining-manager
   exposure in its body rather than as a second dialog.
 - "Forget entirely" must guard the underlying control-row deletion the way `cadre strand remove`
-  does — it destroys the party's only copy of the strand's member key (`STATUS.md` §G hazards).
+  does — it destroys the party's only copy of the strand's member key ([sereus.md](../../../specs/domain/sereus.md)).
 - Storage figure for "Shared here" comes from the same source StrandMedia uses; compute once.

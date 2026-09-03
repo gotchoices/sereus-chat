@@ -107,5 +107,5 @@ state must read as such — never as the beginning of the conversation.
 
 Keeping read position consistent across a user's own devices is treated here as a plain expectation,
 and it currently has **nowhere to live**: an sApp table would publish it to every member, and the
-party-private store that has the right audience has a closed schema (`STATUS.md` §G, question 2).
+party-private store that has the right audience has a closed schema ([sereus.md](../../specs/domain/sereus.md)).
 The expectation stands; the home for it is an open question.

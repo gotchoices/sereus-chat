@@ -65,17 +65,25 @@ Notes for the adapter:
 
 1. Partition: `pending` → Pending section; `archived` → Archived (collapsed); rest → main list.
 2. Sort the main list by the persisted preference (`recent` default, `unread`, `alpha`).
-3. **Muted strands are never promoted by new traffic** — under `recent` they sort by last *read*
+3. **Muted strands are not promoted by ordinary traffic** — under `recent` they sort by last *read*
    activity, not last message. This is the one place sort order is deliberately not literal.
+4. **Being named is not ordinary traffic.** A soft mute exists precisely to let a mention through,
+   so `mentioned` restores a strand to its real recency. Only a **hard** mute holds its place
+   regardless, because that is what was asked for. Verified on device: without this, a strand with
+   an active mention sank below quiet ones.
 
 ## Row precedence
 
 A row shows at most one trailing indicator, in this order:
 
-`mentioned` → `unreadCount` → `draft` → `muted`
+`mentioned` → `unreadCount` → `muted`
 
 Rationale: being named is the only thing that should be able to interrupt (story 12); an unread
 count on a muted strand would re-create the pressure muting removed.
+
+**No draft badge.** The row's preview already reads `Draft: …`, so a badge saying the same is noise;
+the slot goes to the mute state instead. (Changed after device review — the spec still lists a
+draft badge.)
 
 ## Component Inventory
 
@@ -88,6 +96,14 @@ From `src/components/`; all colour and spacing via theme tokens.
 - `SectionHeader` — "Pending", "Archived"
 - `EmptyState` — first-run copy plus primary action
 - `Banner` — error, with retry
+
+## Re-reading
+
+The screen re-reads on focus and on `useDataRevision()` — a neutral signal from
+`src/mock/VariantContext` that bumps when the data source changes beneath the UI. Screens list it as
+a load dependency and never inspect it; it never changes in production. It exists because a mock
+variant deep link must re-read **without** remounting the navigator: keying the navigator on the
+variant resets navigation, so the deep link never reaches its screen.
 
 ## Implementation Notes
 

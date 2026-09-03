@@ -88,4 +88,4 @@ Susan typed a long message to Bob but autocorrect changed several words making i
 ## Open
 
 Removal propagates to every member, but has no reach over copies cached or backed up elsewhere
-(`STATUS.md` Appendix). Nothing in this story may imply otherwise.
+([sereus.md](../../specs/domain/sereus.md)). Nothing in this story may imply otherwise.

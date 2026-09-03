@@ -40,7 +40,7 @@ Every chat strand carries this schema. Each participant inserts itself into `Mem
 
 No delivery or read status is tracked. A reply is the evidence a message was read; the app claims
 nothing further, and reports nothing back to a sender. (Decision recorded in
-`design/stories/mobile/STATUS.md` §G.)
+`sereus.md`.)
 
 ### Ordering — placeholder, unresolved
 

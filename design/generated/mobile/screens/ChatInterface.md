@@ -99,11 +99,20 @@ should not trust. See `domain/schema.md` → Ordering, and sereus#5.
   cannot reach right now (`interfaces.md` error surfaces). The third is a labelled boundary, never
   an end-of-conversation state.
 - Reactions: an open symbol set (any character the keyboard can produce), not a curated palette —
-  recorded in stories STATUS §G.
+  recorded in [sereus.md](../../../specs/domain/sereus.md).
 - Mentions store a member reference, not text, so each reader renders their own name for that member.
 - Edit is in place with no version chain (`domain/schema.md`); delete removes the row and the screen
   renders no tombstone of its own.
+- Attachments render **inside** the bubble: a thumbnail when `locality === 'local'` and the type is
+  image or video, otherwise a labelled chip. `fetching` and `unreachable` stay distinct, and a null
+  `uri` never reads as absent.
 - Attachment tap → MediaViewer with the strand's media as the swipe set.
+- Reactions hug the bubble they belong to (negative top margin); floating them on their own line
+  reads as a separate item between grouped messages.
+
+## Re-reading
+
+On focus and on `useDataRevision()` — see `StrandList.md` for why that signal exists.
 
 ## Libraries
 

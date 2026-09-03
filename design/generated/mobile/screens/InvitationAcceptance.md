@@ -48,6 +48,10 @@ strand before disclosing themselves.
   the joiner will hold → actions. The consequences come before the buttons.
 - "You will be able to read everything already said here" is stated for every strand, not only
   groups.
+- Both primary choices carry **words**, not a tick and a cross: this is the most consequential
+  decision in the app, and bare icons make somebody guess at it. "Join this strand" / "No thanks".
+- The route title is **"Invitation"**, not "Accept invite" — the title must not presume the answer
+  on the one screen whose purpose is deliberation.
 - Three actions: Accept, Decline, and *Ask them to close it first* — the third is offered only when
   `strandState` is private-and-can-change. It performs **no** protocol action: it dismisses and
   returns the user to where they came from. It exists to name a possibility, not to send a request
@@ -59,5 +63,5 @@ strand before disclosing themselves.
 ## Open
 
 What an invitee can verify before joining is thin upstream — inspection may not be able to show the
-member list or history size (`STATUS.md` §G). The adapter returns what it can; the screen shows only
+member list or history size ([sereus.md](../../../specs/domain/sereus.md)). The adapter returns what it can; the screen shows only
 what it is given and never guesses.

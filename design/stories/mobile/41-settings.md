@@ -91,7 +91,7 @@ he goes looking for the settings, expecting the usual thicket.
 
 Notification settings can promise more than the platform currently delivers. Waking a sleeping phone
 depends on push machinery that is design-stage, and the documented approach would need somebody's
-always-on server holding platform credentials (`STATUS.md` §G). Until that settles, Alt A is the
+always-on server holding platform credentials ([sereus.md](../../specs/domain/sereus.md)). Until that settles, Alt A is the
 common case rather than the exceptional one, and the honest thing is to say so where the switch is
 rather than in a help page.
 

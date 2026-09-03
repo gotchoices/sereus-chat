@@ -137,7 +137,7 @@ honestly; if the platform can coordinate it, that path gets kinder.
 
 Alt F assumes removal actually stops things reaching the removed member. In the current source it
 does not — the read gate is a shared key they keep — and whether the intended design fixes that is
-the first open question in `STATUS.md` §G. If it does not, this path needs rewriting: the only real
+the first open question in [sereus.md](../../specs/domain/sereus.md). If it does not, this path needs rewriting: the only real
 remedy would be starting again elsewhere.
 
 Whether a removed member can be invited back, and whether they return as themselves, is unsettled —
