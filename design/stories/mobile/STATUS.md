@@ -27,7 +27,7 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
 | 21 | [Receiving media](21-receiving-media.md) | drafted | review |
 | 30 | [My strands](30-my-strands.md) | **renamed only** | still pre-sereus — rewrite |
 | 31 | [Who's in this strand](31-whos-in-this-strand.md) | drafted | review |
-| 32 | [Finding something](32-finding-something.md) | **renamed only** | still pre-sereus — rewrite |
+| 32 | [Finding something](32-finding-something.md) | revised | review — narrow by name vs. search what was said |
 | 33 | [Managing a strand](33-managing-a-strand.md) | revised | review |
 | 40 | [My profile](40-my-profile.md) | drafted | review |
 | 41 | [Settings](41-settings.md) | drafted | review |
@@ -51,8 +51,6 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
 - [ ] **Rewrite 20, 30, 32.** Renamed but never revised, so they now contradict the specs and
       screens built from them:
   - [ ] 30 has Bob reading Sarah's **email**; only name and avatar are ever shared (`schema.md`)
-  - [ ] 32 has acceptance criteria written for a fast local index; search is progressive, has no
-        cross-strand index, and must wake hibernating strands
   - [ ] 20 needs trimming and pairing with 21; its size-limit criterion should read as the
         **user's** setting, not a platform rule
 - [ ] **Trim 90.** Over-specified for something parked — mid-call video upgrade and screen sharing

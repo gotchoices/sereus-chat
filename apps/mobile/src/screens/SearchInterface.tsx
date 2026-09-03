@@ -24,7 +24,7 @@ export default function SearchInterface() {
   const t = useT();
   const theme = useTheme();
 
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState<string>(route?.params?.initialQuery ?? '');
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [progress, setProgress] = useState<{ searched: number; total: number; skipped: number } | null>(null);
   const [running, setRunning] = useState(false);
@@ -76,7 +76,7 @@ export default function SearchInterface() {
         testID="search-input"
         value={query}
         onChangeText={setQuery}
-        autoFocus
+        autoFocus={!route?.params?.initialQuery}
         placeholder={scopedStrandId
           ? t('screens.search.inStrand', 'Search this conversation')
           : t('screens.search.everywhere', 'Search everything')}

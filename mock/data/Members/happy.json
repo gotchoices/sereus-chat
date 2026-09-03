@@ -1,6 +1,18 @@
 [
-  { "id": "p-bob", "name": "Bob", "avatarUri": null, "isManager": true, "isMe": true },
-  { "id": "p-priya", "name": "Priya", "avatarUri": null, "isManager": true, "isMe": false },
-  { "id": "p-tom", "name": "Tom", "avatarUri": null, "isManager": false, "isMe": false },
-  { "id": "p-susan", "name": "Su-Z", "avatarUri": null, "isManager": false, "isMe": false }
+  { "id": "p-bob",   "name": "Bob",   "avatarUri": null, "isManager": true,  "isMe": true,
+    "strands": ["s-susan", "s-cycling", "s-mike", "s-tom", "s-family", "s-dave"] },
+  { "id": "p-susan", "name": "Su-Z",  "avatarUri": null, "isManager": false, "isMe": false,
+    "strands": ["s-susan"] },
+  { "id": "p-priya", "name": "Priya", "avatarUri": null, "isManager": true,  "isMe": false,
+    "strands": ["s-cycling"] },
+  { "id": "p-tom",   "name": "Tom",   "avatarUri": null, "isManager": false, "isMe": false,
+    "strands": ["s-cycling", "s-tom"] },
+  { "id": "p-ravi",  "name": "Ravi",  "avatarUri": null, "isManager": false, "isMe": false,
+    "strands": ["s-cycling"] },
+  { "id": "p-mike",  "name": "Mike",  "avatarUri": null, "isManager": false, "isMe": false,
+    "strands": ["s-mike", "s-family"] },
+  { "id": "p-emma",  "name": "Emma",  "avatarUri": null, "isManager": false, "isMe": false,
+    "strands": ["s-family"] },
+  { "id": "p-dave",  "name": "Dave",  "avatarUri": null, "isManager": false, "isMe": false,
+    "strands": ["s-dave"] }
 ]

@@ -24,7 +24,9 @@ Progressive search over one strand or all of them.
 ## Route
 
 - `SearchInterface` — push from the home header (all) or the chat header (this strand)
-- Params: `{ strandId? }` — presence selects the scope
+- Params: `{ strandId?, initialQuery? }` — `strandId` selects the scope; `initialQuery` arrives
+  from StrandList's escalation row and starts the sweep immediately, since the user has already
+  asked for it by tapping
 - Mock: `sereus://screen/SearchInterface?variant={happy|empty|error}`
 
 ## UI States
@@ -63,6 +65,8 @@ on the slowest strand and would make partial results impossible to show.
 - Progress line: "searched 6 of 14". On completion it becomes either nothing, or the skipped count.
 - Filters are passed **into** the query so they narrow the sweep, not applied client-side afterwards.
 - In-strand scope skips the sweep entirely and is fast; make it the default entry from a conversation.
+- This screen is **no longer the way to find a conversation** — that is StrandList's inline filter.
+  Do not add strand-name matching here; it would duplicate a free act with an expensive one.
 - Debounce input ~300 ms; cancel the in-flight iterator on a new query — an abandoned sweep must not
   keep waking strands.
 - Result rows lead with the strand title in cross-strand scope, omit it in in-strand scope.

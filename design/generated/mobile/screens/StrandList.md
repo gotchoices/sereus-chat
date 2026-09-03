@@ -98,6 +98,20 @@ From `src/components/`; all colour and spacing via theme tokens.
 - `EmptyState` — first-run copy plus primary action
 - `Banner` — error, with retry
 
+## Search (staged — human spec)
+
+Two acts behind one icon, and only the first is free.
+
+1. **Narrow.** Tapping search reveals an inline field; the list filters as the user types, matching
+   `title` and member names. Purely client-side over data already held — no adapter call, no
+   network, works offline. Member names need `Strands.list()` to carry enough to match on, or a
+   cached member list per strand; do not fetch members on keystroke.
+2. **Escalate.** Below the narrowed rows, a single row — "Search messages for *term*" — routes to
+   `SearchInterface` with the term as its initial query. **Only ever on an explicit tap.** The sweep
+   wakes hibernating strands (`domain/sereus.md`), so it must never be triggered by typing.
+
+Debounce the filter (~100 ms) purely for render cost, not for I/O; there is none.
+
 ## Re-reading
 
 The screen re-reads on focus and on `useDataRevision()` — a neutral signal from

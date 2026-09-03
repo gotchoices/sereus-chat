@@ -2,86 +2,84 @@
 
 ## Story Overview
 
-As a Sereus Chat user with extensive conversation history  
-I want to Search through my messages to find specific content  
-So that I can quickly locate important information, photos, or conversations from the past.
+As somebody with more strands than they can hold in their head  
+I want to find either a conversation or something that was said in one  
+So that I can get back to it without scrolling, and without paying for more than I asked for.
 
-Context: Bob remembers that Mike sent him the name of a great restaurant a few weeks ago, but he can't remember the name or when exactly it was mentioned.
-They've exchanged hundreds of messages since then.
-Susan needs to find a document that Bob sent her last month about the project proposal.
-Mike is trying to find a specific photo Bob sent showing Emma's soccer uniform number.
+Context: Bob is in fifteen or so strands. Most of the time he knows exactly who he wants. Now and
+then he remembers a phrase and not who said it.
+
+## Roles
+
+| Role | Who | Note |
+|------|-----|------|
+| Searcher | Bob | everything here happens on his own machines unless he asks for more |
 
 ## Sequence
-1. Bob opens Sereus Chat.
-2. He initiates a search across all his conversations.
-3. He types "restaurant" as his search term.
-4. Results appear showing all messages containing "restaurant" from various conversations.
-5. He sees a message from Mike from 3 weeks ago mentioning "Bella Vista restaurant".
-6. He taps on that result.
-7. The app opens his chat with Mike and scrolls to the specific message.
-8. Bob reads the context around that message to get the full details.
 
-### Alternative Path A: Searching Within Single Conversation
-1. Bob opens his chat with Mike.
-2. He searches within just this conversation.
-3. He types "restaurant".
-4. Results show only messages in this chat containing "restaurant".
-5. He finds the specific message he was looking for.
-6. The chat scrolls to that message.
+1. Bob wants his conversation with Susan. He starts typing her name where his strands are listed.
+2. The list narrows as he types, to the strands whose name matches — and to strands with a member of
+   that name, since a group is rarely called after the people in it.
+3. It narrows **instantly**, and it does so with the phone in flight mode. Nothing is fetched;
+   these are names he already holds.
+4. He picks Susan's strand and is done. This is the common case and it costs nothing.
+5. Another day he remembers somebody recommended a bike shop but not who, or where. Narrowing by
+   name gets him nowhere — he is not looking for a conversation, he is looking for a sentence.
+6. From the same place, he can ask for that instead: **search everything I have said and been told**.
+   He asks for it deliberately, because it is a different and more expensive act.
+7. He is told what it costs while it happens — that it is going through his strands, and how far it
+   has got. Results appear as they are found and he can act on one before the rest arrives.
+8. He finds it, opens that strand, and lands on the message. → [10](10-catching-up.md)
 
-### Alternative Path B: Searching for Media
-1. Mike wants to find the soccer uniform photo Bob sent.
-2. He searches for media/photos in his chat with Bob.
-3. He filters to show only image results.
-4. Thumbnails of all photos Bob sent appear.
-5. He scrolls through and finds the uniform photo.
-6. He taps it to view full size.
+### Alternative Path A: searching one conversation
 
-### Alternative Path C: Searching by Date Range
-1. Susan knows Bob sent the document sometime in early December.
-2. She searches within her chat with Bob.
-3. She filters to only show messages from December 1-15.
-4. She further filters to only show messages with attachments.
-5. She finds the document and opens it.
+5.1. Bob knows the shop came up in the cycling group, he just cannot find it in the scroll.
+5.2. He searches inside that strand alone. It is quick, because it is one strand and it is already
+     open in front of him.
 
-### Alternative Path D: No Results Found
-4. Bob searches but no results appear for "restaurant".
-5. He realizes he may have the wrong search term.
-6. He tries "Italian food" instead.
-7. Results appear and he finds the message he was looking for.
+### Alternative Path B: not everything could be reached
 
-### Alternative Path E: Searching for Person
-1. Bob received a message mentioning his coworker "Sarah".
-2. He searches for "Sarah" across all conversations.
-3. Results show every message mentioning Sarah from different chats.
-4. He finds the specific mention he was looking for in his chat with Susan.
+7.1. Some of Bob's strands cannot be reached — nothing holding them is answering right now.
+7.2. He is told plainly: this is what was found, and these could not be looked in. The result never
+     presents itself as complete when it is not, and "nothing found" is never said on a partial
+     sweep.
+
+### Alternative Path C: he calls her something else
+
+1.1. Susan calls herself "Su-Z". Bob has her filed under "Susan (work)".
+1.2. Typing either finds her: the name he uses for somebody is a name he can search by
+     ([31](31-whos-in-this-strand.md)).
+
+### Alternative Path D: nothing matches
+
+7.1. The sweep finishes and nothing matched.
+7.2. He is told the search finished and found nothing — which is different from it having stopped
+     early, and reads differently.
 
 ## Acceptance Criteria
 
-- [ ] Users can search across all conversations.
-- [ ] Users can search within a specific conversation.
-- [ ] Search results show the message text, sender, and date.
-- [ ] Tapping a search result opens the conversation and scrolls to that message.
-- [ ] Users can filter search results by media type (photos, videos, documents).
-- [ ] Users can filter by date range.
-- [ ] Search is fast and responsive even with extensive conversation history.
-- [ ] Search handles variations in spelling and capitalization.
+- [ ] Narrowing the list of strands by name is instant, works with nothing reachable, and fetches
+      nothing
+- [ ] Narrowing matches a strand's name and the names of its members, including the user's own
+      private names for people
+- [ ] Searching what was said is a **separate, deliberate act**, reached from the same place but
+      never started on the user's behalf
+- [ ] While it runs, the user can see it is working through their strands and how far it has got
+- [ ] Results are usable before the search finishes
+- [ ] A search that could not reach everything says so, and never reports "nothing found" on a
+      partial sweep
+- [ ] A finished search that matched nothing is distinguishable from one that stopped early
+- [ ] A single conversation can be searched on its own, from inside it
+- [ ] A result leads to the message in place, in its conversation
+
+## Variants
+
+- happy: a name narrows the list; later, a phrase is found across strands
+- empty: nothing matches the name; a finished sweep with no results
+- error: strands that cannot be reached; a search that cannot run at all
 
 ## Open
 
-Search is **complete but not necessarily quick**. Quereus queries find everything in the table; what
-partial locality costs is retrieval — blocks not cached here are fetched from the cohort, so a search
-across a long history may take real time, and cannot finish at all while the device is cut off
-(`specs/domain/overview.md`). Compounding it, there is no index across strands and most strands are
-not running until something wakes them ([sereus.md](../../specs/domain/sereus.md)), so searching everything means waking
-everything.
-
-The consequence for this story is that searching is a **progressive** act with a cost, not an instant
-one: show what has been found so far, keep going, and say plainly when the rest cannot be reached
-rather than presenting a partial sweep as a finished answer. The existing acceptance criteria are
-written for a conventional local index and need revising against that.
-
-## Variants
-- happy: the term is found and the strand opens at that message
-- empty: nothing matches
-- error: a strand cannot be searched because it is not yet attached
+What it costs to search everything depends on the platform: there is no index across strands and
+most are not running until something wakes them ([sereus.md](../../specs/domain/sereus.md)). The
+story asks only that the user be told what is happening and never be charged for it without asking.

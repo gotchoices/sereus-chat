@@ -2,7 +2,8 @@ import React from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import type { LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import StrandList from '../screens/StrandList';
 import SearchInterface from '../screens/SearchInterface';
 import InvitationGenerator from '../screens/InvitationGenerator';
@@ -112,15 +113,33 @@ export default function AppNavigator() {
             const params: any = route?.params ?? {};
             const name: string = params.title || 'Strand';
             return {
+              // The header is the way in to everything *about* a strand —
+              // members, muting, leaving (navigation.md).  It must look
+              // tappable: the status strip alone reads as a passive label.
               headerTitle: () => (
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${name} — strand details`}
+                  onPress={() => navigation.navigate('StrandDetail', {
+                    strandId: params.strandId, title: params.title,
+                  })}
+                  style={{ flexDirection: 'row', alignItems: 'center' }}
+                >
                   <View style={{ marginRight: 8 }}>
                     <Avatar name={name} uri={params.avatarUri} size="sm" />
                   </View>
-                  <Text numberOfLines={1} style={{ maxWidth: 200, ...typography.title, color: theme.textPrimary }}>
-                    {name}
-                  </Text>
-                </View>
+                  <View>
+                    <Text numberOfLines={1} style={{ maxWidth: 180, ...typography.title, color: theme.textPrimary }}>
+                      {name}
+                    </Text>
+                    <Text numberOfLines={1} style={{ ...typography.small, color: theme.textMuted }}>
+                      {params.isGroup && params.memberCount
+                        ? `${params.memberCount} people · details`
+                        : 'details'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={14} color={theme.textMuted} style={{ marginLeft: 4 }} />
+                </Pressable>
               ),
               headerRight: () => (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>

@@ -53,9 +53,14 @@ export class MockAdapter implements DataAdapter {
     return (isEmpty() ? stateEmpty : stateHappy) as StrandState;
   }
 
-  async listMembers(_strandId: string): Promise<Member[]> {
+  async listMembers(strandId: string): Promise<Member[]> {
     if (isError()) fail('Could not load members');
-    return (isEmpty() ? membersEmpty : membersHappy) as Member[];
+    if (isEmpty()) return membersEmpty as Member[];
+    // Membership is per strand, so a two-party strand really is two people and
+    // a name only narrows the strands that person is actually in.
+    const all = membersHappy as Array<Member & { strands?: string[] }>;
+    const mine = all.filter(m => !m.strands || m.strands.includes(strandId));
+    return (mine.length ? mine : all.filter(m => m.isMe)).map(({ strands, ...m }) => m) as Member[];
   }
 
   async listMessages(strandId: string, _opts?: { before?: string; limit?: number }): Promise<Message[]> {

@@ -5,14 +5,14 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, SectionList, StyleSheet, RefreshControl, Alert } from 'react-native';
+import { View, Text, TextInput, SectionList, StyleSheet, RefreshControl, Alert, Pressable } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { listStrands, listOutstandingInvitations } from '../data/adapter';
+import { listStrands, listOutstandingInvitations, listMembers } from '../data/adapter';
 import type { StrandSummary, Invitation } from '../data/types';
 import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { Avatar, ListRow, Badge, EmptyState, Banner, IconButton, SectionHeader } from '../components';
-import { useTheme, spacing } from '../theme';
+import { useTheme, typography, spacing, radius } from '../theme';
 
 type SortMode = 'recent' | 'alpha' | 'unread';
 
@@ -51,6 +51,11 @@ export default function StrandList() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('recent');
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState('');
+  // Member names per strand, so narrowing can match "the group with Priya in it".
+  // Loaded once with the list — never fetched on a keystroke.
+  const [memberNames, setMemberNames] = useState<Record<string, string[]>>({});
 
   const load = useCallback(async () => {
     try {
@@ -61,6 +66,11 @@ export default function StrandList() {
       setStrands(s);
       setInvites(i);
       setError(null);
+      const names: Record<string, string[]> = {};
+      await Promise.all(s.map(async st => {
+        try { names[st.id] = (await listMembers(st.id)).map(m => m.name); } catch { names[st.id] = []; }
+      }));
+      setMemberNames(names);
     } catch (e: any) {
       setError(e?.message || 'Could not reach your strands right now');
     }
@@ -69,9 +79,18 @@ export default function StrandList() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
   useEffect(() => { void load(); }, [load, rev]);
 
+  // Narrowing is free: a string match over names already held.  No adapter
+  // call, no network, works with nothing reachable (story 32).
+  const matches = useCallback((s: StrandSummary) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    if (s.title.toLowerCase().includes(q)) return true;
+    return (memberNames[s.id] ?? []).some(n => n.toLowerCase().includes(q));
+  }, [query, memberNames]);
+
   const sections = useMemo(() => {
-    const active = strands.filter(s => !s.archived && !s.pending);
-    const archived = strands.filter(s => s.archived);
+    const active = strands.filter(s => !s.archived && !s.pending && matches(s));
+    const archived = strands.filter(s => s.archived && matches(s));
 
     const sorted = [...active].sort((a, b) => {
       if (sortMode === 'alpha') return a.title.localeCompare(b.title);
@@ -93,11 +112,11 @@ export default function StrandList() {
     });
 
     const out: Array<{ title: string | null; data: any[] }> = [];
-    if (invites.length) out.push({ title: t('screens.strands.pending', 'Pending'), data: invites });
+    if (invites.length && !query.trim()) out.push({ title: t('screens.strands.pending', 'Pending'), data: invites });
     out.push({ title: null, data: sorted });
     if (archived.length) out.push({ title: t('screens.strands.archived', 'Archived'), data: archived });
     return out;
-  }, [strands, invites, sortMode, t]);
+  }, [strands, invites, sortMode, t, matches, query]);
 
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
@@ -128,12 +147,25 @@ export default function StrandList() {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.controls}>
         <IconButton name="search-outline" size={20} variant="bordered" style={styles.flex1}
-          accessibilityLabel={t('actions.search', 'Search')} onPress={() => navigation.navigate('SearchInterface')} />
+          accessibilityLabel={t('actions.search', 'Search')}
+          onPress={() => setSearching(v => { if (v) setQuery(''); return !v; })} />
         <IconButton name="add-outline" size={20} variant="accent" style={styles.flex2}
           accessibilityLabel={t('actions.newStrand', 'New strand')} onPress={() => navigation.navigate('InvitationGenerator')} />
         <IconButton name={sortIcon} size={20} variant="bordered" style={styles.flex1}
           accessibilityLabel={t('actions.sort', 'Sort')} onPress={chooseSort} />
       </View>
+
+      {searching ? (
+        <TextInput
+          testID="strand-filter"
+          value={query}
+          onChangeText={setQuery}
+          autoFocus
+          placeholder={t('screens.strands.filter', 'Find a conversation')}
+          placeholderTextColor={theme.textMuted}
+          style={[typography.body, styles.filter, { color: theme.textPrimary, backgroundColor: theme.surfaceAlt }]}
+        />
+      ) : null}
 
       <View style={styles.flex1}>
       {error ? (
@@ -163,7 +195,23 @@ export default function StrandList() {
             section.title ? <SectionHeader label={section.title} /> : null
           }
           ListFooterComponent={
-            nothingNew ? (
+            query.trim() ? (
+              // The only way into message search from here, and always an
+              // explicit tap: the sweep wakes hibernating strands.
+              <Pressable
+                testID="escalate-search"
+                onPress={() => navigation.navigate('SearchInterface', { initialQuery: query.trim() })}
+                style={[styles.escalate, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}
+              >
+                <Text style={[typography.body, { color: theme.accent }]}>
+                  {t('screens.strands.searchMessages', 'Search messages for “{{q}}”')
+                    .replace('{{q}}', query.trim())}
+                </Text>
+                <Text style={[typography.small, { color: theme.textMuted }]}>
+                  {t('screens.strands.searchCost', 'Looks inside every strand, and wakes the ones that are asleep')}
+                </Text>
+              </Pressable>
+            ) : nothingNew ? (
               <View style={styles.nothingNew}>
                 <Banner variant="info" message={t('screens.strands.nothingNew', 'Nothing new.')} />
               </View>
@@ -202,7 +250,10 @@ export default function StrandList() {
                 subtitle={preview}
                 leading={<Avatar name={s.title} uri={s.avatarUri} size="sm" />}
                 trailing={indicatorFor(s)}
-                onPress={() => navigation.navigate('ChatInterface', { strandId: s.id, title: s.title, avatarUri: s.avatarUri })}
+                onPress={() => navigation.navigate('ChatInterface', {
+                  strandId: s.id, title: s.title, avatarUri: s.avatarUri,
+                  memberCount: s.memberCount, isGroup: s.isGroup,
+                })}
                 onLongPress={() => rowActions(s)}
               />
             );
@@ -228,5 +279,9 @@ const styles = StyleSheet.create({
   flex2: { flex: 2 },
   list: { paddingHorizontal: spacing[3], paddingTop: spacing[1], paddingBottom: spacing[2] },
   nothingNew: { paddingTop: spacing[2] },
+  filter: { marginHorizontal: spacing[3], marginBottom: spacing[1], borderRadius: radius.control,
+            paddingHorizontal: spacing[2], paddingVertical: spacing[2] },
+  escalate: { marginTop: spacing[2], padding: spacing[2], borderRadius: radius.card,
+              borderWidth: StyleSheet.hairlineWidth, gap: 2 },
   footer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[1], borderTopWidth: StyleSheet.hairlineWidth },
 });
