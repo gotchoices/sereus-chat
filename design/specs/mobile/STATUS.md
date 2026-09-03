@@ -52,28 +52,22 @@ their variants. Calls are parked (story 90).
 - [x] Fixed on device: mention vs. mute sort, mislabelled local media, missing attachments,
       unpinned footer, MediaViewer pager rendering one item for every page, viewer contrast
 
-## To do — write device decisions back into the **human** specs
+## Specs and consolidations
 
-The generated consolidations are current as of 2026-09-03. These are the *human* specs in
-`screens/`, which remain behind the code — and being authoritative, a regeneration read from them
-would undo the fixes. Each line is a one-paragraph edit.
-
-- [ ] `screens/strand-list.md` — a **mention surfaces a soft-muted strand**; only a hard mute holds
-      its place (line ~45 still says muted strands are never reordered)
-- [ ] `screens/strand-list.md` — **draft is not a badge**; the preview says it (precedence is
-      mention → unread → muted)
-- [ ] `screens/media-viewer.md` — dark ground and light chrome are deliberate, not theme tokens
-- [ ] `screens/strand-media.md` — a local file or voice note with no thumbnail shows its **name**;
-      it is not a locality state
-- [ ] `screens/invitation-acceptance.md` — the decision carries words, and the title does not
-      presume the answer
-- [ ] `screens/cadre-manager.md` — integration shows an explanatory state under mocks rather than
-      mounting a component with nothing behind it
-- [x] ~~Record the `useDataRevision()` re-read seam in the consolidations~~ — done
-- [x] ~~Refresh the consolidations~~ — done 2026-09-03: StrandList, ChatInterface, StrandDetail,
-      StrandMedia, MediaViewer, InvitationAcceptance, CadreManager. Dep-hashes re-run; the 12
-      code-bearing routes are no longer stale (CadreManager reports "missing output" because the
-      screen is a component, not a generated `.tsx` — expected)
+- [x] Consolidations refreshed 2026-09-03 (StrandList, ChatInterface, StrandDetail, StrandMedia,
+      MediaViewer, InvitationAcceptance, CadreManager); dep-hashes re-run
+- [x] Human specs for StrandList, StrandMedia, MediaViewer, InvitationAcceptance and CadreManager
+      rewritten to carry only two things: **overrides** generation must not make differently, and
+      **details the stories cannot supply** (e.g. StrandList's sort orders and that the choice is
+      remembered). Everything else defers to the stories — appeus treats anything a human has not
+      specified as latitude for generation (`reference/precedence.md`, rule 3)
+- [ ] Apply the same two-category test to the remaining eight screen specs (chat-interface,
+      strand-detail, search-interface, invitation-generator, settings, profile, media-picker,
+      qr-scanner): keep overrides and anything the stories cannot supply, drop the rest. They are
+      accurate but still restate story detail and prescribe layout generation should be free to
+      choose. ~350 lines that could be ~150.
+- [ ] Consider adding `needs:` frontmatter (domain primitives) to the screen specs — appeus's
+      `spec-schema.md` offers it and it would tighten dependency tracking
 
 ## To do — behaviour the stories specify but no screen does yet
 

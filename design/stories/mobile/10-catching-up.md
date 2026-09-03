@@ -27,16 +27,20 @@ one is about being on the other end of that.
 3. He can tell two different kinds of "new" apart. The cycling group has forty messages and none of
    them concern him. Susan has asked him something directly, by name. The second is not buried under
    the first.
-4. He opens Susan's strand. It opens where he stopped reading — not at the top, and not scrolled
+4. Being named puts a strand where he will look first — near the top, with the recent ones — even
+   though he had quieted that strand. Quieting it stopped it interrupting him; it did not mean he
+   wanted to miss being asked something. A strand he quieted *completely* stays where it was, since
+   that is what he asked for.
+5. He opens Susan's strand. It opens where he stopped reading — not at the top, and not scrolled
    past everything to the bottom.
-5. A clear line marks where he left off, so he can see at once how much is his to catch up on.
-6. What he reads is a conversation, not a list of records: messages carry the day they were sent,
+6. A clear line marks where he left off, so he can see at once how much is his to catch up on.
+7. What he reads is a conversation, not a list of records: messages carry the day they were sent,
    and a run of messages from one person reads as one turn rather than five separate events.
-7. He reads to the end. The strand stops asking for him.
-8. He goes back to his list. Susan's strand now sits quietly with the rest.
-9. The cycling group accumulated its forty messages without interrupting him once, because he muted
+8. He reads to the end. The strand stops asking for him.
+9. He goes back to his list. Susan's strand now sits quietly with the rest.
+10. The cycling group accumulated its forty messages without interrupting him once, because he muted
    it ([33](33-managing-a-strand.md)). When he does open it, it behaves like any other strand.
-10. One message from Mike deserves a real answer and Bob is on a train. He marks it unread again so
+11. One message from Mike deserves a real answer and Bob is on a train. He marks it unread again so
     it comes back to him later, rather than relying on remembering.
 
 ### Alternative Path A: back after a week
@@ -74,6 +78,8 @@ one is about being on the other end of that.
 - [ ] Opening the app lands on the strand list, not on the last strand the user had open
 - [ ] Strands with unread messages are distinguishable at a glance and are ordered to be found first
 - [ ] Being addressed by name is distinguishable from a strand merely being busy
+- [ ] Being named places a strand where the user looks first, even in a strand they had quieted;
+      a strand quieted completely keeps its place
 - [ ] Opening a strand returns the user to where they stopped reading
 - [ ] The boundary between read and unread is marked within the strand
 - [ ] Messages show the day they were sent, and consecutive messages from one sender are grouped
