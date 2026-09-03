@@ -19,6 +19,7 @@ import MediaPicker from '../screens/MediaPicker';
 import { CadreManager } from '../cadre-ui';
 import { Avatar, IconButton } from '../components';
 import { useTheme, useThemeContext, typography } from '../theme';
+import { USE_SEREUS } from '../data/config';
 
 const Stack = createNativeStackNavigator();
 
@@ -81,7 +82,9 @@ export default function AppNavigator() {
             title: route?.params?.strandId ? 'Add someone' : 'New strand',
           })}
         />
-        <Stack.Screen name="InvitationAcceptance" component={InvitationAcceptance} options={{ title: 'Accept Invite' }} />
+        {/* Not "Accept invite" — the decision has not been made, and the title
+            should not presume it. */}
+        <Stack.Screen name="InvitationAcceptance" component={InvitationAcceptance} options={{ title: 'Invitation' }} />
         <Stack.Screen name="Profile" component={Profile} options={{ title: 'Profile' }} />
         <Stack.Screen name="Settings" component={Settings} options={{ title: 'Settings' }} />
         <Stack.Screen
@@ -138,9 +141,31 @@ export default function AppNavigator() {
 }
 
 /** CadreManager is a self-themed component; feed it our active tokens so it
- *  matches the rest of the app instead of its built-in defaults. */
+ *  matches the rest of the app instead of its built-in defaults.
+ *
+ *  On mocks there is no cadre to read, and the component would sit on its own
+ *  loading state forever.  Say so instead — the consolidation is explicit that
+ *  this screen must never block (design/generated/mobile/screens/CadreManager.md).
+ *  We do NOT reimplement any of the component here; we simply do not mount it
+ *  when there is nothing behind it. */
 function ThemedCadreManager() {
   const theme = useTheme();
+
+  if (!USE_SEREUS) {
+    return (
+      <View style={{ flex: 1, padding: 16, gap: 8, backgroundColor: theme.background }}>
+        <Text style={{ ...typography.title, color: theme.textPrimary }}>
+          Your machines live on the real network
+        </Text>
+        <Text style={{ ...typography.body, color: theme.textMuted, lineHeight: 22 }}>
+          This build is running on sample data, so there is no cadre to show. On the live network
+          this is where you would see what acts for you, and add something that stays awake so your
+          messages keep moving while your phone is asleep.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <CadreManager
       theme={{

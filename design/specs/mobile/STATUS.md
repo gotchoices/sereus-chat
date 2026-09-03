@@ -34,15 +34,15 @@ All 13 active routes have a spec and a consolidation as of 2026-09-02, regenerat
 | ChatInterface | ✓ | ✓ | ✓ | renders: grouping, quote-reply, reactions, attachments |
 | StrandDetail | ✓ | ✓ | ✓ | renders: status card, members, the ladder |
 | StrandMedia | ✓ | ✓ | ✓ | renders: grid, filters, all three localities |
-| MediaViewer | ✓ | ✓ | ✓ | built, not yet examined on device |
+| MediaViewer | ✓ | ✓ | ✓ | built; reached from StrandMedia |
 | MediaPicker | ✓ | ✓ | ✓ | pre-existing; two type defects fixed |
 | SearchInterface | ✓ | ✓ | ✓ | streaming consumer; renders idle |
 | InvitationGenerator | ✓ | ✓ | ✓ | renders: private/public, invite-rights |
-| InvitationAcceptance | ✓ | ✓ | ✓ | pre-existing; route names fixed |
-| QrScanner | ✓ | ✓ | ✓ | pre-existing; permission mapping fixed |
+| InvitationAcceptance | ✓ | ✓ | ✓ | **rebuilt to spec**: inviter, strand status, what you take on |
+| QrScanner | ✓ | ✓ | ✓ | renders; has a paste-link fallback for the emulator |
 | Profile | ✓ | ✓ | ✓ | renders: shared vs device-local |
 | Settings | ✓ | ✓ | ✓ | renders: four sections |
-| CadreManager | ✓ | ✓ | ✓ | component-provided; integration only |
+| CadreManager | ✓ | ✓ | ✓ | component-provided; no longer hangs on mocks |
 | VideoCallActive | — | — | — | **parked**, story 90 |
 | VoiceCallOverlay | — | — | — | **parked**, story 90 |
 
@@ -62,8 +62,20 @@ Found and fixed while looking at real screens:
 - Draft was announced twice (badge and preview); the badge went.
 - Media filter chips showed raw keys (`image`, `video`).
 
-Still to examine on device: MediaViewer, InvitationAcceptance, QrScanner, CadreManager, and the
-error/empty variants of the strand-scoped screens.
+Second pass (same day):
+
+- **InvitationAcceptance was still the old screen** — a token string and a Join button, with the
+  accept call stubbed out in a comment. Rebuilt to spec: who is inviting, the strand's status, what
+  you would be taking on, and only then the decision. This is the load-bearing placement of
+  `StrandStatus`; it is the one moment somebody can judge a strand before disclosing themselves.
+- **Its title said "Accept Invite"**, presuming the answer. Now "Invitation".
+- **The decision was two unlabelled icons** — a tick and a cross for the most consequential choice
+  in the app. Now "Join this strand" and "No thanks".
+- **CadreManager sat on "Loading…" forever** under mocks, which the consolidation forbids. The
+  *integration* now says plainly that machines live on the real network, rather than mounting a
+  component with nothing behind it. The component itself is untouched.
+
+Still to examine on device: MediaViewer, and the error/empty variants of the strand-scoped screens.
 
 ### Deep links for review
 
