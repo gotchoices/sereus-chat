@@ -10,9 +10,11 @@ import type {
   Prefs, StorageUsage, SendInput,
 } from '../types';
 import { ensureDefaultChatStrand, getDefaultChatStrand, syncProfileNameToStrands } from '../chat-strand';
+import { joinChatStrand } from '../chat-sapp';
 import {
   queryMessages, insertMessage, updateMessage, removeMessage,
   addReaction, removeReaction, queryReactions, queryAttachments, queryMembers,
+  insertAttachments,
 } from '../chat-operations';
 import { CHAT_SAPP_ID } from '../chat-sapp';
 import { cadreService } from '../../cadre';
@@ -45,10 +47,22 @@ export class SereusAdapter implements DataAdapter {
 
   async listMessages(_strandId: string, _opts?: { before?: string; limit?: number }): Promise<Message[]> {
     const strand = await ensureDefaultChatStrand();
-    const [rows, reactions] = await Promise.all([
+    const [rows, reactions, atts] = await Promise.all([
       queryMessages(strand),
       queryReactions(strand).catch(() => []),
+      queryAttachments(strand).catch(() => []),
     ]);
+    const attByMessage = new Map<string, Attachment[]>();
+    for (const a of atts) {
+      const list = attByMessage.get(a.MessageId) ?? [];
+      list.push({
+        id: a.Id, messageId: a.MessageId, type: a.Type as Attachment['type'],
+        uri: a.Uri, mimeType: a.MimeType, name: a.Name,
+        byteSize: a.ByteSize ?? null, durationMs: a.DurationMs ?? null,
+        locality: (a.Uri ? 'local' : 'fetching') as Attachment['locality'],
+      });
+      attByMessage.set(a.MessageId, list);
+    }
     const byMessage = new Map<string, Array<{ memberId: string; symbol: string }>>();
     for (const r of reactions) {
       const list = byMessage.get(r.MessageId) ?? [];
@@ -63,7 +77,7 @@ export class SereusAdapter implements DataAdapter {
       timestamp: r.Timestamp,
       replyToId: r.ReplyToId ?? null,
       editedAt: r.EditedAt ?? null,
-      attachments: [],
+      attachments: attByMessage.get(r.Id) ?? [],
       reactions: byMessage.get(r.Id) ?? [],
     }));
   }
@@ -76,6 +90,7 @@ export class SereusAdapter implements DataAdapter {
     // A local write.  There is no pending state to surface — the phone holds
     // the strand, so this either lands or genuinely fails.
     const row = await insertMessage(strand, peerId, input.content, input.replyToId);
+    const saved = await insertAttachments(strand, row.Id, input.attachments ?? []);
     return {
       id: row.Id,
       memberId: peerId,
@@ -83,7 +98,12 @@ export class SereusAdapter implements DataAdapter {
       timestamp: row.Timestamp,
       replyToId: row.ReplyToId ?? null,
       editedAt: null,
-      attachments: [],
+      attachments: saved.map(a => ({
+        id: a.Id, messageId: a.MessageId, type: a.Type as Attachment['type'],
+        uri: a.Uri, mimeType: a.MimeType, name: a.Name,
+        byteSize: a.ByteSize ?? null, durationMs: a.DurationMs ?? null,
+        locality: (a.Uri ? 'local' : 'fetching') as Attachment['locality'],
+      })),
       reactions: [],
     };
   }
@@ -283,14 +303,38 @@ export class SereusAdapter implements DataAdapter {
   }
 
   /**
-   * Redeem an encoded invitation.  Still unwired: `formStrand` performs a
-   * consent handshake with the host over libp2p, so it needs a reachable
-   * host — it cannot be exercised on a single device.  Wiring it also means
-   * handling `FormStrandResult.memberPrivateKey` (NOT `invitePrivateKey`)
-   * when attaching the resulting strand.  See STATUS.md "First partner".
+   * Redeem an encoded invitation.
+   *
+   * Three steps, and the third is the one that is easy to get wrong: attach the
+   * resulting strand with `FormStrandResult.memberPrivateKey`, **not** the
+   * invitation's private key.  They are different keys and using the wrong one
+   * yields a strand you cannot write to.
+   *
+   * UNTESTED: `formStrand` performs a consent handshake with the host over
+   * libp2p, so it needs a reachable second party and cannot be exercised on one
+   * device.  Written from the cadre-core signatures, not from a passing run.
    */
-  async acceptInvitation(_token: string): Promise<{ strandId: string }> {
-    this.notImplemented('acceptInvitation');
+  async acceptInvitation(token: string): Promise<{ strandId: string }> {
+    const node = cadreService.cadreNode;
+    if (!node) throw new Error('Cadre is not running.');
+
+    const invitation = node.decodeInvitation(token);
+
+    const profile = await this.getProfile().catch(() => ({ name: '' } as Profile));
+    const result = await node.formStrand(invitation, {
+      // Disclosure is what the joiner chooses to tell the host about itself.
+      // Only the display name — everything else in the profile stays on device.
+      name: profile.name || undefined,
+    } as any);
+
+    const strandId = (result as any).strandId as string;
+    await joinChatStrand(node, {
+      Id: strandId,
+      MemberPrivateKey: (result as any).memberPrivateKey ?? null,
+      Type: 'c',
+    } as any);
+
+    return { strandId };
   }
 
   // ── Not yet wired ──────────────────────────────────────────────────────

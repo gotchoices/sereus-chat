@@ -157,14 +157,21 @@ runtime schema are one file. `newId()` in `chat-operations.ts` mints UUIDs via t
 - [x] `storageUsage` — per strand, from attachment byte sizes
 - [ ] `trimStorage` — **deliberately still unwired.** Whether dropping local copies weakens what the
       strand can serve is an open platform question; guessing would be worse than refusing
-- [ ] `listOutstandingInvitations`, `cancelInvitation` — outstanding invitations live in the control
-      DB as `FormationInvite` rows, not the strand. Reachable, but the API was not confirmed; left
-      rather than invented. `StrandList` already degrades to an empty list
+- [x] **Attachment persistence** — `App.Attachment` had *no writer at all*: an attachment picked in
+      the composer never reached the strand. `insertAttachments()` added; `send` persists them and
+      `listMessages` reads them back per message
+- [ ] `listOutstandingInvitations`, `cancelInvitation` — **confirmed blocked.** `CadreNode` exposes
+      `publishFormationInvite` but no list or delete counterpart, and the strand-level
+      `listOutstandingInvites()` operates on the RBAC layer that no production path writes.
+      `StrandList` already degrades to an empty list
 
 ### Pass 3 — two-party (gated upstream)
 
-- [ ] `acceptInvitation` — needs a consent handshake with a reachable host; cannot be exercised on
-      one device. Until this works there is no second party and no group
+- [x] `acceptInvitation` — **written, untested.** `decodeInvitation` → `formStrand(invitation,
+      disclosure)` → attach with `FormStrandResult.memberPrivateKey` (**not** the invitation key —
+      different keys; the wrong one yields a strand you cannot write to). Disclosure carries only
+      the display name. Cannot be exercised on one device, so this is written from the cadre-core
+      signatures rather than a passing run
 - [ ] `inspectInvitation`, `leaveStrand`, `resignManager`, `removeMember`
 - [ ] Blocked by platform: per-party identity not landed (every joiner presents the founding key,
       so there is no real sender attribution); RBAC not switched on in production. See

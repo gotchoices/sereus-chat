@@ -235,3 +235,33 @@ export async function queryAttachments(strand: StrandInstance): Promise<Attachme
   }
   return out;
 }
+
+/** Persist attachments for a message.  Nothing wrote App.Attachment before
+ *  this: an attachment picked in the composer never reached the strand. */
+export async function insertAttachments(
+  strand: StrandInstance,
+  messageId: string,
+  attachments: Array<{
+    type: string; uri?: string | null; mimeType?: string; name?: string;
+    byteSize?: number | null; durationMs?: number | null;
+  }>,
+): Promise<AttachmentRow[]> {
+  if (!attachments.length) return [];
+  const db = getDb(strand);
+  const rows: AttachmentRow[] = [];
+  for (const a of attachments) {
+    const id = newId();
+    await db.exec(
+      `insert into App.Attachment (Id, MessageId, Type, Uri, MimeType, Name, ByteSize, DurationMs)
+       values (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, messageId, a.type, a.uri ?? null, a.mimeType ?? null, a.name ?? null,
+       a.byteSize ?? null, a.durationMs ?? null],
+    );
+    rows.push({
+      Id: id, MessageId: messageId, Type: a.type, Uri: a.uri ?? null,
+      MimeType: a.mimeType, Name: a.name,
+      ByteSize: a.byteSize ?? null, DurationMs: a.durationMs ?? null,
+    });
+  }
+  return rows;
+}
