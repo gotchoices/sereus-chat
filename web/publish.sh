@@ -95,9 +95,16 @@ chat_pkgs = {pkg(s) for s in chat_al}
 merged_al = [s for s in apex_al if pkg(s) not in chat_pkgs] + chat_al
 write(os.path.join(dest_wk, 'assetlinks.json'), merged_al)
 
-# ── apple-app-site-association (object; key = appID / appIDs[0]) ──
-def app_id(d):
-    return d.get('appID') or (d.get('appIDs') or [None])[0]
+# ── apple-app-site-association (object; key = bundle id, NOT full appID) ──
+# An appID is "<TeamID>.<bundle id>", and the team prefix is a deployment
+# detail: it changes when a placeholder is filled in or a team migrates.  Keying
+# on the whole string means such a change stops matching the existing entry and
+# appends a second one for the same app.  The bundle id is the stable identity.
+# An entry may carry several ids (`appIDs`), so compare sets and drop an apex
+# entry that overlaps chat's at all.
+def bundle_ids(d):
+    ids = d.get('appIDs') or ([d['appID']] if d.get('appID') else [])
+    return {i.split('.', 1)[1] if '.' in i else i for i in ids}
 
 chat_aasa = load(os.path.join(tmp, 'apple-app-site-association'), {})
 apex_aasa = load(os.path.join(dest_wk, 'apple-app-site-association'),
@@ -105,9 +112,9 @@ apex_aasa = load(os.path.join(dest_wk, 'apple-app-site-association'),
 apex_aasa.setdefault('applinks', {}).setdefault('apps', [])
 apex_details = apex_aasa['applinks'].setdefault('details', [])
 chat_details = (chat_aasa.get('applinks') or {}).get('details', [])
-chat_ids = {app_id(d) for d in chat_details}
+chat_ids = set().union(*(bundle_ids(d) for d in chat_details)) if chat_details else set()
 apex_aasa['applinks']['details'] = (
-    [d for d in apex_details if app_id(d) not in chat_ids] + chat_details
+    [d for d in apex_details if not (bundle_ids(d) & chat_ids)] + chat_details
 )
 write(os.path.join(dest_wk, 'apple-app-site-association'), apex_aasa)
 
