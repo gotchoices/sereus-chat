@@ -19,4 +19,4 @@
  * switch is not needed today.  Add it the day a non-optimystic Quereus mode
  * becomes useful.
  */
-export const USE_SEREUS = false;
+export const USE_SEREUS = true;

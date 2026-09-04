@@ -118,6 +118,63 @@ quereus 4.3.1 · p2p-fret 0.6.0. Boot behaviour, hazards and upstream questions:
 - [ ] `src/cadre/CadreService.ts` imports `CHAT_SAPP_ID` from the data layer; must become
       `configure({ sAppId })` before the cadre UI can be extracted
 
+## Live-backend wiring plan (in progress, 2026-09-03)
+
+Three passes. Only 1 and 2 are ours; 3 waits on upstream.
+
+### Pass 1 — schema correctness — **DONE** 2026-09-03
+
+The app imports `chat-sapp.qsql` directly (Metro raw-string transformer), so the contract and the
+runtime schema are one file. `newId()` in `chat-operations.ts` mints UUIDs via the
+`react-native-get-random-values` polyfill already imported at app entry.
+
+
+`design/specs/domain/chat-sapp.qsql` + `apps/mobile/src/data/chat-operations.ts`:
+
+- [x] `Message.Id` → client-generated **UUID text**. Today it is `max(Id)+1`, which is the exact
+      shape of the verified upstream defect `optimystic-concurrent-same-pk-insert-silent-lww`:
+      two writers compute the same id, both are told they succeeded, one message is lost
+- [x] Drop `Message.Status` (no delivery or read state exists) and stop writing `'sent'`
+- [x] Add `Message.ReplyToId` (story 12) and `Message.EditedAt` (story 13)
+- [x] Add a `Reaction` table — `(MessageId, MemberId, Symbol)`, attributed, open symbol set
+- [x] `Attachment.Uri` nullable (a fetching attachment has no local URI); add `ByteSize`
+      and `DurationMs`; drop `location` from `Type`
+- [ ] **Open question:** where a *group's* name lives. A private nickname is device-local, but a
+      shared group name has to be in the strand and has no column
+
+### Pass 2 — adapter ops that work on one device — **DONE** 2026-09-03
+
+`sereus.ts` went from 18 unwired ops to 8.
+
+- [x] `listMembers`, `getStrandState` — members from `App.Member`; strand state is honest about what
+      it cannot know: manager rows are sereus's and no production path writes them, so a solo strand
+      reports private / one manager / I can act
+- [x] `editMessage`, `deleteMessage`, `react`, `unreact` — new helpers in `chat-operations.ts`;
+      deleting a message also clears its reactions and attachments
+- [x] `listAttachments` — a row held with no URI reports `fetching`, never absent
+- [x] `listMessages` now carries reactions
+- [x] `getPrefs`, `setPrefs` — device-local (AsyncStorage), never strand data
+- [x] `storageUsage` — per strand, from attachment byte sizes
+- [ ] `trimStorage` — **deliberately still unwired.** Whether dropping local copies weakens what the
+      strand can serve is an open platform question; guessing would be worse than refusing
+- [ ] `listOutstandingInvitations`, `cancelInvitation` — outstanding invitations live in the control
+      DB as `FormationInvite` rows, not the strand. Reachable, but the API was not confirmed; left
+      rather than invented. `StrandList` already degrades to an empty list
+
+### Pass 3 — two-party (gated upstream)
+
+- [ ] `acceptInvitation` — needs a consent handshake with a reachable host; cannot be exercised on
+      one device. Until this works there is no second party and no group
+- [ ] `inspectInvitation`, `leaveStrand`, `resignManager`, `removeMember`
+- [ ] Blocked by platform: per-party identity not landed (every joiner presents the founding key,
+      so there is no real sender attribution); RBAC not switched on in production. See
+      [`domain/sereus.md`](../domain/sereus.md)
+
+### Switching over
+
+`USE_SEREUS = true` is **not** safe until pass 2 lands: `ChatInterface` calls `listMembers`
+alongside `listMessages`, so a conversation would show an error banner rather than messages.
+
 ## Final Wiring
 
 ### Data Adapter Architecture

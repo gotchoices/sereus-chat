@@ -37,10 +37,23 @@ Every chat strand carries this schema. Each participant inserts itself into `Mem
 | MemberId | text | FK → Member.Id |
 | Content | text | Message text |
 | Timestamp | datetime | Asserted by the sender. Not authoritative — see *Ordering* below |
+| ReplyToId | text | Quote-reply target; null when not a reply |
+| EditedAt | datetime | Set when edited in place. No version chain is kept |
 
 No delivery or read status is tracked. A reply is the evidence a message was read; the app claims
 nothing further, and reports nothing back to a sender. (Decision recorded in
 `sereus.md`.)
+
+### Reaction
+
+| Column | Type | Notes |
+|--------|------|-------|
+| MessageId | text | FK → Message.Id |
+| MemberId | text | FK → Member.Id — attributed, never an anonymous tally |
+| Symbol | text | Open set, not a curated palette |
+
+Primary key is the triple, so a member may react more than once with different symbols and
+un-reacting is a delete.
 
 ### Ordering — placeholder, unresolved
 
@@ -74,10 +87,12 @@ manufacture one.
 
 | Column | Type | Notes |
 |--------|------|-------|
-| Id | integer | Attachment id |
-| MessageId | integer | FK → Message.Id |
-| Type | text | image, video, file, location |
-| Uri | text | Content reference (blob, CID, …) |
+| Id | text | Attachment id |
+| MessageId | text | FK → Message.Id |
+| Type | text | image, video, file, voice |
+| Uri | text | Content reference (blob, CID, …). **Nullable** — an attachment being fetched has no local URI; see `locality` in `ops.md` |
+| ByteSize | integer | Optional |
+| DurationMs | integer | Video and voice |
 | MimeType | text | Optional |
 | Name | text | Display name |
 

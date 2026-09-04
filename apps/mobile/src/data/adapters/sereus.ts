@@ -10,12 +10,21 @@ import type {
   Prefs, StorageUsage, SendInput,
 } from '../types';
 import { ensureDefaultChatStrand, getDefaultChatStrand, syncProfileNameToStrands } from '../chat-strand';
-import { queryMessages, insertMessage } from '../chat-operations';
+import {
+  queryMessages, insertMessage, updateMessage, removeMessage,
+  addReaction, removeReaction, queryReactions, queryAttachments, queryMembers,
+} from '../chat-operations';
 import { CHAT_SAPP_ID } from '../chat-sapp';
 import { cadreService } from '../../cadre';
 import { withTimeout, CONTROL_OP_TIMEOUT_MS } from '../../cadre/async';
 
 const PROFILE_KEY = '@sereus.chat/profile';
+const PREFS_KEY = '@sereus.chat/prefs';
+
+const DEFAULT_PREFS: Prefs = {
+  theme: 'system', language: 'en', notifyDefault: 'all',
+  storageCeilingBytes: null, perStrandOverrides: 0,
+};
 
 /** Open invitations are valid for 24h — matches the cadre-core default. */
 const INVITE_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -36,17 +45,26 @@ export class SereusAdapter implements DataAdapter {
 
   async listMessages(_strandId: string, _opts?: { before?: string; limit?: number }): Promise<Message[]> {
     const strand = await ensureDefaultChatStrand();
-    const rows = await queryMessages(strand);
+    const [rows, reactions] = await Promise.all([
+      queryMessages(strand),
+      queryReactions(strand).catch(() => []),
+    ]);
+    const byMessage = new Map<string, Array<{ memberId: string; symbol: string }>>();
+    for (const r of reactions) {
+      const list = byMessage.get(r.MessageId) ?? [];
+      list.push({ memberId: r.MemberId, symbol: r.Symbol });
+      byMessage.set(r.MessageId, list);
+    }
     // No status is read: none is tracked (design/specs/domain/schema.md).
     return rows.map(r => ({
-      id: String(r.Id),
+      id: r.Id,
       memberId: r.MemberId,
       content: r.Content,
       timestamp: r.Timestamp,
-      replyToId: null,
-      editedAt: null,
+      replyToId: r.ReplyToId ?? null,
+      editedAt: r.EditedAt ?? null,
       attachments: [],
-      reactions: [],
+      reactions: byMessage.get(r.Id) ?? [],
     }));
   }
 
@@ -57,13 +75,13 @@ export class SereusAdapter implements DataAdapter {
 
     // A local write.  There is no pending state to surface — the phone holds
     // the strand, so this either lands or genuinely fails.
-    const row = await insertMessage(strand, peerId, input.content);
+    const row = await insertMessage(strand, peerId, input.content, input.replyToId);
     return {
-      id: String(row.Id),
+      id: row.Id,
       memberId: peerId,
       content: row.Content,
       timestamp: row.Timestamp,
-      replyToId: input.replyToId ?? null,
+      replyToId: row.ReplyToId ?? null,
       editedAt: null,
       attachments: [],
       reactions: [],
@@ -152,7 +170,7 @@ export class SereusAdapter implements DataAdapter {
             return {
               strandId: id,
               strandTitle: `Strand ${id.slice(0, 8)}`,
-              messageId: String(m.Id),
+              messageId: m.Id,
               senderName: m.MemberName ?? m.MemberId.slice(0, 12),
               snippet: m.Content,
               matchRange: [at, at + q.length] as [number, number],
@@ -279,21 +297,115 @@ export class SereusAdapter implements DataAdapter {
   // Each of these needs cadre-core surface that does not exist or is not
   // reachable from a solo device.  See design/stories/mobile/STATUS.md §G.
 
-  async getStrandState(_strandId: string): Promise<StrandState> { this.notImplemented('getStrandState'); }
-  async listMembers(_strandId: string): Promise<Member[]> { this.notImplemented('listMembers'); }
-  async listAttachments(_strandId: string): Promise<Attachment[]> { this.notImplemented('listAttachments'); }
-  async editMessage(_id: string, _content: string): Promise<void> { this.notImplemented('editMessage'); }
-  async deleteMessage(_id: string): Promise<void> { this.notImplemented('deleteMessage'); }
-  async react(_id: string, _symbol: string): Promise<void> { this.notImplemented('react'); }
-  async unreact(_id: string, _symbol: string): Promise<void> { this.notImplemented('unreact'); }
+  async getStrandState(_strandId: string): Promise<StrandState> {
+    // Membership and manager rows are sereus's, and no production path writes
+    // them yet (domain/sereus.md).  Until per-party identity lands, the honest
+    // answer for a solo strand is: private, and I can still act.
+    const strand = await ensureDefaultChatStrand();
+    return {
+      visibility: (strand as any).type === 'o' ? 'public' : 'private',
+      managerCount: 1,
+      settled: false,
+      canIManage: true,
+    };
+  }
+
+  async listMembers(_strandId: string): Promise<Member[]> {
+    const strand = await ensureDefaultChatStrand();
+    const me = cadreService.peerId ?? '';
+    const rows = await queryMembers(strand);
+    return rows.map(r => ({
+      id: r.Id,
+      name: r.Name,
+      avatarUri: r.AvatarUri ?? null,
+      isManager: r.Id === me,   // not readable yet; see getStrandState
+      isMe: r.Id === me,
+    }));
+  }
+
+  async listAttachments(_strandId: string, opts?: { kind?: Attachment['type'] }): Promise<Attachment[]> {
+    const strand = await ensureDefaultChatStrand();
+    const rows = await queryAttachments(strand);
+    return rows
+      .filter(r => !opts?.kind || r.Type === opts.kind)
+      .map(r => ({
+        id: r.Id,
+        messageId: r.MessageId,
+        type: r.Type as Attachment['type'],
+        uri: r.Uri,
+        mimeType: r.MimeType,
+        name: r.Name,
+        byteSize: r.ByteSize ?? null,
+        durationMs: r.DurationMs ?? null,
+        // A row held with no URI is being fetched — a null URI must never read
+        // as absent (domain/overview.md).
+        locality: r.Uri ? ('local' as const) : ('fetching' as const),
+      }));
+  }
+
+  async editMessage(id: string, content: string): Promise<void> {
+    await updateMessage(await ensureDefaultChatStrand(), id, content);
+  }
+
+  async deleteMessage(id: string): Promise<void> {
+    await removeMessage(await ensureDefaultChatStrand(), id);
+  }
+
+  async react(id: string, symbol: string): Promise<void> {
+    const peerId = cadreService.peerId;
+    if (!peerId) throw new Error('Peer ID not available; cadre may not be running');
+    await addReaction(await ensureDefaultChatStrand(), id, peerId, symbol);
+  }
+
+  async unreact(id: string, symbol: string): Promise<void> {
+    const peerId = cadreService.peerId;
+    if (!peerId) throw new Error('Peer ID not available; cadre may not be running');
+    await removeReaction(await ensureDefaultChatStrand(), id, peerId, symbol);
+  }
   async leaveStrand(_id: string, _o: { keepIdentity: boolean }): Promise<void> { this.notImplemented('leaveStrand'); }
   async resignManager(_id: string): Promise<void> { this.notImplemented('resignManager'); }
   async removeMember(_s: string, _m: string): Promise<void> { this.notImplemented('removeMember'); }
   async listOutstandingInvitations(): Promise<Invitation[]> { this.notImplemented('listOutstandingInvitations'); }
   async cancelInvitation(_id: string): Promise<void> { this.notImplemented('cancelInvitation'); }
   async inspectInvitation(_t: string): Promise<InvitationPreview> { this.notImplemented('inspectInvitation'); }
-  async getPrefs(): Promise<Prefs> { this.notImplemented('getPrefs'); }
-  async setPrefs(_p: Partial<Prefs>): Promise<Prefs> { this.notImplemented('setPrefs'); }
-  async storageUsage(): Promise<StorageUsage> { this.notImplemented('storageUsage'); }
-  async trimStorage(): Promise<{ bytesFreed: number }> { this.notImplemented('trimStorage'); }
+  // ── Device-local.  Never strand data, never replicated: settings are
+  //    per-device by design and sidestep the missing party-private store
+  //    (gotchoices/sereus#6).
+
+  async getPrefs(): Promise<Prefs> {
+    const raw = await AsyncStorage.getItem(PREFS_KEY);
+    return { ...DEFAULT_PREFS, ...(raw ? JSON.parse(raw) : {}) };
+  }
+
+  async setPrefs(patch: Partial<Prefs>): Promise<Prefs> {
+    const next = { ...(await this.getPrefs()), ...patch };
+    await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(next));
+    return next;
+  }
+
+  async storageUsage(): Promise<StorageUsage> {
+    // What this device is holding, strand by strand.  Attachment byte sizes are
+    // what we can account for; block-level storage is the platform's and is not
+    // exposed.
+    const byStrand: StorageUsage['byStrand'] = [];
+    for (const [id, strand] of cadreService.getStrands()) {
+      if (!strand.database) continue;
+      try {
+        const rows = await queryAttachments(strand);
+        byStrand.push({
+          strandId: id,
+          title: `Strand ${id.slice(0, 8)}`,
+          bytes: rows.reduce((n, r) => n + (r.ByteSize ?? 0), 0),
+        });
+      } catch { /* a strand we cannot read right now contributes nothing */ }
+    }
+    byStrand.sort((a, b) => b.bytes - a.bytes);
+    return { totalBytes: byStrand.reduce((n, s) => n + s.bytes, 0), byStrand };
+  }
+
+  async trimStorage(): Promise<{ bytesFreed: number }> {
+    // Dropping local copies without weakening what the strand can still serve
+    // is an unresolved platform question (domain/sereus.md) — not guessed at here.
+    this.notImplemented('trimStorage');
+  }
 }

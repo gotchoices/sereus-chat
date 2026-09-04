@@ -1,6 +1,15 @@
 -- Sereus Chat sApp schema — applied to every chat strand.
 -- StrandDatabase wraps this DDL in `declare schema App { … }; apply schema App;`
 -- so tables are referenced as App.Member / App.Message / App.Attachment.
+--
+-- Shapes follow design/specs/domain/schema.md and ops.md.  Two things are
+-- deliberate and must not be "tidied" back:
+--   · Message.Id is a client-generated UUID, never a counter.  A monotonic id
+--     computed as max(Id)+1 lets two concurrent writers pick the same value;
+--     upstream then silently keeps one and tells both they succeeded
+--     (optimystic-concurrent-same-pk-insert-silent-lww).
+--   · There is no delivery or read status anywhere.  A reply is the evidence a
+--     message was read.
 
 table Member (
     Id text primary key,                -- libp2p Peer ID of the participating member
@@ -9,20 +18,32 @@ table Member (
 );
 
 table Message (
-    Id integer primary key,
+    Id text primary key,                -- client-generated UUID
     MemberId text not null,
     Content text not null,
-    Timestamp datetime not null,
-    Status text,                        -- advisory: sent / delivered / read
+    Timestamp datetime not null,        -- asserted by the sender; not authoritative
+    ReplyToId text,                     -- quote-reply target, null when not a reply
+    EditedAt datetime,                  -- set when edited in place; no version chain
     foreign key (MemberId) references Member(Id)
 );
 
 table Attachment (
-    Id integer primary key,
-    MessageId integer not null,
-    Type text not null,                 -- image | video | file | location
-    Uri text not null,                  -- blob ref, CID, or local file
+    Id text primary key,
+    MessageId text not null,
+    Type text not null,                 -- image | video | file | voice
+    Uri text,                           -- null while not held locally; see `locality` in ops.md
     MimeType text,
     Name text,
+    ByteSize integer,
+    DurationMs integer,                 -- video and voice
     foreign key (MessageId) references Message(Id)
+);
+
+table Reaction (
+    MessageId text not null,
+    MemberId text not null,             -- attributed; never an anonymous tally
+    Symbol text not null,               -- open set, not a curated palette
+    primary key (MessageId, MemberId, Symbol),
+    foreign key (MessageId) references Message(Id),
+    foreign key (MemberId) references Member(Id)
 );
