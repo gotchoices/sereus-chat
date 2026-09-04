@@ -3,8 +3,12 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAMID.org.sereus.chat",
-        "paths": ["/chat/invite/*"]
+        "appID": "6849Q7KVP5.org.sereus.chat",
+        "paths": [
+          "/chat/invite/*",
+          "/chat/relay",
+          "/chat/relay/*"
+        ]
       }
     ]
   }

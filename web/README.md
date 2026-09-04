@@ -125,4 +125,10 @@ as listed-but-not-running.
       -d "sereus://relay?addr=%2Fip4%2F10.0.2.2%2Ftcp%2F4002%2Fws%2Fp2p%2F<peerId>" \
       org.sereus.chat
 
-`sereus://` needs a native rebuild to be registered; `chat://` works today.
+App Links only verify at install time, and the OS fetches the association file
+from the **apex** (`https://sereus.org/.well-known/`), never `/chat/.well-known/`.
+So a `/chat/relay` link opens the app only once the merged association files are
+live *and* the app has been reinstalled (`yarn android`) since.
+
+Until then, the custom scheme works for local testing: `chat://relay?addr=…`
+(`sereus://` also needs a rebuild, having only just been added to the manifest).

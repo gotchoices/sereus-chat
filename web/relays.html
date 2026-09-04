@@ -107,14 +107,18 @@
   </footer>
 
   <script>
-    // A relay link PROPOSES a relay.  The app shows who runs it and what they
-    // would see, and the person decides there — a web page never configures
+    // An App Link (https://sereus.org/chat/relay), not the custom scheme: from a
+    // web page, browsers block or silently drop `sereus://`, and an App Link
+    // falls back to this page when the app is not installed.
+    //
+    // The link PROPOSES a relay.  The app shows who runs it and what they would
+    // see, and the person decides there — a web page never configures
     // reachability silently.  Empty data-addr = listed but not yet running.
     for (const el of document.querySelectorAll('.relay-link')) {
       const addr = el.getAttribute('data-addr');
       const pending = el.parentElement.querySelector('.relay-pending');
       if (!addr) { el.setAttribute('aria-disabled', 'true'); continue; }
-      el.setAttribute('href', 'sereus://relay?addr=' + encodeURIComponent(addr));
+      el.setAttribute('href', 'https://sereus.org/chat/relay?addr=' + encodeURIComponent(addr));
       if (pending) pending.hidden = true;
     }
   </script>
