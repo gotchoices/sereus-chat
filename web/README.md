@@ -98,3 +98,31 @@ RewriteRule ^invite/.*$ /chat/invite.html [L]
 scoped to chat's own dir) and **merges** chat's `.well-known` entries into
 `sereus.org/.well-known/` without touching other apps' entries. Requires ssh
 access to the host that serves `sereus.org`.
+
+## relays.html
+
+Listed relays live here, not in the app. A bundled list ages badly, cannot be
+retracted, and would make the app carry infrastructure policy it should not
+have; a page can be edited and a listing withdrawn.
+
+Two rules for this page:
+
+- **Listing is vouching.** However it is worded, a relay listed here reads as
+  endorsed by the project. Only list operators you are willing to stand behind.
+- **A link proposes, it never applies.** `sereus://relay?addr=<urlencoded>` asks
+  the app to *offer* a relay; the app shows who runs it and what they would be
+  able to see, and the person decides there. Any page on the internet can emit
+  that link, and the cost of a bad one is invisible afterwards.
+
+To list a relay, fill in `data-addr` on its `.relay-link` with the full
+multiaddr including `/p2p/<peerId>`, e.g.
+`/dns4/relay.sereus.org/tcp/4002/wss/p2p/12D3Koo…`. An empty `data-addr` renders
+as listed-but-not-running.
+
+### Testing the deep link without the page
+
+    adb shell am start -a android.intent.action.VIEW \
+      -d "sereus://relay?addr=%2Fip4%2F10.0.2.2%2Ftcp%2F4002%2Fws%2Fp2p%2F<peerId>" \
+      org.sereus.chat
+
+`sereus://` needs a native rebuild to be registered; `chat://` works today.

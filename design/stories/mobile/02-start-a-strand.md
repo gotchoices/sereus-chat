@@ -37,7 +37,20 @@ cubicle. Bob's brother Mike is not.
 9. He can see the invitation is outstanding, and that nothing exists yet — there is no strand until
    someone accepts. → [03](03-respond-to-an-invitation.md)
 
-### Alternative Path A: closing it for good
+### Alternative Path A: nowhere to be reached yet
+
+6.1. Bob asks for the invitation and cannot have one. Nothing of his can be reached from outside, so
+     there is nowhere for Susan to answer. It is not that she may not reach him — that is the point
+     of the app — it is that she *could* not.
+6.2. He is told this in his own terms, and it is not framed as an error he caused. Nobody's phone is
+     reachable on its own; this is the ordinary starting position.
+6.3. He is offered two ways out. Something of his own that stays awake — his to run, nobody else
+     involved. Or borrowing somebody else's for now, which is quicker and costs him something he
+     should understand first. → [42](42-staying-connected.md)
+6.4. Whichever he chooses, the terms he already set are not thrown away. He comes back and the
+     invitation is there to be made.
+
+### Alternative Path B: closing it for good
 
 9.1. Susan has joined, and Bob wants this to stay between the two of them permanently.
 9.2. He gives up his own ability to add people. He is told exactly what he is giving up and that it
@@ -48,7 +61,7 @@ cubicle. Bob's brother Mike is not.
 9.4. If he had wanted a group of four instead, he would have invited three people first and given
      it up afterwards. The act is the same; when he does it is what fixes the size.
 
-### Alternative Path B: someone who is not in the room
+### Alternative Path C: someone who is not in the room
 
 7.1. Bob wants to invite his brother Mike, who is across town. He sends the link by text.
 7.2. He gets impatient and sends the same link by email as well.
@@ -56,13 +69,13 @@ cubicle. Bob's brother Mike is not.
      good — an invitation is spent once it is used. He learns this from the app rather than being
      left to guess.
 
-### Alternative Path C: nobody responds
+### Alternative Path D: nobody responds
 
 9.1. Bob sends an invitation and hears nothing.
 9.2. He can see it is still outstanding, and can share it again or abandon it. It does not sit there
      looking like a conversation.
 
-### Alternative Path D: a strand meant to grow
+### Alternative Path E: a strand meant to grow
 
 3.1. Bob is setting up something for his cycling group rather than for one person.
 3.2. He passes on the ability to invite, to one friend he trusts, so the group does not depend on
@@ -89,6 +102,11 @@ cubicle. Bob's brother Mike is not.
 - [ ] Outstanding invitations are visible, distinguishable from strands, and can be re-shared or abandoned
 - [ ] A spent invitation says so when used again, rather than failing obscurely
 - [ ] A strand does not exist until someone accepts
+- [ ] A user who cannot yet be reached is told so at the moment they try to invite somebody, in
+      terms of what it means rather than what is missing
+- [ ] That message is not a dead end: it offers running something of their own and borrowing
+      somebody else's, and does not present either as the obvious answer
+- [ ] The terms already chosen survive the detour
 
 ## Variants
 

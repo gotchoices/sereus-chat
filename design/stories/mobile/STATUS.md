@@ -15,7 +15,7 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
 | # | Story | State | Outstanding |
 |---|-------|-------|-------------|
 | 01 | [First run](01-first-run.md) | drafted | review |
-| 02 | [Start a strand](02-start-a-strand.md) | revised | review |
+| 02 | [Start a strand](02-start-a-strand.md) | revised | review — adds "nowhere to be reached yet" |
 | 03 | [Respond to an invitation](03-respond-to-an-invitation.md) | revised | review |
 | 04 | [Our first conversation](04-our-first-conversation.md) | revised | review |
 | 05 | [Add someone to a strand](05-add-someone-to-a-strand.md) | revised | review |
@@ -31,7 +31,7 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
 | 33 | [Managing a strand](33-managing-a-strand.md) | revised | review |
 | 40 | [My profile](40-my-profile.md) | drafted | review |
 | 41 | [Settings](41-settings.md) | drafted | review |
-| 42 | [Staying connected](42-staying-connected.md) | drafted | review |
+| 42 | [Staying connected](42-staying-connected.md) | revised | review — leads with reachability; borrowing a relay and its cost |
 | 90 | [Voice and video call](90-voice-and-video-call.md) | parked | trim; after messaging |
 
 ## Done

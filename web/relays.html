@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Being reachable — Sereus Chat</title>
+  <meta name="description" content="A phone on its own has no address the world can reach. Here is how to fix that in Sereus Chat." />
+  <link rel="icon" href="/chat/images/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/chat/styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <img class="logo" src="/images/logo.svg" alt="Sereus Chat logo" width="88" height="88" />
+    <h1>Being reachable</h1>
+    <p class="tagline">So the person you invite can actually answer.</p>
+  </header>
+
+  <main>
+    <section>
+      <p class="lede">
+        Nobody <em>may</em> reach you in Sereus Chat without an invitation — that is
+        the whole point. But right now nobody <em>can</em> reach you either, and that
+        is a different problem. A phone in your pocket has no address the world can
+        knock on.
+      </p>
+      <p>
+        There are two ways to fix it. Neither is the obvious answer; they suit
+        different people.
+      </p>
+    </section>
+
+    <section class="invite-card">
+      <h2>Borrow a relay</h2>
+      <p>
+        A relay is somebody's always-on machine that passes traffic along so people
+        can reach you. It is the quick way to get started, and you can stop using it
+        whenever you like.
+      </p>
+      <p class="note">
+        <strong>What it costs you.</strong> A relay carries your traffic sealed and
+        <strong>cannot read anything you say</strong>. But whoever runs it can see
+        <em>that</em> you are talking to someone, when, and roughly how much. You are
+        choosing a particular person to know that about you. Pick one you are willing
+        to trust with that much — and change it later if you want to.
+      </p>
+
+      <h3>Open relays</h3>
+      <ul class="steps" id="relay-list">
+        <li>
+          <strong>sereus.org community relay</strong> — operated by the Sereus
+          project. Free, no sign-up, a limited number of slots.
+          <br />
+          <a class="btn-secondary relay-link" data-addr="" href="#">Use this relay</a>
+          <span class="note relay-pending">Not running yet — listed here ahead of the relay itself.</span>
+        </li>
+      </ul>
+      <p class="note">
+        Tapping a relay does not switch anything on by itself. Your app will show you
+        who runs it and what they would be able to see, and you decide there.
+      </p>
+    </section>
+
+    <section class="how">
+      <h2>Run your own</h2>
+      <p>
+        Nothing borrowed, nobody else in it. This is the answer most people want in
+        the end, and the only one where no stranger sees the shape of your
+        conversations.
+      </p>
+      <ol class="steps">
+        <li>Run a relay on a machine that stays on — a spare computer, or a small
+          server you rent.</li>
+        <li>Point your app at it the same way as any other relay.</li>
+        <li>Offer it to friends if you like. One relay can serve more than one person.</li>
+      </ol>
+      <p class="note">
+        A relay is a small program. It holds none of your messages and joins none of
+        your conversations.
+      </p>
+    </section>
+
+    <section class="how">
+      <h2>Paying somebody to do it</h2>
+      <p>
+        Some people would rather rent this than run it. Providers who offer a machine
+        <em>you</em> control will be listed here as they appear. That is not the same
+        as borrowing somebody else's: on a machine you control, no stranger sees the
+        shape of your conversations.
+      </p>
+    </section>
+
+    <section class="how">
+      <h2>What a relay is not</h2>
+      <ul class="steps">
+        <li>It is not an account. Nothing to sign up for, no password.</li>
+        <li>It does not hold your messages. Those live with you and the people you
+          talk to.</li>
+        <li>It does not decide who may reach you. Only your invitations do that.</li>
+        <li>It can go away. If yours stops working your conversations are unaffected —
+          you simply stop being reachable by anyone new until you pick another.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>Part of the <a href="https://sereus.org/">Sereus</a> project. Proprietary — Sereus Chat.</p>
+  </footer>
+
+  <script>
+    // A relay link PROPOSES a relay.  The app shows who runs it and what they
+    // would see, and the person decides there — a web page never configures
+    // reachability silently.  Empty data-addr = listed but not yet running.
+    for (const el of document.querySelectorAll('.relay-link')) {
+      const addr = el.getAttribute('data-addr');
+      const pending = el.parentElement.querySelector('.relay-pending');
+      if (!addr) { el.setAttribute('aria-disabled', 'true'); continue; }
+      el.setAttribute('href', 'sereus://relay?addr=' + encodeURIComponent(addr));
+      if (pending) pending.hidden = true;
+    }
+  </script>
+</body>
+</html>

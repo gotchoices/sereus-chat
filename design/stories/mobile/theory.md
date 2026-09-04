@@ -116,6 +116,18 @@ confidential. Agreements like that can carry consequences — that's sereus's bu
 the chat app makes up. What it means for you is that "this is private" can be a commitment somebody
 made, instead of a setting some company could quietly change next Tuesday.
 
+Susan: So how does anyone reach you at all, if there's no company in the middle?
+
+Bob: Something of mine has to be somewhere the world can knock on. A phone in your pocket isn't
+that. So either I run something that stays awake, or I borrow a bit of somebody else's for now —
+which means they can see that I'm talking to people, and when, but never what I'm saying.
+
+Susan: That's not nothing.
+
+Bob: No. It's the difference between nobody being *allowed* to reach me, which is the whole point,
+and nobody being *able* to — which is just a phone in a pocket. The first is worth having. The
+second is a problem to solve.
+
 Susan: And who's running the whole thing?
 
 Bob: Nobody. That's the trade. No company holding your messages means none to be breached,
@@ -136,6 +148,9 @@ Susan: Fine. Show me the code.
 
 - **There is no directory and no discovery.** Every story that starts a conversation starts with an
   invitation shared out of band.
+- **Being unreachable is not the same as being private.** Nobody *may* reach you without an
+  invitation — that is the design. Nobody *can* reach a phone that has no address — that is
+  plumbing, and stories should treat it as a problem to solve rather than a feature.
 - **Unsolicited contact is structurally absent, not filtered.** Stories should not invent spam
   controls for a channel that does not exist.
 - **Membership is not an address.** Being in a group strand with someone gives no private route to

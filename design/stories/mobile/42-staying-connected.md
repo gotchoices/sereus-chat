@@ -2,13 +2,14 @@
 
 ## Story Overview
 
-As somebody whose phone is asleep most of the day  
-I want something of mine that stays awake  
-So that my conversations keep working, keep up with me, and can reach me.
+As somebody with only a phone  
+I want to be reachable at all, and then to stay reachable while I sleep  
+So that people I invite can actually answer, and so my conversations keep working when I am not holding it.
 
-Context: Bob has been using the app for months on one phone. Deliberately brief — the machines a
-person owns are **sereus's** to design, and the screen is a shared component, not chat's. This story
-records only what a chat user notices and why they would act.
+Context: Bob has just tried to invite Susan and been told there is nowhere for her to answer
+([02](02-start-a-strand.md)). Deliberately brief — the machines a person owns are **sereus's** to
+design, and the screen is a shared component, not chat's. This story records only what a chat user
+notices and why they would act.
 
 ## Roles
 
@@ -18,35 +19,52 @@ records only what a chat user notices and why they would act.
 
 ## Sequence
 
-1. Bob keeps noticing the same three things. Messages sit until he opens the app. Scrolling back far
-   enough makes him wait ([21](21-receiving-media.md)). And nothing reaches him while the phone is
-   asleep, however he sets his notifications ([41](41-settings.md)).
-2. He finds the page about his own machines. It shows who he is on the network and what is currently
-   acting for him: this phone, and nothing else.
-3. He is told what that costs him, in his own terms rather than in the language of nodes. One phone
-   means his conversations only move when he is holding it, only as much history is to hand as the
-   phone will keep, and nothing can wake him.
-4. He adds something of his own that stays on. The app gives him what that machine needs; he sets it
-   up over there, and it appears here as his.
-5. Afterwards the three things are different. Messages move while he sleeps, more of the past is to
-   hand without waiting on anybody, and something is awake to be reached.
-6. He can remove a machine later, and is told what he would be giving back if it leaves him with
-   only the phone again.
+1. Bob cannot invite anybody. A phone on its own has no address the world can reach, so there is
+   nowhere for an answer to arrive. This is where almost everybody starts.
+2. He is offered two honest ways out, neither dressed up as the obvious one.
+3. **Something of his own that stays awake.** His machine, nobody else in it. More to set up, and
+   the answer he will want in the end.
+4. **Borrowing somebody else's for now.** Quicker, and the app is straight about the cost before he
+   takes it: whoever runs it will be able to see that he talks to people, when, and how much — never
+   what he says. He is choosing a particular person to know that much about him.
+5. He takes the quick route. He is shown where such offers are listed rather than the app choosing
+   for him, picks one, and confirms it knowing what it means.
+6. He is reachable. His invitation works, Susan answers, and nothing about the conversation itself
+   involves the machine he borrowed. → [02](02-start-a-strand.md)
+7. Months later he notices the other things a sleeping phone costs him: messages sit until he opens
+   the app, reaching into the past makes him wait ([21](21-receiving-media.md)), and nothing wakes
+   him however he sets his notifications ([41](41-settings.md)).
+8. So he adds a machine of his own. Those three things change, and he stops depending on anybody
+   else's goodwill to be reachable at all.
+9. He can remove a machine later, and is told what he would be giving back.
 
-### Alternative Path A: only ever a phone
+### Alternative Path A: the borrowed one goes away
 
-1.1. Bob never adds anything, and the app does not block him or nag.
-1.2. The consequence is stated once, accurately, in his terms — not as a defect and not as a feature
-     he is failing to buy.
+6.1. The machine Bob was borrowing stops answering, or stops taking new arrangements.
+6.2. He finds out because he is told, not because an invitation quietly fails.
+6.3. He is offered the same two ways out as before. Nothing he has said is lost; his strands are
+     unaffected. What he loses is the ability to be *reached* by somebody new.
 
-### Alternative Path B: something that has gone quiet
+### Alternative Path B: he wants nothing borrowed
 
-5.1. One of Bob's machines stops answering.
-5.2. What he can see is that it was last heard from some time ago. Whether it is unplugged, out of
+4.1. Bob does not want a stranger knowing even the shape of his conversations.
+4.2. That is a reasonable position and the app does not argue. He sets up something of his own
+     first, and does not get to invite anybody until he has.
+
+### Alternative Path C: only ever a phone
+
+1.1. Bob does neither, and the app does not block him or nag.
+1.2. He can read and write in strands he is already in. He cannot bring anybody new in, and he is
+     told that plainly once rather than reminded.
+
+### Alternative Path D: something that has gone quiet
+
+8.1. One of Bob's machines stops answering.
+8.2. What he can see is that it was last heard from some time ago. Whether it is unplugged, out of
      signal, or gone for good is not something anything here can know, and the app does not guess on
      his behalf ([31](31-whos-in-this-strand.md) takes the same line about people).
 
-### Alternative Path C: it is not only about chat
+### Alternative Path E: it is not only about chat
 
 2.1. Bob has another sereus app on the same phone.
 2.2. His machines are **his**, not this app's. What he adds here serves everything he runs on
@@ -54,26 +72,37 @@ records only what a chat user notices and why they would act.
 
 ## Acceptance Criteria
 
-- [ ] A user can reach a page showing their network identity and the machines acting for them, with
-      this device among them
-- [ ] The cost of having only a phone is stated once, in terms of what the user experiences —
-      messages waiting, history that has to be fetched, nothing able to wake them — and not as an
-      error
-- [ ] A user can add a machine of their own, and see it become part of what acts for them
-- [ ] A user can remove one, and is told the consequence when it would leave them with only a phone
+- [ ] A user who cannot be reached is told so, in terms of what it prevents rather than what is
+      missing, and is never left at a dead end
+- [ ] Both ways out are offered plainly, and neither is presented as the obvious choice
+- [ ] Before borrowing somebody else's machine, the user is told what its operator would be able to
+      see — that they talk, when, and how much — and that it is never what they say
+- [ ] The app does not choose an operator for the user; it shows where offers are listed and the
+      user picks
+- [ ] Borrowing is described as borrowing: it can end, and the user is told when it has
+- [ ] Losing a borrowed machine costs reachability only — no strand and nothing said is affected
+- [ ] A user who declines to borrow anything is not nagged, and can still use strands they are in
+- [ ] A user can add a machine of their own, and see what changes when they do
+- [ ] A user can remove one, and is told the consequence
 - [ ] Each machine shows when it was last heard from, without the app claiming to know why it is
       quiet
-- [ ] The user is not nagged for running only a phone
-- [ ] It is clear that these machines are the user's own and serve every sereus app they run, not
-      this one
+- [ ] It is clear that these machines are the user's own and serve every sereus app they run
 
 ## Variants
 
-- happy: a second machine added, and the difference visible afterwards
-- empty: a user with only a phone
-- error: a machine that has stopped answering
+- happy: unreachable, borrows a relay, invites successfully; later adds a machine of their own
+- empty: a user with only a phone and nothing borrowed
+- error: the borrowed machine goes away; a machine of their own stops answering
 
 ## Open
+
+**Where offers are listed.** The app deliberately ships with no operators in it: a bundled list ages
+badly, cannot be retracted, and makes the app carry infrastructure policy it should not have. The
+list lives on the web (`chat/web/`, published to sereus.org/chat) where it can be changed and
+withdrawn, and a link carries a chosen operator back into the app. Two consequences worth holding
+on to: listing somebody reads as vouching for them, whatever a disclaimer says; and a link that
+configures reachability must **propose**, never apply silently — any page can offer one, and the
+cost is invisible afterwards.
 
 **This screen is not chat's to design.** Chat renders a shared component (`apps/mobile/src/cadre-ui/`,
 with its own `SPEC.md`), developed here first and intended to be proposed upstream as
