@@ -25,7 +25,7 @@ const PREFS_KEY = '@sereus.chat/prefs';
 
 const DEFAULT_PREFS: Prefs = {
   theme: 'system', language: 'en', notifyDefault: 'all',
-  storageCeilingBytes: null, perStrandOverrides: 0,
+  storageCeilingBytes: null, perStrandOverrides: 0, relayAddrs: [],
 };
 
 /** Open invitations are valid for 24h — matches the cadre-core default. */
@@ -424,6 +424,9 @@ export class SereusAdapter implements DataAdapter {
   async setPrefs(patch: Partial<Prefs>): Promise<Prefs> {
     const next = { ...(await this.getPrefs()), ...patch };
     await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(next));
+    // Reserving is fail-soft and must not block the caller: a relay that is
+    // down should leave the app working, just unreachable.
+    if (patch.relayAddrs) void cadreService.reserveRelays?.(next.relayAddrs);
     return next;
   }
 

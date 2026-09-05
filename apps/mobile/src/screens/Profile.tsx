@@ -114,8 +114,8 @@ export default function Profile() {
           <View style={styles.rows}>
             <ListRow title={t('screens.settings.title', 'Settings')} onPress={() => navigation.navigate('Settings')} />
             <ListRow
-              title={t('screens.profile.machines', 'My machines')}
-              subtitle={t('screens.profile.machinesHint', 'What acts for you when your phone is asleep')}
+              title={t('screens.profile.machines', 'My network')}
+              subtitle={t('screens.profile.machinesHint', 'How you are reachable, and what acts for you')}
               onPress={() => navigation.navigate('CadreManager')}
             />
           </View>

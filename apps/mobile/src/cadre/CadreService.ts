@@ -25,6 +25,7 @@ import {
   type CadreNodeConfig,
   type CadreNodeEvents,
   type ControlDatabase,
+  type RelayReservationState,
   type StrandInstance,
 } from '@serfab/cadre-core';
 import { webSockets } from '@libp2p/websockets';
@@ -344,8 +345,29 @@ class CadreServiceImpl {
             webSockets(),
             circuitRelayTransport() as unknown as ReturnType<typeof webSockets>,
           ],
-          // RN cannot listen for inbound connections.
-          listenAddrs: [],
+          // RN cannot listen for inbound connections, so there is no TCP entry
+          // here.  The bare `/p2p-circuit` IS needed though: it is the "search"
+          // listener a relay reservation lands in, and cadre-core only adds one
+          // itself when `relayAddrs` is set at config time.  We deliberately do
+          // not set `relayAddrs` — it makes a relay that is down fatal to
+          // `start()` — so the listener has to be named here instead, and
+          // `reserveRelays()` fills it afterwards.  Bare `/p2p-circuit` opens no
+          // connection on its own, so it costs nothing when no relay is
+          // configured.  (A `<relay>/p2p-circuit` entry would be REJECTED; that
+          // shape dials during bring-up.  See cadre-core `relay-addrs.ts`.)
+          listenAddrs: ['/p2p-circuit'],
+          // libp2p's default gater refuses to dial private/loopback addresses
+          // and insecure WebSockets — which covers an emulator's `10.0.2.2`, a
+          // phone reaching a relay on the house wifi, and any relay not behind
+          // TLS.  All three are cases chat means to support: "run your own on a
+          // spare machine" is the outcome we steer people to.
+          //
+          // Dialing is not the security boundary here.  The user is dialing a
+          // relay they chose, at an address they were shown, and the pinned
+          // `/p2p/<peerId>` is what guarantees the machine that answers is the
+          // one offered — the promise RelayOffer makes in as many words.  A
+          // relay also never joins a strand or reads a message.
+          connectionGater: { denyDialMultiaddr: () => false },
         },
         // cadre-core verifies the sApp schema signature fail-closed.  Our sApp
         // config carries `signature: ''` and its `id` is a name
@@ -411,6 +433,45 @@ class CadreServiceImpl {
    * token is never actually checked.  Synchronous — `initializeStrandSolicitation`
    * only constructs + registers a responder; it performs no control-DB read.
    */
+  /**
+   * Ask the node to reserve a `/p2p-circuit` slot on each relay.
+   *
+   * Fail-soft on purpose.  Passing `relayAddrs` in `CadreNodeConfig` throws
+   * `RelayReservationFailedError` out of `start()` when a first reservation
+   * lands nothing — a relay that is down would then prevent the app from
+   * starting at all.  Reserving after start keeps the app usable and merely
+   * unreachable, which is the honest failure.
+   *
+   * Reachability is not confirmed here; `getMultiaddrs()` becoming non-empty is
+   * what actually unblocks invitations.
+   */
+  async reserveRelays(addrs: string[]): Promise<RelayReservationState | null> {
+    const node = this.cadreNode;
+    if (!node) {
+      console.warn('[CadreService] cadre node not running; relays not applied');
+      return null;
+    }
+    // Never throws — an unreachable relay, a control node that is not up yet, or
+    // a timeout all come back as a non-`reserved` STATUS.  So the return value is
+    // the only evidence of what happened: a caller that ignores it would report
+    // the user reachable when nothing dialled.
+    const state = await node.reserveRelays(addrs);
+    if (state.status !== 'reserved') {
+      console.warn('[CadreService] relay reservation not held:',
+        state.status, state.error ?? '');
+    }
+    return state;
+  }
+
+  /**
+   * The node's live reachability, recomputed on every call from its current
+   * multiaddrs — a reservation can be lost after it was granted (the relay
+   * restarts, the connection drops), so this is read, never cached.
+   */
+  getRelayReservationState(): RelayReservationState | null {
+    return this.cadreNode?.getRelayReservationState() ?? null;
+  }
+
   private initializeFormationResponder(): void {
     if (!this.node) throw new Error('CadreNode not running');
     const controlDb = this.node.getControlDatabase();

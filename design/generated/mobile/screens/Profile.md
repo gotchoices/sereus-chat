@@ -51,7 +51,7 @@ one place the user can see what they are disclosing.
   Oversized images offer downscaling rather than refusal.
 - Save validates a non-empty name and nothing else.
 - Unsaved-changes guard on back.
-- Two rows at the foot: Settings, and "My machines" → CadreManager. The cadre screen is a shared
+- Two rows at the foot: Settings, and "My network" → CadreManager (identity, machines, relays). The cadre screen is a shared
   component (`src/cadre-ui/`) and is not designed here (story 42).
 - A one-line note, shown once and dismissible, that in a strand which can still grow, people the
   user has not met may come to see their name and picture.

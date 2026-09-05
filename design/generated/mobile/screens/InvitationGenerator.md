@@ -57,6 +57,18 @@ grant landing late, and the screen must not promise it as instantaneous.
 - **Regenerate** mints a new token and updates both link and QR
 - The screen can simply be held up for a direct scan
 
+## When the user cannot be reached
+
+`createInvitation` fails when the node has no dialable address — the common state for a fresh
+install, since a phone cannot listen. Story 02 Alt A: this is not an error the user caused, and it
+must not be a dead end.
+
+- Detect this case distinctly from other failures (the adapter surfaces it as a precondition, not a
+  crash) and say what it prevents rather than what is missing
+- Offer both routes without ranking them: a machine of their own, or borrowing a relay — the latter
+  linking out to the listing at `sereus.org/chat/relays`
+- Keep the terms already chosen. Returning from the detour must not mean re-entering them
+
 ## Implementation Notes
 
 - The private/public choice is two labelled cards with consequences as body text, not a switch.

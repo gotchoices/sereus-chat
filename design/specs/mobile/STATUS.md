@@ -242,6 +242,30 @@ with `listenAddrs: []`. Progress:
       → the phone dials the drone, gains a cohort, and control-DB reads unblock.
 - [x] `useCadreManager` control-DB reads (`AuthorityKey`/`CadrePeer`) are
       time-boxed so "My Devices" renders immediately solo instead of spinning.
+- [x] **Relay reservation works end to end.** A `chat://relay?addr=…` link →
+      RelayOffer → accept → the relay grants a `/p2p-circuit` slot, and "My
+      network" reports *Working — people can reach you through this* from the
+      LIVE posture (`getRelayReservationState()`), not from the fact an address
+      is saved. Survives a cold restart (`reserveSavedRelays()` on boot: a
+      reservation lives with the running node, not the stored address).
+      Four things had to be fixed to get there:
+  - `listenAddrs: ['/p2p-circuit']` — the bare "search" listener is where a
+    reservation lands. cadre-core only adds one when `relayAddrs` is set at
+    config time, which we avoid (it makes a dead relay fatal to `start()`).
+    Without it there was nowhere for a reservation to go.
+  - `connectionGater: { denyDialMultiaddr: () => false }` — libp2p's default
+    refuses private/loopback and insecure-ws addresses, i.e. the emulator's
+    `10.0.2.2`, a relay on the house wifi, and any relay not behind TLS.
+  - **`WebSocket.bufferedAmount` polyfill (`index.js`) — the big one.** RN
+    declares the field but never assigns it, so it is `undefined`;
+    `@libp2p/websockets` computes `canSendMore = bufferedAmount < max` →
+    always false, and the drain poll tests `=== 0` → never fires. Every
+    libp2p WebSocket write therefore blocked until the socket closed and then
+    rejected with `undefined`, which libp2p's upgrader turned into
+    "Cannot read property 'message' of undefined". **libp2p WebSockets cannot
+    work in React Native without this** — worth reporting upstream, and worth
+    adding to sereus's `docs/reference-app-rn.md` polyfill table.
+  - `DOMException` + `AbortSignal.timeout` polyfills (absent from Hermes).
 - [ ] `webRTC({ rtcConfiguration: { iceServers } })` — relayed→direct hole-punch
       (phone↔phone NAT traversal). Needs `react-native-webrtc` (native dep →
       native rebuild) + `@libp2p/webrtc@6.0.14` + a `polyfills/webrtc`

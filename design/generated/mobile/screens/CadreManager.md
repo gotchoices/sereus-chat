@@ -15,7 +15,9 @@ Integration only. The screen is a shared component; chat mounts it and themes it
 
 ## Route
 
-- `CadreManager` — push from Profile, title "My machines"
+- `CadreManager` — push from Profile, title **"My network"** (not "My machines": the screen covers
+  identity, keys, machines *and* relays, and a borrowed relay is none of the user's machines).
+  Chat avoids "connections" here — that word is retired in this app.
 
 ## What chat generates
 
@@ -35,6 +37,17 @@ Under mocks (`USE_SEREUS = false`) there is no cadre to read and the component s
 loading state indefinitely — which this consolidation forbids. The **integration** therefore does
 not mount it at all in that case, and says plainly that machines live on the real network. The
 component is untouched; chat only decides whether to mount it.
+
+## Chat's own sections, rendered below the component
+
+The component's SPEC sanctions this seam: *apps render their own widgets below the component*.
+Health uses it for guests; chat uses it for **relays**.
+
+- Lists `Prefs.relayAddrs` — host and abbreviated peer id per row
+- Remove one (device-local; nothing to coordinate)
+- Add another → the same offer screen the link uses, so the cost is stated on both paths
+- Empty and no cadre node: this is the state a new user is in, and it is why they cannot invite
+  anybody ([02](../../../stories/mobile/02-start-a-strand.md)). Say so here, once, without nagging
 
 ## Constraints
 

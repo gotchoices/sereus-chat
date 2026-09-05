@@ -65,11 +65,94 @@ if (typeof Promise.withResolvers === 'undefined') {
   };
 }
 
+// ── WebSocket.bufferedAmount ───────────────────────────────────────────────
+// React Native DECLARES `bufferedAmount` on its WebSocket (a Flow annotation in
+// Libraries/WebSocket/WebSocket.js) but never assigns it, so at runtime it is
+// `undefined`.  That breaks libp2p's WebSocket transport outright, and silently:
+//
+//   @libp2p/websockets `sendData()` computes
+//     canSendMore = websocket.bufferedAmount < maxBufferedAmount
+//   which is `undefined < n` → FALSE for every send, so every write reports
+//   back-pressure.  `byteStream.write()` then waits for a 'drain' event, and the
+//   poll that would emit it tests `bufferedAmount === 0` — also false forever.
+//   So the write blocks until the socket closes, at which point pEvent's
+//   `rejectionEvents: ['close']` rejects with `undefined`, and libp2p's upgrader
+//   does `err.message` on it and dies with "Cannot read property 'message' of
+//   undefined" — burying the cause.
+//
+// Net effect without this: the multistream-select handshake never completes, so
+// no relay reservation, so the phone is never reachable.
+//
+// 0 is the honest value: RN buffers sends natively and exposes no depth, so
+// there is no back-pressure signal to report — the same thing a browser reports
+// once its buffer has flushed.
+if (typeof WebSocket !== 'undefined' && WebSocket.prototype != null &&
+    typeof Object.getOwnPropertyDescriptor(WebSocket.prototype, 'bufferedAmount') === 'undefined') {
+  Object.defineProperty(WebSocket.prototype, 'bufferedAmount', {
+    get() { return 0; },
+    configurable: true,
+  });
+}
+
+// ── DOMException ───────────────────────────────────────────────────────────
+// Absent from Hermes.  Needed before the AbortSignal polyfills below, which
+// reject with one — and code that inspects `err.name` to tell a timeout from a
+// real abort relies on it carrying the right name.
+if (typeof globalThis.DOMException === 'undefined') {
+  class DOMException extends Error {
+    constructor(message = '', name = 'Error') {
+      super(message);
+      this.name = name;
+    }
+  }
+  globalThis.DOMException = DOMException;
+}
+
 // ── AbortSignal.throwIfAborted ─────────────────────────────────────────────
 if (typeof AbortSignal !== 'undefined' &&
     typeof AbortSignal.prototype.throwIfAborted === 'undefined') {
   AbortSignal.prototype.throwIfAborted = function () {
     if (this.aborted) throw this.reason ?? new DOMException('The operation was aborted', 'AbortError');
+  };
+}
+
+// ── AbortController.abort() default reason ─────────────────────────────────
+// Per spec, `abort()` with no argument sets `signal.reason` to an AbortError.
+// RN leaves it `undefined`, and libp2p propagates a cancellation by throwing
+// `signal.reason` — so the throw lands as a bare `undefined`, and any handler
+// that reads `err.message` (libp2p's upgrader does, verbatim) dies with
+// "Cannot read property 'message' of undefined", burying the real cause.
+if (typeof AbortController !== 'undefined') {
+  const nativeAbort = AbortController.prototype.abort;
+  AbortController.prototype.abort = function (reason) {
+    if (reason === undefined) {
+      nativeAbort.call(this, new DOMException('This operation was aborted', 'AbortError'));
+      return;
+    }
+    nativeAbort.call(this, reason);
+  };
+}
+
+// ── AbortSignal.timeout ────────────────────────────────────────────────────
+// Hermes ships neither this nor `AbortSignal.abort()`.  libp2p's circuit-relay
+// reservation uses `AbortSignal.timeout` to bound its dial, so without this the
+// relay reservation fails with "AbortSignal.timeout is not a function" and the
+// phone stays unreachable.
+if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout !== 'function') {
+  AbortSignal.timeout = function (ms) {
+    const controller = new AbortController();
+    setTimeout(
+      () => controller.abort(new DOMException('The operation timed out', 'TimeoutError')),
+      ms,
+    );
+    return controller.signal;
+  };
+}
+if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.abort !== 'function') {
+  AbortSignal.abort = function (reason) {
+    const controller = new AbortController();
+    controller.abort(reason);
+    return controller.signal;
   };
 }
 

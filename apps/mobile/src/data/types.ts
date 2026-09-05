@@ -135,6 +135,12 @@ export type Prefs = {
   notifyDefault: 'all' | 'mentions' | 'none';
   storageCeilingBytes: number | null;
   perStrandOverrides: number;
+  /**
+   * Relays this device borrows to be reachable.  Plural on purpose: relays fill
+   * up and go away, and losing one should not cost reachability.  Device-local —
+   * never strand data.
+   */
+  relayAddrs: string[];
 };
 
 export type StorageUsage = {

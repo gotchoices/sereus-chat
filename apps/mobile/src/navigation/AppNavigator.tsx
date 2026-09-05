@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import type { LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Linking } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import StrandList from '../screens/StrandList';
 import SearchInterface from '../screens/SearchInterface';
@@ -14,11 +14,14 @@ import Settings from '../screens/Settings';
 import StrandDetail from '../screens/StrandDetail';
 import StrandMedia from '../screens/StrandMedia';
 import MediaViewer from '../screens/MediaViewer';
+import RelayOffer from '../screens/RelayOffer';
 import QrScanner from '../screens/QrScanner';
 import ChatInterface from '../screens/ChatInterface';
 import MediaPicker from '../screens/MediaPicker';
 import { CadreManager } from '../cadre-ui';
+import { cadreService } from '../cadre';
 import { Avatar, IconButton } from '../components';
+import { getPrefs, setPrefs } from '../data/adapter';
 import { useTheme, useThemeContext, typography } from '../theme';
 import { USE_SEREUS } from '../data/config';
 
@@ -52,7 +55,9 @@ export default function AppNavigator() {
   } as const;
 
   const linking: LinkingOptions<any> = {
-    prefixes: ['sereus://', 'chat://', 'https://sereus.org/chat'],
+    // App Links carry offers arriving from the web (browsers block custom
+    // schemes); the custom scheme serves QR codes, in-app links and testing.
+    prefixes: ['https://sereus.org/chat', 'sereus://', 'chat://'],
     config: {
       screens: {
         StrandList: 'strands',
@@ -66,6 +71,7 @@ export default function AppNavigator() {
         Settings: 'settings',
         CadreManager: 'machines',
         QrScanner: 'scan',
+        RelayOffer: 'relay',
       },
     },
   };
@@ -99,7 +105,12 @@ export default function AppNavigator() {
           component={MediaViewer}
           options={{ headerShown: false, presentation: 'fullScreenModal' as any }}
         />
-        <Stack.Screen name="CadreManager" component={ThemedCadreManager} options={{ title: 'My machines' }} />
+        <Stack.Screen name="CadreManager" component={ThemedCadreManager} options={{ title: 'My network' }} />
+        <Stack.Screen
+          name="RelayOffer"
+          component={RelayOffer}
+          options={{ title: 'Relay', presentation: 'modal' as any }}
+        />
         <Stack.Screen name="QrScanner" component={QrScanner} options={{ title: 'Scan' }} />
         <Stack.Screen
           name="MediaPicker"
@@ -167,6 +178,89 @@ export default function AppNavigator() {
  *  this screen must never block (design/generated/mobile/screens/CadreManager.md).
  *  We do NOT reimplement any of the component here; we simply do not mount it
  *  when there is nothing behind it. */
+/** Chat's own section, rendered below the shared component — the seam its own
+ *  SPEC sanctions (health uses it for guests).  Relays are how the user is
+ *  reachable; a borrowed relay is not one of their machines, which is why the
+ *  screen is "My network" rather than "My machines". */
+function RelaySection() {
+  const theme = useTheme();
+  const [addrs, setAddrs] = React.useState<string[]>([]);
+  const [status, setStatus] = React.useState<string | null>(null);
+
+  React.useEffect(() => { getPrefs().then(p => setAddrs(p.relayAddrs ?? [])).catch(() => {}); }, []);
+
+  /* Listing a relay under "How you are reachable" is a claim, and a configured
+     relay is not a working one: the reservation is granted by the relay and can
+     be lost again afterwards.  So the posture is read live rather than inferred
+     from the fact that an address is saved. */
+  React.useEffect(() => {
+    if (!USE_SEREUS) return;
+    let alive = true;
+    const read = () => {
+      const st = cadreService.getRelayReservationState();
+      if (alive) setStatus(st ? st.status : null);
+    };
+    read();
+    const id = setInterval(read, 4000);
+    return () => { alive = false; clearInterval(id); };
+  }, [addrs]);
+
+  const drop = async (a: string) => {
+    const next = addrs.filter(x => x !== a);
+    setAddrs(next);
+    await setPrefs({ relayAddrs: next }).catch(() => {});
+  };
+
+  const short = (a: string) => {
+    const p = a.split('/').filter(Boolean);
+    const hostAt = p.findIndex(x => ['dns4', 'dns6', 'dnsaddr', 'ip4', 'ip6'].includes(x));
+    const peerAt = p.indexOf('p2p');
+    const host = hostAt >= 0 ? p[hostAt + 1] : a;
+    const peer = peerAt >= 0 ? p[peerAt + 1] : '';
+    return peer ? `${host} · ${peer.slice(0, 10)}…` : host;
+  };
+
+  return (
+    <View style={{ padding: 16, gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }}>
+      <Text style={{ ...typography.small, color: theme.textSecondary, textTransform: 'uppercase' }}>
+        How you are reachable
+      </Text>
+      {addrs.length === 0 ? (
+        <Text style={{ ...typography.body, color: theme.textMuted, lineHeight: 22 }}>
+          Nothing yet. A phone on its own has no address the world can reach, so nobody you invite
+          can answer. Borrow a relay to get started, or run a machine of your own.
+        </Text>
+      ) : (
+        addrs.map(a => (
+          <View key={a} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text numberOfLines={1} style={{ flex: 1, ...typography.body, color: theme.textPrimary }}>
+              {short(a)}
+            </Text>
+            <IconButton name="trash-outline" size={18} accessibilityLabel="Stop using this relay"
+              onPress={() => drop(a)} />
+          </View>
+        ))
+      )}
+      {addrs.length > 0 && status && status !== 'none' ? (
+        <Text style={{ ...typography.small, color: status === 'reserved' ? theme.textSecondary : theme.textMuted }}>
+          {status === 'reserved'
+            ? 'Working — people can reach you through this.'
+            : status === 'dialing'
+              ? 'Connecting…'
+              : 'Not working yet. Still trying — you are not reachable until it does.'}
+        </Text>
+      ) : null}
+      <Text
+        accessibilityRole="button"
+        onPress={() => Linking.openURL('https://sereus.org/chat/relays.html')}
+        style={{ ...typography.small, color: theme.accent, paddingTop: 4 }}
+      >
+        Find a relay →
+      </Text>
+    </View>
+  );
+}
+
 function ThemedCadreManager() {
   const theme = useTheme();
 
@@ -186,6 +280,7 @@ function ThemedCadreManager() {
   }
 
   return (
+    <ScrollView style={{ flex: 1, backgroundColor: theme.background }}>
     <CadreManager
       theme={{
         background: theme.background,
@@ -202,5 +297,7 @@ function ThemedCadreManager() {
         backdrop: theme.overlay,
       }}
     />
+    <RelaySection />
+    </ScrollView>
   );
 }
