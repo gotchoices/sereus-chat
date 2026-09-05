@@ -266,6 +266,23 @@ with `listenAddrs: []`. Progress:
     work in React Native without this** — worth reporting upstream, and worth
     adding to sereus's `docs/reference-app-rn.md` polyfill table.
   - `DOMException` + `AbortSignal.timeout` polyfills (absent from Hermes).
+- [x] **Dev scripts for the two-instance pair.** `yarn relay` runs the relay and
+      now tees its output to `$DATA_DIR/relay.log` so the peer id can be read
+      back; `sh ./scripts/link.sh relay --all` derives the address, picks
+      `10.0.2.2` vs `127.0.0.1` per device kind, runs `adb reverse` for USB
+      devices, and sends the offer. Note the trap it exists to avoid: `adb shell`
+      re-parses the command ON the device, so an unquoted `&` truncates a query
+      string silently — `launch:android` had this bug and now routes through
+      `link.sh`.
+- [ ] **BLOCKER for the invitation pair test: control-DB writes do not settle.**
+      On a fresh party the boot logs `owner genesis timed out after 30000ms`, and
+      `createChatStrand` for the default strand then never resolves (>2 min).
+      `createInvitation` awaits `ensureDefaultChatStrand()`, so the invite screen
+      spins forever with no error. Reachability is NOT the missing piece — the
+      relay reservation is held at this point. Diagnose before any pair test.
+- [ ] `inspectInvitation` is still `notImplemented` in `SereusAdapter`, so
+      InvitationAcceptance would throw the moment a scanned token opened it.
+      `acceptInvitation` is written but its docstring records it as UNTESTED.
 - [ ] `webRTC({ rtcConfiguration: { iceServers } })` — relayed→direct hole-punch
       (phone↔phone NAT traversal). Needs `react-native-webrtc` (native dep →
       native rebuild) + `@libp2p/webrtc@6.0.14` + a `polyfills/webrtc`

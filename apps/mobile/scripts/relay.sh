@@ -61,11 +61,14 @@ case "$RELAY_FROM" in
     fi
 
     echo "==> relay: role=$SEREUS_ROLE limit=$RELAY_APPLY_DEFAULT_LIMIT"
-    echo "    emulator dials : /ip4/10.0.2.2/tcp/$RELAY_WS_PORT/ws"
-    echo "    usb device     : adb -s <serial> reverse tcp:$RELAY_WS_PORT tcp:$RELAY_WS_PORT"
-    echo "                     then /ip4/127.0.0.1/tcp/$RELAY_WS_PORT/ws"
+    echo "    configure devices with: sh ./scripts/link.sh relay --all"
     echo
-    exec node --enable-source-maps "$INFRA/dist/main.js"
+
+    # Tee into DATA_DIR so `link.sh relay` can read the peer id back rather than
+    # making you copy it out of this terminal.  `exec` is gone on purpose: the
+    # pipe needs a shell to keep the write end open.
+    mkdir -p "$DATA_DIR"
+    node --enable-source-maps "$INFRA/dist/main.js" 2>&1 | tee "$DATA_DIR/relay.log"
     ;;
   *)
     echo "Unknown RELAY_FROM=$RELAY_FROM (expected: source | npx)" >&2
