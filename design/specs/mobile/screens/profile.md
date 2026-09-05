@@ -15,7 +15,7 @@ Story 40.
 - **Avatar**: large, with an edit pencil → media picker
 - **Fields**: Name (required), Email, Phone, Notes/Bio
 - **Privacy notice**: inline text about what is shared with peers
-- **Rows**: Settings, My machines
+- **Rows**: Settings, My network
 
 ## Behaviours
 
