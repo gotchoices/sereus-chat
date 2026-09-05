@@ -50,6 +50,13 @@
                 android:scheme="https"
                 android:host="sereus.org"
                 android:pathPrefix="/chat/invite" />
+            <!-- Relay offers come from a web page, so they must be App Links:
+                 browsers block or silently drop custom-scheme navigation, and an
+                 App Link falls back to the page when the app is not installed. -->
+            <data
+                android:scheme="https"
+                android:host="sereus.org"
+                android:pathPrefix="/chat/relay" />
         </intent-filter>
       </activity>
     </application>

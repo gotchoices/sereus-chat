@@ -57,10 +57,40 @@ nagged.
 
 ## Deep links
 
-- Scheme: `sereus://`
-- Invitation: `sereus://invite/{token}` → InvitationAcceptance
-- Strand: `sereus://strand/{id}` → ChatInterface
-- Mock variants (mock builds only): `sereus://screen/{Route}?variant={happy|empty|error}`
+Two mechanisms, chosen by where the link comes from.
+
+**App Links — `https://sereus.org/chat/…`** for anything arriving from a web page or another app.
+The OS opens the app when installed and loads the page when not, which is the behaviour a stranger
+tapping a link needs. Browsers block or silently drop custom-scheme navigation, so this is the only
+reliable route from the web.
+
+| Path | Goes to |
+|------|---------|
+| `/chat/invite/{token}` | InvitationAcceptance |
+| `/chat/relay?addr={multiaddr}` | Relay offer — **proposes**, never applies (story 42) |
+
+**Custom scheme — `sereus://`** for QR codes, in-app links and local testing, where there is no
+browser in the way. `chat://` remains as an alias.
+
+| Link | Goes to |
+|------|---------|
+| `sereus://invite/{token}` | InvitationAcceptance |
+| `sereus://strand/{id}` | ChatInterface |
+| `sereus://relay?addr={multiaddr}` | Relay offer |
+| `sereus://screen/{Route}?variant={…}` | Mock builds only |
+
+### What App Links need
+
+Verification happens **at install**, and the OS fetches the association file from the site **apex** —
+`https://sereus.org/.well-known/`, never `/chat/.well-known/`. There is exactly one file per
+platform for the whole host, shared by every sereus app:
+
+- `assetlinks.json` — a JSON array, one entry per app, keyed by `target.package_name`
+- `apple-app-site-association` — `applinks.details`, one entry per app, keyed by `appID`
+
+Chat's copies live in `web/.well-known/` and are **merged** into the apex by `web/publish.sh`;
+copying them wholesale would wipe the other apps' entries. Adding a path here means adding it to
+both files and to the Android manifest, then reinstalling the app.
 
 An invitation link opened without the app installed lands on a web page; after installing, the user
 scans or opens the link again (story 03 — deliberate, no third-party deferred-link service).
