@@ -274,12 +274,19 @@ with `listenAddrs: []`. Progress:
       re-parses the command ON the device, so an unquoted `&` truncates a query
       string silently — `launch:android` had this bug and now routes through
       `link.sh`.
-- [ ] **BLOCKER for the invitation pair test: control-DB writes do not settle.**
-      On a fresh party the boot logs `owner genesis timed out after 30000ms`, and
-      `createChatStrand` for the default strand then never resolves (>2 min).
-      `createInvitation` awaits `ensureDefaultChatStrand()`, so the invite screen
-      spins forever with no error. Reachability is NOT the missing piece — the
-      relay reservation is held at this point. Diagnose before any pair test.
+- [ ] **BLOCKER for the invitation pair test: control-DB WRITES never complete on a
+      solo node.** Reads work throughout; every write hangs with no error, no timeout
+      and no retry, and all optimystic activity stops dead at that moment. So owner
+      genesis times out (30 s) and the default strand's insert never returns, and
+      `createInvitation` — which awaits `ensureDefaultChatStrand()` — spins forever.
+      Filed upstream: **gotchoices/sereus#10**.
+      Reproduce with `DEBUG='sereus:cadre:*,optimystic:*'` (`src/debug-bootstrap.js`)
+      and `yarn logs`; the tell is `control-db Inserting owner key: …` being the last
+      line of any kind, with `Owner key inserted` never following.
+      **Not the relay.** A relayed run also logs `Control cohort grew (0 → ≥1)` and a
+      FRET `announceNeighbors` failure against the relay's peer id, and I initially
+      blamed those — but a control run with **no relay configured** hangs identically.
+      Recorded in the issue in case cohort-counting a relay is independently wrong.
 - [ ] `inspectInvitation` is still `notImplemented` in `SereusAdapter`, so
       InvitationAcceptance would throw the moment a scanned token opened it.
       `acceptInvitation` is written but its docstring records it as UNTESTED.

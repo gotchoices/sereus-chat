@@ -24,7 +24,8 @@
     "launch:android": "sh -c '. ./env-defaults.sh && sh ./scripts/link.sh \"$DEEPLINK\"'",
     "launch:ios": "sh -c 'xcrun simctl openurl booted \"$DEEPLINK\"'",
     "relay": "sh ./scripts/relay.sh",
-    "link": "sh ./scripts/link.sh"
+    "link": "sh ./scripts/link.sh",
+    "logs": "sh ./scripts/logs.sh"
   },
   "dependencies": {
     "@libp2p/websockets": "^10.1.3",

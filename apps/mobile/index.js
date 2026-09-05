@@ -7,6 +7,10 @@
  * required: sereus/docs/reference-app-rn.md.
  */
 
+// Must be first: sets process.env.DEBUG before `debug`/`weald` initialize and
+// read it.  See the file for which namespaces to turn on.
+import './src/debug-bootstrap';
+
 // ── Timer .ref() / .unref() ────────────────────────────────────────────────
 // Node timers are objects with .ref()/.unref(); Hermes returns plain numbers.
 // Required by @optimystic/db-p2p, undici, libp2p internals.

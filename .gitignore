@@ -27,3 +27,6 @@ build/
 Thumbs.db
 
 .relay-data/
+
+# Temporary
+tmp/
