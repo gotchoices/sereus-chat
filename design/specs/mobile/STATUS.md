@@ -279,7 +279,12 @@ with `listenAddrs: []`. Progress:
       and no retry, and all optimystic activity stops dead at that moment. So owner
       genesis times out (30 s) and the default strand's insert never returns, and
       `createInvitation` — which awaits `ensureDefaultChatStrand()` — spins forever.
-      Filed upstream: **gotchoices/sereus#10**.
+      Filed upstream: **gotchoices/sereus#10**, cross-linked with **#8** (solo strand
+      founding on the coordinated commit path) and gotchoices/Optimystic#8. Likely a
+      DISTINCT defect: #8's coordinated path progresses slowly, whereas here the write
+      emits zero `optimystic:` lines (3,154 in the run, none after the write begins), so
+      it appears to block before reaching optimystic — plus this is cadre-core 0.10 and
+      the CONTROL database, which `StrandConfig.mode` does not govern.
       Reproduce with `DEBUG='sereus:cadre:*,optimystic:*'` (`src/debug-bootstrap.js`)
       and `yarn logs`; the tell is `control-db Inserting owner key: …` being the last
       line of any kind, with `Owner key inserted` never following.
