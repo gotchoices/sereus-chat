@@ -51,8 +51,13 @@ case "$RELAY_FROM" in
     # This package sits outside sereus's `packages/*` workspaces, so it installs
     # standalone.  npm, not yarn: the Dockerfile uses `npm install`, and yarn 4
     # refuses a package that is inside the project directory but not a workspace.
-    if [ ! -d "$INFRA/node_modules" ]; then
-      echo "==> installing relay dependencies (first run)"
+    # Reinstall when package.json is newer than the install, not just when
+    # node_modules is absent: a pull that ADDS a dependency would otherwise
+    # skip the install and fail in the build with a bare "cannot find module".
+    # (PR #9 added @multiformats/multiaddr; it only built here because the dep
+    # happened to be present already.)
+    if [ ! -d "$INFRA/node_modules" ] || [ "$INFRA/package.json" -nt "$INFRA/node_modules" ]; then
+      echo "==> installing relay dependencies"
       (cd "$INFRA" && npm install --silent)
     fi
     if [ ! -f "$INFRA/dist/main.js" ] || [ "$INFRA/src/main.ts" -nt "$INFRA/dist/main.js" ]; then

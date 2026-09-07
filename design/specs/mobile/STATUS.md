@@ -274,24 +274,22 @@ with `listenAddrs: []`. Progress:
       re-parses the command ON the device, so an unquoted `&` truncates a query
       string silently — `launch:android` had this bug and now routes through
       `link.sh`.
-- [ ] **BLOCKER for the invitation pair test: control-DB WRITES never complete on a
-      solo node.** Reads work throughout; every write hangs with no error, no timeout
-      and no retry, and all optimystic activity stops dead at that moment. So owner
-      genesis times out (30 s) and the default strand's insert never returns, and
-      `createInvitation` — which awaits `ensureDefaultChatStrand()` — spins forever.
-      Filed upstream: **gotchoices/sereus#10**, cross-linked with **#8** (solo strand
-      founding on the coordinated commit path) and gotchoices/Optimystic#8. Likely a
-      DISTINCT defect: #8's coordinated path progresses slowly, whereas here the write
-      emits zero `optimystic:` lines (3,154 in the run, none after the write begins), so
-      it appears to block before reaching optimystic — plus this is cadre-core 0.10 and
-      the CONTROL database, which `StrandConfig.mode` does not govern.
-      Reproduce with `DEBUG='sereus:cadre:*,optimystic:*'` (`src/debug-bootstrap.js`)
-      and `yarn logs`; the tell is `control-db Inserting owner key: …` being the last
-      line of any kind, with `Owner key inserted` never following.
-      **Not the relay.** A relayed run also logs `Control cohort grew (0 → ≥1)` and a
-      FRET `announceNeighbors` failure against the relay's peer id, and I initially
-      blamed those — but a control run with **no relay configured** hangs identically.
-      Recorded in the issue in case cohort-counting a relay is independently wrong.
+- [x] **Control-DB writes hanging on a solo node — FIXED by upgrading** (was
+      gotchoices/sereus#10, now closed). On cadre-core **0.12.0** + db-p2p **0.28.0**
+      `Owner key inserted` and `Strand inserted` both land in ~8 s; owner genesis
+      finishes in 9.5 s instead of timing out. Branch `upgrade/cadre-0.12`.
+      Two upgrade gotchas worth remembering: a `resolutions` block in
+      `apps/mobile/package.json` pins the whole stack (bump it too, or the install
+      silently changes nothing), and db-p2p 0.28 ships **static class blocks**, needing
+      `@babel/plugin-transform-class-static-block` plus `yarn start --reset-cache`.
+- [ ] **NOW BLOCKED ON: strand schema apply never converges** (gotchoices/sereus#8).
+      Immediately after the strand row is inserted, `addStrand` loops on
+      `findCluster`/`findCoordinator`/`cluster-fetch:solo-self-skip` — 60,000 debug lines,
+      no completion in 12+ min, with a schema of only **4 tables** (Health's case was 22
+      objects). Upstream has described the cause (cohort-of-one short-circuit in the read
+      path never recording that it checked, so every read re-consults forever) and fixed it
+      on Optimystic `main` — **not in 0.28.0**. So invitations and the two-device relay test
+      wait on that publish. Chat repro posted to #8.
 - [ ] `inspectInvitation` is still `notImplemented` in `SereusAdapter`, so
       InvitationAcceptance would throw the moment a scanned token opened it.
       `acceptInvitation` is written but its docstring records it as UNTESTED.
