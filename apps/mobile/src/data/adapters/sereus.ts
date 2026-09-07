@@ -16,6 +16,7 @@ import {
   addReaction, removeReaction, queryReactions, queryAttachments, queryMembers,
   insertAttachments,
 } from '../chat-operations';
+import { UnreachableError } from '../errors';
 import { CHAT_SAPP_ID } from '../chat-sapp';
 import { cadreService } from '../../cadre';
 import { withTimeout, CONTROL_OP_TIMEOUT_MS } from '../../cadre/async';
@@ -267,10 +268,11 @@ export class SereusAdapter implements DataAdapter {
     // writes.  Without a dialable address there is nothing to put in the
     // invitation's bootstrap list, and no peer could ever reach us.
     if (node.getMultiaddrs().length === 0) {
-      throw new Error(
-        'This device has no reachable address yet. Add a node to your cadre ' +
-          '(a drone or server, under "My Devices") so friends have somewhere to connect, ' +
-          'then try again.',
+      // Typed, not a bare Error: story 02 Alt A requires this to be presented as
+      // the ordinary starting position with two ways out, never as a failure.
+      // The screen distinguishes it by class — see data/errors.ts.
+      throw new UnreachableError(
+        'There is nowhere for them to answer yet.',
       );
     }
 
@@ -411,7 +413,68 @@ export class SereusAdapter implements DataAdapter {
   async removeMember(_s: string, _m: string): Promise<void> { this.notImplemented('removeMember'); }
   async listOutstandingInvitations(): Promise<Invitation[]> { this.notImplemented('listOutstandingInvitations'); }
   async cancelInvitation(_id: string): Promise<void> { this.notImplemented('cancelInvitation'); }
-  async inspectInvitation(_t: string): Promise<InvitationPreview> { this.notImplemented('inspectInvitation'); }
+  /**
+   * Read an invitation without redeeming it.
+   *
+   * PURELY LOCAL, and it has to be: an `OpenInvitation` is a bearer token
+   * carrying `{ token, sAppId, expiration, bootstrap }` and nothing else.  The
+   * `FormationInvite` row that says whether a token is still redeemable lives in
+   * the HOST's control database, which an invitee cannot read until they have
+   * joined — so there is no peek, and cadre-core exposes none.
+   *
+   * What that means for each field:
+   *
+   * - `status` — `invalid` when the token will not decode, `expired` past its
+   *   own expiration, else `live`.  **`spent` and `cancelled` are not knowable
+   *   here.**  Both are host-side facts, and a token that has been used or
+   *   withdrawn is indistinguishable from a live one until redemption fails.
+   *   We report `live` and let `acceptInvitation` surface the truth, rather
+   *   than guessing — the acceptance screen already handles a failed accept.
+   * - `inviterName` / `inviterAvatarUri` — NOT in the token.  Empty, so the
+   *   screen falls back to its unattributed wording rather than inventing a
+   *   name.
+   * - `strandState` — NOT in the token either.  Reported as a private,
+   *   unsettled strand with no manager rights: the most conservative shape,
+   *   and the one that overstates nothing about what the invitee is joining.
+   * - `grantsInviteRight` — likewise absent; `false` is the safe claim.
+   *
+   * ⚠️ This leaves story 03 partly unmet: it requires that "before accepting,
+   * the user sees who is inviting them, whether the strand is private, and
+   * [on what terms]".  The platform cannot supply any of that pre-join.
+   * Carrying the inviter's claimed name in the invitation LINK (as
+   * `relay-offer` already does for a relay's claimed name, labelled as a claim
+   * nothing proves) would satisfy it without inventing trust — but that is a
+   * design decision for the stories, not something to slip in here.
+   */
+  async inspectInvitation(token: string): Promise<InvitationPreview> {
+    const node = cadreService.cadreNode;
+    if (!node) throw new Error('Cadre is not running.');
+
+    const unknownState: StrandState = {
+      visibility: 'private',
+      managerCount: 1,
+      settled: false,
+      canIManage: false,
+    };
+
+    let expiration: Date;
+    try {
+      ({ expiration } = node.decodeInvitation(token));
+    } catch {
+      return {
+        inviterName: '', inviterAvatarUri: null,
+        strandState: unknownState, grantsInviteRight: false, status: 'invalid',
+      };
+    }
+
+    return {
+      inviterName: '',
+      inviterAvatarUri: null,
+      strandState: unknownState,
+      grantsInviteRight: false,
+      status: expiration.getTime() <= Date.now() ? 'expired' : 'live',
+    };
+  }
   // ── Device-local.  Never strand data, never replicated: settings are
   //    per-device by design and sidestep the missing party-private store
   //    (gotchoices/sereus#6).

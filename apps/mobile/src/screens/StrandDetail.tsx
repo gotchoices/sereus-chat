@@ -77,7 +77,7 @@ export default function StrandDetail() {
         'Nothing further reaches them. It does not undo anything they have already read.'),
       [
         { text: t('common.cancel', 'Cancel'), style: 'cancel' },
-        { text: t('screens.strand.remove', 'Remove'), style: 'destructive',
+        { text: t('screens.strand.removeConfirm', 'Remove'), style: 'destructive',
           onPress: () => removeMember(strandId, m.id).then(load).catch(e => setError(e.message)) },
       ],
     );
@@ -95,7 +95,7 @@ export default function StrandDetail() {
             'This cannot be undone. Nobody will be able to add or remove anyone, ever. This is who the strand will always be.'),
       [
         { text: t('common.cancel', 'Cancel'), style: 'cancel' },
-        { text: t('screens.strand.resign', 'Give it up'), style: 'destructive',
+        { text: t('screens.strand.resignConfirm', 'Give it up'), style: 'destructive',
           onPress: () => resignManager(strandId).then(load).catch(e => setError(e.message)) },
       ],
     );
@@ -127,7 +127,7 @@ export default function StrandDetail() {
             undefined,
             [
               { text: t('common.cancel', 'Cancel'), style: 'cancel' },
-              { text: t('screens.strand.forget', 'Forget it'), style: 'destructive',
+              { text: t('screens.strand.forgetIt', 'Forget it'), style: 'destructive',
                 onPress: () => leaveStrand(strandId, { keepIdentity: false }).then(() => navigation.popToTop()) },
             ],
           ) },

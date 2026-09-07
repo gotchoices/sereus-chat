@@ -23,9 +23,9 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
 | 11 | [Writing a message](11-writing-a-message.md) | revised | review |
 | 12 | [Replying and mentioning](12-replying-and-mentioning.md) | drafted | review |
 | 13 | [Correcting a message](13-correcting-a-message.md) | revised | review |
-| 20 | [Sending media](20-sending-media.md) | **renamed only** | still pre-sereus — rewrite |
+| 20 | [Sending media](20-sending-media.md) | revised | review — size limit is the user's setting; paired with 21 |
 | 21 | [Receiving media](21-receiving-media.md) | drafted | review |
-| 30 | [My strands](30-my-strands.md) | **renamed only** | still pre-sereus — rewrite |
+| 30 | [My strands](30-my-strands.md) | revised | review — no email; narrowing defers to 32 |
 | 31 | [Who's in this strand](31-whos-in-this-strand.md) | drafted | review |
 | 32 | [Finding something](32-finding-something.md) | revised | review — narrow by name vs. search what was said |
 | 33 | [Managing a strand](33-managing-a-strand.md) | revised | review |
@@ -48,11 +48,11 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
 
 ## To do — story content
 
-- [ ] **Rewrite 20, 30, 32.** Renamed but never revised, so they now contradict the specs and
-      screens built from them:
-  - [ ] 30 has Bob reading Sarah's **email**; only name and avatar are ever shared (`schema.md`)
-  - [ ] 20 needs trimming and pairing with 21; its size-limit criterion should read as the
-        **user's** setting, not a platform rule
+- [x] **Rewrite 20 and 30.** Both were renamed but never revised. 30 had Bob reading Sarah's
+      **email** (only name and avatar are ever shared) and its own search/sort/filter design, which
+      now defers to 32 and to the StrandList spec; it gained group strands, private names, the
+      not-reachable case and setting a strand aside. 20's "too large" criterion is now explicitly
+      **the user's own setting**, not a platform rule, and it hands the receiving half to 21.
 - [ ] **Trim 90.** Over-specified for something parked — mid-call video upgrade and screen sharing
       are asserted as free. Group calling is a further question and is not assumed.
 - [ ] **Alternative-path return points.** Paths are now `### Alternative Path X: name` throughout,

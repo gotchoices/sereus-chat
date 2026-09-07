@@ -2,82 +2,94 @@
 
 ## Story Overview
 
-As a Sereus Chat user with several strands  
-I want to View all my strands and easily select who I want to chat with  
-So that I can efficiently communicate with the right person without searching through clutter.
+As somebody who is in more strands than fit on one screen
+I want to see them all and get to the right one quickly
+So that reaching a person is a glance and a tap, not a hunt.
 
-Context: After using Sereus Chat for a few months, Bob now has strands with 15 people including family, friends, and coworkers.
-Some conversations are very active, others haven't been touched in weeks.
-Bob wants to message his coworker Sarah about a project but can't remember if they already share a strand or if he needs to invite her.
-Susan has 30+ strands and is getting overwhelmed trying to find specific people.
+Context: Bob has been using the app for a few months and is in fifteen or so strands — family, a
+couple of coworkers, a cycling group. Some are alive daily, some he has not touched in weeks. This
+is the screen he opens the app to, so it is the screen that has to be honest at a glance.
+
+## Roles
+
+| Role | Who | Note |
+|------|-----|------|
+| Owner of the list | Bob | it is his device's view of his strands, and nobody else's |
 
 ## Sequence
-1. Bob opens Sereus Chat to his main screen.
-2. He sees a list of all his active strands.
-3. The list shows each person's name and the most recent message preview.
-4. He scrolls through the list looking for Sarah.
-5. He doesn't see Sarah in his strand list.
-6. He realizes he hasn't invited Sarah yet.
-7. He generates a new invitation to send to Sarah.
 
-### Alternative Path A: Finding and Selecting Strand
-4. Bob sees Sarah in his list.
-5. He taps on Sarah's name.
-6. The chat interface opens showing their conversation history.
-7. He types and sends his message about the project.
+1. Bob opens the app and lands on his strands. Every strand he is in is here — there is no other
+   place a conversation can hide.
+2. Each row is a strand, not a person: a name, something of what was last said, and when. Most of
+   his are with one other person and read as that person. The cycling group is four people and reads
+   as the group.
+3. What he sees of another member is what they chose to share — a name and, if they set one, a
+   picture. Nothing else about them is his to see. → [31](31-whos-in-this-strand.md)
+4. Where he has given somebody a name of his own, that is the name he sees. It is his private name
+   for them and they are never told it.
+5. He wants Sarah. He starts typing her name and the list narrows to match. → [32](32-finding-something.md)
+6. He taps her strand and it opens where he left it. → [10](10-catching-up.md)
 
-### Alternative Path B: Filtering by Name
-1. Susan opens Sereus Chat and sees her long list of 30+ strands.
-2. She uses the search/filter feature.
-3. She types "Mar" to find her sister Martha.
-4. The list immediately filters to show only matching names.
-5. She sees Martha and two other strands with "Mar" in their names.
-6. She selects Martha.
-7. The chat opens and she sends her message.
+### Alternative Path A: she is not there
 
-### Alternative Path C: Sorting Strands
-2. Bob wants to focus on his most active conversations.
-3. He sorts his strands by most recent activity.
-4. His most active chats appear at the top.
-4.1. He notices conversations with Mike and Susan at the top.
-4.2. Old conversations with acquaintances are near the bottom.
-5. He easily finds and opens his chat with Mike.
+5.1. Nothing matches. He and Sarah have no strand — the list is the whole truth, so its silence is
+     an answer rather than a doubt.
+5.2. From here he can start one. What it takes is story [02](02-start-a-strand.md), including the
+     part where he may have nowhere to be reached yet.
 
-### Alternative Path D: Viewing Strand Details
-4. Bob finds Sarah but wants to verify it's the right Sarah before messaging.
-5. He views Sarah's profile details.
-6. He sees the profile information Sarah shared (name, email).
-7. He confirms it's his coworker Sarah.
-8. He opens the chat and messages her.
+### Alternative Path B: nothing has been said yet
 
-### Alternative Path E: No Active Conversations
-2. Bob sees that several strands exist but no messages have been exchanged yet.
-3. These appear in his strand list with an indicator showing "No messages yet".
-4. He selects one and initiates the first conversation.
+2.1. A strand Sarah accepted this morning sits in the list with nothing said in it.
+2.2. It reads as a strand awaiting its first word, not as an empty or broken one. It is a real
+     strand: it exists, both of them are in it, and either may speak first. → [04](04-our-first-conversation.md)
+
+### Alternative Path C: ordering it his way
+
+1.1. Bob would rather see what moved most recently, or read down the names, or put what is waiting
+     on him at the top.
+1.2. He chooses, and the choice sticks. He is not asked again every time he opens the app.
+
+### Alternative Path D: putting one out of the way
+
+1.3. A strand from a finished project still takes a row. He sets it aside. It leaves the list
+     without leaving the app: nothing is deleted, nobody is told, and it comes back if somebody
+     speaks in it.
+1.4. Setting aside is not muting and not leaving. Those are different acts with different
+     consequences, and they live in [33](33-managing-a-strand.md).
+
+### Alternative Path E: some of it cannot be reached
+
+1.5. Nothing holding one of Bob's strands is answering right now, so what was last said in it is
+     not something his phone can state.
+1.6. The strand is still listed — it exists and he is in it. What is missing is shown as not
+     reachable right now, never as an empty conversation and never as one with nothing in it.
+     → [42](42-staying-connected.md)
 
 ## Acceptance Criteria
 
-- [ ] Users see a list of all their strands when opening the app.
-- [ ] Each strand shows the person's name and recent message preview.
-- [ ] Users can search/filter strands by name.
-- [ ] Users can sort strands (by recent activity, alphabetically, etc.).
-- [ ] Users can view strand profile details.
-- [ ] Users can easily distinguish between active conversations and new strands with no messages.
-- [ ] Selecting a strand opens the chat interface.
-- [ ] Users can identify when they need to create a new invitation for someone not in their list.
+- [ ] Every strand the user is in appears in one list; nothing is reachable only from elsewhere
+- [ ] A row identifies the strand, what was last said, and when — enough to choose without opening it
+- [ ] A group strand is shown as a group, not as one of its members
+- [ ] Only what a member has shared of themselves is ever displayed; a private name the user has
+      given somebody takes precedence and is never disclosed to them
+- [ ] A strand with nothing said in it is distinguishable from one whose content cannot be reached,
+      and neither reads as an error
+- [ ] The user can order the list, and the choice is remembered between launches
+- [ ] A strand can be set aside and comes back on new activity; this is distinct from muting and from
+      leaving
+- [ ] Narrowing the list by name is instant and needs nothing reachable — see [32](32-finding-something.md)
+- [ ] Opening a row lands where the user left off, not at the top
 
 ## Variants
-- happy: several strands, one opened
-- empty: no strands yet — the first-run state
-- error: the list cannot be loaded
+
+- happy: a dozen strands, mixed one-to-one and group, one opened
+- empty: no strands yet — the first-run state, which is also where an invitation starts
+- error: the list itself cannot be built
 
 ## Open
 
-How a group strand is titled and pictured when it has no single partner. `ops.md` now returns a strand title and member count rather than a single partner.
-
-Nicknames for strand partners are **provided by sereus**, not invented here: a user may name a
-partner privately, and the partner need not ever know. This story should surface them rather than
-build its own. Sereus also intends, eventually, to group a user's strands across sApps by that same
-private name — every strand with the person the user calls "Bobaroo", chat and otherwise — which is
-what would one day let a user cross from a chat strand to a tally with the same person. Nothing is
-required of this story now beyond not making that harder.
+Nothing outstanding. How a group is titled and pictured when it has no single partner is settled by
+`ops.md` returning a strand title and member count. Private names for partners are **provided by
+sereus** and surfaced here rather than invented — sereus also intends, eventually, to group a user's
+strands across sApps by that same private name, which is what would one day let a user cross from a
+chat strand to a tally with the same person. Nothing here should make that harder.

@@ -7,13 +7,14 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Switch, StyleSheet, Share, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, Switch, StyleSheet, Share, Alert, Linking } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { createInvitation, listOutstandingInvitations, cancelInvitation } from '../data/adapter';
 import type { Invitation } from '../data/types';
 import { useT } from '../i18n';
+import { UnreachableError } from '../data/errors';
 import { Banner, IconButton, ListRow, SectionHeader } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
@@ -32,6 +33,7 @@ export default function InvitationGenerator() {
   const [loading, setLoading] = useState(false);
   const [showQr, setShowQr] = useState(true);   // human spec: default on
   const [error, setError] = useState<string | null>(null);
+  const [unreachable, setUnreachable] = useState(false);
 
   const refresh = useCallback(() => {
     listOutstandingInvitations().then(setOutstanding).catch(() => {});
@@ -39,7 +41,7 @@ export default function InvitationGenerator() {
   useEffect(refresh, [refresh]);
 
   const generate = useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setUnreachable(false);
     try {
       setInvitation(await createInvitation({
         strandId,
@@ -49,7 +51,11 @@ export default function InvitationGenerator() {
       refresh();
     } catch (err) {
       setInvitation(null);
-      setError(err instanceof Error ? err.message : String(err));
+      // Story 02 Alt A: "nowhere to be reached yet" is not an error he caused,
+      // so it never goes through the error Banner (which offers a Retry that
+      // could not possibly work).  It gets its own state, below.
+      if (err instanceof UnreachableError) { setUnreachable(true); setError(null); }
+      else { setError(err instanceof Error ? err.message : String(err)); }
     } finally {
       setLoading(false);
     }
@@ -61,12 +67,59 @@ export default function InvitationGenerator() {
       // An invitation works for whoever holds it.
       t('screens.invite.postBody',
         'Everyone in this strand will be able to use it. That hands every member a one-off ability to bring somebody in. If you can reach the person another way, do that instead.'),
-      [{ text: t('common.cancel', 'Cancel'), style: 'cancel' }, { text: t('screens.invite.post', 'Post it') }],
+      [{ text: t('common.cancel', 'Cancel'), style: 'cancel' }, { text: t('screens.invite.postConfirm', 'Post it') }],
     );
 
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.content}>
       {error ? <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: generate }} /> : null}
+
+      {/* Story 02 Alt A — "nowhere to be reached yet".  Deliberately NOT the
+          error Banner: this is the ordinary starting position, not a mistake,
+          and a Retry button here would be a lie.  It sits ABOVE the terms and
+          leaves them mounted, so whatever he already chose is still chosen when
+          he comes back (6.4). */}
+      {unreachable ? (
+        <View style={[styles.unreachable, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
+          <Text style={[typography.title, { color: theme.textPrimary }]}>
+            {t('screens.invite.unreachableTitle', 'There is nowhere for them to answer yet')}
+          </Text>
+          <Text style={[typography.body, styles.unreachableBody, { color: theme.textMuted }]}>
+            {t('screens.invite.unreachableBody',
+              'It is not that they may not reach you — that is the whole point of this app. It is that they could not. A phone on its own has no address the world can knock on, and nobody’s does. This is where everyone starts.')}
+          </Text>
+          <Text style={[typography.small, styles.unreachableLead, { color: theme.textSecondary }]}>
+            {t('screens.invite.unreachableWays', 'Two ways out:')}
+          </Text>
+          <Pressable
+            onPress={() => navigation.navigate('CadreManager')}
+            style={[styles.wayOut, { borderColor: theme.border }]}
+          >
+            <Text style={[typography.body, styles.wayOutTitle, { color: theme.textPrimary }]}>
+              {t('screens.invite.wayOwn', 'Something of your own that stays awake')}
+            </Text>
+            <Text style={[typography.small, { color: theme.textMuted }]}>
+              {t('screens.invite.wayOwnBody', 'Yours to run, nobody else involved.')}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => Linking.openURL('https://sereus.org/chat/relays.html')}
+            style={[styles.wayOut, { borderColor: theme.border }]}
+          >
+            <Text style={[typography.body, styles.wayOutTitle, { color: theme.textPrimary }]}>
+              {t('screens.invite.wayBorrow', 'Borrow somebody else’s for now')}
+            </Text>
+            <Text style={[typography.small, { color: theme.textMuted }]}>
+              {t('screens.invite.wayBorrowBody',
+                'Quicker, and it costs you something you should understand first.')}
+            </Text>
+          </Pressable>
+          <Text style={[typography.small, styles.unreachableKeep, { color: theme.textMuted }]}>
+            {t('screens.invite.unreachableKeep',
+              'What you chose here is kept. Come back and the invitation is there to be made.')}
+          </Text>
+        </View>
+      ) : null}
 
       {!addingToExisting ? (
         <>
@@ -160,7 +213,7 @@ export default function InvitationGenerator() {
                   ? t('screens.invite.expires', 'Runs out {{when}}').replace('{{when}}', new Date(inv.expiresAt).toLocaleDateString())
                   : undefined}
                 onPress={() => Alert.alert(inv.label ?? t('screens.strands.invitation', 'Invitation'), undefined, [
-                  { text: t('common.share', 'Share again'), onPress: () => Share.share({ message: inv.url }) },
+                  { text: t('common.shareAgain', 'Share again'), onPress: () => Share.share({ message: inv.url }) },
                   { text: t('screens.invite.abandon', 'Abandon'), style: 'destructive',
                     onPress: () => cancelInvitation(inv.id).then(refresh).catch(() => {}) },
                   { text: t('common.cancel', 'Cancel'), style: 'cancel' },
@@ -175,6 +228,18 @@ export default function InvitationGenerator() {
 }
 
 const styles = StyleSheet.create({
+  unreachable: {
+    borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.card,
+    padding: spacing[3], gap: spacing[2],
+  },
+  unreachableBody: { lineHeight: 22 },
+  unreachableLead: { textTransform: 'uppercase', paddingTop: spacing[1] },
+  wayOut: {
+    borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.control,
+    padding: spacing[3], gap: spacing[1] / 2,
+  },
+  wayOutTitle: { fontWeight: '600' },
+  unreachableKeep: { lineHeight: 18, paddingTop: spacing[1] },
   content: { padding: spacing[3], gap: spacing[1], paddingBottom: spacing[5] },
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.card, padding: spacing[2], gap: 4 },
   cardTitle: { fontWeight: '600' },

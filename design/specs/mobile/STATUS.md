@@ -85,9 +85,17 @@ their variants. Calls are parked (story 90).
 
 ## To do — i18n
 
-- [ ] Every new string needs a home in `locales/*/screens.json`. They render today only via code
-      fallbacks, and the bundle **wins wherever a key exists** — so a stale bundle entry silently
-      replaces designed copy (this already happened once).
+- [x] **`en/screens.json` is now generated from the code fallbacks** — 177 keys, up from 25, so the
+      bundle and the designed copy agree by construction rather than by discipline. Two live hazards
+      were found doing it:
+  - **Five keys carried two different strings each** (`screens.strand.remove` was both "Remove from
+    this strand" and "Remove"; likewise `forget`, `resign`, `invite.post`, `common.share`). Nothing
+    had broken only because no bundle entry existed; the moment one did, one string would silently
+    win in both places. Split into `*Confirm`/`forgetIt`/`shareAgain`.
+  - **Eighteen dead keys** in the `chat.*` and `InvitationGenerator.*` namespaces survived the
+    earlier retirement, in both `en` and `es`. Removed; `es` is pruned to the 7 real translations.
+- [ ] Regenerate `en/screens.json` whenever strings change — every `t()` call now carries a default,
+      so the generator is the source of truth. Worth a lint or a CI check.
 
 ## To do — assets
 

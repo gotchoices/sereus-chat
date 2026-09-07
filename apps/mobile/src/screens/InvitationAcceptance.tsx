@@ -86,13 +86,24 @@ export default function InvitationAcceptance() {
         </View>
       ) : preview ? (
         <>
-          {/* 1. Who is inviting — only as they have disclosed themselves. */}
+          {/* 1. Who is inviting — only as they have disclosed themselves, which
+              may be not at all.  An invitation is a bearer token: it carries no
+              identity, and whoever holds it can pass it on.  When nothing has
+              been disclosed we say so rather than leaving a blank where a name
+              would go, because a blank reads as a loading failure and invites
+              the reader to assume the app knows more than it does. */}
           <View style={styles.who}>
-            <Avatar name={preview.inviterName} uri={preview.inviterAvatarUri} size="lg" />
+            <Avatar name={preview.inviterName || '?'} uri={preview.inviterAvatarUri} size="lg" />
             <View style={styles.flex1}>
-              <Text style={[typography.title, { color: theme.textPrimary }]}>{preview.inviterName}</Text>
+              <Text style={[typography.title, { color: theme.textPrimary }]}>
+                {preview.inviterName ||
+                  t('screens.accept.unattributed', 'Whoever gave you this link')}
+              </Text>
               <Text style={[typography.small, { color: theme.textMuted }]}>
-                {t('screens.accept.invitesYou', 'invites you to a strand')}
+                {preview.inviterName
+                  ? t('screens.accept.invitesYou', 'invites you to a strand')
+                  : t('screens.accept.invitesYouUnattributed',
+                      'invites you to a strand. The invitation does not say who sent it — trust it as far as you trust them.')}
               </Text>
             </View>
           </View>

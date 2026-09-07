@@ -48,7 +48,7 @@ export default function QrScanner() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <Text style={[styles.title, { color: theme.textPrimary }]}>{t('screens.QrScanner.title')}</Text>
+      <Text style={[styles.title, { color: theme.textPrimary }]}>{t('screens.QrScanner.title', 'Scan QR')}</Text>
       {cameraReady ? (
         <View style={styles.cameraWrap}>
           <Camera
@@ -67,14 +67,14 @@ export default function QrScanner() {
           <EmptyState
             icon="camera-outline"
             title={t('screens.QrScanner.cameraUnavailable', 'Camera unavailable')}
-            hint={t('screens.QrScanner.simulatorNote')}
+            hint={t('screens.QrScanner.simulatorNote', 'Camera not available in simulator. Paste an invite link below.')}
           />
         </View>
       )}
-      <Text style={[styles.label, { color: theme.textSecondary }]}>{t('screens.QrScanner.pasteLabel')}</Text>
+      <Text style={[styles.label, { color: theme.textSecondary }]}>{t('screens.QrScanner.pasteLabel', 'Paste invite link')}</Text>
       <TextInput
         style={[styles.input, { backgroundColor: theme.surfaceAlt, borderColor: theme.border, color: theme.textPrimary }]}
-        placeholder={t('screens.QrScanner.pastePlaceholder')}
+        placeholder={t('screens.QrScanner.pastePlaceholder', 'sereus://invite/abc123?variant=happy')}
         placeholderTextColor={theme.textMuted}
         value={value}
         onChangeText={setValue}
@@ -91,7 +91,7 @@ export default function QrScanner() {
         accessibilityLabel="Open invite"
         testID="qr-open"
       >
-        <Text style={[styles.openText, { color: theme.accentText }]}>{t('screens.QrScanner.open')}</Text>
+        <Text style={[styles.openText, { color: theme.accentText }]}>{t('screens.QrScanner.open', 'Open')}</Text>
       </TouchableOpacity>
     </View>
   );

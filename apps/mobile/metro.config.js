@@ -54,6 +54,16 @@ const sharedNodeStubs = {
   'node:net': emptyShim,
   tls: emptyShim,
   'node:tls': emptyShim,
+  // Real implementations, not stubs: unlike net/tls, these have working
+  // userland ports and upstream code genuinely uses them.  Carried to match
+  // sereus/packages/reference-app-rn/metro.config.js — nothing in the graph
+  // reaches for them today, but each stack upgrade pulls in more upstream
+  // code, and an unmapped `node:*` specifier fails the whole bundle with a
+  // resolution error that names the importer rather than the cause.
+  stream: require.resolve('readable-stream'),
+  'node:stream': require.resolve('readable-stream'),
+  buffer: require.resolve('buffer'),
+  'node:buffer': require.resolve('buffer'),
 };
 
 const localOnlyNodeStubs = {
