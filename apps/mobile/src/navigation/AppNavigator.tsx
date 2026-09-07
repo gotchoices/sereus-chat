@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import type { LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Text, Pressable, ScrollView, StyleSheet, Linking } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Linking, Image } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import StrandList from '../screens/StrandList';
 import SearchInterface from '../screens/SearchInterface';
@@ -79,7 +79,23 @@ export default function AppNavigator() {
   return (
     <NavigationContainer linking={linking} theme={navTheme}>
       <Stack.Navigator screenOptions={screenOptions}>
-        <Stack.Screen name="StrandList" component={StrandList} options={{ title: 'Strands' }} />
+        <Stack.Screen
+          name="StrandList"
+          component={StrandList}
+          options={{
+            title: 'Strands',
+            // The one branded corner in the app — the mark on the home header,
+            // the way ser/health carries its logo. Decorative only.
+            headerLeft: () => (
+              <Image
+                source={require('../assets/logo.png')}
+                style={{ width: 26, height: 26, marginRight: 8, resizeMode: 'contain' }}
+                accessibilityRole="image"
+                accessibilityLabel="Sereus Chat"
+              />
+            ),
+          }}
+        />
         <Stack.Screen name="SearchInterface" component={SearchInterface} options={{ title: 'Search' }} />
         <Stack.Screen
           name="InvitationGenerator"

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive-icon background layer: a solid brand square.
+     Colour lives in values/ic_launcher_background.xml (written by
+     scripts/logo-gen-android.sh) so it stays in sync with the icon art. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/ic_launcher_background" />
+</shape>
