@@ -290,7 +290,14 @@ with `listenAddrs: []`. Progress:
       `apps/mobile/package.json` pins the whole stack (bump it too, or the install
       silently changes nothing), and db-p2p 0.28 ships **static class blocks**, needing
       `@babel/plugin-transform-class-static-block` plus `yarn start --reset-cache`.
-- [ ] **NOW BLOCKED ON: strand schema apply never converges** (gotchoices/sereus#8).
+- [ ] **NOW BLOCKED ON: strand schema apply never converges** (gotchoices/sereus#8,
+      gotchoices/Optimystic#8). **Retested on `@optimystic/*` 0.29.0, 2026-09-08 — improved but
+      still blocked.** Owner genesis 9.5 s → **797 ms**, and per-block read-repair now mostly
+      respects the 10 s window (296 repeats at a 14.3 s median). But 225 repeats still land
+      INSIDE the window at a 0.141 s median, and **`default/Revocation` alone is 179 of them** —
+      a sub-second loop still running 13 min in. Apply had not attached after **20 min**. Capture
+      posted to Optimystic#8. Getting 0.29.0 requires overriding all five `@optimystic/*` packages
+      via yarn `resolutions`: cadre-core 0.12.0 pins `^0.27.0`, so they do not arrive otherwise.
       Immediately after the strand row is inserted, `addStrand` loops on
       `findCluster`/`findCoordinator`/`cluster-fetch:solo-self-skip` with a schema of only
       **4 tables** (Health's case was 22 objects). Measured with debug logging OFF:
@@ -302,6 +309,16 @@ with `listenAddrs: []`. Progress:
       path never recording that it checked, so every read re-consults forever) and fixed it
       on Optimystic `main` — **not in 0.28.0**. So invitations and the two-device relay test
       wait on that publish. Chat repro posted to #8.
+- [x] **Founding is now idempotent** (`chat-sapp.ts`). Founding is two steps — `publishStrand`
+      INSERTs the control-plane `Strand` row, then `addStrand` attaches the local instance and
+      applies the sApp schema — and the second is far the slower. An app killed between them
+      (force-stop, phone restart, a Metro reload) came back with the row present and no instance,
+      whereupon publishing again threw `UNIQUE constraint failed: Strand.Id` **on that and every
+      later launch**, permanently, short of wiping app data. Found by accident when a reload
+      interrupted a stalled apply. Now the row's existence is checked (`ControlDatabase.queryStrand`)
+      and treated as a resumable state; verified against the stuck data set — it logs
+      "strand row already published; resuming attach" and proceeds. This will matter the moment the
+      upstream apply is fast enough to finish, because until then every first run is interruptible.
 - [ ] `inspectInvitation` is still `notImplemented` in `SereusAdapter`, so
       InvitationAcceptance would throw the moment a scanned token opened it.
       `acceptInvitation` is written but its docstring records it as UNTESTED.

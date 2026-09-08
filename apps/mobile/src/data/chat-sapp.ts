@@ -85,7 +85,24 @@ export async function createChatStrand(
     Type: 'o', // open — strand type is the user's choice; default to open
   };
 
-  await cadreNode.publishStrand(strandId, 'o');
+  // IDEMPOTENT ON PURPOSE.  `publishStrand` INSERTs the control-plane `Strand`
+  // row, and founding is two steps: publish the row, then attach the local
+  // instance.  The second step is much the slower of the two (it applies the
+  // sApp schema), so an app killed between them — force-stop, a phone restart,
+  // a reload — comes back with the row present and no instance.  Publishing
+  // again then throws `UNIQUE constraint failed: Strand.Id` and the strand can
+  // NEVER be attached again, on this or any later launch, without wiping app
+  // data.  Observed exactly that way.
+  //
+  // So the row's existence is checked rather than assumed: it means "already
+  // published", which is a resumable state, not a conflict.
+  const control = cadreNode.getControlDatabase();
+  const existing = await control?.queryStrand(strandId).catch(() => null);
+  if (!existing) {
+    await cadreNode.publishStrand(strandId, 'o');
+  } else {
+    console.info('[chat-sapp] strand row already published; resuming attach:', strandId);
+  }
 
   return cadreNode.addStrand({
     strandRow,

@@ -45,26 +45,50 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
 - [x] Nine new stories drafted (04, 05, 10, 11, 12, 21, 31, 41, 42)
 - [x] Forwarding drafted then **dropped**; recorded as a deferral in index.md
 - [x] `Message.Status` dropped — no delivery or read state anywhere
+- [x] **20 and 30 rewritten.** Both had been renamed but never revised. 30 had Bob reading Sarah's
+      **email** (only a name and avatar are ever shared) and its own search/sort/filter design, now
+      deferred to [32](32-finding-something.md) and the StrandList spec; it gained group strands,
+      private names, the not-reachable case, and setting a strand aside. 20's "too large" is now
+      explicitly **the user's own setting**, and it hands the receiving half to [21](21-receiving-media.md).
 
 ## To do — story content
 
-- [x] **Rewrite 20 and 30.** Both were renamed but never revised. 30 had Bob reading Sarah's
-      **email** (only name and avatar are ever shared) and its own search/sort/filter design, which
-      now defers to 32 and to the StrandList spec; it gained group strands, private names, the
-      not-reachable case and setting a strand aside. 20's "too large" criterion is now explicitly
-      **the user's own setting**, not a platform rule, and it hands the receiving half to 21.
 - [ ] **Trim 90.** Over-specified for something parked — mid-call video upgrade and screen sharing
       are asserted as free. Group calling is a further question and is not assumed.
 - [ ] **Alternative-path return points.** Paths are now `### Alternative Path X: name` throughout,
       but several never state which step they rejoin. Settle per story during review.
+- [ ] **20 promises a setting 41 does not have.** 20 says an attachment "too large" is measured
+      against a limit the user set "in [41](41-settings.md)" — but 41 only has a **storage
+      ceiling** (how much room the app takes), which is a different thing from a limit on what
+      you are willing to *send*. Either add an outgoing-size setting to 41 or drop the forward
+      reference from 20. **Do not leave both as they are** — a story that points at a setting
+      which does not exist is worse than one that does not mention it.
+- [ ] **20 introduces permission refusal, and nothing else covers it.** Alt D (the phone refuses
+      camera or library) is new with this rewrite: no other story, screen spec or consolidation
+      handles it, so there is no screen behaviour behind it yet.
+- [ ] **30 depends on read position, which has no home upstream.** "Opening a row lands where the
+      user left off" rests on [10](10-catching-up.md)'s read boundary, and per-user, party-private
+      state is exactly what gotchoices/sereus#6 says there is nowhere to put. Device-local for now;
+      revisit if #6 lands.
+- [ ] **30 depends on private names, which are sereus roadmap.** Surfacing a user's own name for a
+      partner (and never disclosing it) is provided by sereus, not invented here — and is not
+      available yet. The story is written to surface them when they arrive; nothing to build until
+      then, but it means 30 cannot be fully satisfied today.
+- [ ] **30 assumes a stable "what was last said" ordering.** Whether per-collection revision order
+      is available to sApps is gotchoices/sereus#5, still open.
 - [ ] **Human review of all 19.** Nothing has been read and accepted yet.
 
 ## To do — decisions still ours
 
-- [ ] **Reply vs. threading beyond quote-reply** — settled as quote-reply plus `@`-mentions;
-      revisit only if groups get large.
-- [ ] Nothing else outstanding. Every other decision is recorded in index.md (deferrals) or
-      `specs/domain/sereus.md` (platform).
+- [ ] **Who the invitation says is inviting.** [03](03-respond-to-an-invitation.md) requires that
+      before accepting, a person sees who is inviting them and on what terms. The platform token
+      carries neither — it is a bearer token, and the row saying whether it is still good lives in
+      the host's control database. Carrying the inviter's claimed name in the LINK, labelled as a
+      claim nothing proves (as `relay-offer` already does for a relay's name), would satisfy it.
+      Until this is settled the acceptance screen is honestly unattributed.
+
+Everything else is recorded in [index.md](index.md) (deferrals) or
+[`specs/domain/sereus.md`](../../specs/domain/sereus.md) (platform).
 
 ## Settled decisions (for reference)
 
@@ -77,3 +101,6 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
 - Deletion may leave a trace; the app simply never manufactures one.
 - No link previews, and no forwarding mechanism.
 - Reaction symbols are open, not a curated palette.
+- Reply is quote-reply plus `@`-mentions; no threading. Revisit only if groups get large.
+- Any limit on what a user sends or stores is theirs to set. There is no platform limit and no
+  authority to impose one.
