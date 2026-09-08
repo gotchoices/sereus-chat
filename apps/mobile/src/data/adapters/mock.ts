@@ -2,6 +2,7 @@
 // See design/specs/domain/interfaces.md and appeus/reference/mock-variants.md.
 
 import type { DataAdapter } from '../adapter';
+import { UnreachableError } from '../errors';
 import type {
   Profile, StrandSummary, StrandState, Member, Message, Attachment,
   SearchBatch, SearchOptions, Invitation, InvitationPreview,
@@ -36,6 +37,10 @@ const wait = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 function fail(msg: string): never { throw new Error(msg); }
 const isEmpty = () => currentVariant === 'empty';
 const isError = () => currentVariant === 'error';
+/** Story 02 Alt A — "nowhere to be reached yet".  Its own variant because it is
+ *  neither an error nor an empty state, and it is the only way to review that
+ *  panel without a live node that has no address. */
+const isUnreachable = () => currentVariant === 'unreachable';
 
 export class MockAdapter implements DataAdapter {
   private sent: Record<string, Message[]> = {};
@@ -128,6 +133,7 @@ export class MockAdapter implements DataAdapter {
   // ---- Invitations --------------------------------------------------------
   async createInvitation(input: { strandId?: string; visibility?: 'public' | 'private'; grantsInviteRight: boolean }): Promise<Invitation> {
     if (isError()) fail('Could not create an invitation');
+    if (isUnreachable()) throw new UnreachableError('There is nowhere for them to answer yet.');
     const token = `tok-${Math.abs(Date.now() % 1e8)}`;
     return {
       id: `i-${token}`, token,

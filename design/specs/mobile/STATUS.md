@@ -292,9 +292,13 @@ with `listenAddrs: []`. Progress:
       `@babel/plugin-transform-class-static-block` plus `yarn start --reset-cache`.
 - [ ] **NOW BLOCKED ON: strand schema apply never converges** (gotchoices/sereus#8).
       Immediately after the strand row is inserted, `addStrand` loops on
-      `findCluster`/`findCoordinator`/`cluster-fetch:solo-self-skip` — 60,000 debug lines,
-      no completion in 12+ min, with a schema of only **4 tables** (Health's case was 22
-      objects). Upstream has described the cause (cohort-of-one short-circuit in the read
+      `findCluster`/`findCoordinator`/`cluster-fetch:solo-self-skip` with a schema of only
+      **4 tables** (Health's case was 22 objects). Measured with debug logging OFF:
+      **no completion in 23m41s**, app alive throughout — so it is non-termination, not
+      cost, and not the logging. (Debug logging roughly doubles everything else: owner
+      genesis 4.2 s off vs 9.5 s on — turn it off when timing.) While it runs, the strand
+      appears in `getStrands()` but its database is never ready, so reads fail with
+      `StrandDatabase … not ready`. Upstream has described the cause (cohort-of-one short-circuit in the read
       path never recording that it checked, so every read re-consults forever) and fixed it
       on Optimystic `main` — **not in 0.28.0**. So invitations and the two-device relay test
       wait on that publish. Chat repro posted to #8.

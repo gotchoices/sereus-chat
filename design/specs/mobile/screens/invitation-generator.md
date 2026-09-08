@@ -1,7 +1,7 @@
 ---
 id: invitation-generator
 route: InvitationGenerator
-variants: [happy, empty, error]
+variants: [happy, empty, error, unreachable]
 description: Make and share an invitation.
 ---
 
