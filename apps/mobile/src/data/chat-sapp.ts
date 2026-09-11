@@ -79,30 +79,22 @@ export async function createChatStrand(
   cadreNode: CadreNode,
   strandId: string,
 ): Promise<StrandInstance> {
-  const strandRow: StrandRow = {
-    Id: strandId,
-    MemberPrivateKey: null,
-    Type: 'o', // open — strand type is the user's choice; default to open
-  };
-
-  // IDEMPOTENT ON PURPOSE.  `publishStrand` INSERTs the control-plane `Strand`
-  // row, and founding is two steps: publish the row, then attach the local
-  // instance.  The second step is much the slower of the two (it applies the
-  // sApp schema), so an app killed between them — force-stop, a phone restart,
-  // a reload — comes back with the row present and no instance.  Publishing
-  // again then throws `UNIQUE constraint failed: Strand.Id` and the strand can
-  // NEVER be attached again, on this or any later launch, without wiping app
-  // data.  Observed exactly that way.
+  // `publishStrand` is idempotent as of cadre-core 0.13.0 and RETURNS the row,
+  // so it is both the publish and the source of truth for what to attach.
   //
-  // So the row's existence is checked rather than assumed: it means "already
-  // published", which is a resumable state, not a conflict.
-  const control = cadreNode.getControlDatabase();
-  const existing = await control?.queryStrand(strandId).catch(() => null);
-  if (!existing) {
-    await cadreNode.publishStrand(strandId, 'o');
-  } else {
-    console.info('[chat-sapp] strand row already published; resuming attach:', strandId);
-  }
+  // Founding is two steps — publish the control-plane row, then attach the local
+  // instance and apply the sApp schema — and the second is far the slower. An app
+  // killed in between used to come back with the row present and no instance,
+  // whereupon re-publishing threw `UNIQUE constraint failed: Strand.Id` on that
+  // and every later launch, permanently (gotchoices/sereus#12). We carried a
+  // local `queryStrand` guard for that; 0.13.0 does it upstream and does it
+  // better — it verifies the existing row's content MATCHES before treating it as
+  // a no-op, and re-queries after a uniqueness collision to handle the race. So
+  // the guard is gone rather than duplicated.
+  //
+  // Taking the returned row also means `FounderOwnerKey` comes from the signer
+  // that actually published it, instead of being guessed at here.
+  const strandRow: StrandRow = await cadreNode.publishStrand(strandId, 'o');
 
   return cadreNode.addStrand({
     strandRow,

@@ -305,6 +305,12 @@ with `listenAddrs: []`. Progress:
       coordinator reporting a win for a write its cohort refused). The read-repair machinery —
       `solo-self-skip`, `markBlocksSeen`, `shouldReadRepair` — is untouched. Confirmed on device:
       boots clean, genesis **568 ms**, no regression, apply still unconverged at 7 min.
+      **1.0.0-beta.2 + cadre-core 0.13.0 (2026-09-10): same verdict for the blocker.** beta.2's
+      `db-p2p` differs from 0.29.0 in the same four pend/commit files, read-repair untouched;
+      on device, genesis **499 ms**, apply unconverged at 10 min. The pairing is now official —
+      cadre-core 0.13.0 declares `^1.0.0-beta.2`, so all the `resolutions` overrides for the
+      optimystic set are removed. Breaking change absorbed: `StrandRow` now requires
+      `FounderOwnerKey`, supplied by taking `publishStrand`'s returned row.
       Immediately after the strand row is inserted, `addStrand` loops on
       `findCluster`/`findCoordinator`/`cluster-fetch:solo-self-skip` with a schema of only
       **4 tables** (Health's case was 22 objects). Measured with debug logging OFF:
@@ -326,8 +332,12 @@ with `listenAddrs: []`. Progress:
       and treated as a resumable state; verified against the stuck data set — it logs
       "strand row already published; resuming attach" and proceeds. This will matter the moment the
       upstream apply is fast enough to finish, because until then every first run is interruptible.
-      Raised upstream as **gotchoices/sereus#12** — the reference app has the same unguarded
-      sequence in both founding paths, so this is the pattern being copied, not our slip.
+      Raised upstream as **gotchoices/sereus#12** and **FIXED in cadre-core 0.13.0**:
+      `publishStrand` now queries first, no-ops when the existing row's content matches
+      (`requireMatchingStrandRow`), re-queries after a uniqueness collision to handle the
+      race, and RETURNS the row. Our local `queryStrand` guard is removed in favour of it —
+      upstream's also verifies content, which ours did not. Verified on device: killed
+      mid-apply, restarted, resumed with no `UNIQUE constraint failed`.
 - [ ] `inspectInvitation` is still `notImplemented` in `SereusAdapter`, so
       InvitationAcceptance would throw the moment a scanned token opened it.
       `acceptInvitation` is written but its docstring records it as UNTESTED.

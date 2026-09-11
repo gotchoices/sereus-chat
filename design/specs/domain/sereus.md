@@ -283,3 +283,33 @@ Mitigation in place (so the app boots + stays responsive solo):
 The real remedy is to give the phone a reachable peer (relay/drone) so the
 control network forms — see **Transports** below. Solo note-taking ("My Notes")
 does NOT persist across the control layer on 0.8.1 without a cohort.
+
+## Answers from upstream (2026-09-10/11)
+
+Four long-standing questions were answered; these are settled platform facts now, not open asks.
+
+- **Message ordering is ours** (sereus#5). Per-collection revision order exists in Optimystic but is
+  **not reachable from SQL**; `StampId()` says which transaction wrote a row, never when relative to
+  another. Use a client timestamp with a deterministic tiebreak, or record what the author had
+  already seen. **Never `max(Id)+1`**: concurrent inserts of the same key are both told they
+  succeeded and one silently wins — no constraint fires, the message is simply lost. Our UUID
+  primary keys already avoid this and `chat-sapp.qsql` documents it.
+- **Per-user private state has no home** (sereus#6). Planned, but not in the initial release and its
+  shape is undecided. The sanctioned interim is a per-user key in the **strand** database — which
+  partitions by owner but does **not hide**: every member replicates it in full.
+  **Consequence for chat: read position stays DEVICE-LOCAL.** Putting it in the strand would expose
+  how far each member has read, which is a read receipt in all but name, and the stories rule that
+  out ("no delivery or read state; a reply is the evidence a message was read"). We accept that it
+  does not follow the user between devices until the real facility lands.
+- **Removal cuts the party off the network** (sereus#4), not just the member list: remaining machines
+  refuse connections and streams, stop relaying and dialing, and close open sessions — so whether a
+  removed party *could* write stops mattering. Built and proven on a four-machine strand; ships after
+  0.13.0. Two things for us when we wire `removeMember`: call
+  `CadreNode.refreshRevocationEnforcement(strandId)` right after the removal write so our own node
+  cuts immediately rather than on its 30 s poll, and the removed node receives a best-effort
+  `strand:revoked` event — **the hook for a "you were removed" screen, which no story covers yet.**
+  Correction from upstream: a removed party can **not** re-admit itself on a held invitation (an
+  earlier reply said otherwise); cancel outstanding invitations anyway.
+- **`schemas/chat.qsql` was repaired, not retired** (sereus#7) — now fully signature-checked, with
+  messages/attachments/responses immutable by design. Irrelevant to us (we have `chat-sapp.qsql`),
+  but it is no longer a misleading reference.
