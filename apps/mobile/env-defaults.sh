@@ -8,7 +8,16 @@
 # Precedence, lowest to highest:
 #   1. the defaults below                    — applied only when the var is unset/empty
 #   2. values already in the environment      — kept, because ${VAR:=default} won't clobber them
-#   3. .env.ports.local at the project root   — git-ignored; sourced last, so it wins over both
+#   3. .env.ports.local at the project root   — git-ignored; wins over 1 and 2
+#   4. a value given on the command line      — wins over everything (see below)
+
+# (4) is captured FIRST, before the defaults below fill these in: afterwards every
+# one of them is non-empty, so there would be no way to tell a value the caller
+# gave from one we defaulted.
+_cli_METRO_PORT=${METRO_PORT:-}
+_cli_EMULATOR_PORT=${EMULATOR_PORT:-}
+_cli_DEVICE_SERIAL=${DEVICE_SERIAL:-}
+_cli_AVD_NAME=${AVD_NAME:-}
 
 # (1) + (2): defaults that yield to anything already exported.
 : "${METRO_PORT:=8081}"
@@ -19,8 +28,23 @@
 # (3): project-local overrides, not committed. Sourced from the project root
 # (the package.json scripts run there). The leading "./" is required: POSIX `.`
 # searches PATH for a bare name, so `. ./.env.ports.local` sources the local file.
+#
+# (4): a value passed on the command line beats the local file.
+#
+# The local file assigns plainly (`DEVICE_SERIAL="emulator-5564"`), so without the
+# save/restore below it would clobber an explicit `DEVICE_SERIAL=<serial> yarn …`
+# and quietly act on the WRONG DEVICE — installing to the emulator when you meant
+# the phone on the cable, with nothing to indicate it. The ports are per-project
+# and belong in the file; the target device is a one-off and belongs on the
+# command line, so the command line has to win.
 if [ -f ./.env.ports.local ]; then
   . ./.env.ports.local
 fi
+
+[ -n "$_cli_METRO_PORT" ] && METRO_PORT=$_cli_METRO_PORT
+[ -n "$_cli_EMULATOR_PORT" ] && EMULATOR_PORT=$_cli_EMULATOR_PORT
+[ -n "$_cli_DEVICE_SERIAL" ] && DEVICE_SERIAL=$_cli_DEVICE_SERIAL
+[ -n "$_cli_AVD_NAME" ] && AVD_NAME=$_cli_AVD_NAME
+unset _cli_METRO_PORT _cli_EMULATOR_PORT _cli_DEVICE_SERIAL _cli_AVD_NAME
 
 export METRO_PORT EMULATOR_PORT DEVICE_SERIAL AVD_NAME

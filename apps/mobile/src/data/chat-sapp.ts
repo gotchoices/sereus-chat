@@ -79,28 +79,31 @@ export async function createChatStrand(
   cadreNode: CadreNode,
   strandId: string,
 ): Promise<StrandInstance> {
-  // `publishStrand` is idempotent as of cadre-core 0.13.0 and RETURNS the row,
-  // so it is both the publish and the source of truth for what to attach.
+  // ONE CALL, not publish-then-attach.  `foundStrand` is the sanctioned founder
+  // path as of cadre-core 0.13.0 and does both steps resumably.
   //
-  // Founding is two steps — publish the control-plane row, then attach the local
-  // instance and apply the sApp schema — and the second is far the slower. An app
-  // killed in between used to come back with the row present and no instance,
-  // whereupon re-publishing threw `UNIQUE constraint failed: Strand.Id` on that
-  // and every later launch, permanently (gotchoices/sereus#12). We carried a
-  // local `queryStrand` guard for that; 0.13.0 does it upstream and does it
-  // better — it verifies the existing row's content MATCHES before treating it as
-  // a no-op, and re-queries after a uniqueness collision to handle the race. So
-  // the guard is gone rather than duplicated.
+  // Why it matters beyond tidiness: the two-step form we used before could lose a
+  // race and leave the strand HEADERLESS.  If anything else attaches the strand
+  // first — a `strand:discovered` handler after a restart, or the node's own
+  // StrandWatcher poll — the founder bootstrap that writes `Strand.Header` was
+  // silently skipped, and a headerless strand admits nobody and never settles.
+  // `foundStrand` resolves founder-ness FROM THE ROW (this machine founds iff the
+  // row's `FounderOwnerKey` is its own owner key) and runs the idempotent founder
+  // bootstrap even on an instance something else attached, so the Header is
+  // written either way.
   //
-  // Taking the returned row also means `FounderOwnerKey` comes from the signer
-  // that actually published it, instead of being guessed at here.
-  const strandRow: StrandRow = await cadreNode.publishStrand(strandId, 'o');
-
-  return cadreNode.addStrand({
-    strandRow,
+  // `founded: false` is a correct outcome, not a failure: it means a sibling
+  // machine won the founding race and we attached as a joiner, which is what
+  // avoids two machines bootstrapping one strand (the double-Header hazard).
+  const { instance, founded } = await cadreNode.foundStrand({
+    strandId,
+    type: 'o',            // open — strand type is the user's choice; default to open
     sAppConfig: getChatSAppConfig(),
-    founder: true,
   });
+  console.info(
+    `[chat-sapp] ${founded ? 'founded' : 'attached (a sibling founded it)'}: ${strandId}`,
+  );
+  return instance;
 }
 
 /**

@@ -311,6 +311,33 @@ with `listenAddrs: []`. Progress:
       cadre-core 0.13.0 declares `^1.0.0-beta.2`, so all the `resolutions` overrides for the
       optimystic set are removed. Breaking change absorbed: `StrandRow` now requires
       `FounderOwnerKey`, supplied by taking `publishStrand`'s returned row.
+      **Real-hardware run, 2026-09-10 (Galaxy S7 Edge, arm64, fresh party): also does not
+      converge** — 14+ min, app alive. So it is NOT emulator-specific. And the
+      `default/Revocation` residual we reported upstream **was a measurement artifact**: using
+      `read-repair-triggered`'s own `ageMs` field (absent ⇒ never armed), that run shows 290
+      triggers with **0** inside the 10 s window, and **0 of 254** Revocation `solo-self-skip`
+      events are preceded by a read-repair trigger. They are separate reads of a hot block, not
+      re-entries of an unarmed window — skip-to-skip gap timing cannot tell those apart, which is
+      what we had been measuring. Correction posted to gotchoices/Optimystic#8.
+      What remains is read VOLUME: 626 cluster consults and 290 triggers to apply a 4-table
+      schema, against 56 commits — i.e. the unimplemented `beginSchemaBatch`/`endSchemaBatch`.
+      **Use `ageMs` for any future capture, not gap inference.**
+      **2026-09-11, cadre-core 0.13.0 + beta.2, real arm64, fresh wipe per the release's RN
+      instructions, using the sanctioned `foundStrand` one-call path:**
+        · 4-table schema — **no convergence in 44 min**
+        · **1-table schema — no convergence in 18 min** (probe verified in the running bundle)
+      So schema SIZE is not the variable, and the read-volume explanation
+      (`beginSchemaBatch`) does not account for our failure. Also eliminated: stale data, the
+      two-step founding race, the emulator, and read-repair. Something categorical is wrong for
+      chat on this device, and it sits oddly beside the 0.13.0 release note claiming
+      "phone → blind relay → phone … proven end to end".
+      **`@optimystic/*` 1.0.0-beta.3 (2026-09-11) does not fix it either** — 18 min, same host,
+      same wipe, `foundStrand`. beta.3 adds `settledAbsences` (an LRU memo so a settled absent
+      block stops being re-consulted), which was the best remaining fit for our data; it is
+      present in the installed build and changes nothing for us. Results posted to
+      Optimystic#8 with the full elimination list, cross-referenced on sereus#8 as evidence for
+      the solo-founder fast-path ask. **We have no replacement hypothesis** — the open question
+      is what the passing upstream e2e suite does that a real RN sApp does not.
       Immediately after the strand row is inserted, `addStrand` loops on
       `findCluster`/`findCoordinator`/`cluster-fetch:solo-self-skip` with a schema of only
       **4 tables** (Health's case was 22 objects). Measured with debug logging OFF:
