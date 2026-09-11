@@ -66,9 +66,13 @@ it. He wants to tidy up, and does not want to discover afterwards that he threw 
 1.1. Bob is removed from a strand by one of the people who can do that. He did not choose this and
      was not asked.
 1.2. He is told it happened, rather than left to work it out from a conversation that quietly stops.
-1.3. Nothing further reaches him. What he already held, he still holds — being removed does not
+1.3. That notice is **best-effort** — it is sent as he is cut off, so it can miss him (his phone was
+     away, the app was closed). So being told is not the only way he finds out: whenever he opens
+     the strand, it says plainly that he is no longer in it. A notice that may not arrive must never
+     be the sole way somebody learns this.
+1.4. Nothing further reaches him. What he already held, he still holds — being removed does not
      reach back into what he has read or kept.
-1.4. This is a risk of any strand where somebody holds that ability, and it is one of the things the
+1.5. This is a risk of any strand where somebody holds that ability, and it is one of the things the
      strand's status is telling him ([31](31-whos-in-this-strand.md)).
 
 ### Alternative Path F: a member who keeps talking
@@ -91,7 +95,9 @@ it. He wants to tidy up, and does not want to discover afterwards that he threw 
       costs: a later return is as a new member, and earlier messages stay attributed to who the user
       was
 - [ ] The remaining members are not notified when someone leaves
-- [ ] A member who is removed by someone else is told, rather than left to infer it
+- [ ] A member who is removed by someone else is told, rather than left to infer it — and because
+      that notice is best-effort, opening the strand also states it, so a missed notice is not a
+      silent removal
 - [ ] Removal stops anything further reaching them and does not reach back into what they hold
 - [ ] A user leaving a strand where they are the last member is told that this ends it
 - [ ] The user can keep content that matters to them before forgetting a strand
