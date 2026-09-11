@@ -298,6 +298,13 @@ with `listenAddrs: []`. Progress:
       a sub-second loop still running 13 min in. Apply had not attached after **20 min**. Capture
       posted to Optimystic#8. Getting 0.29.0 requires overriding all five `@optimystic/*` packages
       via yarn `resolutions`: cadre-core 0.12.0 pins `^0.27.0`, so they do not arrive otherwise.
+      **Retested on `@optimystic/*` 1.0.0-beta.1 (2026-09-09): does NOT address it.** Diffed the
+      published tarballs against 0.29.0 first — `db-core` is byte-identical, and `db-p2p` differs
+      in only four files (`cluster-coordinator`, `coordinator-repo`, `cluster-repo`,
+      `storage-repo`), all in the pend/commit refusal path (Optimystic#17/#18 territory: a
+      coordinator reporting a win for a write its cohort refused). The read-repair machinery —
+      `solo-self-skip`, `markBlocksSeen`, `shouldReadRepair` — is untouched. Confirmed on device:
+      boots clean, genesis **568 ms**, no regression, apply still unconverged at 7 min.
       Immediately after the strand row is inserted, `addStrand` loops on
       `findCluster`/`findCoordinator`/`cluster-fetch:solo-self-skip` with a schema of only
       **4 tables** (Health's case was 22 objects). Measured with debug logging OFF:
@@ -319,6 +326,8 @@ with `listenAddrs: []`. Progress:
       and treated as a resumable state; verified against the stuck data set — it logs
       "strand row already published; resuming attach" and proceeds. This will matter the moment the
       upstream apply is fast enough to finish, because until then every first run is interruptible.
+      Raised upstream as **gotchoices/sereus#12** — the reference app has the same unguarded
+      sequence in both founding paths, so this is the pattern being copied, not our slip.
 - [ ] `inspectInvitation` is still `notImplemented` in `SereusAdapter`, so
       InvitationAcceptance would throw the moment a scanned token opened it.
       `acceptInvitation` is written but its docstring records it as UNTESTED.
