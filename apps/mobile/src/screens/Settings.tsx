@@ -142,6 +142,19 @@ export default function Settings() {
       <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
         {t('screens.settings.ceilingNote', 'The limit is yours to set. Nothing is imposed, and nothing is deleted on your behalf.')}
       </Text>
+
+      {/* Dev-only.  Deliberately untranslated and outside the story set: this is a
+          workbench for us, not a feature, and it must never appear in a release. */}
+      {__DEV__ ? (
+        <>
+          <SectionHeader label="Developer" />
+          <ListRow
+            title="Diagnostics"
+            subtitle="Run sereus stack checks on this device"
+            onPress={() => navigation.navigate('Diagnostics')}
+          />
+        </>
+      ) : null}
     </ScrollView>
   );
 }

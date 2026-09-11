@@ -27,7 +27,8 @@
     "launch:ios": "sh -c 'xcrun simctl openurl booted \"$DEEPLINK\"'",
     "relay": "sh ./scripts/relay.sh",
     "link": "sh ./scripts/link.sh",
-    "logs": "sh ./scripts/logs.sh"
+    "logs": "sh ./scripts/logs.sh",
+    "stack:check": "cd ../../test/stack && node found-strand.mjs"
   },
   "dependencies": {
     "@libp2p/websockets": "^10.1.3",

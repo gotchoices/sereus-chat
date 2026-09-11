@@ -16,6 +16,7 @@ import StrandMedia from '../screens/StrandMedia';
 import MediaViewer from '../screens/MediaViewer';
 import RelayOffer from '../screens/RelayOffer';
 import QrScanner from '../screens/QrScanner';
+import Diagnostics from '../screens/Diagnostics';
 import ChatInterface from '../screens/ChatInterface';
 import MediaPicker from '../screens/MediaPicker';
 import { CadreManager } from '../cadre-ui';
@@ -71,6 +72,7 @@ export default function AppNavigator() {
         Settings: 'settings',
         CadreManager: 'machines',
         QrScanner: 'scan',
+        Diagnostics: 'diagnostics',
         RelayOffer: 'relay',
       },
     },
@@ -110,6 +112,9 @@ export default function AppNavigator() {
         <Stack.Screen name="InvitationAcceptance" component={InvitationAcceptance} options={{ title: 'Invitation' }} />
         <Stack.Screen name="Profile" component={Profile} options={{ title: 'Profile' }} />
         <Stack.Screen name="Settings" component={Settings} options={{ title: 'Settings' }} />
+        {/* Dev-only: stack checks inside RN.  Registered unconditionally (a route
+            nobody navigates to costs nothing); the ENTRY is __DEV__-gated. */}
+        <Stack.Screen name="Diagnostics" component={Diagnostics} options={{ title: 'Diagnostics' }} />
         <Stack.Screen
           name="StrandDetail"
           component={StrandDetail}

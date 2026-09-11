@@ -47,4 +47,15 @@ fi
 [ -n "$_cli_AVD_NAME" ] && AVD_NAME=$_cli_AVD_NAME
 unset _cli_METRO_PORT _cli_EMULATOR_PORT _cli_DEVICE_SERIAL _cli_AVD_NAME
 
-export METRO_PORT EMULATOR_PORT DEVICE_SERIAL AVD_NAME
+# ANDROID_SERIAL pins every adb and Gradle operation to one device.
+#
+# This is load-bearing, not a convenience. `react-native run-android` shells out to
+# Gradle's `app:installDebug`, and that task installs to EVERY connected device --
+# the CLI's own --device/--deviceId flag is not passed through to it. So with a
+# phone on the cable and other projects' emulators up, `yarn android` tries to
+# install on all of them and the whole build fails if ANY one is out of space,
+# even when the emulator you actually targeted had room. adb honors this variable
+# too, so the launch:/preview-style scripts inherit the same targeting for free.
+ANDROID_SERIAL=$DEVICE_SERIAL
+
+export METRO_PORT EMULATOR_PORT DEVICE_SERIAL AVD_NAME ANDROID_SERIAL

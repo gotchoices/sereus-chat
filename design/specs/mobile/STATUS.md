@@ -322,6 +322,15 @@ with `listenAddrs: []`. Progress:
       What remains is read VOLUME: 626 cluster consults and 290 triggers to apply a 4-table
       schema, against 56 commits — i.e. the unimplemented `beginSchemaBatch`/`endSchemaBatch`.
       **Use `ageMs` for any future capture, not gap inference.**
+      **2026-09-11 — the A/B that isolates it.** Identical founding logic, one variable:
+      Node + `classic-level` **0.2 s**; RN + `rn-leveldb` **>600 s**. Node arm:
+      `test/stack/found-strand.mjs` (`yarn stack:check`). RN arm: Settings → Diagnostics
+      (dev-only, `chat://diagnostics`). `node.start()` alone is 20.9 s on device vs 0.2 s in
+      Node, so the divergence precedes any schema work. Latency ruled out by a sweep (linear to
+      50 ms/op; 600 s would need ~3,700 ms/op). Posted to Optimystic#8 with an ask for Nate to
+      run `reference-app-rn` solo — blank bootstrap, no drone — since RN-with-a-cohort-of-one is
+      covered by neither the integration suite (Node + memory) nor the reference app (RN +
+      drone). We could not run it ourselves: it would not bundle from a fresh checkout.
       **2026-09-11, cadre-core 0.13.0 + beta.2, real arm64, fresh wipe per the release's RN
       instructions, using the sanctioned `foundStrand` one-call path:**
         · 4-table schema — **no convergence in 44 min**
