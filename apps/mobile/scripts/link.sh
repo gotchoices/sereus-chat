@@ -18,6 +18,8 @@
 #
 # Default target is $DEVICE_SERIAL (see env-defaults.sh / .env.ports.local);
 # `--all` targets every attached device, which is the two-instance pair.
+# For a one-off elsewhere, `TARGET_DEVICE=<serial> sh ./scripts/link.sh …` — and a
+# plain exported DEVICE_SERIAL deliberately does NOT win (env-defaults.sh says why).
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)

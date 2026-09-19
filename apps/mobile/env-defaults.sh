@@ -6,56 +6,46 @@
 #     . ./env-defaults.sh && react-native start --port "$METRO_PORT"
 #
 # Precedence, lowest to highest:
-#   1. the defaults below                    — applied only when the var is unset/empty
-#   2. values already in the environment      — kept, because ${VAR:=default} won't clobber them
-#   3. .env.ports.local at the project root   — git-ignored; wins over 1 and 2
-#   4. a value given on the command line      — wins over everything (see below)
+#   1. the defaults below                   — applied only when the var is unset/empty
+#   2. .env.ports.local at the project root — git-ignored; the project's real settings
+#   3. TARGET_* on the command line         — a deliberate one-off, see below
+#
+# WHY NOT "anything already exported wins".  That was the rule here until it caused a
+# genuinely confusing failure: a terminal that had sourced this file BEFORE
+# .env.ports.local changed still had the old METRO_PORT exported, so `yarn start` in
+# that terminal silently bound the OLD port while every other tool used the new one.
+# The app then could not find Metro, and nothing said why.  A shell cannot tell a
+# deliberate `METRO_PORT=… yarn …` from a stale leftover — they are the same thing —
+# so the override moved to names nothing ever exports by accident.
 
-# (4) is captured FIRST, before the defaults below fill these in: afterwards every
-# one of them is non-empty, so there would be no way to tell a value the caller
-# gave from one we defaulted.
-_cli_METRO_PORT=${METRO_PORT:-}
-_cli_EMULATOR_PORT=${EMULATOR_PORT:-}
-_cli_DEVICE_SERIAL=${DEVICE_SERIAL:-}
-_cli_AVD_NAME=${AVD_NAME:-}
-
-# (1) + (2): defaults that yield to anything already exported.
 : "${METRO_PORT:=8081}"
 : "${EMULATOR_PORT:=5554}"
 : "${DEVICE_SERIAL:=emulator-5554}"
 : "${AVD_NAME:=Pixel_A}"
 
-# (3): project-local overrides, not committed. Sourced from the project root
-# (the package.json scripts run there). The leading "./" is required: POSIX `.`
-# searches PATH for a bare name, so `. ./.env.ports.local` sources the local file.
-#
-# (4): a value passed on the command line beats the local file.
-#
-# The local file assigns plainly (`DEVICE_SERIAL="emulator-5564"`), so without the
-# save/restore below it would clobber an explicit `DEVICE_SERIAL=<serial> yarn …`
-# and quietly act on the WRONG DEVICE — installing to the emulator when you meant
-# the phone on the cable, with nothing to indicate it. The ports are per-project
-# and belong in the file; the target device is a one-off and belongs on the
-# command line, so the command line has to win.
+# (2): project-local settings, not committed. Sourced from the project root (the
+# package.json scripts run there). The leading "./" is required: POSIX `.` searches
+# PATH for a bare name, so `. ./.env.ports.local` sources the local file.
+# Assigns plainly, so it beats the defaults above.
 if [ -f ./.env.ports.local ]; then
   . ./.env.ports.local
 fi
 
-[ -n "$_cli_METRO_PORT" ] && METRO_PORT=$_cli_METRO_PORT
-[ -n "$_cli_EMULATOR_PORT" ] && EMULATOR_PORT=$_cli_EMULATOR_PORT
-[ -n "$_cli_DEVICE_SERIAL" ] && DEVICE_SERIAL=$_cli_DEVICE_SERIAL
-[ -n "$_cli_AVD_NAME" ] && AVD_NAME=$_cli_AVD_NAME
-unset _cli_METRO_PORT _cli_EMULATOR_PORT _cli_DEVICE_SERIAL _cli_AVD_NAME
-
-# ANDROID_SERIAL pins every adb and Gradle operation to one device.
+# (3): one-off overrides. Distinct names, never set by the file or by sourcing this,
+# so a leftover cannot masquerade as an intention:
 #
-# This is load-bearing, not a convenience. `react-native run-android` shells out to
-# Gradle's `app:installDebug`, and that task installs to EVERY connected device --
-# the CLI's own --device/--deviceId flag is not passed through to it. So with a
-# phone on the cable and other projects' emulators up, `yarn android` tries to
-# install on all of them and the whole build fails if ANY one is out of space,
-# even when the emulator you actually targeted had room. adb honors this variable
-# too, so the launch:/preview-style scripts inherit the same targeting for free.
-ANDROID_SERIAL=$DEVICE_SERIAL
+#   TARGET_DEVICE=6a61c968 yarn android     install to the phone, not the emulator
+#   TARGET_METRO_PORT=8090 yarn start       run Metro somewhere else, just this once
+#
+# Announced on stderr: an override that changes which device or port you are acting
+# on should never be silent.
+if [ -n "${TARGET_METRO_PORT:-}" ]; then
+  echo "env-defaults: METRO_PORT $METRO_PORT -> $TARGET_METRO_PORT (TARGET_METRO_PORT)" >&2
+  METRO_PORT=$TARGET_METRO_PORT
+fi
+if [ -n "${TARGET_DEVICE:-}" ]; then
+  echo "env-defaults: DEVICE_SERIAL $DEVICE_SERIAL -> $TARGET_DEVICE (TARGET_DEVICE)" >&2
+  DEVICE_SERIAL=$TARGET_DEVICE
+fi
 
 export METRO_PORT EMULATOR_PORT DEVICE_SERIAL AVD_NAME ANDROID_SERIAL

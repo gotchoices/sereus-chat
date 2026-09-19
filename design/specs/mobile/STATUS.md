@@ -290,90 +290,20 @@ with `listenAddrs: []`. Progress:
       `apps/mobile/package.json` pins the whole stack (bump it too, or the install
       silently changes nothing), and db-p2p 0.28 ships **static class blocks**, needing
       `@babel/plugin-transform-class-static-block` plus `yarn start --reset-cache`.
-- [ ] **NOW BLOCKED ON: strand schema apply never converges** (gotchoices/sereus#8,
-      gotchoices/Optimystic#8). **Retested on `@optimystic/*` 0.29.0, 2026-09-08 — improved but
-      still blocked.** Owner genesis 9.5 s → **797 ms**, and per-block read-repair now mostly
-      respects the 10 s window (296 repeats at a 14.3 s median). But 225 repeats still land
-      INSIDE the window at a 0.141 s median, and **`default/Revocation` alone is 179 of them** —
-      a sub-second loop still running 13 min in. Apply had not attached after **20 min**. Capture
-      posted to Optimystic#8. Getting 0.29.0 requires overriding all five `@optimystic/*` packages
-      via yarn `resolutions`: cadre-core 0.12.0 pins `^0.27.0`, so they do not arrive otherwise.
-      **Retested on `@optimystic/*` 1.0.0-beta.1 (2026-09-09): does NOT address it.** Diffed the
-      published tarballs against 0.29.0 first — `db-core` is byte-identical, and `db-p2p` differs
-      in only four files (`cluster-coordinator`, `coordinator-repo`, `cluster-repo`,
-      `storage-repo`), all in the pend/commit refusal path (Optimystic#17/#18 territory: a
-      coordinator reporting a win for a write its cohort refused). The read-repair machinery —
-      `solo-self-skip`, `markBlocksSeen`, `shouldReadRepair` — is untouched. Confirmed on device:
-      boots clean, genesis **568 ms**, no regression, apply still unconverged at 7 min.
-      **1.0.0-beta.2 + cadre-core 0.13.0 (2026-09-10): same verdict for the blocker.** beta.2's
-      `db-p2p` differs from 0.29.0 in the same four pend/commit files, read-repair untouched;
-      on device, genesis **499 ms**, apply unconverged at 10 min. The pairing is now official —
-      cadre-core 0.13.0 declares `^1.0.0-beta.2`, so all the `resolutions` overrides for the
-      optimystic set are removed. Breaking change absorbed: `StrandRow` now requires
-      `FounderOwnerKey`, supplied by taking `publishStrand`'s returned row.
-      **Real-hardware run, 2026-09-10 (Galaxy S7 Edge, arm64, fresh party): also does not
-      converge** — 14+ min, app alive. So it is NOT emulator-specific. And the
-      `default/Revocation` residual we reported upstream **was a measurement artifact**: using
-      `read-repair-triggered`'s own `ageMs` field (absent ⇒ never armed), that run shows 290
-      triggers with **0** inside the 10 s window, and **0 of 254** Revocation `solo-self-skip`
-      events are preceded by a read-repair trigger. They are separate reads of a hot block, not
-      re-entries of an unarmed window — skip-to-skip gap timing cannot tell those apart, which is
-      what we had been measuring. Correction posted to gotchoices/Optimystic#8.
-      What remains is read VOLUME: 626 cluster consults and 290 triggers to apply a 4-table
-      schema, against 56 commits — i.e. the unimplemented `beginSchemaBatch`/`endSchemaBatch`.
-      **Use `ageMs` for any future capture, not gap inference.**
-      **2026-09-11 — the A/B that isolates it.** Identical founding logic, one variable:
-      Node + `classic-level` **0.2 s**; RN + `rn-leveldb` **>600 s**. Node arm:
-      `test/stack/found-strand.mjs` (`yarn stack:check`). RN arm: Settings → Diagnostics
-      (dev-only, `chat://diagnostics`). `node.start()` alone is 20.9 s on device vs 0.2 s in
-      Node, so the divergence precedes any schema work. Latency ruled out by a sweep (linear to
-      50 ms/op; 600 s would need ~3,700 ms/op). Posted to Optimystic#8 with an ask for Nate to
-      run `reference-app-rn` solo — blank bootstrap, no drone — since RN-with-a-cohort-of-one is
-      covered by neither the integration suite (Node + memory) nor the reference app (RN +
-      drone). We could not run it ourselves: it would not bundle from a fresh checkout.
-      **2026-09-11, cadre-core 0.13.0 + beta.2, real arm64, fresh wipe per the release's RN
-      instructions, using the sanctioned `foundStrand` one-call path:**
-        · 4-table schema — **no convergence in 44 min**
-        · **1-table schema — no convergence in 18 min** (probe verified in the running bundle)
-      So schema SIZE is not the variable, and the read-volume explanation
-      (`beginSchemaBatch`) does not account for our failure. Also eliminated: stale data, the
-      two-step founding race, the emulator, and read-repair. Something categorical is wrong for
-      chat on this device, and it sits oddly beside the 0.13.0 release note claiming
-      "phone → blind relay → phone … proven end to end".
-      **`@optimystic/*` 1.0.0-beta.3 (2026-09-11) does not fix it either** — 18 min, same host,
-      same wipe, `foundStrand`. beta.3 adds `settledAbsences` (an LRU memo so a settled absent
-      block stops being re-consulted), which was the best remaining fit for our data; it is
-      present in the installed build and changes nothing for us. Results posted to
-      Optimystic#8 with the full elimination list, cross-referenced on sereus#8 as evidence for
-      the solo-founder fast-path ask. **We have no replacement hypothesis** — the open question
-      is what the passing upstream e2e suite does that a real RN sApp does not.
-      Immediately after the strand row is inserted, `addStrand` loops on
-      `findCluster`/`findCoordinator`/`cluster-fetch:solo-self-skip` with a schema of only
-      **4 tables** (Health's case was 22 objects). Measured with debug logging OFF:
-      **no completion in 23m41s**, app alive throughout — so it is non-termination, not
-      cost, and not the logging. (Debug logging roughly doubles everything else: owner
-      genesis 4.2 s off vs 9.5 s on — turn it off when timing.) While it runs, the strand
-      appears in `getStrands()` but its database is never ready, so reads fail with
-      `StrandDatabase … not ready`. Upstream has described the cause (cohort-of-one short-circuit in the read
-      path never recording that it checked, so every read re-consults forever) and fixed it
-      on Optimystic `main` — **not in 0.28.0**. So invitations and the two-device relay test
-      wait on that publish. Chat repro posted to #8.
-- [x] **Founding is now idempotent** (`chat-sapp.ts`). Founding is two steps — `publishStrand`
-      INSERTs the control-plane `Strand` row, then `addStrand` attaches the local instance and
-      applies the sApp schema — and the second is far the slower. An app killed between them
-      (force-stop, phone restart, a Metro reload) came back with the row present and no instance,
-      whereupon publishing again threw `UNIQUE constraint failed: Strand.Id` **on that and every
-      later launch**, permanently, short of wiping app data. Found by accident when a reload
-      interrupted a stalled apply. Now the row's existence is checked (`ControlDatabase.queryStrand`)
-      and treated as a resumable state; verified against the stuck data set — it logs
-      "strand row already published; resuming attach" and proceeds. This will matter the moment the
-      upstream apply is fast enough to finish, because until then every first run is interruptible.
-      Raised upstream as **gotchoices/sereus#12** and **FIXED in cadre-core 0.13.0**:
-      `publishStrand` now queries first, no-ops when the existing row's content matches
-      (`requireMatchingStrandRow`), re-queries after a uniqueness collision to handle the
-      race, and RETURNS the row. Our local `queryStrand` guard is removed in favour of it —
-      upstream's also verifies content, which ours did not. Verified on device: killed
-      mid-apply, restarted, resumed with no `UNIQUE constraint failed`.
+- [x] **RESOLVED 2026-09-18 — founding converges.** Root cause was **not** in sereus or
+      optimystic at all: a defect in Babel's `wrapAsyncGenerator` helper before **7.29.2**,
+      which *"drops async-generator cleanup after an await in a finally block when iteration
+      stops early"* — leaving Quereus's execution lock **held forever**. We were on 7.28.6.
+      cadre-core/optimystic **1.0.0** added a startup self-check that detects it and says
+      exactly what to do; that check is what finally named it.
+      Fix: pin `@babel/runtime` and `@babel/helpers` to `^7.29.2` (deps **and** resolutions —
+      RN's preset pulls its own copies), then rebuild. Now:
+      **owner genesis 457 ms, strand founded and attached in 4.2 s**, clean boot, no warnings.
+      Previously: never, across 44 min, three stacks and two hosts.
+      Why every earlier experiment missed it: Node runs async generators **natively** and never
+      loads the Babel helper, so the Node arm always passed — the A/B was measuring the
+      transpile, not the runtime. It also explains why the failure was insensitive to schema
+      size, storage latency, listen addresses and read-repair: a held lock is none of those.
 - [ ] `inspectInvitation` is still `notImplemented` in `SereusAdapter`, so
       InvitationAcceptance would throw the moment a scanned token opened it.
       `acceptInvitation` is written but its docstring records it as UNTESTED.

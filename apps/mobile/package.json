@@ -33,19 +33,19 @@
   "dependencies": {
     "@libp2p/websockets": "^10.1.3",
     "@noble/hashes": "^2.0.0",
-    "@optimystic/db-core": "^1.0.0-beta.3",
-    "@optimystic/db-p2p": "^1.0.0-beta.3",
-    "@optimystic/db-p2p-storage-rn": "^1.0.0-beta.3",
-    "@optimystic/quereus-plugin-crypto": "^1.0.0-beta.3",
-    "@optimystic/quereus-plugin-optimystic": "^1.0.0-beta.3",
-    "@quereus/quereus": "^4.18.0",
+    "@optimystic/db-core": "^1.0.0",
+    "@optimystic/db-p2p": "^1.0.0",
+    "@optimystic/db-p2p-storage-rn": "^1.0.0",
+    "@optimystic/quereus-plugin-crypto": "^1.0.0",
+    "@optimystic/quereus-plugin-optimystic": "^1.0.0",
+    "@quereus/quereus": "^4.19.4",
     "@react-native-async-storage/async-storage": "^2.1.0",
     "@react-native-clipboard/clipboard": "^1.16.3",
     "@react-native-documents/picker": "^11.0.0",
     "@react-native/new-app-screen": "0.82.1",
     "@react-navigation/native": "^7.1.19",
     "@react-navigation/native-stack": "^7.6.2",
-    "@serfab/cadre-core": "^0.13.0",
+    "@serfab/cadre-core": "^1.0.0",
     "@ungap/structured-clone": "^1.3.0",
     "event-target-polyfill": "^0.0.4",
     "p2p-fret": "^1.0.0-beta.4",
@@ -65,9 +65,10 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@babel/helpers": "^7.29.2",
     "@babel/plugin-transform-class-static-block": "^7.24.7",
     "@babel/preset-env": "^7.25.3",
-    "@babel/runtime": "^7.25.0",
+    "@babel/runtime": "^7.29.2",
     "@react-native-community/cli": "20.0.0",
     "@react-native-community/cli-platform-android": "20.0.0",
     "@react-native-community/cli-platform-ios": "20.0.0",
@@ -89,12 +90,14 @@
     "node": ">=20"
   },
   "resolutions": {
-    "@quereus/quereus": "^4.18.0",
+    "@quereus/quereus": "^4.19.4",
     "p2p-fret": "^1.0.0-beta.4",
     "@libp2p/interface": "npm:3.2.5",
     "@libp2p/peer-id": "npm:6.0.14",
     "libp2p": "npm:3.3.8",
-    "@noble/hashes": "npm:2.2.0"
+    "@noble/hashes": "npm:2.2.0",
+    "@babel/runtime": "^7.29.2",
+    "@babel/helpers": "^7.29.2"
   },
   "detox": {
     "testRunner": {
