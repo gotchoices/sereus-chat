@@ -35,6 +35,23 @@ CHAT_ROOT=$(cd "$APP_DIR/../.." && pwd)
 usage() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
 # ── target selection ───────────────────────────────────────────────────────
+# `--all` means EVERY DEVICE THIS PROJECT OWNS — not every device `adb` can see.
+#
+# ser/health, ser/chat and ser/taleus each pin their own emulator in
+# .env.ports.local (health 5562, chat 5564) precisely so all three can run at once.
+# A bare `adb devices` walks straight through that: it returns a sibling project's
+# emulator, and `--all` would then deep-link into it, or `adb reverse` this
+# project's Metro and relay ports INSIDE it. Neither is ours to touch.
+#
+# Ownership rule:
+#   - an emulator is ours only if its serial is $DEVICE_SERIAL
+#   - a PHYSICAL device is ours: it is plugged into this machine deliberately and
+#     there is no per-project way to claim one (nor should there be — the whole
+#     point of attaching a phone is to test on it from wherever you are working)
+#
+# Foreign emulators are skipped out loud, so "it did nothing" is never silent. To
+# reach one anyway — a deliberate cross-project act — name it: `-d emulator-5562`,
+# which bypasses this filter entirely.
 targets_from_args() {
   _all=no; _serial=''
   while [ $# -gt 0 ]; do
@@ -45,7 +62,15 @@ targets_from_args() {
     shift
   done
   if [ "$_all" = yes ]; then
-    adb devices | awk '/\tdevice$/ { print $1 }'
+    _skipped=''
+    for _dev in $(adb devices | awk '/\tdevice$/ { print $1 }'); do
+      if is_emulator "$_dev" && [ "$_dev" != "$DEVICE_SERIAL" ]; then
+        _skipped="$_skipped $_dev"
+        continue
+      fi
+      echo "$_dev"
+    done
+    [ -n "$_skipped" ] && echo "    skipped (another project's emulator):$_skipped" >&2
   elif [ -n "$_serial" ]; then
     echo "$_serial"
   else
@@ -129,6 +154,25 @@ cmd_relay() {
   echo "\"Working — people can reach you through this.\""
 }
 
+# Annotated `adb devices`: which of these this project will act on, and which
+# belong to a sibling project. Worth a command of its own because the failure it
+# prevents is silent — three projects' emulators look identical in `adb devices`,
+# and the only thing distinguishing them is a port number in a git-ignored file.
+cmd_devices() {
+  echo "this project: METRO_PORT=$METRO_PORT  DEVICE_SERIAL=$DEVICE_SERIAL  AVD_NAME=${AVD_NAME:-?}"
+  echo
+  for _dev in $(adb devices | awk '/\tdevice$/ { print $1 }'); do
+    if [ "$_dev" = "$DEVICE_SERIAL" ]; then
+      echo "  $_dev  — this project's emulator"
+    elif is_emulator "$_dev"; then
+      echo "  $_dev  — ANOTHER project's emulator (skipped by --all; -d to force)"
+    else
+      _model=$(adb -s "$_dev" shell getprop ro.product.model 2>/dev/null | tr -d '\r')
+      echo "  $_dev  — physical device${_model:+ ($_model)}"
+    fi
+  done
+}
+
 cmd_reverse() {
   for s in $(targets_from_args "$@"); do setup_reverse "$s"; done
 }
@@ -141,7 +185,7 @@ cmd_url() {
 
 case "${1:-}" in
   ''|-h|--help) usage 0 ;;
-  devices)      adb devices ;;
+  devices)      cmd_devices ;;
   relay)        shift; cmd_relay "$@" ;;
   reverse)      shift; cmd_reverse "$@" ;;
   *)            cmd_url "$@" ;;

@@ -74,6 +74,14 @@ class CadreServiceImpl {
   private _authorityPublicKey: string | null = null;
   private _startError: string | null = null;
   private _startPromise: Promise<void> | null = null;
+  /**
+   * Relays this node is configured with, named at CONSTRUCTION.
+   *
+   * Set by `applyRelays` before start (App boot reads them from prefs). They go
+   * into `network.relayAddrs`, which is the only way a relay reaches this
+   * machine's STRAND nodes as well as its control node — see `applyRelays`.
+   */
+  private _relayAddrs: string[] = [];
 
   /**
    * LevelDB handles open for the lifetime of this service.
@@ -345,17 +353,35 @@ class CadreServiceImpl {
             webSockets(),
             circuitRelayTransport() as unknown as ReturnType<typeof webSockets>,
           ],
-          // RN cannot listen for inbound connections, so there is no TCP entry
-          // here.  The bare `/p2p-circuit` IS needed though: it is the "search"
-          // listener a relay reservation lands in, and cadre-core only adds one
-          // itself when `relayAddrs` is set at config time.  We deliberately do
-          // not set `relayAddrs` — it makes a relay that is down fatal to
-          // `start()` — so the listener has to be named here instead, and
-          // `reserveRelays()` fills it afterwards.  Bare `/p2p-circuit` opens no
-          // connection on its own, so it costs nothing when no relay is
-          // configured.  (A `<relay>/p2p-circuit` entry would be REJECTED; that
-          // shape dials during bring-up.  See cadre-core `relay-addrs.ts`.)
-          listenAddrs: ['/p2p-circuit'],
+          // RN cannot listen for inbound connections, so no TCP entry — and no
+          // hand-written `/p2p-circuit` either. Naming a relay in `relayAddrs`
+          // ADDS the bare `/p2p-circuit` search listener for us, one per relay,
+          // to both the control node and every strand node. An explicitly empty
+          // list stays empty when no relay is configured, which is right: a
+          // phone with no relay has no address and should not pretend to listen.
+          listenAddrs: [],
+          // THE RELAYS, NAMED AT CONSTRUCTION — not `reserveRelays()` afterwards.
+          //
+          // This used to be the other way round, to avoid `relayAddrs`' fail-fast
+          // contract (a relay that is down aborting `start()`). That reasoning was
+          // sound but the conclusion was wrong: `requireRelay: false` below softens
+          // exactly that, and strand nodes are fail-soft over `relayAddrs`
+          // regardless of it.
+          //
+          // The difference is not cosmetic. `reserveRelays()` supervises the
+          // CONTROL node alone, while every strand runs as its own libp2p node with
+          // its own transport peer id — so on the runtime path our strand nodes had
+          // no circuit address at all. Formation still completed (the invitee dials
+          // the control node first), the invitation was consumed, and then the
+          // joiner sat in `StrandAwaitingFirstSyncError` because nothing holding
+          // the strand's data was reachable. Success on one side, silence on the
+          // other. `reference-app-rn/src/phone-node-config.ts` warns about this in
+          // as many words.
+          relayAddrs: this._relayAddrs,
+          // Fail-soft: a relay that is down leaves the app usable and merely
+          // unreachable, which is the honest failure and the posture the old
+          // `reserveRelays()` call was really after.
+          requireRelay: false,
           // libp2p's default gater refuses to dial private/loopback addresses
           // and insecure WebSockets — which covers an emulator's `10.0.2.2`, a
           // phone reaching a relay on the house wifi, and any relay not behind
@@ -434,39 +460,50 @@ class CadreServiceImpl {
    * only constructs + registers a responder; it performs no control-DB read.
    */
   /**
-   * Ask the node to reserve a `/p2p-circuit` slot on each relay.
+   * Point this machine at `addrs` as its relays, and make that true of the
+   * running node.
    *
-   * Fail-soft on purpose.  Passing `relayAddrs` in `CadreNodeConfig` throws
-   * `RelayReservationFailedError` out of `start()` when a first reservation
-   * lands nothing — a relay that is down would then prevent the app from
-   * starting at all.  Reserving after start keeps the app usable and merely
-   * unreachable, which is the honest failure.
+   * Relays are named when the node is BUILT (`network.relayAddrs`), because that
+   * is what gives a circuit listener to the control node AND to every strand
+   * node — and a strand node is what actually holds a conversation's data. There
+   * is no runtime call that reaches strand nodes: `CadreNode.reserveRelays()`
+   * supervises the control node only, by design (it exists for a browser tab
+   * that learns its relay late).
    *
-   * Reachability is not confirmed here; `getMultiaddrs()` becoming non-empty is
-   * what actually unblocks invitations.
+   * So changing the relay set on a RUNNING node means rebuilding the node. That
+   * is a few seconds of reconnecting, and it is deliberate:
+   *
+   *   - It is not a new identity. The peer key lives in the control store and is
+   *     reloaded on start, so this machine keeps the same peer id across the
+   *     rebuild and remains the same party to everyone else. Nothing on disk is
+   *     touched.
+   *   - It is rare. Relays are chosen at setup and changed seldom; every launch
+   *     afterwards reads them from prefs and names them at construction, with no
+   *     restart involved.
+   *   - The alternative is worse. Reserving at runtime makes the control node
+   *     reachable and leaves the strand nodes unreachable, which presents as a
+   *     successful join whose conversation never arrives.
+   *
+   * Idempotent and fail-soft: an unchanged set does nothing, and a relay that is
+   * down leaves the node running and merely unreachable (`requireRelay: false`).
    */
-  async reserveRelays(addrs: string[]): Promise<RelayReservationState | null> {
-    const node = this.cadreNode;
-    if (!node) {
-      console.warn('[CadreService] cadre node not running; relays not applied');
-      return null;
-    }
-    // Never throws — an unreachable relay, a control node that is not up yet, or
-    // a timeout all come back as a non-`reserved` STATUS.  So the return value is
-    // the only evidence of what happened: a caller that ignores it would report
-    // the user reachable when nothing dialled.
-    const state = await node.reserveRelays(addrs);
-    if (state.status !== 'reserved') {
-      console.warn('[CadreService] relay reservation not held:',
-        state.status, state.error ?? '');
-      return state;
-    }
-    // A held reservation is the moment this node first HAS an address, so the
-    // formation responder has to be rebuilt now — see the note on
-    // `initializeFormationResponder`. Without this an invitation we mint is
-    // accepted, validated, and then rejected by the joiner as unreachable.
-    this.initializeFormationResponder();
-    return state;
+  async applyRelays(addrs: string[]): Promise<void> {
+    const next = [...addrs];
+    const unchanged =
+      next.length === this._relayAddrs.length &&
+      next.every((a, i) => a === this._relayAddrs[i]);
+    if (unchanged) return;
+
+    this._relayAddrs = next;
+
+    // Not running yet: `doStart` will read the new list. This is the common
+    // case — App boot applies saved relays before the first start.
+    if (!this.node?.isRunning) return;
+
+    console.info(`[CadreService] relays changed (${next.length}) — restarting node so strand nodes get them`);
+    await this.stop();
+    this._startPromise = null;
+    await this.ensureStarted();
   }
 
   /**
@@ -479,37 +516,22 @@ class CadreServiceImpl {
   }
 
   /**
-   * Install (or REINSTALL) the strand-formation responder.
+   * Install the strand-formation responder, backed by the control DB's
+   * `FormationInvite` / `FormationUsage` tables. Without this, an invitation
+   * token is never actually checked.
    *
-   * Called once at startup and again whenever a relay reservation is granted,
-   * because `initializeStrandSolicitation` takes the node's addresses as a
-   * SNAPSHOT — `cadrePeerAddrs: this.getMultiaddrs()`, evaluated once — while
-   * `resolveStrandAddrs` beside it is a live hook. On a phone that distinction
-   * decides whether anyone can join us: an RN node listens on nothing, so at
-   * startup `getMultiaddrs()` is `[]` and stays the responder's answer forever,
-   * even after a relay reservation later gives the node real addresses.
-   *
-   * The failure that causes is thoroughly misleading. The joiner dials fine,
-   * the responder approves, creates the strand and records the token as spent —
-   * and then the joiner rejects the result, because `isValidResponderCreatesResult`
-   * requires a non-empty `cadrePeerAddrs`. It surfaces as "Responder result failed
-   * validation" on the JOINER, with nothing wrong on the host, and it burns the
-   * invitation on the way through.
-   *
-   * Reinstalling means dropping the previous responder first: a fresh
-   * `StrandSolicitationService` carries a fresh registration set, so it would
-   * call `node.handle()` for a protocol the old one still holds.
+   * Installed once, at startup, and that is now correct: `initializeStrandSolicitation`
+   * snapshots the node's addresses (`cadrePeerAddrs: getMultiaddrs()`), and with
+   * relays named in `network.relayAddrs` the circuit listener exists before this
+   * runs. On the old `reserveRelays()` path it did not, so the responder advertised
+   * an empty address list for the life of the process and every joiner rejected the
+   * result — which is why this briefly grew a reinstall-on-reservation hook. The
+   * config change removed the reason for it.
    */
   private initializeFormationResponder(): void {
     if (!this.node) throw new Error('CadreNode not running');
     const controlDb = this.node.getControlDatabase();
     if (!controlDb) throw new Error('Control database not available');
-
-    const previous = this.node.getStrandSolicitationService();
-    const controlNode = this.node.getControlNode();
-    if (previous && controlNode) {
-      previous.unregisterResponder(controlNode);
-    }
 
     this.node.initializeStrandSolicitation({
       formationUsageRecorder: new ControlFormationUsageRecorder(controlDb),
@@ -519,10 +541,10 @@ class CadreServiceImpl {
       `[CadreService] ✓ formation responder installed — advertising ${addrs.length} address(es)`,
     );
     if (addrs.length === 0) {
-      // Not fatal: this is the expected state at startup, before any relay.
-      // Said out loud because an invitation minted while it holds cannot be
-      // completed, and the joiner is the only side that reports the problem.
-      console.warn('[CadreService] responder has no addresses yet — joins will be rejected until a relay is reserved');
+      // Expected only when no relay is configured at all. Said out loud because an
+      // invitation minted in this state cannot be completed, and the joiner is the
+      // only side that finds out.
+      console.warn('[CadreService] responder has no addresses — nobody can join until a relay is configured');
     }
   }
 

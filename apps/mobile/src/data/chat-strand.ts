@@ -35,22 +35,22 @@ let inFlight: Promise<StrandInstance> | null = null;
  * calls on the same strandId.
  */
 /**
- * Reserve a slot on every relay the user has accepted.
+ * Configure the node with every relay the user has accepted.
  *
- * Relays are saved in prefs, and `setPrefs` reserves through them at the moment
- * they are accepted — but a reservation lives with the running node, not with
- * the stored address, so it does not survive a restart.  Without this the app
- * would come back from a cold start silently unreachable while still listing
- * the relay under "how you are reachable".
+ * MUST run BEFORE the node starts, not after: relays are named at construction
+ * (`network.relayAddrs`), which is the only path that reaches this machine's
+ * strand nodes as well as its control node. Applying them afterwards would make
+ * `applyRelays` rebuild a node we had just built.
  *
- * Runs before the strand attach: a relayed address is often the only way the
- * control DB reaches a cohort at all.
+ * Stored in prefs rather than on the node, because a reservation lives with the
+ * running node and does not survive a restart — without this the app would come
+ * back from a cold start silently unreachable while still listing the relay
+ * under "how you are reachable".
  */
-export async function reserveSavedRelays(): Promise<void> {
+export async function applySavedRelays(): Promise<void> {
   const { relayAddrs } = await getPrefs();
   if (!relayAddrs?.length) return;
-  await cadreService.ensureStarted();
-  await cadreService.reserveRelays(relayAddrs);
+  await cadreService.applyRelays(relayAddrs);
 }
 
 export async function ensureDefaultChatStrand(): Promise<StrandInstance> {
@@ -66,6 +66,12 @@ export async function ensureDefaultChatStrand(): Promise<StrandInstance> {
 async function doEnsureDefaultChatStrand(): Promise<StrandInstance> {
   if (cachedStrand?.database) return cachedStrand;
 
+  // BEFORE the node starts, every time — not only from App's boot effect.
+  // `listStrands()` kicks this off in the background as the strand list renders,
+  // which races that effect; whichever gets here first would otherwise build a
+  // node with no relays and force `applyRelays` to rebuild it a moment later.
+  // Idempotent, so the boot effect calling it too costs nothing.
+  await applySavedRelays();
   await cadreService.ensureStarted();
   const node = cadreService.cadreNode;
   if (!node) throw new Error('CadreNode not running');

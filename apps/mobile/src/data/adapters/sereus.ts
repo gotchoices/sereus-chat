@@ -495,9 +495,15 @@ export class SereusAdapter implements DataAdapter {
   async setPrefs(patch: Partial<Prefs>): Promise<Prefs> {
     const next = { ...(await this.getPrefs()), ...patch };
     await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(next));
-    // Reserving is fail-soft and must not block the caller: a relay that is
-    // down should leave the app working, just unreachable.
-    if (patch.relayAddrs) void cadreService.reserveRelays?.(next.relayAddrs);
+    // Applying relays can REBUILD the node (they are named at construction — see
+    // `CadreService.applyRelays`), so it is deliberately not awaited: accepting a
+    // relay should return to the UI immediately and reconnect behind it. Fail-soft
+    // — a relay that is down leaves the app working, just unreachable.
+    if (patch.relayAddrs) {
+      void cadreService.applyRelays(next.relayAddrs).catch(err =>
+        console.warn('[prefs] applying relays failed:', err),
+      );
+    }
     return next;
   }
 

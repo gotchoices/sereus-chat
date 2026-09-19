@@ -444,3 +444,50 @@ Imports the cadre layer; must not import sereus internals directly.
       resume) — a suspended phone can't be woken on strand activity
 - [ ] `registerSelf()` never writes a `CadrePeer` row (root cause = empty
       `getMultiaddrs()`, i.e. Transports)
+
+## Waiting on sereus — revisit when these upstream tickets land
+
+Booked here rather than in a new `apps/mobile/STATUS`: this file already tracks app
+code, and a second status file would split the same subject in two. Each entry names
+the upstream ticket, what we do TODAY because of it, and what to undo when it lands —
+the last part is the point, because a workaround whose trigger nobody recorded
+outlives its cause.
+
+- [ ] **`feat-cross-party-strand-addr-durability`** (sereus `tickets/backlog/`, marked
+      `hard`) — cross-party strand addresses are seeded ONCE, at formation, from
+      addresses held in memory, and nothing can re-resolve them. The ticket names three
+      consequences, all of which are ours: a party that **restarts** cannot be re-found
+      until a fresh invitation is exchanged; a party whose **relay changes** strands
+      every peer holding the old address; and in a **3+ party** strand, late joiners
+      never learn the addresses of parties they never exchanged an invitation with.
+
+      Its own words: "Two people's shared workspace stays connected only while both apps
+      keep running."
+
+      *Today:* stories 02/03 quietly assume a strand stays reachable across restarts. It
+      does not. Do not build a client-side address cache to paper over this — the fix is
+      a replicated signed address registry in the strand DB, and a local cache would
+      have to be unpicked when it arrives.
+
+      *When it lands:* re-read the invitation and strand stories against real
+      reachability, and decide what (if anything) the UI should say about a party that
+      cannot currently be reached. See also `feat-strand-member-allowlist-admission`,
+      which the ticket says should be designed together with it.
+
+- [ ] **Runtime relay changes** — relays are named at node construction
+      (`network.relayAddrs`), the only path that reaches strand nodes;
+      `CadreNode.reserveRelays()` covers the control node alone and is documented as the
+      fail-soft entry point for callers that learn a relay late.
+
+      *Today:* `CadreService.applyRelays` rebuilds the node when the relay set changes on
+      a running node — a few seconds of reconnecting, and no identity change (the peer
+      key is reloaded from the control store). Rare by construction: relays are chosen at
+      setup, and every launch afterwards names them before the node starts.
+
+      *When it lands:* if cadre-core ever grows a runtime path that reaches strand nodes,
+      drop the rebuild and apply relays in place.
+
+- [ ] **Open question, not yet upstream: message replication between parties.** A
+      two-device join now completes and the joiner's strand goes writable, but a message
+      sent on the joiner was not observed on the host. Not yet diagnosed — could be
+      replication or just a stale screen. Establish which before filing anything.

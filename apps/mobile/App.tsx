@@ -29,12 +29,12 @@ export default function App() {
     // chat screen.  Errors are logged; the rest of the app keeps running.
     (async () => {
       try {
-        const { ensureDefaultChatStrand, reserveSavedRelays, watchDiscoveredStrands } =
+        const { ensureDefaultChatStrand, applySavedRelays, watchDiscoveredStrands } =
           await import('./src/data/chat-strand');
-        // Reachability first: a reservation is held by the running node, so a
-        // relay accepted in an earlier session has to be re-reserved here, and
-        // a relayed address is often the only route the strand attach has.
-        await reserveSavedRelays();
+        // Relays FIRST, and specifically before anything starts the node: they are
+        // named at construction, and that is the only path that gives a circuit
+        // address to the strand nodes a conversation actually lives on.
+        await applySavedRelays();
         // Before the default strand, because the strand watcher offers stored
         // strands about 100 ms after the node starts and never re-offers them.
         // Anything invited into existence by our own formation responder — which
