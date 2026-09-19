@@ -43,6 +43,10 @@ export default function InvitationAcceptance() {
       const { strandId } = await acceptInvitation(token);
       navigation.replace('ChatInterface', { strandId });
     } catch (e: any) {
+      // Dev-only: accepting crosses the network into cadre-core's formation
+      // protocol, and the surfaced message ("Responder result failed validation")
+      // names a verdict, not a site. The stack is what makes it actionable.
+      if (__DEV__) console.warn('[accept] failed:', e?.name, e?.message, '\nstack:', e?.stack);
       setError(e?.message ?? 'That invitation could not be used');
     } finally { setBusy(false); }
   };

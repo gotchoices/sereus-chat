@@ -43,11 +43,16 @@ export default function InvitationGenerator() {
   const generate = useCallback(async () => {
     setLoading(true); setError(null); setUnreachable(false);
     try {
-      setInvitation(await createInvitation({
+      const minted = await createInvitation({
         strandId,
         visibility: addingToExisting ? undefined : visibility,
         grantsInviteRight,
-      }));
+      });
+      // Dev-only: an invitation is a QR or a share sheet for a real user, but in
+      // development it has to cross from one device to another with no camera in
+      // the loop.  Logging the URL lets `link.sh` deliver it to the other device.
+      if (__DEV__) console.info('[invite] minted:', minted.url);
+      setInvitation(minted);
       refresh();
     } catch (err) {
       setInvitation(null);

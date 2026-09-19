@@ -459,7 +459,13 @@ class CadreServiceImpl {
     if (state.status !== 'reserved') {
       console.warn('[CadreService] relay reservation not held:',
         state.status, state.error ?? '');
+      return state;
     }
+    // A held reservation is the moment this node first HAS an address, so the
+    // formation responder has to be rebuilt now — see the note on
+    // `initializeFormationResponder`. Without this an invitation we mint is
+    // accepted, validated, and then rejected by the joiner as unreachable.
+    this.initializeFormationResponder();
     return state;
   }
 
@@ -472,15 +478,52 @@ class CadreServiceImpl {
     return this.cadreNode?.getRelayReservationState() ?? null;
   }
 
+  /**
+   * Install (or REINSTALL) the strand-formation responder.
+   *
+   * Called once at startup and again whenever a relay reservation is granted,
+   * because `initializeStrandSolicitation` takes the node's addresses as a
+   * SNAPSHOT — `cadrePeerAddrs: this.getMultiaddrs()`, evaluated once — while
+   * `resolveStrandAddrs` beside it is a live hook. On a phone that distinction
+   * decides whether anyone can join us: an RN node listens on nothing, so at
+   * startup `getMultiaddrs()` is `[]` and stays the responder's answer forever,
+   * even after a relay reservation later gives the node real addresses.
+   *
+   * The failure that causes is thoroughly misleading. The joiner dials fine,
+   * the responder approves, creates the strand and records the token as spent —
+   * and then the joiner rejects the result, because `isValidResponderCreatesResult`
+   * requires a non-empty `cadrePeerAddrs`. It surfaces as "Responder result failed
+   * validation" on the JOINER, with nothing wrong on the host, and it burns the
+   * invitation on the way through.
+   *
+   * Reinstalling means dropping the previous responder first: a fresh
+   * `StrandSolicitationService` carries a fresh registration set, so it would
+   * call `node.handle()` for a protocol the old one still holds.
+   */
   private initializeFormationResponder(): void {
     if (!this.node) throw new Error('CadreNode not running');
     const controlDb = this.node.getControlDatabase();
     if (!controlDb) throw new Error('Control database not available');
 
+    const previous = this.node.getStrandSolicitationService();
+    const controlNode = this.node.getControlNode();
+    if (previous && controlNode) {
+      previous.unregisterResponder(controlNode);
+    }
+
     this.node.initializeStrandSolicitation({
       formationUsageRecorder: new ControlFormationUsageRecorder(controlDb),
     });
-    console.info('[CadreService] ✓ formation responder installed (token validity enforced)');
+    const addrs = this.node.getMultiaddrs();
+    console.info(
+      `[CadreService] ✓ formation responder installed — advertising ${addrs.length} address(es)`,
+    );
+    if (addrs.length === 0) {
+      // Not fatal: this is the expected state at startup, before any relay.
+      // Said out loud because an invitation minted while it holds cannot be
+      // completed, and the joiner is the only side that reports the problem.
+      console.warn('[CadreService] responder has no addresses yet — joins will be rejected until a relay is reserved');
+    }
   }
 
   /** Stop the CadreNode gracefully.  Idempotent. */

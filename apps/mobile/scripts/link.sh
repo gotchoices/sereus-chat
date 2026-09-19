@@ -53,9 +53,22 @@ targets_from_args() {
   fi
 }
 
-# An emulator reaches the Mac at the special gateway 10.0.2.2.  A USB device has
-# no route to the Mac at all, so it talks to 127.0.0.1 and `adb reverse` carries
-# the port back down the cable.
+# EVERY target gets `adb reverse` and talks to 127.0.0.1 — emulators included.
+#
+# The obvious thing is to let an emulator use its special gateway 10.0.2.2, which
+# is how it reaches the Mac without any forwarding, and that is what this script
+# used to do.  It does not work for the relay.  The emulator's user-mode NAT
+# completes the TCP connection to ws://10.0.2.2:4002 — `lsof` shows it
+# ESTABLISHED — and then the libp2p upgrade stalls: no multistream negotiation,
+# no reservation, just silence until the dial times out and surfaces as
+# `Cannot read property 'message' of undefined` (RN's WebSocket close carries no
+# Error, so libp2p's handler reads `.message` off `undefined`).
+#
+# The same emulator, same app build, same relay, reserves in about two seconds
+# over `adb reverse` + 127.0.0.1.  So the route is the variable, and 10.0.2.2 is
+# simply not usable here.  Worth knowing because the failure is doubly deceptive:
+# it looks like an app bug, and the app's own network screen reports "Working"
+# throughout.
 is_emulator() {
   case "$1" in
     emulator-*) return 0 ;;
@@ -64,19 +77,18 @@ is_emulator() {
 }
 
 host_for() {
-  if is_emulator "$1"; then echo "10.0.2.2"; else echo "127.0.0.1"; fi
+  echo "127.0.0.1"
 }
 
-# Metro and the relay both live on the Mac; a USB device needs both forwarded.
+# Metro and the relay both live on the Mac; every target needs both forwarded.
+# 8081 as well as $METRO_PORT: `pm clear` wipes the app's saved dev-server
+# setting, and a freshly-cleared app looks for the RN default port.
 setup_reverse() {
   _s="$1"
-  if is_emulator "$_s"; then
-    echo "    $_s is an emulator — no adb reverse needed"
-    return 0
-  fi
   adb -s "$_s" reverse "tcp:$METRO_PORT" "tcp:$METRO_PORT" >/dev/null
+  adb -s "$_s" reverse tcp:8081 "tcp:$METRO_PORT" >/dev/null
   adb -s "$_s" reverse "tcp:$RELAY_WS_PORT" "tcp:$RELAY_WS_PORT" >/dev/null
-  echo "    $_s reversed: metro $METRO_PORT, relay $RELAY_WS_PORT"
+  echo "    $_s reversed: metro $METRO_PORT (and 8081), relay $RELAY_WS_PORT"
 }
 
 send_link() {

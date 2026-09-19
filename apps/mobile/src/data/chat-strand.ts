@@ -11,10 +11,10 @@
  * `insertMember`).
  */
 
-import type { StrandInstance } from '@serfab/cadre-core';
+import type { StrandInstance, StrandRow } from '@serfab/cadre-core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cadreService } from '../cadre';
-import { createChatStrand } from './chat-sapp';
+import { createChatStrand, joinChatStrand } from './chat-sapp';
 import { upsertMember } from './chat-operations';
 import { getPrefs } from './adapter';
 
@@ -168,4 +168,64 @@ function generateUuid(): string {
     hex.slice(16, 20),
     hex.slice(20),
   ].join('-');
+}
+
+/**
+ * Attach every strand the control network offers that we are not already running.
+ *
+ * WHY THIS IS NOT OPTIONAL. When someone accepts our invitation, the formation
+ * responder CREATES the strand on this machine's behalf and writes its row — but
+ * it does not launch it. Nothing else does either, so without this the host holds
+ * a strand it never runs, and the joiner, whose side completed perfectly, waits
+ * out `StrandAwaitingFirstSyncError`: "no member of this strand has been
+ * reachable since this machine joined". The host is the missing member, and it is
+ * sitting right there.
+ *
+ * ORDER MATTERS, and cadre-core is explicit about it: the StrandWatcher offers
+ * every stored strand ~100 ms after `start()`, records them as seen, and never
+ * re-offers them. So subscribe FIRST, then drain `getDiscoveredStrands()`. Doing
+ * it the other way round loses any strand that arrives between the two steps —
+ * permanently, for the life of the process. In this order a strand can instead be
+ * handled TWICE, which is why the handler below is idempotent.
+ *
+ * The in-flight set is load-bearing for the same reason: the strand manager only
+ * tracks an instance once `addStrand` has RESOLVED, so two overlapping attaches
+ * of one strand would both see it as absent and both proceed.
+ */
+const attaching = new Set<string>();
+
+async function attachDiscoveredStrand(strandId: string, strandRow: StrandRow): Promise<void> {
+  const node = cadreService.cadreNode;
+  if (!node) return;
+  if (attaching.has(strandId) || node.getStrands().has(strandId)) return;
+
+  attaching.add(strandId);
+  try {
+    await joinChatStrand(node, strandRow);
+    console.info('[chat-strand] ✓ attached discovered strand:', strandId);
+  } catch (err) {
+    // Best-effort on purpose: a strand we cannot attach now (no peer reachable
+    // yet, storage busy) is re-offered by the watcher on a later poll, and one
+    // failure must not stop the others in the drain below.
+    console.warn('[chat-strand] attach of discovered strand failed:', strandId, err);
+  } finally {
+    attaching.delete(strandId);
+  }
+}
+
+/** Idempotent — safe to call on every app start. */
+export async function watchDiscoveredStrands(): Promise<void> {
+  await cadreService.ensureStarted();
+  const node = cadreService.cadreNode;
+  if (!node) return;
+
+  // Subscribe first …
+  cadreService.on('strand:discovered', ({ strandId, strand }) => {
+    void attachDiscoveredStrand(strandId, strand);
+  });
+
+  // … then drain what was offered before we were listening.
+  for (const [strandId, strandRow] of node.getDiscoveredStrands()) {
+    void attachDiscoveredStrand(strandId, strandRow);
+  }
 }

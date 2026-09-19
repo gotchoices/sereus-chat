@@ -304,6 +304,25 @@ with `listenAddrs: []`. Progress:
       loads the Babel helper, so the Node arm always passed — the A/B was measuring the
       transpile, not the runtime. It also explains why the failure was insensitive to schema
       size, storage latency, listen addresses and read-repair: a held lock is none of those.
+- [x] **Two-device invitation reached the network, 2026-09-18.** Emulator + Galaxy S7 Edge, both
+      on 1.0.0 + the Babel fix, both holding relay reservations ("Working — people can reach you
+      through this"). Achieved for the first time: **an invitation minted** (real
+      `sereus://invite/…`, 1,212 chars, bootstrap list carrying `/p2p-circuit/` relayed addrs),
+      **delivered to the second device**, and **the acceptance screen rendered** with the
+      unattributed wording.
+- [ ] **Join fails at formation validation.** `Responder result failed validation` —
+      cadre-core's `isValidResponderCreatesResult`, which rejects on any of: not approved, no
+      `partyId`, empty or placeholder `cadrePeerAddrs`, missing `provisionResult.strand.strandId`,
+      `createdBy !== 'responder'`, or a malformed `membershipInvite`. The host DID respond (a
+      timeout would look different), so the relay round-trip works. Next: run both sides with
+      `DEBUG='sereus:cadre:*'` to see which arm of that check fails.
+- [ ] **Our `acceptInvitation` passes a disclosure shape that does not exist.** It sends
+      `{ name }`, but `StrandFormationDisclosure` is `{ partyId?, identityBundle?, purpose?,
+      metadata? }` — hidden by an `as any`. Also `joinChatStrand` builds a `StrandRow` without
+      `FounderOwnerKey`, required since 0.13.0, behind another `as any`. Both need fixing before
+      the validation failure can be cleanly attributed.
+- [ ] **Cold-start deep-link race:** an invitation link opened before the cadre finishes starting
+      shows "Cadre is not running." The screen should wait for readiness rather than fail.
 - [ ] `inspectInvitation` is still `notImplemented` in `SereusAdapter`, so
       InvitationAcceptance would throw the moment a scanned token opened it.
       `acceptInvitation` is written but its docstring records it as UNTESTED.

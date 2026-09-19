@@ -119,5 +119,12 @@ export async function joinChatStrand(
   return cadreNode.addStrand({
     strandRow,
     sAppConfig: getChatSAppConfig(),
+    // EXPLICIT, not omitted.  Left unset, founder-ness is derived by comparing the
+    // row's `FounderOwnerKey` to this node's own owner key — and a consent-seated
+    // row carries `null` there, which matches nobody.  cadre-core's own docs say
+    // the formation flows pass this deliberately for exactly that reason.
+    // A joiner also writes nothing: it receives `Strand.Header`, `Member` and
+    // `Manager` by sync from the party that founded the strand.
+    founder: false,
   });
 }

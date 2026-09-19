@@ -1,293 +1,42 @@
 /**
  * @format
  *
- * RN/Hermes polyfills required by the sereus/optimystic/libp2p stack.
- * Must run before any library imports — App.tsx pulls in modules that
- * reference these globals at module-scope.  Source-of-truth for what's
- * required: sereus/docs/reference-app-rn.md.
+ * Entry point. Every polyfill runs before any library code: App.tsx pulls in
+ * modules that touch these globals at module scope, so an import ordered after
+ * the app tree is an import that ran too late.
+ *
+ * THESE POLYFILLS ARE NOT OURS. `polyfills/` is adopted verbatim from
+ * sereus/packages/reference-app-rn/polyfills, which is the maintained,
+ * authoritative account of what the sereus + optimystic + libp2p stack needs
+ * from Hermes. This file previously carried a hand-rolled partial copy, and the
+ * cost of that divergence was real: our copy wrapped `AbortController.abort()`
+ * and handed the reason to a native `abort()` that discards it, so every
+ * cancellation in the bundle became a bare `undefined` and the errors that
+ * followed read "Cannot read property 'message' of undefined" instead of the
+ * actual fault. The reference copy had that right, and carries knowledge we
+ * would not have arrived at (that `AbortSignal.any` leaks listeners on Hermes,
+ * for one). Fix bugs UPSTREAM and re-copy; do not patch these files locally.
+ *
+ * Deliberately not adopted: `webrtc.js` (we depend on no react-native-webrtc),
+ * and `reload-reason.js` / `node-crypto.js` / `node-os.js` / `empty.js`, which
+ * serve that app's Expo Router entry and Metro shims.
  */
 
-// Must be first: sets process.env.DEBUG before `debug`/`weald` initialize and
-// read it.  See the file for which namespaces to turn on.
+// Debug namespaces. Before `polyfills/hermes`, which sets a default only when
+// nothing is set — so whatever this file chooses wins. Kept as our own module
+// because it documents which namespaces are worth turning on for this app, and
+// the one that will not resolve (`libp2p:*`, via weald) under our Metro config.
 import './src/debug-bootstrap';
 
-// ── Timer .ref() / .unref() ────────────────────────────────────────────────
-// Node timers are objects with .ref()/.unref(); Hermes returns plain numbers.
-// Required by @optimystic/db-p2p, undici, libp2p internals.
-const _origSetTimeout = globalThis.setTimeout;
-const _origSetInterval = globalThis.setInterval;
-const _origClearTimeout = globalThis.clearTimeout;
-const _origClearInterval = globalThis.clearInterval;
-
-function _unwrapTimer(handle) {
-  return (handle && typeof handle === 'object' && '_id' in handle) ? handle._id : handle;
-}
-function _wrapTimer(id) {
-  if (typeof id === 'object' && id !== null) return id;
-  return {
-    _id: id,
-    ref() { return this; },
-    unref() { return this; },
-    [Symbol.toPrimitive]() { return this._id; },
-  };
-}
-globalThis.setTimeout = function patchedSetTimeout(...args) {
-  return _wrapTimer(_origSetTimeout.apply(this, args));
-};
-Object.assign(globalThis.setTimeout, _origSetTimeout);
-globalThis.setInterval = function patchedSetInterval(...args) {
-  return _wrapTimer(_origSetInterval.apply(this, args));
-};
-Object.assign(globalThis.setInterval, _origSetInterval);
-globalThis.clearTimeout = function patchedClearTimeout(handle) {
-  return _origClearTimeout.call(this, _unwrapTimer(handle));
-};
-globalThis.clearInterval = function patchedClearInterval(handle) {
-  return _origClearInterval.call(this, _unwrapTimer(handle));
-};
-
-// ── EventTarget / Event ────────────────────────────────────────────────────
-import 'event-target-polyfill';
-
-// CustomEvent is not provided by event-target-polyfill; libp2p's
-// safeDispatchEvent uses it internally.
-if (typeof globalThis.CustomEvent === 'undefined') {
-  globalThis.CustomEvent = class CustomEvent extends Event {
-    constructor(type, params) {
-      super(type, params);
-      this.detail = params?.detail ?? null;
-    }
-  };
-}
-
-// ── Promise.withResolvers (ES2024) ─────────────────────────────────────────
-if (typeof Promise.withResolvers === 'undefined') {
-  Promise.withResolvers = function () {
-    let resolve, reject;
-    const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
-    return { promise, resolve, reject };
-  };
-}
-
-// ── WebSocket.bufferedAmount ───────────────────────────────────────────────
-// React Native DECLARES `bufferedAmount` on its WebSocket (a Flow annotation in
-// Libraries/WebSocket/WebSocket.js) but never assigns it, so at runtime it is
-// `undefined`.  That breaks libp2p's WebSocket transport outright, and silently:
-//
-//   @libp2p/websockets `sendData()` computes
-//     canSendMore = websocket.bufferedAmount < maxBufferedAmount
-//   which is `undefined < n` → FALSE for every send, so every write reports
-//   back-pressure.  `byteStream.write()` then waits for a 'drain' event, and the
-//   poll that would emit it tests `bufferedAmount === 0` — also false forever.
-//   So the write blocks until the socket closes, at which point pEvent's
-//   `rejectionEvents: ['close']` rejects with `undefined`, and libp2p's upgrader
-//   does `err.message` on it and dies with "Cannot read property 'message' of
-//   undefined" — burying the cause.
-//
-// Net effect without this: the multistream-select handshake never completes, so
-// no relay reservation, so the phone is never reachable.
-//
-// 0 is the honest value: RN buffers sends natively and exposes no depth, so
-// there is no back-pressure signal to report — the same thing a browser reports
-// once its buffer has flushed.
-if (typeof WebSocket !== 'undefined' && WebSocket.prototype != null &&
-    typeof Object.getOwnPropertyDescriptor(WebSocket.prototype, 'bufferedAmount') === 'undefined') {
-  Object.defineProperty(WebSocket.prototype, 'bufferedAmount', {
-    get() { return 0; },
-    configurable: true,
-  });
-}
-
-// ── DOMException ───────────────────────────────────────────────────────────
-// Absent from Hermes.  Needed before the AbortSignal polyfills below, which
-// reject with one — and code that inspects `err.name` to tell a timeout from a
-// real abort relies on it carrying the right name.
-if (typeof globalThis.DOMException === 'undefined') {
-  class DOMException extends Error {
-    constructor(message = '', name = 'Error') {
-      super(message);
-      this.name = name;
-    }
-  }
-  globalThis.DOMException = DOMException;
-}
-
-// ── AbortSignal.throwIfAborted ─────────────────────────────────────────────
-if (typeof AbortSignal !== 'undefined' &&
-    typeof AbortSignal.prototype.throwIfAborted === 'undefined') {
-  AbortSignal.prototype.throwIfAborted = function () {
-    if (this.aborted) throw this.reason ?? new DOMException('The operation was aborted', 'AbortError');
-  };
-}
-
-// ── AbortController.abort() default reason ─────────────────────────────────
-// Per spec, `abort()` with no argument sets `signal.reason` to an AbortError.
-// RN leaves it `undefined`, and libp2p propagates a cancellation by throwing
-// `signal.reason` — so the throw lands as a bare `undefined`, and any handler
-// that reads `err.message` (libp2p's upgrader does, verbatim) dies with
-// "Cannot read property 'message' of undefined", burying the real cause.
-if (typeof AbortController !== 'undefined') {
-  const nativeAbort = AbortController.prototype.abort;
-  AbortController.prototype.abort = function (reason) {
-    if (reason === undefined) {
-      nativeAbort.call(this, new DOMException('This operation was aborted', 'AbortError'));
-      return;
-    }
-    nativeAbort.call(this, reason);
-  };
-}
-
-// ── AbortSignal.timeout ────────────────────────────────────────────────────
-// Hermes ships neither this nor `AbortSignal.abort()`.  libp2p's circuit-relay
-// reservation uses `AbortSignal.timeout` to bound its dial, so without this the
-// relay reservation fails with "AbortSignal.timeout is not a function" and the
-// phone stays unreachable.
-if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout !== 'function') {
-  AbortSignal.timeout = function (ms) {
-    const controller = new AbortController();
-    setTimeout(
-      () => controller.abort(new DOMException('The operation timed out', 'TimeoutError')),
-      ms,
-    );
-    return controller.signal;
-  };
-}
-if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.abort !== 'function') {
-  AbortSignal.abort = function (reason) {
-    const controller = new AbortController();
-    controller.abort(reason);
-    return controller.signal;
-  };
-}
-
-// ── crypto.getRandomValues ─────────────────────────────────────────────────
-import 'react-native-get-random-values';
-
-// ── crypto.subtle.digest (targeted; SHA-256/SHA-512 only) ──────────────────
-// multiformats/hashes/sha2-browser calls crypto.subtle.digest().  Backed by
-// @noble/hashes to avoid pulling in a native Web Crypto module.
-import { sha256, sha512 } from '@noble/hashes/sha2';
-if (typeof globalThis.crypto === 'undefined') {
-  globalThis.crypto = {};
-}
-if (!globalThis.crypto.subtle) {
-  globalThis.crypto.subtle = {
-    digest: async (algorithm, data) => {
-      const name = typeof algorithm === 'string' ? algorithm : algorithm.name;
-      const input = data instanceof Uint8Array ? data : new Uint8Array(data);
-      if (name === 'SHA-256') return sha256(input).buffer;
-      if (name === 'SHA-512') return sha512(input).buffer;
-      throw new Error(`crypto.subtle.digest: unsupported algorithm ${name}`);
-    },
-  };
-}
-
-// ── TextDecoder (UTF-8 only) ──────────────────────────────────────────────
-// Hermes on bare RN ships TextEncoder but not TextDecoder.  `uint8arrays`
-// (pulled in by libp2p / multiformats / yamux) does `new TextDecoder('utf8')`
-// at module scope, so without this polyfill yamux's default export resolves
-// to undefined and CadreNode.start fails.  UTF-8-only by design — throws a
-// clear RangeError on any other encoding.  Lifted from sereus
-// reference-app-rn/polyfills/hermes.js.
-if (typeof globalThis.TextDecoder === 'undefined') {
-  class TextDecoderPolyfill {
-    constructor(label = 'utf-8') {
-      const enc = String(label).toLowerCase().replace('_', '-');
-      if (enc !== 'utf-8' && enc !== 'utf8') {
-        throw new RangeError(`TextDecoder polyfill only supports UTF-8 (got "${label}")`);
-      }
-      this.encoding = 'utf-8';
-      this.fatal = false;
-      this.ignoreBOM = false;
-    }
-    decode(input) {
-      if (input == null) return '';
-      const bytes = input instanceof Uint8Array
-        ? input
-        : ArrayBuffer.isView(input)
-          ? new Uint8Array(input.buffer, input.byteOffset, input.byteLength)
-          : new Uint8Array(input);
-      if (bytes.length === 0) return '';
-      let i = 0;
-      let str = '';
-      if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) i = 3;
-      while (i < bytes.length) {
-        const b = bytes[i++];
-        if (b < 0x80) {
-          str += String.fromCharCode(b);
-        } else if (b < 0xC0) {
-          str += '�';
-        } else if (b < 0xE0) {
-          str += String.fromCharCode(((b & 0x1F) << 6) | (bytes[i++] & 0x3F));
-        } else if (b < 0xF0) {
-          str += String.fromCharCode(
-            ((b & 0x0F) << 12) | ((bytes[i++] & 0x3F) << 6) | (bytes[i++] & 0x3F),
-          );
-        } else {
-          let cp = ((b & 0x07) << 18)
-            | ((bytes[i++] & 0x3F) << 12)
-            | ((bytes[i++] & 0x3F) << 6)
-            | (bytes[i++] & 0x3F);
-          cp -= 0x10000;
-          str += String.fromCharCode(0xD800 + (cp >> 10), 0xDC00 + (cp & 0x3FF));
-        }
-      }
-      return str;
-    }
-  }
-  globalThis.TextDecoder = TextDecoderPolyfill;
-}
-
-// ── structuredClone ───────────────────────────────────────────────────────
-// @optimystic/db-core uses it for defensive deep cloning.
-import structuredClone from '@ungap/structured-clone';
-if (typeof global.structuredClone === 'undefined') {
-  global.structuredClone = structuredClone;
-}
-
-// ── Web Streams ───────────────────────────────────────────────────────────
-import {
-  ReadableStream,
-  WritableStream,
-  TransformStream,
-} from 'web-streams-polyfill';
-if (typeof global.ReadableStream === 'undefined') global.ReadableStream = ReadableStream;
-if (typeof global.WritableStream === 'undefined') global.WritableStream = WritableStream;
-if (typeof global.TransformStream === 'undefined') global.TransformStream = TransformStream;
-
-// ── Symbol.asyncIterator (registry-backed for cross-polyfill convergence) ──
-if (typeof Symbol !== 'undefined' && typeof Symbol.asyncIterator === 'undefined') {
-  try {
-    Object.defineProperty(Symbol, 'asyncIterator', {
-      value: Symbol.for('Symbol.asyncIterator'),
-      configurable: false,
-      enumerable: false,
-      writable: false,
-    });
-  } catch {
-    Symbol.asyncIterator = Symbol.for('Symbol.asyncIterator');
-  }
-}
-
-// ── Intl.PluralRules (English-only) ───────────────────────────────────────
-// moat-maker (dep of optimystic) constructs PluralRules at module scope for
-// ordinal formatting in error messages.
-if (typeof Intl !== 'undefined' && typeof Intl.PluralRules === 'undefined') {
-  const ordinalRules = (n) => {
-    const mod10 = n % 10;
-    const mod100 = n % 100;
-    if (mod10 === 1 && mod100 !== 11) return 'one';
-    if (mod10 === 2 && mod100 !== 12) return 'two';
-    if (mod10 === 3 && mod100 !== 13) return 'few';
-    return 'other';
-  };
-  const cardinalRules = (n) => (n === 1 ? 'one' : 'other');
-  Intl.PluralRules = class PluralRules {
-    constructor(_locale, options) { this._type = options?.type === 'ordinal' ? 'ordinal' : 'cardinal'; }
-    select(n) { return this._type === 'ordinal' ? ordinalRules(n) : cardinalRules(n); }
-    resolvedOptions() { return { type: this._type, locale: 'en' }; }
-  };
-}
+// The stack's Hermes gaps: crypto, TextDecoder, structuredClone, Web Streams,
+// DOMException, the AbortSignal family, WebSocket.bufferedAmount, timer ref().
+import './polyfills/hermes';
+import './polyfills/intl-pluralrules';
+import './polyfills/event';
+// Prints the native / polyfilled / gap / MISSING table under __DEV__. Position
+// is the point: after every polyfill, before the app tree evaluates, so the
+// table beats any import-time crash caused by a global that is not there.
+import './polyfills/audit';
 
 // ── App entry ──────────────────────────────────────────────────────────────
 import { AppRegistry } from 'react-native';

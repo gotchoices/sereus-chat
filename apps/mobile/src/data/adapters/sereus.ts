@@ -323,18 +323,26 @@ export class SereusAdapter implements DataAdapter {
     const invitation = node.decodeInvitation(token);
 
     const profile = await this.getProfile().catch(() => ({ name: '' } as Profile));
+    // Disclosure is what the joiner chooses to tell the host about itself: only the
+    // display name, everything else in the profile stays on device.
+    //
+    // It goes in `metadata`, which is the sanctioned app-specific slot.  We used to
+    // pass `{ name }` at the top level behind an `as any` — `StrandFormationDisclosure`
+    // has no such field, so it was being dropped silently, and the cast is what hid it.
     const result = await node.formStrand(invitation, {
-      // Disclosure is what the joiner chooses to tell the host about itself.
-      // Only the display name — everything else in the profile stays on device.
-      name: profile.name || undefined,
-    } as any);
+      ...(profile.name ? { metadata: { name: profile.name } } : {}),
+    });
 
-    const strandId = (result as any).strandId as string;
+    const { strandId, memberPrivateKey } = result;
     await joinChatStrand(node, {
       Id: strandId,
-      MemberPrivateKey: (result as any).memberPrivateKey ?? null,
+      MemberPrivateKey: memberPrivateKey ?? null,
       Type: 'c',
-    } as any);
+      // Null is CORRECT here, not a gap: this row was seated by consent, so it
+      // records no trustworthy founding signer. `joinChatStrand` passes
+      // `founder: false` explicitly so nothing tries to derive founder-ness from it.
+      FounderOwnerKey: null,
+    });
 
     return { strandId };
   }
