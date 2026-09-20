@@ -621,6 +621,25 @@ class CadreServiceImpl {
         return;
       }
 
+      // ONLY when the responder currently has NOTHING to offer.
+      //
+      // Reinstalling means `unhandle()` then `handle()` on the formation
+      // protocol, and that tears down streams in flight — a joiner mid-handshake
+      // gets "Formation stream closed before length prefix" and its invitation is
+      // spent. Relay reservations turn out to drop and recover routinely during a
+      // formation (measured: a 4 → 0 → 4 cycle on whichever side is working), so
+      // reacting to EVERY change meant we were reliably cutting the very
+      // handshakes this was meant to enable.
+      //
+      // Empty → non-empty is the case that actually needed fixing: a responder
+      // stuck advertising nothing rejects every joiner, forever, and has no
+      // stream to lose. A responder that already has addresses stays as it is
+      // even if they change; a stale address costs one failed dial, while a
+      // mid-formation teardown costs the invitation.
+      if (this._responderAddrs.length > 0) {
+        return;
+      }
+
       console.info(
         `[CadreService] reachability changed (${this._responderAddrs.length} → ${current.length} address(es)) — reinstalling formation responder`,
       );
