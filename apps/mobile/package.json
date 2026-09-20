@@ -28,7 +28,8 @@
     "relay": "sh ./scripts/relay.sh",
     "link": "sh ./scripts/link.sh",
     "logs": "sh ./scripts/logs.sh",
-    "stack:check": "cd ../../test/stack && node found-strand.mjs"
+    "stack:check": "cd ../../test/stack && node found-strand.mjs",
+    "stack:two-party": "cd ../../test/stack && node two-party-formation.mjs"
   },
   "dependencies": {
     "@libp2p/websockets": "^10.1.3",

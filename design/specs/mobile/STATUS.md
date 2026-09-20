@@ -508,6 +508,30 @@ outlives its cause.
       our exact topology — two parties, `listenAddrs: []` + `relayAddrs`, one neutral
       relay — and asserts data flowing BOTH ways with every connection proven relayed.
 
+- [x] **THE STACK IS NOT THE PROBLEM — two-party chat works in Node (2026-09-20).**
+      `test/stack/two-party-formation.mjs` (`yarn stack:two-party`) stands up TWO
+      parties in one Node process, both shaped like phones — `listenAddrs: []`,
+      reachable only through `relayAddrs` — against the same relay the devices use.
+      It founds a closed strand, publishes a BOUND invitation, redeems it from the
+      other party, and reads a row written by the host.
+
+      Deterministic, twice in a row: formation 120 ms, **first sync 1.2 s**, host's
+      row visible to the joiner at 2.8 s total. The same sequence on two devices
+      ends in `StrandAwaitingFirstSyncError` after 30–70 s.
+
+      So cadre-core, optimystic, quereus, circuit-relay and our own formation logic
+      all do this correctly. What remains is mobile-specific: React Native, the
+      emulator's networking, or the `adb reverse`/USB transport. That bounds the
+      search to the device side and means there is nothing to file upstream.
+
+      Worth keeping: the harness caught a real trap on its first run. Passing
+      `initializeStrandSolicitation({})` with no `formationUsageRecorder` makes
+      cadre-core treat every invite as UNBOUND — the responder mints a brand new
+      strand per joiner, returns no membership key and no strand addresses, and the
+      joiner waits out first sync against a strand with no other member. It is
+      indistinguishable from the device failure at a glance. Our app passes the
+      recorder; anything new that calls this must too.
+
 - [ ] **Relay reservations are the fragile link, and the dev harness makes it worse.**
       Not yet isolated to a cause. What is established:
 

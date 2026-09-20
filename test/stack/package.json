@@ -4,7 +4,8 @@
   "type": "module",
   "description": "Validates the sereus stack in Node \u2014 no app, no device. See README.md.",
   "scripts": {
-    "check": "node found-strand.mjs"
+    "check": "node found-strand.mjs",
+    "two-party": "node two-party-formation.mjs"
   },
   "dependencies": {
     "@chainsafe/libp2p-noise": "^17.0.0",
@@ -16,6 +17,7 @@
     "@quereus/quereus": "^4.19.4",
     "@serfab/cadre-core": "^1.0.0",
     "classic-level": "^3.0.0",
-    "libp2p": "^3.1.3"
+    "libp2p": "^3.1.3",
+    "@libp2p/circuit-relay-v2": "^4.2.13"
   }
 }
