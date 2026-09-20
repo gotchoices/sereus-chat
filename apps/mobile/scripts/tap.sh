@@ -64,6 +64,15 @@ if [ -z "$COORDS" ]; then
   exit 1
 fi
 
+# A PRESS WITH DURATION, not `input tap`.
+#
+# `input tap` synthesises a DOWN and an UP in the same millisecond. The emulator
+# accepts that; the physical Galaxy S7 silently ignores it for React Native
+# Pressables — the command reports success, the screen does not change, and the
+# failure is indistinguishable from a tap that landed on nothing. `input swipe`
+# with identical start/end coordinates and a 120 ms hold is the same gesture with
+# a realistic duration, and both devices honour it.
 # shellcheck disable=SC2086
-adb -s "$S" shell input tap $COORDS
-echo "tapped \"$LABEL\" on $S at $COORDS"
+set -- $COORDS
+adb -s "$S" shell input swipe "$1" "$2" "$1" "$2" 120
+echo "pressed \"$LABEL\" on $S at $COORDS"

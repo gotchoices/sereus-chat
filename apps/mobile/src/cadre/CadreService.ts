@@ -82,6 +82,12 @@ class CadreServiceImpl {
    * machine's STRAND nodes as well as its control node — see `applyRelays`.
    */
   private _relayAddrs: string[] = [];
+  /**
+   * The address set the formation responder was last installed with, and the
+   * timer that notices when reality diverges from it. See `watchReachability`.
+   */
+  private _responderAddrs: string[] = [];
+  private _reachabilityListener: (() => void) | null = null;
 
   /**
    * LevelDB handles open for the lifetime of this service.
@@ -443,6 +449,7 @@ class CadreServiceImpl {
       // which accepts every token.  Synchronous (no control-DB read).
       try {
         this.initializeFormationResponder();
+        this.watchReachability();
       } catch (err) {
         console.warn('[CadreService] formation responder init failed:', err);
       }
@@ -533,23 +540,110 @@ class CadreServiceImpl {
     const controlDb = this.node.getControlDatabase();
     if (!controlDb) throw new Error('Control database not available');
 
+    // Drop the previous responder first. A fresh `StrandSolicitationService`
+    // carries a fresh registration set, so it would call `node.handle()` for a
+    // protocol the old one still holds — and libp2p throws on a duplicate.
+    const previous = this.node.getStrandSolicitationService();
+    const controlNode = this.node.getControlNode();
+    if (previous && controlNode) {
+      previous.unregisterResponder(controlNode);
+    }
+
     this.node.initializeStrandSolicitation({
       formationUsageRecorder: new ControlFormationUsageRecorder(controlDb),
     });
-    const addrs = this.node.getMultiaddrs();
+
+    this._responderAddrs = this.node.getMultiaddrs();
     console.info(
-      `[CadreService] ✓ formation responder installed — advertising ${addrs.length} address(es)`,
+      `[CadreService] ✓ formation responder installed — advertising ${this._responderAddrs.length} address(es)`,
     );
-    if (addrs.length === 0) {
-      // Expected only when no relay is configured at all. Said out loud because an
-      // invitation minted in this state cannot be completed, and the joiner is the
-      // only side that finds out.
-      console.warn('[CadreService] responder has no addresses — nobody can join until a relay is configured');
+    if (this._responderAddrs.length === 0) {
+      // Not fatal, and not permanent any more — `watchReachability` reinstalls
+      // once an address appears. Said out loud because an invitation minted in
+      // this state cannot be completed, and the joiner is the only side that
+      // finds out.
+      console.warn('[CadreService] responder has no addresses yet — joins will be rejected until a relay reservation lands');
     }
+  }
+
+  /** Stable comparison key for an address set; order from libp2p is not stable. */
+  private static addrsKey(addrs: string[]): string {
+    return [...addrs].sort().join('|');
+  }
+
+  /**
+   * Keep the formation responder's advertised addresses honest.
+   *
+   * `initializeStrandSolicitation` takes `cadrePeerAddrs` as a SNAPSHOT —
+   * `getMultiaddrs()`, evaluated once — while `resolveStrandAddrs` beside it is a
+   * live hook. On a phone that asymmetry decides whether anyone can join us, and
+   * naming relays in `network.relayAddrs` is not by itself enough to fix it:
+   * `requireRelay: false` (which we want, so a dead relay leaves the app usable)
+   * lets `start()` return before the first reservation has landed. A device slow
+   * enough to lose that race — our 2016 test phone does, repeatedly — installs a
+   * responder advertising NOTHING and, without this, keeps advertising nothing
+   * for the life of the process even after the reservation succeeds seconds later.
+   *
+   * The failure that causes is thoroughly misleading: the joiner dials fine, the
+   * responder approves, creates the strand and records the token as spent, and
+   * only then does the joiner reject the result, because
+   * `isValidResponderCreatesResult` requires a non-empty `cadrePeerAddrs`. It
+   * reads as "Responder result failed validation" on the JOINER, with nothing
+   * visibly wrong on the host, and it burns the invitation on the way through.
+   *
+   * EVENT-DRIVEN, not polled. libp2p dispatches `self:peer:update` whenever this
+   * node's own peer record changes — "a transport started listening on a new
+   * address" covers a circuit-relay reservation being granted, lost, or moved —
+   * and cadre-core exposes the control node through `getControlNode()`, so the
+   * signal is already there to subscribe to.
+   *
+   * The event also fires for changes we do not care about (registering a protocol
+   * handler, for one — which reinstalling the responder itself does). Comparing
+   * address SETS is what makes that safe: a handler registration leaves the set
+   * identical, the comparison returns early, and the reinstall cannot re-trigger
+   * itself.
+   *
+   * Reacting to any CHANGE, not merely empty → non-empty: a reservation that
+   * lapses and is re-granted comes back on a different relay address, and a
+   * responder still advertising the old one sends joiners somewhere that no
+   * longer routes.
+   */
+  private watchReachability(): void {
+    const node = this.node;
+    const controlNode = node?.getControlNode();
+    if (!node || !controlNode || this._reachabilityListener) return;
+
+    const onSelfUpdate = () => {
+      if (!this.node?.isRunning) return;
+
+      const current = this.node.getMultiaddrs();
+      if (CadreServiceImpl.addrsKey(current) === CadreServiceImpl.addrsKey(this._responderAddrs)) {
+        return;
+      }
+
+      console.info(
+        `[CadreService] reachability changed (${this._responderAddrs.length} → ${current.length} address(es)) — reinstalling formation responder`,
+      );
+      try {
+        this.initializeFormationResponder();
+      } catch (err) {
+        // Best-effort: a failed reinstall leaves the PREVIOUS responder
+        // unregistered, so record the failure loudly and clear the remembered set
+        // so the next address change retries rather than comparing equal.
+        console.warn('[CadreService] responder reinstall failed; will retry on the next address change:', err);
+        this._responderAddrs = [];
+      }
+    };
+
+    controlNode.addEventListener('self:peer:update', onSelfUpdate);
+    this._reachabilityListener = () => controlNode.removeEventListener('self:peer:update', onSelfUpdate);
   }
 
   /** Stop the CadreNode gracefully.  Idempotent. */
   async stop(): Promise<void> {
+    this._reachabilityListener?.();
+    this._reachabilityListener = null;
+    this._responderAddrs = [];
     if (this.node) {
       await this.node.stop();
       this.node = null;
