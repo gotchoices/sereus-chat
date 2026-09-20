@@ -399,7 +399,30 @@ export class SereusAdapter implements DataAdapter {
     // retrying most.
     await rememberJoinedStrand(joinedRow);
 
-    await joinChatStrand(node, joinedRow);
+    // NARRATE THE ATTACH. `addStrand` resolves only once the strand is writable,
+    // so on the failing path this call is a 30-second silence ending in
+    // `StrandAwaitingFirstSyncError` — no indication of whether the joiner ever
+    // reached anybody, or how far it got. These lines turn that silence into a
+    // timeline we can compare against the Node harness, which does the identical
+    // sequence in 1.2 s.
+    if (__DEV__) {
+      const t0 = Date.now();
+      const tick = setInterval(() => {
+        const inst = node.getStrands().get(strandId);
+        console.info(
+          `[accept] +${Math.round((Date.now() - t0) / 1000)}s attaching — status=${inst?.status ?? 'not-tracked'} ` +
+            `database=${!!inst?.database} peers=${inst?.connectedPeers ?? '?'} myAddrs=${node.getMultiaddrs().length}`,
+        );
+      }, 5000);
+      try {
+        await joinChatStrand(node, joinedRow);
+        console.info(`[accept] ✓ attached in ${Date.now() - t0}ms`);
+      } finally {
+        clearInterval(tick);
+      }
+    } else {
+      await joinChatStrand(node, joinedRow);
+    }
 
     return { strandId };
   }

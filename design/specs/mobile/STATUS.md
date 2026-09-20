@@ -532,6 +532,93 @@ outlives its cause.
       indistinguishable from the device failure at a glance. Our app passes the
       recorder; anything new that calls this must too.
 
+- [x] **REPRODUCED IN NODE, NO DEVICE: 10 ms of per-frame outbound latency breaks
+      two-party strand formation.** (2026-09-20)
+
+      `WS_SEND_DELAY_MS=<n> yarn stack:two-party` replaces the global `WebSocket`
+      (`test/stack/ws-latency.mjs`) and holds each outbound frame `n` ms, in order,
+      reporting a truthful `bufferedAmount` so libp2p's backpressure keeps working.
+      `@libp2p/websockets` constructs `new WebSocket(uri)` against the global, so
+      this reaches every socket libp2p opens and nothing else — and it is the same
+      surface React Native differs on, which makes it a model rather than a sleep.
+
+      | per-frame delay | outcome                               |
+      |-----------------|---------------------------------------|
+      | 0 ms            | PASS — data crosses in 2.8 s          |
+      | 5 ms            | PASS                                  |
+      | 10 ms           | `StrandAwaitingFirstSyncError` (x2)   |
+      | 20 / 40 / 50 ms | `StrandAwaitingFirstSyncError`        |
+      | 150 ms          | no relay reservation within 60 s      |
+
+      Deterministic at the boundary: 10 ms failed twice, 5 ms passed on retest.
+
+      IT IS THE SAME MECHANISM, not merely the same message. Under injection the
+      diagnostics read exactly as they do on the phone: `findCluster:done … peers=1
+      addressless=0 selfRelayOnly=0` (a cohort of one, with no address problem) and
+      `fret:error … unreachable` / `timeout`. The delay also reproduces the OTHER
+      device failures we had been treating as separate — at higher delays the run
+      dies with `Formation dial-connect timed out after 5000ms`, and higher still it
+      cannot hold a relay reservation at all, which is the phone's `myAddrs 4 → 0`.
+      Three symptoms, one cause.
+
+      WHY THIS MATTERS BEYOND OUR PHONE. 10 ms per frame is not a broken device; it
+      is an ordinary network. A single WAN round trip is 20–100 ms, and a relayed
+      hop costs more. On this evidence the stack cannot survive the internet it is
+      designed for — the 2016 test phone merely reached the threshold first.
+
+      This is the artifact every earlier attempt failed to produce: deterministic,
+      scriptable, no device, no emulator, no `adb`, one file to read.
+
+- [ ] **Device-side detail behind the above** — the joiner's strand node cannot
+      complete a FRET announce over
+      the relay in time, so the host never enters its ring.** (2026-09-20)
+
+      A real phone on Wi-Fi joining the Node harness (`--host`) — a counterpart that
+      completes the same sequence in 1.2 s — still fails. That removes the emulator,
+      `adb reverse`, USB and the mobile host in one step. The chain, measured end to
+      end on the device:
+
+      1. Formation succeeds; the seed is correct — `4 strand addr(s), memberKey=true`.
+      2. The seed IS merged into the strand's address book:
+         `address book merged (peers=1, merged=1, … dropped=0)`. Discovery is fine.
+      3. The joiner dials the host's strand node and the dials **do connect** —
+         `dial:ok ms=1599` and `dial:ok ms=38965`. Others fail with
+         `Unexpected EOF - stream closed while reading 0/1 bytes` and
+         `All multiaddr dials failed`.
+      4. FRET cannot finish its handshake at that latency:
+         `fret:error announce to 12D3KooWJZyy… : timeout` (and once `unreachable`).
+      5. So the host never joins the ring. Every `findCluster:done` reports
+         `peers=1 addressless=0 selfRelayOnly=0`, and `cohort:membership` shows
+         `serves=1 … cohort=1` — a cohort of one. `addressless` and `selfRelayOnly`
+         are both ZERO, which is the proof that this is not an address problem.
+      6. First sync therefore has nobody to fetch from and times out, exactly as
+         `StrandAwaitingFirstSyncError` says.
+
+      The headline number: **a circuit dial that Node completes in milliseconds takes
+      1.6 s to 39 s on the phone.** Nothing downstream can work at that latency.
+
+      *Ruled out:* the stack (Node does all of this in 1.2 s over the same relay,
+      same sApp, same schema); the Babel async-generator bug (pins hold at 7.29.7,
+      one copy); the relay's libp2p major skew (upgraded; cleared a spurious
+      `TimeoutNaNWarning`, changed nothing else); the emulator and `adb reverse`
+      (absent from this test); missing or unusable addresses (counters are zero).
+
+      *Tried and rejected:* libp2p's backpressure IS disabled on RN — the adopted
+      `bufferedAmount` polyfill returns 0 and `@libp2p/websockets` gates writes on
+      `bufferedAmount < maxBufferedAmount` (4 MB), so `canSendMore` is always true.
+      A real approximate signal only changed the symptom (the relay reservation
+      recovered instead of staying lost); `peers=0` and the failure were unchanged.
+      Experiment reverted. Still worth reporting upstream as a property of the
+      shared polyfill.
+
+      *Next:* find where the seconds go in an RN circuit dial. The candidates are
+      the noise handshake under Hermes (this is a 2016 phone, and we measured it
+      ~5x slower than the emulator on owner genesis, which is also crypto), RN's
+      WebSocket throughput across the JS bridge, and contention from the several
+      strand nodes this app runs at once. A dial that takes 39 s is not a tuning
+      problem — something is pathologically slow, and it should be measurable in
+      isolation with a single dial and no strand work around it.
+
 - [ ] **Relay reservations are the fragile link, and the dev harness makes it worse.**
       Not yet isolated to a cause. What is established:
 

@@ -30,11 +30,22 @@
  * mirrors upstream's `blind-relay-phone-to-phone-e2e.integration.ts` — which
  * passes in their suite — against our own relay build.
  *
+ * HOST MODE (`--host`) runs only the host and stays alive, printing an invitation
+ * in the same `sereus://invite/...` form the app mints. That lets a REAL DEVICE be
+ * the joiner against a counterpart known to work — which is the next cut once
+ * Node-to-Node passes: it removes the emulator and the `adb reverse` tunnel in one
+ * step, so anything that still fails is React Native's.
+ *
  * Usage:
- *   node two-party-formation.mjs
+ *   node two-party-formation.mjs            # both parties here (the full check)
+ *   node two-party-formation.mjs --host     # host only; a device joins
+ *   WS_SEND_DELAY_MS=200 node two-party-formation.mjs   # model a slow device
  *   RELAY_ADDR=/ip4/127.0.0.1/tcp/4002/ws/p2p/12D3Koo... node two-party-formation.mjs
  *   FIRST_SYNC_TIMEOUT_MS=120000 node two-party-formation.mjs
  */
+// FIRST: replaces the global WebSocket when WS_SEND_DELAY_MS is set, so every
+// socket libp2p opens below is already slowed. A no-op otherwise.
+import './ws-latency.mjs';
 import { CadreNode, ControlFormationUsageRecorder, generateStrandMemberKey } from '@serfab/cadre-core';
 import { LevelDBRawStorage } from '@optimystic/db-p2p-storage-rn';
 import { webSockets } from '@libp2p/websockets';
@@ -45,6 +56,7 @@ import { readFileSync } from 'node:fs';
 import { openTestDb } from './classic-level-driver.mjs';
 
 const FIRST_SYNC_TIMEOUT_MS = Number(process.env.FIRST_SYNC_TIMEOUT_MS ?? 120_000);
+const HOST_ONLY = process.argv.includes('--host');
 
 /** The relay the phones use. Read from the running relay's log unless overridden. */
 function resolveRelayAddr() {
@@ -55,23 +67,34 @@ function resolveRelayAddr() {
   return line.trim();
 }
 
-/** Same shape the chat app ships (design/specs/domain/chat-sapp.qsql, trimmed). */
-const SCHEMA = `table Member (
-    Id text primary key,
-    Name text not null,
-    AvatarUri text
-);
-table Message (
-    Id text primary key,
-    MemberId text not null,
-    Body text not null,
-    SentAt text not null
-);`;
+/**
+ * THE CHAT APP'S OWN sApp, read from the same file the app bundles.
+ *
+ * Not a lookalike: a device joining this host arrives with
+ * `getChatSAppConfig()` — id `org.sereus.chat` and the DDL below — and cadre-core
+ * matches strands by sApp. A harness with its own id and schema can only ever be
+ * joined by itself, which is fine for the Node-to-Node run and useless the moment
+ * a real device is the joiner.
+ *
+ * `extractInnerDDL` mirrors `apps/mobile/src/data/chat-sapp.ts`: StrandDatabase
+ * re-wraps the DDL in `declare schema App { … }`, so it is handed the inner
+ * declarations only.
+ */
+const CHAT_QSQL = readFileSync(
+  new URL('../../design/specs/domain/chat-sapp.qsql', import.meta.url), 'utf8');
+
+function extractInnerDDL(schemaSql) {
+  return schemaSql
+    .replace(/^\s*--[^\n]*\n/gm, '')
+    .replace(/^declare\s+schema\s+\w+\s*\{/m, '')
+    .replace(/\}\s*$/, '')
+    .trim();
+}
 
 const SAPP = {
-  id: 'org.sereus.chat.twoparty',
+  id: 'org.sereus.chat',
   version: '0.1.0',
-  schema: SCHEMA,
+  schema: extractInnerDDL(CHAT_QSQL),
   signature: '',
   latencyHint: 'interactive',
 };
@@ -148,10 +171,11 @@ try {
   log('relay', relayAddr);
 
   host = await makeParty('HOST', relayAddr);
-  joiner = await makeParty('JOINER', relayAddr);
-
   await awaitReachable(host, 'HOST');
-  await awaitReachable(joiner, 'JOINER');
+  if (!HOST_ONLY) {
+    joiner = await makeParty('JOINER', relayAddr);
+    await awaitReachable(joiner, 'JOINER');
+  }
 
   // ── Host founds a CLOSED strand and binds an invitation to it ──────────────
   const strandId = randomUUID();
@@ -179,6 +203,27 @@ try {
     strandId,
   });
   log('HOST: invitation published, token', invitation.token);
+
+  if (HOST_ONLY) {
+    const encoded = host.encodeInvitation(invitation);
+    console.log('\n  sereus://invite/' + encoded + '\n');
+    log('HOST: waiting for a device to join — Ctrl-C to stop');
+    host.on('strand:writable', ({ strandId: id }) => log('HOST: strand:writable', id));
+    // Report what the strand actually holds, so a join that half-completes is
+    // visible from this side rather than only as silence on the device.
+    setInterval(async () => {
+      try {
+        const db = founded.instance.database?.getDatabase?.();
+        if (!db) return log('HOST: strand has no database yet');
+        let members = 0;
+        for await (const _r of db.eval('select Id from App.Member')) members += 1;
+        log(`HOST: ${members} Member row(s), ${host.getMultiaddrs().length} addr(s)`);
+      } catch (err) {
+        log('HOST: poll failed —', err?.message ?? String(err));
+      }
+    }, 15_000);
+    await new Promise(() => {});
+  }
 
   // ── Joiner redeems it ─────────────────────────────────────────────────────
   log('JOINER: forming strand…');

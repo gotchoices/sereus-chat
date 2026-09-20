@@ -30,3 +30,8 @@ Thumbs.db
 
 # Temporary
 tmp/
+
+# Watchman probe files. Watchman drops these into any directory it watches to
+# verify the watch is live, then deletes them; one got committed because it
+# happened to exist when something ran `git add`. They are never ours to keep.
+.watchman-cookie-*
