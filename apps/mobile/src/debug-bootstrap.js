@@ -35,5 +35,5 @@
 if (!globalThis.process) globalThis.process = {};
 if (!globalThis.process.env) globalThis.process.env = {};
 
-// globalThis.process.env.DEBUG = 'sereus:cadre:*';
+// globalThis.process.env.DEBUG = 'sereus:cadre:relay-reservation';
 // globalThis.process.env.DEBUG = 'sereus:cadre:*,optimystic:*';

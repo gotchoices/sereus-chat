@@ -29,7 +29,7 @@ export default function App() {
     // chat screen.  Errors are logged; the rest of the app keeps running.
     (async () => {
       try {
-        const { ensureDefaultChatStrand, applySavedRelays, watchDiscoveredStrands } =
+        const { attachJoinedStrands, ensureDefaultChatStrand, applySavedRelays, watchDiscoveredStrands } =
           await import('./src/data/chat-strand');
         // Relays FIRST, and specifically before anything starts the node: they are
         // named at construction, and that is the only path that gives a circuit
@@ -42,6 +42,10 @@ export default function App() {
         // listener attached later misses it for the life of the process.
         await watchDiscoveredStrands();
         await ensureDefaultChatStrand();
+        // Strands joined through someone else's invitation. Last, because it is
+        // the only step that dials other PARTIES — the two above are local — and a
+        // host that is currently unreachable should not delay our own strands.
+        await attachJoinedStrands();
       } catch (err) {
         // Expected on a solo node: attaching the default strand reads the
         // control DB, which times out without a cohort.  It attaches once the

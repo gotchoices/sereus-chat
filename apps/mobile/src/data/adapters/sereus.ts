@@ -6,11 +6,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DataAdapter } from '../adapter';
 import type {
   Profile, StrandSummary, StrandState, Member, Message, Attachment,
-  SearchBatch, SearchOptions, Invitation, InvitationPreview,
+  SearchBatch, SearchOptions, Invitation, InvitationPreview, Visibility,
   Prefs, StorageUsage, SendInput,
 } from '../types';
-import { ensureDefaultChatStrand, getDefaultChatStrand, syncProfileNameToStrands } from '../chat-strand';
-import { joinChatStrand } from '../chat-sapp';
+import { ensureDefaultChatStrand, generateUuid, getDefaultChatStrand, rememberJoinedStrand, syncProfileNameToStrands } from '../chat-strand';
+import { createChatStrand, joinChatStrand } from '../chat-sapp';
+import type { StrandInstance } from '@serfab/cadre-core';
 import {
   queryMessages, insertMessage, updateMessage, removeMessage,
   addReaction, removeReaction, queryReactions, queryAttachments, queryMembers,
@@ -257,7 +258,7 @@ export class SereusAdapter implements DataAdapter {
    */
   async createInvitation(input: {
     strandId?: string;
-    visibility?: 'public' | 'private';
+    visibility?: Visibility;
     grantsInviteRight: boolean;
   }): Promise<Invitation> {
     const node = cadreService.cadreNode;
@@ -276,7 +277,20 @@ export class SereusAdapter implements DataAdapter {
       );
     }
 
-    const strand = await ensureDefaultChatStrand();
+    // WHICH STRAND THIS INVITATION LETS THEM INTO.
+    //
+    // With a `strandId` the user is inviting someone into a conversation that
+    // already exists, and its type was fixed when it was founded — `visibility`
+    // is undefined in that case and there is nothing to choose.
+    //
+    // Without one the screen is "New strand", and the Private/Open choice is the
+    // whole point of it. This used to bind every invitation to the default strand
+    // and drop `visibility` on the floor, so "Only people you invite can be in
+    // it" was a sentence the UI said and the data layer did not implement.
+    const strand = input.strandId
+      ? await this.attachedStrandById(input.strandId)
+      : (await createChatStrand(node, generateUuid(), input.visibility ?? 'private')).instance;
+
     const invitation = await node.createOpenInvitation(CHAT_SAPP_ID, INVITE_EXPIRY_MS);
 
     await withTimeout(
@@ -302,6 +316,20 @@ export class SereusAdapter implements DataAdapter {
       spent: false,
       direction: 'outgoing',
     };
+  }
+
+  /**
+   * An already-attached strand, by id — for inviting someone into a conversation
+   * that exists. Throws rather than silently falling back to the default strand:
+   * minting an invitation into the wrong conversation is worse than not minting
+   * one, because the mistake is only visible to whoever accepts it.
+   */
+  private async attachedStrandById(strandId: string): Promise<StrandInstance> {
+    const strand = cadreService.getStrands().get(strandId);
+    if (!strand) {
+      throw new Error(`Strand ${strandId} is not attached on this device.`);
+    }
+    return strand;
   }
 
   /**
@@ -334,15 +362,30 @@ export class SereusAdapter implements DataAdapter {
     });
 
     const { strandId, memberPrivateKey } = result;
-    await joinChatStrand(node, {
-      Id: strandId,
-      MemberPrivateKey: memberPrivateKey ?? null,
-      Type: 'c',
-      // Null is CORRECT here, not a gap: this row was seated by consent, so it
-      // records no trustworthy founding signer. `joinChatStrand` passes
-      // `founder: false` explicitly so nothing tries to derive founder-ness from it.
-      FounderOwnerKey: null,
-    });
+    // THE HOST STRAND'S TYPE DECIDES THIS, not a constant.
+    //
+    // `memberPrivateKey` is the closed strand's read-gating secret, returned by
+    // formation only when the host strand is closed. Its presence is therefore
+    // the honest signal of which kind of strand we were invited into. We used to
+    // hard-code `Type: 'c'` and pass `memberPrivateKey ?? null`, which on an open
+    // host strand produced a closed strand carrying no key — readable by nobody,
+    // including us.
+    // `FounderOwnerKey: null` is CORRECT, not a gap: this row was seated by
+    // consent, so it records no trustworthy founding signer. `joinChatStrand`
+    // passes `founder: false` explicitly so nothing derives founder-ness from it.
+    const joinedRow = memberPrivateKey
+      ? { Id: strandId, MemberPrivateKey: memberPrivateKey, Type: 'c' as const, FounderOwnerKey: null }
+      : { Id: strandId, MemberPrivateKey: null, Type: 'o' as const, FounderOwnerKey: null };
+
+    // REMEMBER FIRST, ATTACH SECOND. `memberPrivateKey` is delivered exactly once,
+    // here, and is written to neither side's control DB — if this device forgets
+    // it, the conversation can never be reopened. Attaching can legitimately fail
+    // with `StrandAwaitingFirstSyncError` (retryable, strand stays launched), and
+    // recording only on success would discard precisely the memberships that need
+    // retrying most.
+    await rememberJoinedStrand(joinedRow);
+
+    await joinChatStrand(node, joinedRow);
 
     return { strandId };
   }

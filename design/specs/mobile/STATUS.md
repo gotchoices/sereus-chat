@@ -487,7 +487,63 @@ outlives its cause.
       *When it lands:* if cadre-core ever grows a runtime path that reaches strand nodes,
       drop the rebuild and apply relays in place.
 
-- [ ] **Open question, not yet upstream: message replication between parties.** A
-      two-device join now completes and the joiner's strand goes writable, but a message
-      sent on the joiner was not observed on the host. Not yet diagnosed — could be
-      replication or just a stale screen. Establish which before filing anything.
+- [x] **Strand type — FIXED and verified on device (2026-09-19).** We founded every
+      strand `type: 'o'` and then attached the joined row as `Type: 'c'` with a null
+      key: a closed strand readable by nobody. Chat strands are now founded CLOSED with
+      `generateStrandMemberKey()`, mirroring `createClosedChatStrand` in
+      `reference-app-rn` and the shape upstream's blind-relay scenario exercises; the
+      join side picks the type from whether formation returned a `memberPrivateKey`,
+      rather than hard-coding one. Verified: both devices log `founded closed strand`,
+      and minting an invitation now creates a NEW strand instead of binding the
+      default one.
+
+      Superseded diagnoses, kept so they are not re-derived: (1) "the formation address
+      seed only flows one way" — wrong; `strand-formation-cross-party-seed` asserts the
+      joiner dials in and the host sees the inbound connection. (2) The
+      `cohort-unreachable` error behind it was observed after BOTH devices had
+      restarted, which is the known in-memory-address limit
+      (`feat-cross-party-strand-addr-durability`), not a new defect.
+
+      No upstream gap to file: `blind-relay-phone-to-phone-e2e.integration.ts` covers
+      our exact topology — two parties, `listenAddrs: []` + `relayAddrs`, one neutral
+      relay — and asserts data flowing BOTH ways with every connection proven relayed.
+
+- [ ] **Relay reservations are the fragile link, and the dev harness makes it worse.**
+      Not yet isolated to a cause. What is established:
+
+      - A relay reservation can lapse while `CadreNode.getMultiaddrs()` still returns
+        the circuit addresses it produced. We saw the app report "advertising 4
+        addresses" with ZERO live connections to the relay. `createOpenInvitation`
+        fills an invitation's bootstrap list from exactly that, so an invitation can be
+        minted carrying addresses that no longer route.
+      - `createInvitation` checks `getMultiaddrs()` and then calls
+        `createOpenInvitation`, which checks again — and we have seen it pass the first
+        and fail the second ("No multiaddrs available for invitation") after creating
+        the strand. The strand survives, the invitation does not.
+      - Restarting the relay leaves `adb reverse` entries that still LIST but no longer
+        carry. They must be torn down and rebuilt (`reverse --remove-all`, then
+        `link.sh reverse`).
+      - `nc` through an `adb reverse` tunnel is not a valid liveness probe: adb accepts
+        the connection locally even when nothing is listening on the Mac, so it returns
+        success against a dead relay.
+
+      *Next:* re-validate from a clean slate — relay started in its own terminal, fresh
+      emulator, tunnels rebuilt — before drawing any conclusion about the stack. The
+      last stretch of instability was traced to a relay this session had killed, and
+      the environment must be trustworthy before the app's behaviour is.
+
+- [ ] **The invitation screen's Private/Open choice does nothing.**
+      `InvitationGenerator` collects `visibility` and passes it to
+      `createInvitation`, which accepts the parameter and never reads it. The
+      invitation always binds to the default strand, whose type was fixed when it was
+      founded on first run — so choosing "Private — only people you invite can be in
+      it" changes nothing about who can join. A promise the UI makes in words and the
+      data layer does not keep. Tied to the strand-type fix above: the type has to be
+      decided where the strand is created, not where an invitation is minted.
+
+- [ ] **Ours: `Retry` on the acceptance screen retries the wrong thing.**
+      `StrandAwaitingFirstSyncError` is explicitly retryable — the strand stays
+      launched and wants another `addStrand`. Our banner's Retry calls `load`, which
+      re-inspects the INVITATION, whose token is already spent. So the one action we
+      offer at the one moment it matters cannot succeed. Retry should re-attach the
+      strand (or wait on `strand:writable`), not re-run formation.

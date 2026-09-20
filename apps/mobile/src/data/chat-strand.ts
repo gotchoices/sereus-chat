@@ -22,6 +22,30 @@ const PROFILE_KEY = '@sereus.chat/profile';
 
 const DEFAULT_STRAND_ID_KEY = '@sereus.chat/defaultStrandId';
 
+/** Strands joined through someone else's invitation — see `rememberJoinedStrand`. */
+const JOINED_STRANDS_KEY = '@sereus.chat/joinedStrands';
+
+/**
+ * Exactly what `addStrand` needs to re-attach a joined strand, and nothing else.
+ *
+ * Structurally a `StrandRow`, declared in full — `FounderOwnerKey` included —
+ * so the value can be passed straight to `joinChatStrand` with no cast. An
+ * earlier version omitted that field and reached for `as unknown as StrandRow`,
+ * which is precisely the move that hid the `{ name }` disclosure bug and the
+ * keyless-closed-strand bug in this same file's neighbours. If this shape ever
+ * stops matching, the compiler is the right thing to hear it from.
+ *
+ * `FounderOwnerKey` is null because a consent-seated row records no trustworthy
+ * founding signer; `joinChatStrand` passes `founder: false` explicitly so
+ * nothing tries to derive founder-ness from it.
+ */
+type JoinedStrand = {
+  Id: string;
+  MemberPrivateKey: string | null;
+  Type: 'c' | 'o';
+  FounderOwnerKey: null;
+};
+
 let cachedStrand: StrandInstance | null = null;
 let inFlight: Promise<StrandInstance> | null = null;
 
@@ -81,7 +105,13 @@ async function doEnsureDefaultChatStrand(): Promise<StrandInstance> {
 
   if (!strand) {
     console.info('[chat-strand] creating default chat strand:', strandId);
-    strand = await createChatStrand(node, strandId);
+    // CLOSED, like every other chat strand. This one is the user's own to begin
+    // with, so the gate is moot today — but a strand's type is fixed at founding,
+    // and "invite someone into this conversation" is a thing the app offers. An
+    // open strand could never honour that invitation, and there is no later act
+    // that closes it.
+    const created = await createChatStrand(node, strandId, 'private');
+    strand = created.instance;
     console.info(
       '[chat-strand] ✓ default chat strand attached. status:',
       strand.status,
@@ -154,8 +184,8 @@ async function getOrCreateDefaultStrandId(): Promise<string> {
   return id;
 }
 
-/** Lightweight UUID v4 using crypto.getRandomValues (polyfilled in index.js). */
-function generateUuid(): string {
+/** Lightweight UUID v4 using crypto.getRandomValues (polyfilled in polyfills/hermes.js). */
+export function generateUuid(): string {
   const bytes = new Uint8Array(16);
   const g = globalThis as Record<string, unknown>;
   const c = (g.crypto ?? {}) as { getRandomValues?: (buf: Uint8Array) => void };
@@ -205,6 +235,14 @@ async function attachDiscoveredStrand(strandId: string, strandRow: StrandRow): P
   if (!node) return;
   if (attaching.has(strandId) || node.getStrands().has(strandId)) return;
 
+  // Never the default strand: `ensureDefaultChatStrand` owns that one and founds
+  // it through `foundStrand`. The watcher offers it too (it is a stored strand
+  // like any other), and the `getStrands()` check above loses the race when the
+  // offer lands mid-founding — which is how this ended up attaching the same
+  // strand twice on every launch, once as founder and once as joiner.
+  const defaultId = await AsyncStorage.getItem(DEFAULT_STRAND_ID_KEY);
+  if (defaultId === strandId) return;
+
   attaching.add(strandId);
   try {
     await joinChatStrand(node, strandRow);
@@ -233,5 +271,100 @@ export async function watchDiscoveredStrands(): Promise<void> {
   // … then drain what was offered before we were listening.
   for (const [strandId, strandRow] of node.getDiscoveredStrands()) {
     void attachDiscoveredStrand(strandId, strandRow);
+  }
+}
+
+async function readJoinedStrands(): Promise<JoinedStrand[]> {
+  try {
+    const raw = await AsyncStorage.getItem(JOINED_STRANDS_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    // NORMALISED, not cast. This list is read back from storage written by an
+    // OLDER build of this app — entries predating `FounderOwnerKey` carry no
+    // such field, and a bare `as JoinedStrand[]` would tell the compiler
+    // otherwise while handing `undefined` to cadre-core at runtime. Anything
+    // without an `Id` is not a strand record at all and is dropped.
+    return parsed
+      .filter((row): row is Record<string, unknown> =>
+        !!row && typeof row === 'object' && typeof (row as { Id?: unknown }).Id === 'string')
+      .map(row => ({
+        Id: row.Id as string,
+        MemberPrivateKey: typeof row.MemberPrivateKey === 'string' ? row.MemberPrivateKey : null,
+        Type: row.Type === 'o' ? 'o' as const : 'c' as const,
+        FounderOwnerKey: null,
+      }));
+  } catch {
+    // A corrupt entry must not brick startup — the strands are still on disk and
+    // a later successful join rewrites the list.
+    return [];
+  }
+}
+
+/**
+ * Record a strand this device joined, so a restart can get back into it.
+ *
+ * NOTHING ELSE REMEMBERS THESE. `addStrand` is the attach half only and never
+ * publishes the `Strand` row — correct for a joiner, since cadre-core expects a
+ * joiner's row to have arrived over its own control network. Across PARTIES it
+ * never does: the host publishes into its own cadre, and this device is not in
+ * it. So without this list, a restart loses the strand outright — no row, nothing
+ * for the StrandWatcher to offer, no `strand:discovered`, no way back short of a
+ * fresh invitation.
+ *
+ * `MemberPrivateKey` is what makes that urgent rather than untidy: the closed
+ * strand's read-gating secret, handed over exactly once in the formation result
+ * and written to neither side's control DB. Lose it and the conversation cannot
+ * be reopened by anyone, ever — a fresh invitation mints a new membership, it
+ * does not recover the old one.
+ *
+ * `reference-app-rn` does not do this; it holds joined strands in React state
+ * and loses them on restart, which is fine for a demo and not for a messenger.
+ * Upstream tracks the wider problem as `feat-cross-party-strand-addr-durability`;
+ * when that lands, re-read this — the id and key stay ours to keep, but the
+ * re-attach loop may not be.
+ *
+ * Called on the ACCEPT path as soon as formation returns, BEFORE the attach is
+ * awaited. Deliberate: `addStrand` rejects with `StrandAwaitingFirstSyncError`
+ * when no member is reachable yet, and that is a retryable, strand-stays-launched
+ * outcome — not a reason to forget a membership we genuinely hold. Recording
+ * after a successful attach would drop exactly the memberships that most need
+ * retrying.
+ */
+export async function rememberJoinedStrand(row: JoinedStrand): Promise<void> {
+  const list = await readJoinedStrands();
+  const next = [...list.filter(s => s.Id !== row.Id), row];
+  await AsyncStorage.setItem(JOINED_STRANDS_KEY, JSON.stringify(next));
+}
+
+/**
+ * Re-attach every remembered strand. Idempotent; safe on every start.
+ *
+ * Failures are per-strand and non-fatal: one unreachable host must not stop the
+ * others, and `StrandAwaitingFirstSyncError` in particular means the strand IS
+ * launched and still trying, so it is logged at info rather than as a fault.
+ */
+export async function attachJoinedStrands(): Promise<void> {
+  const remembered = await readJoinedStrands();
+  if (!remembered.length) return;
+
+  await cadreService.ensureStarted();
+  const node = cadreService.cadreNode;
+  if (!node) return;
+
+  for (const row of remembered) {
+    if (attaching.has(row.Id) || node.getStrands().has(row.Id)) continue;
+    attaching.add(row.Id);
+    try {
+      await joinChatStrand(node, row);
+      console.info('[chat-strand] ✓ re-attached joined strand:', row.Id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const awaitingSync = err instanceof Error && err.name === 'StrandAwaitingFirstSyncError';
+      console[awaitingSync ? 'info' : 'warn'](
+        `[chat-strand] ${awaitingSync ? 'joined strand launched, awaiting first sync' : 'could not re-attach joined strand'}: ${row.Id} — ${message}`,
+      );
+    } finally {
+      attaching.delete(row.Id);
+    }
   }
 }
