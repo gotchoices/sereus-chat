@@ -87,6 +87,14 @@ class CadreServiceImpl {
    * timer that notices when reality diverges from it. See `watchReachability`.
    */
   private _responderAddrs: string[] = [];
+  /**
+   * The address set most recently OBSERVED, which is not the same thing as the
+   * set the responder advertises: the responder is only reinstalled when it has
+   * nothing, so after one reinstall its set goes stale by design. Comparing
+   * against the responder's copy made the log undercount — a 4 → 0 → 4 → 0 cycle
+   * printed as two identical "4 → 0" lines with the recoveries invisible.
+   */
+  private _lastSeenAddrs: string[] = [];
   private _reachabilityListener: (() => void) | null = null;
 
   /**
@@ -617,9 +625,19 @@ class CadreServiceImpl {
       if (!this.node?.isRunning) return;
 
       const current = this.node.getMultiaddrs();
-      if (CadreServiceImpl.addrsKey(current) === CadreServiceImpl.addrsKey(this._responderAddrs)) {
+      if (CadreServiceImpl.addrsKey(current) === CadreServiceImpl.addrsKey(this._lastSeenAddrs)) {
         return;
       }
+      const previousSeen = this._lastSeenAddrs;
+      this._lastSeenAddrs = current;
+
+      // Always SAY what changed, even when we decline to act on it. The
+      // reservation dropping and recovering underneath a live connection is the
+      // single most useful signal we have about this stack's behaviour, and the
+      // narrow guard below would otherwise hide it.
+      console.info(
+        `[CadreService] reachability ${previousSeen.length} → ${current.length} address(es)`,
+      );
 
       // ONLY when the responder currently has NOTHING to offer.
       //
@@ -640,9 +658,7 @@ class CadreServiceImpl {
         return;
       }
 
-      console.info(
-        `[CadreService] reachability changed (${this._responderAddrs.length} → ${current.length} address(es)) — reinstalling formation responder`,
-      );
+      console.info('[CadreService] responder had no addresses — reinstalling now that it does');
       try {
         this.initializeFormationResponder();
       } catch (err) {
@@ -663,6 +679,7 @@ class CadreServiceImpl {
     this._reachabilityListener?.();
     this._reachabilityListener = null;
     this._responderAddrs = [];
+    this._lastSeenAddrs = [];
     if (this.node) {
       await this.node.stop();
       this.node = null;

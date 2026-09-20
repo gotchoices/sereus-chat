@@ -362,6 +362,20 @@ export class SereusAdapter implements DataAdapter {
     });
 
     const { strandId, memberPrivateKey } = result;
+
+    if (__DEV__) {
+      // THE CROSS-PARTY DISCOVERY SEED, and the one thing we cannot see from
+      // either side afterwards. cadre-core calls `strandAddrs` "the only
+      // cross-party discovery seed there is": a strand runs as its own libp2p
+      // node, and the strand-addr RPC that would otherwise resolve one answers
+      // own-party callers only. If this arrives empty the joiner has nowhere to
+      // dial, and the failure surfaces much later as `StrandAwaitingFirstSyncError`
+      // — "no member of this strand has been reachable" — which reads like a
+      // network fault rather than a seed that was never sent.
+      const seed = (result as { strandAddrs?: string[] }).strandAddrs ?? [];
+      console.info(`[accept] formation seed: ${seed.length} strand addr(s), memberKey=${!!memberPrivateKey}`);
+      for (const addr of seed) console.info('[accept]   seed:', addr);
+    }
     // THE HOST STRAND'S TYPE DECIDES THIS, not a constant.
     //
     // `memberPrivateKey` is the closed strand's read-gating secret, returned by
