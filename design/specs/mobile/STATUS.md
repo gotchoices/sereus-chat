@@ -532,42 +532,132 @@ outlives its cause.
       indistinguishable from the device failure at a glance. Our app passes the
       recorder; anything new that calls this must too.
 
-- [x] **REPRODUCED IN NODE, NO DEVICE: 10 ms of per-frame outbound latency breaks
-      two-party strand formation.** (2026-09-20)
+- [x] **CORRECTED: there is no 10 ms latency cliff. Our injector was wrong.**
+      (filed as gotchoices/sereus#13; corrected by the maintainer 2026-09-21)
 
-      `WS_SEND_DELAY_MS=<n> yarn stack:two-party` replaces the global `WebSocket`
-      (`test/stack/ws-latency.mjs`) and holds each outbound frame `n` ms, in order,
-      reporting a truthful `bufferedAmount` so libp2p's backpressure keeps working.
-      `@libp2p/websockets` constructs `new WebSocket(uri)` against the global, so
-      this reaches every socket libp2p opens and nothing else — and it is the same
-      surface React Native differs on, which makes it a model rather than a sleep.
+      What we reported: two-party strand formation failing at 10 ms of per-frame
+      outbound delay, passing at 5 ms, deterministic. What was actually true: our
+      injector held every frame on ONE promise chain, so frame *k* waited for the
+      *k-1* frames ahead of it to serve their delays first. The delay COMPOUNDED.
+      That models an outbound frame-RATE cap of 1000/delay frames per second per
+      socket — not latency, where frames stay overlapped and a constant delay
+      shifts them all equally.
 
-      | per-frame delay | outcome                               |
-      |-----------------|---------------------------------------|
-      | 0 ms            | PASS — data crosses in 2.8 s          |
-      | 5 ms            | PASS                                  |
-      | 10 ms           | `StrandAwaitingFirstSyncError` (x2)   |
-      | 20 / 40 / 50 ms | `StrandAwaitingFirstSyncError`        |
-      | 150 ms          | no relay reservation within 60 s      |
+      The comment on our own code said "one chain per socket keeps frame ORDER
+      intact", which was the intent; serialising the DELAYS as well was not noticed.
 
-      Deterministic at the boundary: 10 ms failed twice, 5 ms passed on retest.
+      Why it produced such a sharp cliff: bring-up is frame-heavy. Measured with
+      `WS_COUNT_FRAMES=1`: **7,474 outbound frames across 4 sockets, busiest 3,585**,
+      for a run that completes in 2.8 s. At 10 ms compounding, that one socket needs
+      ~36 s to drain. Upstream measured the same order (~10,800 / ~5,200).
 
-      IT IS THE SAME MECHANISM, not merely the same message. Under injection the
-      diagnostics read exactly as they do on the phone: `findCluster:done … peers=1
-      addressless=0 selfRelayOnly=0` (a cohort of one, with no address problem) and
-      `fret:error … unreachable` / `timeout`. The delay also reproduces the OTHER
-      device failures we had been treating as separate — at higher delays the run
-      dies with `Formation dial-connect timed out after 5000ms`, and higher still it
-      cannot hold a relay reservation at all, which is the phone's `myAddrs 4 → 0`.
-      Three symptoms, one cause.
+      Re-tested with each frame delayed INDEPENDENTLY (`WS_SEND_DELAY_MS=<n>`, the
+      new default; the old shape is kept as `WS_SEND_DELAY_MODE=serial` because
+      upstream kept it under that name):
 
-      WHY THIS MATTERS BEYOND OUR PHONE. 10 ms per frame is not a broken device; it
-      is an ordinary network. A single WAN round trip is 20–100 ms, and a relayed
-      hop costs more. On this evidence the stack cannot survive the internet it is
-      designed for — the 2016 test phone merely reached the threshold first.
+      | one-way delay | outcome |
+      |---------------|---------|
+      | 10 ms         | PASS |
+      | 50 ms         | PASS |
 
-      This is the artifact every earlier attempt failed to produce: deterministic,
-      scriptable, no device, no emulator, no `adb`, one file to read.
+      So delay alone does not break this, and phone-to-phone over a WAN relay is not
+      blocked in the way we claimed. Upstream additionally reports degradation above
+      ~100 ms (first sync completes; membership rows miss a deliberately tight 20 s
+      gate), and notes that BANDWIDTH is the untested variable — given the frame
+      counts above, a congested mobile link is the case nobody has measured.
+
+      *What the report did achieve:* their relay scenarios all ran on loopback with
+      no delay, so nothing in the suite could have caught a latency regression. They
+      landed a latency fixture with both modes plus a committed 10 ms scenario. They
+      are also investigating the round-trip cost behind all of this — a single
+      message insert measured at **48–130 network exchanges** on the initiating
+      party's link — which sits in Optimystic rather than sereus.
+
+      *Lesson worth keeping:* the injector was never validated against a known
+      quantity before its numbers were published. A frame counter existed in five
+      lines and would have shown the compounding immediately.
+
+- [x] **DEVICE-FREE REPRODUCTION, and it is not a timeout: work grows
+      SUPERLINEARLY with per-op cost.** (2026-09-21)
+
+      `CPU_SLOWDOWN=<fraction> yarn stack:two-party` (`test/stack/cpu-cost.mjs`)
+      charges the measured S7 crypto cost inside the Noise crypto implementation
+      and busy-waits it. A blocking burn is the FAITHFUL model here — a busy CPU
+      really does block other work — which is the opposite of the latency case,
+      where serialising was wrong because frames overlap in flight.
+
+      | fraction of S7 cost | first sync | total | crypto ops | CPU burned | result |
+      |---|---|---|---|---|---|
+      | 0     | 1.4 s  | 2.8 s  | —      | —       | PASS |
+      | 0.05  | 1.6 s  | 7.3 s  | 9,940  | 3.2 s   | PASS |
+      | 0.10  | 1.7 s  | 14.3 s | 13,572 | 9.8 s   | PASS |
+      | 0.25  | 4.4 s  | 30.6 s | 19,061 | 25.4 s  | PASS |
+      | 0.50  | 26.1 s | 53.5 s | 22,038 | 48.1 s  | PASS |
+      | 1.00  | —      | fails  | 42,557 | 313 s   | **FAIL** |
+
+      Up to half the device's cost it degrades exactly as one would hope: slower,
+      and correct. At full cost it does not merely take longer — it never finishes.
+
+      THE SHAPE IS THE FINDING. Going from 0.5x to 1.0x doubles the per-operation
+      cost but multiplies total crypto work by ~6.5x (22k ops / 48 s -> 43k ops /
+      313 s). That is retry amplification: internal deadlines lapse, the work is
+      retried, the retries cost more crypto, which lapses more deadlines. Raising
+      the first-sync budget from 30 s to 300 s did not help — it burned 313 s of
+      CPU and still failed, where 0.5x needed only 48 s in total.
+
+      So "a slow device should just be slower" is right in principle and holds up
+      to a point, but there is a regime past which this stack does not degrade, it
+      diverges. That is worth fixing on its own terms, independently of making the
+      crypto faster.
+
+      *Harness bug found and fixed along the way:* `strandFirstSync.timeoutMs` is
+      NODE config, not an `addStrand` option. We had been passing it to
+      `addStrand`, where it is silently ignored, so every earlier run used the 30 s
+      default while the logs implied otherwise.
+
+- [x] **ROOT CAUSE: Hermes runs the pure-JS crypto 20-560x slower than Node, and
+      bring-up needs ~7,000 frames of it.** (measured 2026-09-21)
+
+      `Settings → Diagnostics → Handshake + frame cost` on the device, against
+      `node test/stack/handshake-cost.mjs` on the same machine as the relay. Same
+      primitives, same sizes, same code path libp2p uses.
+
+      | primitive | Node (V8, x64) | Galaxy S7 (Hermes, ARM) | ratio |
+      |---|---|---|---|
+      | x25519 shared secret | 2.635 ms | **57.650 ms** | 22x |
+      | ed25519 sign | 1.370 ms | 26.000 ms | 19x |
+      | ed25519 verify | 2.720 ms | 89.950 ms | 33x |
+      | chacha20-poly1305 seal (512B) | 0.053 ms | **7.760 ms** | 146x |
+      | sha256 (512B) | 0.027 ms | **15.165 ms** | 561x |
+      | WebSocket.send (512B) | — | 0.700 ms | — |
+
+      What that buys:
+
+      - **~231 ms of CPU per Noise handshake** on the phone (Node: ~10.5 ms). Every
+        connection pays a quarter second before a byte moves, and a relayed strand
+        mesh opens many.
+      - **~160 s of pure symmetric crypto** across a 7,000-frame bring-up (Node:
+        ~0.56 s). That single figure explains every timeout we have chased: FRET's
+        announce, `Formation dial-connect timed out after 5000ms`, the relay
+        reservation lapsing, and first sync. Nothing was ever unreachable.
+      - **The bridge is NOT the bottleneck.** `WebSocket.send` costs 0.7 ms/op —
+        ~4.9 s per bring-up, ~30x less than the crypto. The `bufferedAmount`
+        backpressure gap is real but nowhere near the dominant cost.
+
+      WHY: Hermes has no JIT. `@noble/*` is pure JavaScript, so V8 optimises it
+      heavily and Hermes interprets it. The symmetric primitives suffer worst
+      (sha256 561x) because they are tight bit-manipulation loops — exactly what an
+      interpreter is worst at and a JIT is best at.
+
+      *Caveat:* the app's own strand work runs during the measurement and competes
+      for the CPU, so treat these as an upper bound. The conclusion survives halving
+      them.
+
+      *Direction, not yet decided:* native crypto on RN (e.g. `react-native-quick-crypto`,
+      or noble with a native backend) is the obvious lever, and would cut the
+      dominant term by orders of magnitude. Reducing the frame count is the other —
+      upstream is already investigating the 48-130 network exchanges per message
+      insert, and that multiplier is what turns per-frame cost into minutes.
 
 - [ ] **Device-side detail behind the above** — the joiner's strand node cannot
       complete a FRET announce over

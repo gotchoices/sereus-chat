@@ -39,13 +39,17 @@
  * Usage:
  *   node two-party-formation.mjs            # both parties here (the full check)
  *   node two-party-formation.mjs --host     # host only; a device joins
- *   WS_SEND_DELAY_MS=200 node two-party-formation.mjs   # model a slow device
+ *   WS_SEND_DELAY_MS=200 node two-party-formation.mjs   # model a slow link
+ *   CPU_SLOWDOWN=1 node two-party-formation.mjs         # model a slow device
  *   RELAY_ADDR=/ip4/127.0.0.1/tcp/4002/ws/p2p/12D3Koo... node two-party-formation.mjs
  *   FIRST_SYNC_TIMEOUT_MS=120000 node two-party-formation.mjs
  */
 // FIRST: replaces the global WebSocket when WS_SEND_DELAY_MS is set, so every
 // socket libp2p opens below is already slowed. A no-op otherwise.
 import './ws-latency.mjs';
+// Models a slow device's crypto CPU cost (CPU_SLOWDOWN). Must precede any node
+// construction: noise copies its crypto method references when it is built.
+import './cpu-cost.mjs';
 import { CadreNode, ControlFormationUsageRecorder, generateStrandMemberKey } from '@serfab/cadre-core';
 import { LevelDBRawStorage } from '@optimystic/db-p2p-storage-rn';
 import { webSockets } from '@libp2p/websockets';
@@ -137,6 +141,10 @@ async function makeParty(tag, relayAddr) {
     },
     hibernation: { enabled: false },
     requireSignedSchemas: false,
+    // NODE config, not an `addStrand` option — an earlier version of this file
+    // passed it to `addStrand`, where it is silently ignored, and every run
+    // therefore used the 30 s default while claiming otherwise.
+    strandFirstSync: { timeoutMs: FIRST_SYNC_TIMEOUT_MS },
   });
 
   await node.start();
@@ -259,7 +267,6 @@ try {
     },
     sAppConfig: SAPP,
     founder: false,
-    strandFirstSync: { timeoutMs: FIRST_SYNC_TIMEOUT_MS },
   });
   log(`JOINER: ✓ FIRST SYNC COMPLETE in ${Date.now() - t1}ms — status ${instance.status}, database ${!!instance.database}`);
 

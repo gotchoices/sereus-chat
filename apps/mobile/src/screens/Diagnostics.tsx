@@ -14,6 +14,8 @@ import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { runFoundStrandCheck } from '../diagnostics/found-strand-check';
 import type { CheckResult } from '../diagnostics/found-strand-check';
+import { runHandshakeCostCheck, runSocketFrameCost } from '../diagnostics/handshake-cost';
+import { getPrefs } from '../data/adapter';
 import { SectionHeader } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
@@ -54,6 +56,49 @@ export default function Diagnostics() {
     }
   }, []);
 
+  /**
+   * Where the seconds go. Prints per-operation costs for the primitives a dial
+   * and a frame actually pay for, so they can be set beside the Node figures
+   * from `test/stack/handshake-cost.mjs`. The ratio is the finding, not the
+   * absolute numbers.
+   */
+  const runCost = useCallback(async () => {
+    setRunning('Handshake + frame cost');
+    setResult(null);
+    setLines(['Measuring crypto primitives — no network, no strand…']);
+    try {
+      const report = await runHandshakeCostCheck(l => setLines(p => [...p, l]));
+      for (const m of report.measurements) {
+        setLines(p => [...p,
+          `${m.label}: ${m.msPerOp.toFixed(3)} ms/op (n=${m.iterations})` +
+          (m.implication ? `  → ${m.implication}` : ''),
+        ]);
+      }
+      for (const n of report.notes) setLines(p => [...p, n]);
+
+      // The non-crypto half needs a relay to talk to; skip cleanly without one
+      // rather than failing the whole run.
+      const { relayAddrs } = await getPrefs();
+      const relay = relayAddrs?.[0];
+      const m = relay ? /\/ip4\/([^/]+)\/tcp\/(\d+)\/ws/.exec(relay) : null;
+      if (!m) {
+        setLines(p => [...p, 'No /ws relay configured — skipping WebSocket.send timing.']);
+      } else {
+        const frame = await runSocketFrameCost(`ws://${m[1]}:${m[2]}`, 200,
+          l => setLines(p => [...p, l]));
+        setLines(p => [...p,
+          `${frame.label}: ${frame.msPerOp.toFixed(3)} ms/op (n=${frame.iterations})` +
+          (frame.implication ? `  → ${frame.implication}` : ''),
+        ]);
+      }
+      setLines(p => [...p, 'Compare with: node test/stack/handshake-cost.mjs']);
+    } catch (err) {
+      setLines(p => [...p, `failed: ${err instanceof Error ? err.message : String(err)}`]);
+    } finally {
+      setRunning(null);
+    }
+  }, []);
+
   return (
     <ScrollView
       ref={scroller}
@@ -86,6 +131,26 @@ export default function Diagnostics() {
           {running === v.label ? <ActivityIndicator /> : null}
         </Pressable>
       ))}
+
+      <Pressable
+        disabled={running !== null}
+        onPress={runCost}
+        style={[
+          styles.row,
+          { borderColor: theme.border, backgroundColor: theme.surfaceAlt },
+          running !== null && styles.dim,
+        ]}
+      >
+        <View style={styles.flex1}>
+          <Text style={[typography.body, styles.rowTitle, { color: theme.textPrimary }]}>
+            Handshake + frame cost
+          </Text>
+          <Text style={[typography.small, { color: theme.textMuted }]}>
+            why a dial here takes seconds and milliseconds in Node
+          </Text>
+        </View>
+        {running === 'Handshake + frame cost' ? <ActivityIndicator /> : null}
+      </Pressable>
 
       {result ? (
         <View
