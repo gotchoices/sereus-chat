@@ -185,6 +185,45 @@ runtime schema are one file. `newId()` in `chat-operations.ts` mints UUIDs via t
       so there is no real sender attribution); RBAC not switched on in production. See
       [`domain/sereus.md`](../domain/sereus.md)
 
+### Pass 3 results — device joined a Node host, 2026-09-23
+
+Exercised with `test/stack/two-party-formation.mjs --host` against the emulator, over the local
+relay, with native crypto on. Five of seven join attempts attached (44–94 s); the other two failed
+`StrandAwaitingFirstSyncError`, which remains intermittent and unexplained.
+
+What this run proved, and the two app bugs it exposed:
+
+- [x] **`acceptInvitation` works** — no longer "written, untested". A device redeems an invitation,
+      attaches, and reads the host's rows.
+- [x] **Strand-scoped reads honour their `strandId`.** Every per-strand adapter method ignored its
+      parameter and opened the default strand — a pass-2 stub that outlived the arrival of real
+      strand ids. A joined conversation therefore rendered empty while its rows sat in the database,
+      so working replication looked like broken replication. `SereusAdapter.strandFor` resolves it
+      now, and throws on an unattached id rather than falling back.
+- [x] **A joiner registers itself in `App.Member`.** Self-registration lived inline in the
+      default-strand path, and the only other writer was `saveProfile` — so anyone who joined a
+      strand and did not then edit their profile was a participant the conversation had no record
+      of. Now `registerSelfAsMember` runs on first join and on every re-attach.
+
+Still open, and the reason a two-party conversation is not yet usable:
+
+- [ ] **A device's writes replicate only during the attach window.** Controlled run: the host wrote
+      a new message every 60 s and the device received all thirteen, so host → device streams
+      continuously. In the same session, on the same strand, a message typed on the device was still
+      absent from the host two minutes later — while those ticks kept arriving. The variable is
+      timing, not the table: a probe message inserted from the device *inside* the attach window did
+      reach the host, as did the `App.Member` row written there. So outbound writes propagate while
+      the strand is attaching and stop afterwards; the device reports `peers=0` throughout, and a
+      restart does not flush what is pending. Not yet reported upstream — decide sereus vs
+      optimystic first.
+- [ ] **Schema changes strand existing data.** Adding `null` to columns in `chat-sapp.qsql` made
+      already-founded strands fail on open with `ALTER TABLE App.Member ALTER COLUMN AvatarUri DROP
+      NOT NULL` → `Module for table 'Member' does not support ALTER COLUMN`. Dev worked around it by
+      wiping; there is no migration path, which matters before anyone ships.
+- [ ] `inspectInvitation`, `leaveStrand`, `resignManager`, `removeMember`
+- [ ] The acceptance screen's `Retry` calls `load`, which re-inspects a spent invitation instead of
+      re-attaching.
+
 ### Switching over
 
 `USE_SEREUS = true` is **not** safe until pass 2 lands: `ChatInterface` calls `listMembers`
@@ -576,6 +615,186 @@ outlives its cause.
       *Lesson worth keeping:* the injector was never validated against a known
       quantity before its numbers were published. A frame counter existed in five
       lines and would have shown the compounding immediately.
+
+- [x] **ROOT CAUSE FOUND AND FIX VERIFIED: libp2p's ConnectionMonitor aborts
+      connections when a CPU-saturated peer misses a ping.** (2026-09-22)
+
+      `ws-trace.mjs` wraps `close()` to capture the CALLER's stack (a stack taken in
+      the close EVENT is useless — it unwinds to the event loop), so each close is
+      attributable. The failing run: 23 opens, 20 closes, of which **16 REMOTE
+      code=1006** and 3 REMOTE 1005 — abnormal closures with no close frame. Only
+      one was ours. So the far end was killing them, and every one of these sockets
+      terminates at the relay.
+
+      Running the relay with `DEBUG=libp2p:connection-monitor*` says it outright,
+      30 times in one run:
+
+          libp2p:connection-monitor:error aborting connection due to ping failure
+          libp2p:connection-monitor:error error during heartbeat DOMException [TimeoutError]
+
+      THE LOOP: libp2p pings every connection every 10 s and, with
+      `abortConnectionOnPingFailure` defaulting to TRUE, kills any connection whose
+      ping times out. A CPU-saturated peer cannot answer. The connection dies, the
+      client re-dials, the new connection costs a fresh Noise handshake (~231 ms of
+      CPU at S7 rates), which saturates it further, which misses more pings. That
+      is the amplification, and nothing in it involves a deadline we could raise.
+
+      THE FIX, verified end to end at FULL measured S7 crypto cost:
+
+      | configuration | sockets | result |
+      |---|---|---|
+      | stock | 17-23 | **0 of 3 pass** |
+      | `abortConnectionOnPingFailure: false` on the RELAY only | 4-8 | 2 of 3 pass |
+      | ...on BOTH ends | 4 | **3 of 3 pass** — 86 s, 86 s, 106 s |
+
+      With it off on both ends the system does exactly what it should: ~30x slower
+      than baseline (2.8 s -> ~90 s), matching the injected slowdown, and correct.
+      Slow, not broken.
+
+      This is also where an adaptive-timeout scheme would genuinely help: the ping
+      already uses `AdaptiveTimeout`, but adapting the DEADLINE does not help if the
+      consequence of missing it is to destroy a working connection. The remedy is
+      either not aborting on ping failure, or requiring sustained failure before
+      concluding a peer is gone (phi-accrual style) rather than a single timeout.
+
+- [x] **CONNECTION CHURN PROVEN — cause still unidentified; three suspects ruled
+      out.** (2026-09-22)
+
+      Two independent censuses, both cheap to repeat: sockets opened
+      (`WS_COUNT_FRAMES=1`, transport level) and Noise handshakes performed
+      (`cpu-cost.mjs` per-primitive counts; `keygen`/`dh` are the handshake's
+      asymmetric steps).
+
+      | injection | sockets | keygen | dh | frames | result |
+      |---|---|---|---|---|---|
+      | baseline (0.02x) | 4 | 12 | 24 | 6,059 | PASS |
+      | `CPU_SLOWDOWN=0.5` | 7 | 17 | 39 | 5,324 | PASS |
+      | `CPU_SLOWDOWN=1.0` | **17** | **41** | **107** | **13,092** | FAIL |
+      | `LOOP_HOG_DUTY=0.95` (6x slower, PASSES) | **4** | — | 11,214 | PASS |
+
+      The control is what makes this conclusive: running SIX TIMES SLOWER through
+      loop starvation opens the same 4 connections and completes. Expensive crypto
+      opens 17 and never finishes. So this is not "the same work, slower" — it is
+      materially more work, and the extra work is connections and handshakes.
+
+      RULED OUT as the driver (each raised and re-measured at 1.0x):
+
+      | suspect | change | sockets | result |
+      |---|---|---|---|
+      | Fret maintenance deadlines (all) | 10x | — | still fails |
+      | libp2p DIAL/ADDRESS_DIAL/UPGRADE/NEGOTIATION | 10x | 17 -> 13 | still fails |
+      | db-p2p `maxConnections` | 16 -> 256 | 17 -> 11 | still fails |
+
+      Each nudges the count without changing the outcome, so none is the trigger.
+      What actually causes the re-dialing is NOT yet identified. All three patches
+      reverted; harness verified back to a 2.6 s baseline pass.
+
+- [x] **NOT timer starvation. The amplification is driven by EXPENSIVE RETRIES.**
+      (2026-09-22)
+
+      `test/stack/loop-hog.mjs` blocks the event loop on a duty cycle while leaving
+      crypto at native speed — isolating "timers and handlers run late" from
+      "each operation costs more".
+
+      | injection | loop blocked | result |
+      |---|---|---|
+      | `LOOP_HOG_DUTY=0.5` | 50% | PASS, 4.8 s |
+      | `LOOP_HOG_DUTY=0.8` | 80% | PASS, 8.4 s |
+      | `LOOP_HOG_DUTY=0.9` | 90% | PASS, 13.3 s |
+      | `LOOP_HOG_DUTY=0.95` | 95% | PASS, 23.3 s |
+      | `CPU_SLOWDOWN=1.0` | ~96% (inside crypto) | **FAIL** |
+
+      Starving the loop 95% of the time — the same duty the crypto burn produces —
+      degrades exactly as one would want: first sync 1.4 s -> 7.8 s, total 2.8 s ->
+      23.3 s, still correct. Only when the cost sits INSIDE the crypto path does it
+      diverge.
+
+      So the trigger is not late timers, and that also explains why raising every
+      Fret budget 10x changed nothing.
+
+      THE MECHANISM, then: something retries, and the retried unit of work is
+      itself crypto-heavy — a fresh Noise handshake is ~231 ms of CPU on S7 figures.
+      Under starvation a retry is still cheap (native crypto), so the loop settles.
+      Under slow crypto each retry is expensive, so failures beget more expensive
+      work: 0.5x cost -> 22k ops / 48 s (passes); 1.0x -> 43k ops / 313 s (fails).
+      That is the superlinear growth, and it points at connection churn — failed
+      dials producing new dials producing new handshakes — rather than at any
+      single deadline.
+
+- [x] **Divergence investigated: Fret's deadlines are NOT the trigger; the failure
+      is streams dying mid-negotiation.** (2026-09-22)
+
+      Upstream's backlog ticket `bug-slow-peer-crypto-cost-diverges-into-retry-
+      amplification` names `MAINTENANCE_RPC_TIMEOUT_MS = 2000` (Fret) as a suspect.
+      Tested in the harness at `CPU_SLOWDOWN=1.0`:
+
+      - raising that constant 2 s -> 30 s: still fails.
+      - raising EVERY Fret budget 10x (snapshot, stabilize tick, phase-one,
+        shutdown, leave-notice) as well: still fails.
+
+      So the suspect is wrong, or at least insufficient. Worth telling them before
+      anyone spends time there.
+
+      WHAT THE INSTRUMENTATION SHOWS instead — same run, same debug, slow vs fast:
+
+      | | baseline | `CPU_SLOWDOWN=1.0` |
+      |---|---|---|
+      | dial:ok / dial:fail | 78 / 2 (2.5% fail) | 50 / 19 (**28% fail**) |
+      | fret announce timeouts | 0 | **10** |
+      | result | PASS in 3.8 s | FAIL |
+
+      Failure reasons under load, in order: `Unexpected EOF - stream closed while
+      reading 0/1 bytes` (7), `Protocol selection failed - could not negotiate
+      /optimystic/strand-X/db-p2p/block-transfer/1.0.0` (4), `All multiaddr dials
+      failed` (4), aborted/timeout (3). At baseline the only fret errors are
+      `foreign-protocol` against the relay (expected — it speaks no FRET) and
+      `sendLeave unreachable` at shutdown.
+
+      Reading: CPU-bound crypto blocks the single-threaded JS loop, so timers and
+      handlers run late; peers give up mid-negotiation and close streams before any
+      byte arrives; the dial fails; the work is retried; the retry costs more
+      crypto. That is the amplification loop, and it is consistent with the phone
+      (same `Unexpected EOF`, same announce timeouts).
+
+      ONE HONEST DIFFERENCE from the device: in Node the cohort DOES reach two
+      members (81 observations of `peers=2`), where on the S7 it never did
+      (`peers=1` always). Upstream reported the same. So the Node model reproduces
+      the failure but not every step of the device's path — the device is worse
+      than the model, which matches the emulator failing where the model predicted
+      it should pass. The injector charges only Noise crypto; the device also pays
+      Hermes tax on ed25519 signing, quereus, protobuf and storage.
+
+- [x] **The crypto cost is REACT NATIVE, not the old phone. Hardware contributes 2x;
+      the runtime contributes 11-198x.** (2026-09-22)
+
+      Same diagnostic, three runtimes, all on the SAME native architecture — an
+      Intel i9-9980HK Mac, an x86_64 emulator running natively on it (no
+      translation), and the Galaxy S7:
+
+      | primitive | Node (V8 + native) | Emulator (Hermes, i9) | S7 (Hermes, 2016 ARM) |
+      |---|---|---|---|
+      | x25519 shared secret | 2.635 ms | 29.000 ms | 57.650 ms |
+      | ed25519 sign | 1.370 ms | 11.500 ms | 26.000 ms |
+      | ed25519 verify | 2.720 ms | 45.900 ms | 89.950 ms |
+      | chacha20-poly1305 (512B) | 0.053 ms | 2.735 ms | 7.760 ms |
+      | sha256 (512B) | 0.027 ms | 5.335 ms | 15.165 ms |
+      | WebSocket.send (512B) | — | 0.370 ms | 0.700 ms |
+
+      The emulator has a desktop CPU and is still 11x to 198x slower than Node on
+      the same machine. The S7 is only about 2x slower than that. So the 2016
+      handset is a minor term: what dominates is Hermes interpreting pure-JS crypto
+      where Node runs OpenSSL/WASM.
+
+      WHAT THAT CHANGES. `noiseCrypto` (optimystic 1.3) is not an accommodation for
+      legacy hardware — every React Native device needs it. A modern phone should
+      land near the emulator's figures: ~116 ms of crypto per Noise handshake and
+      ~40-56 s of symmetric crypto per bring-up. That is inside the passing range we
+      measured (0.25x-0.5x of S7 cost passed, 1.0x failed), but not by much, and it
+      degrades with every extra strand and every slower device.
+
+      Also worth noting: `WebSocket.send` is 0.37 ms on the emulator against 0.70 ms
+      on the phone — the bridge scales with hardware as one would expect, and stays
+      a minor term either way. It is the crypto that does not scale.
 
 - [x] **DEVICE-FREE REPRODUCTION, and it is not a timeout: work grows
       SUPERLINEARLY with per-op cost.** (2026-09-21)

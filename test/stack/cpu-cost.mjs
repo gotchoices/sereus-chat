@@ -84,6 +84,12 @@ function byteLengthOf(data) {
 
 let ops = 0;
 let burnedMs = 0;
+/**
+ * Per-primitive counts. `keygen` and `dh` are the Noise handshake's asymmetric
+ * steps, so their totals are a direct census of HOW MANY HANDSHAKES happened —
+ * which is what distinguishes "the same work, slower" from "more work".
+ */
+const opCounts = new Map();
 
 const seen = new Set();
 function charge(ms, what) {
@@ -92,6 +98,7 @@ function charge(ms, what) {
     console.log(`[cpu-cost] first call: ${what}`);
   }
   ops += 1;
+  if (what) opCounts.set(what, (opCounts.get(what) ?? 0) + 1);
   burnedMs += ms;
   burn(ms);
 }
@@ -137,6 +144,9 @@ if (SCALE > 0) {
 
   console.log(`[cpu-cost] modelling ${SCALE}x of the measured S7 crypto deltas`);
   process.on('exit', () => {
+    const byOp = [...opCounts.entries()].sort((a, b) => b[1] - a[1])
+      .map(([k, v]) => `${k}=${v}`).join(' ');
     console.log(`[cpu-cost] ${ops} crypto ops, ${(burnedMs / 1000).toFixed(1)}s of CPU burned`);
+    console.log(`[cpu-cost] by primitive: ${byOp}`);
   });
 }

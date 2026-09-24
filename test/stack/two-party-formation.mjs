@@ -46,10 +46,13 @@
  */
 // FIRST: replaces the global WebSocket when WS_SEND_DELAY_MS is set, so every
 // socket libp2p opens below is already slowed. A no-op otherwise.
+import './ws-trace.mjs';
 import './ws-latency.mjs';
 // Models a slow device's crypto CPU cost (CPU_SLOWDOWN). Must precede any node
 // construction: noise copies its crypto method references when it is built.
 import './cpu-cost.mjs';
+// Starves the loop without slowing any operation (LOOP_HOG_DUTY).
+import './loop-hog.mjs';
 import { CadreNode, ControlFormationUsageRecorder, generateStrandMemberKey } from '@serfab/cadre-core';
 import { LevelDBRawStorage } from '@optimystic/db-p2p-storage-rn';
 import { webSockets } from '@libp2p/websockets';
@@ -215,17 +218,62 @@ try {
   if (HOST_ONLY) {
     const encoded = host.encodeInvitation(invitation);
     console.log('\n  sereus://invite/' + encoded + '\n');
+    // Write a real chat Message so a joining DEVICE has something to DISPLAY.
+    // Reading rows back on the device proves replication end to end, and unlike
+    // driving the app's composer it does not depend on tapping the right pixel.
+    const hostDb0 = founded.instance.database.getDatabase();
+    await hostDb0.exec(`insert into App.Member (Id, Name, AvatarUri) values (?, ?, ?)`,
+      ['node-host', 'Node Host', null]);
+    // Every column named, nulls included. Quereus does not treat an omitted
+    // column as NULL — it reports `NOT NULL constraint failed` on a column the
+    // schema declares nullable, which is what `Member.AvatarUri` did earlier too.
+    await hostDb0.exec(
+      `insert into App.Message (Id, MemberId, Content, Timestamp, ReplyToId, EditedAt)
+       values (?, ?, ?, ?, ?, ?)`,
+      [randomUUID(), 'node-host', 'Hello from the Node host', new Date().toISOString(), null, null]);
+    log('HOST: wrote a Member and a Message for the joiner to read');
+
     log('HOST: waiting for a device to join — Ctrl-C to stop');
     host.on('strand:writable', ({ strandId: id }) => log('HOST: strand:writable', id));
     // Report what the strand actually holds, so a join that half-completes is
     // visible from this side rather than only as silence on the device.
+    // Later messages, long after the joiner's first sync. If these reach a device
+    // that is already attached, the strand-level link survives the attach window;
+    // if only the pre-join message ever lands, it does not — and that difference
+    // is the whole question about why a device's own writes never come back.
+    let tick = 0;
+    setInterval(async () => {
+      try {
+        const db = founded.instance.database?.getDatabase?.();
+        if (!db) return;
+        tick += 1;
+        await db.exec(
+          `insert into App.Message (Id, MemberId, Content, Timestamp, ReplyToId, EditedAt)
+             values (?, ?, ?, ?, null, null)`,
+          [randomUUID(), 'node-host', `host tick ${tick}`, new Date().toISOString()],
+        );
+        log(`HOST: wrote "host tick ${tick}"`);
+      } catch (err) {
+        log('HOST: tick write failed —', err?.message ?? String(err));
+      }
+    }, 60_000);
+
     setInterval(async () => {
       try {
         const db = founded.instance.database?.getDatabase?.();
         if (!db) return log('HOST: strand has no database yet');
         let members = 0;
         for await (const _r of db.eval('select Id from App.Member')) members += 1;
-        log(`HOST: ${members} Member row(s), ${host.getMultiaddrs().length} addr(s)`);
+        // Messages too, and their CONTENT — this poll is how a message typed on a
+        // device becomes visible here, so counting alone would not show whether the
+        // text survived the trip.
+        const said = [];
+        for await (const r of db.eval('select Content from App.Message')) {
+          said.push(r?.Content ?? r?.content ?? JSON.stringify(r));
+        }
+        log(`HOST: ${members} Member row(s), ${said.length} Message row(s), ` +
+            `${host.getMultiaddrs().length} addr(s)`);
+        for (const c of said) log(`HOST:   message: ${JSON.stringify(c)}`);
       } catch (err) {
         log('HOST: poll failed —', err?.message ?? String(err));
       }

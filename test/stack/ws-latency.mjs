@@ -71,7 +71,10 @@ if (COUNT_FRAMES && typeof globalThis.WebSocket === 'function') {
   process.on('exit', () => {
     const counts = perSocket.map(f => f()).sort((a, b) => b - a);
     const total = counts.reduce((a, b) => a + b, 0);
-    console.log(`[ws-latency] outbound frames: ${total} across ${counts.length} socket(s); busiest ${counts[0] ?? 0}`);
+    // SOCKETS OPENED is the transport-level churn measure: the same work done
+    // slower opens the same number of connections, whereas a retry loop that
+    // re-dials opens more.
+    console.log(`[ws-latency] sockets opened: ${counts.length}; outbound frames: ${total}; busiest socket ${counts[0] ?? 0}`);
   });
 }
 

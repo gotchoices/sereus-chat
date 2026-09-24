@@ -155,7 +155,7 @@ export default function ChatInterface() {
       const target = editing;
       setEditing(null); setDraft('');
       try {
-        await editMessage(target.id, text);
+        await editMessage(strandId, target.id, text);
         setMessages(prev => prev.map(m => (m.id === target.id
           ? { ...m, content: text, editedAt: new Date().toISOString() } : m)));
       } catch (e: any) {
@@ -186,11 +186,11 @@ export default function ChatInterface() {
         ? [
             { text: t('actions.edit', 'Edit'), onPress: () => { setEditing(m); setReplyTo(null); setDraft(m.content); } },
             { text: t('actions.delete', 'Delete'), style: 'destructive' as const,
-              onPress: () => deleteMessage(m.id).then(load).catch(() => {}) },
+              onPress: () => deleteMessage(strandId, m.id).then(load).catch(() => {}) },
           ]
         : [
             { text: t('actions.reply', 'Reply'), onPress: () => setReplyTo(m) },
-            { text: t('actions.react', 'React 👍'), onPress: () => react(m.id, '👍').then(load).catch(() => {}) },
+            { text: t('actions.react', 'React 👍'), onPress: () => react(strandId, m.id, '👍').then(load).catch(() => {}) },
           ]),
       { text: t('actions.copy', 'Copy'), onPress: () => Clipboard.setString(m.content) },
       { text: t('common.cancel', 'Cancel'), style: 'cancel' as const },

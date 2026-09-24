@@ -9,7 +9,7 @@ import type {
   SearchBatch, SearchOptions, Invitation, InvitationPreview, Visibility,
   Prefs, StorageUsage, SendInput,
 } from '../types';
-import { ensureDefaultChatStrand, generateUuid, getDefaultChatStrand, rememberJoinedStrand, syncProfileNameToStrands } from '../chat-strand';
+import { ensureDefaultChatStrand, generateUuid, getDefaultChatStrand, registerSelfAsMember, rememberJoinedStrand, syncProfileNameToStrands } from '../chat-strand';
 import { createChatStrand, joinChatStrand } from '../chat-sapp';
 import type { StrandInstance } from '@serfab/cadre-core';
 import {
@@ -47,8 +47,8 @@ export class SereusAdapter implements DataAdapter {
   // wired (step 5).  Until then every chat screen reads/writes the single
   // default strand.
 
-  async listMessages(_strandId: string, _opts?: { before?: string; limit?: number }): Promise<Message[]> {
-    const strand = await ensureDefaultChatStrand();
+  async listMessages(strandId: string, _opts?: { before?: string; limit?: number }): Promise<Message[]> {
+    const strand = await this.strandFor(strandId);
     const [rows, reactions, atts] = await Promise.all([
       queryMessages(strand),
       queryReactions(strand).catch(() => []),
@@ -84,8 +84,8 @@ export class SereusAdapter implements DataAdapter {
     }));
   }
 
-  async send(_strandId: string, input: SendInput): Promise<Message> {
-    const strand = await ensureDefaultChatStrand();
+  async send(strandId: string, input: SendInput): Promise<Message> {
+    const strand = await this.strandFor(strandId);
     const peerId = cadreService.peerId;
     if (!peerId) throw new Error('Peer ID not available; cadre may not be running');
 
@@ -319,6 +319,30 @@ export class SereusAdapter implements DataAdapter {
   }
 
   /**
+   * The strand a strand-scoped call is about.
+   *
+   * Every per-strand read used to ignore its `strandId` and open the default
+   * strand instead — a step-3 stub from when the UI had no real strand ids.  The
+   * failure it caused is the quiet kind: a joined conversation renders as empty
+   * because the query ran against "My Notes", so replication looks broken when it
+   * is working.  Resolve here, or not at all.
+   *
+   * No id means the default strand, which is the one strand we can bring up on
+   * demand.  A named strand that is not attached THROWS rather than falling back
+   * to the default — reading the wrong conversation is worse than an error,
+   * because an error says so and a wrong read does not.
+   */
+  private async strandFor(strandId?: string | null): Promise<StrandInstance> {
+    if (!strandId) return ensureDefaultChatStrand();
+    const attached = cadreService.getStrands().get(strandId);
+    if (attached) return attached;
+    // Not in the map yet — it may be the default strand, which attaches lazily.
+    const fallback = await ensureDefaultChatStrand();
+    if (getDefaultChatStrand()?.strandId === strandId) return fallback;
+    throw new Error(`Strand ${strandId} is not attached on this device.`);
+  }
+
+  /**
    * An already-attached strand, by id — for inviting someone into a conversation
    * that exists. Throws rather than silently falling back to the default strand:
    * minting an invitation into the wrong conversation is worse than not minting
@@ -415,13 +439,17 @@ export class SereusAdapter implements DataAdapter {
         );
       }, 5000);
       try {
-        await joinChatStrand(node, joinedRow);
+        const instance = await joinChatStrand(node, joinedRow);
+        // Put ourselves in App.Member before declaring the join done — otherwise
+        // we are in the conversation but absent from it, and the other party has
+        // no row saying we arrived.
+        await registerSelfAsMember(instance);
         console.info(`[accept] ✓ attached in ${Date.now() - t0}ms`);
       } finally {
         clearInterval(tick);
       }
     } else {
-      await joinChatStrand(node, joinedRow);
+      await registerSelfAsMember(await joinChatStrand(node, joinedRow));
     }
 
     return { strandId };
@@ -431,11 +459,11 @@ export class SereusAdapter implements DataAdapter {
   // Each of these needs cadre-core surface that does not exist or is not
   // reachable from a solo device.  See design/stories/mobile/STATUS.md §G.
 
-  async getStrandState(_strandId: string): Promise<StrandState> {
+  async getStrandState(strandId: string): Promise<StrandState> {
     // Membership and manager rows are sereus's, and no production path writes
     // them yet (domain/sereus.md).  Until per-party identity lands, the honest
     // answer for a solo strand is: private, and I can still act.
-    const strand = await ensureDefaultChatStrand();
+    const strand = await this.strandFor(strandId);
     return {
       visibility: (strand as any).type === 'o' ? 'public' : 'private',
       managerCount: 1,
@@ -444,8 +472,8 @@ export class SereusAdapter implements DataAdapter {
     };
   }
 
-  async listMembers(_strandId: string): Promise<Member[]> {
-    const strand = await ensureDefaultChatStrand();
+  async listMembers(strandId: string): Promise<Member[]> {
+    const strand = await this.strandFor(strandId);
     const me = cadreService.peerId ?? '';
     const rows = await queryMembers(strand);
     return rows.map(r => ({
@@ -457,8 +485,8 @@ export class SereusAdapter implements DataAdapter {
     }));
   }
 
-  async listAttachments(_strandId: string, opts?: { kind?: Attachment['type'] }): Promise<Attachment[]> {
-    const strand = await ensureDefaultChatStrand();
+  async listAttachments(strandId: string, opts?: { kind?: Attachment['type'] }): Promise<Attachment[]> {
+    const strand = await this.strandFor(strandId);
     const rows = await queryAttachments(strand);
     return rows
       .filter(r => !opts?.kind || r.Type === opts.kind)
@@ -477,24 +505,24 @@ export class SereusAdapter implements DataAdapter {
       }));
   }
 
-  async editMessage(id: string, content: string): Promise<void> {
-    await updateMessage(await ensureDefaultChatStrand(), id, content);
+  async editMessage(strandId: string, id: string, content: string): Promise<void> {
+    await updateMessage(await this.strandFor(strandId), id, content);
   }
 
-  async deleteMessage(id: string): Promise<void> {
-    await removeMessage(await ensureDefaultChatStrand(), id);
+  async deleteMessage(strandId: string, id: string): Promise<void> {
+    await removeMessage(await this.strandFor(strandId), id);
   }
 
-  async react(id: string, symbol: string): Promise<void> {
+  async react(strandId: string, id: string, symbol: string): Promise<void> {
     const peerId = cadreService.peerId;
     if (!peerId) throw new Error('Peer ID not available; cadre may not be running');
-    await addReaction(await ensureDefaultChatStrand(), id, peerId, symbol);
+    await addReaction(await this.strandFor(strandId), id, peerId, symbol);
   }
 
-  async unreact(id: string, symbol: string): Promise<void> {
+  async unreact(strandId: string, id: string, symbol: string): Promise<void> {
     const peerId = cadreService.peerId;
     if (!peerId) throw new Error('Peer ID not available; cadre may not be running');
-    await removeReaction(await ensureDefaultChatStrand(), id, peerId, symbol);
+    await removeReaction(await this.strandFor(strandId), id, peerId, symbol);
   }
   async leaveStrand(_id: string, _o: { keepIdentity: boolean }): Promise<void> { this.notImplemented('leaveStrand'); }
   async resignManager(_id: string): Promise<void> { this.notImplemented('resignManager'); }

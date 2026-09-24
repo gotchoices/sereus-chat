@@ -11,10 +11,18 @@
 --   · There is no delivery or read status anywhere.  A reply is the evidence a
 --     message was read.
 
+-- NULLABILITY IS EXPLICIT HERE, and has to be.  Quereus follows the Third
+-- Manifesto and defaults a column to NOT NULL (`schema/column.js`:
+-- `notNull: defaultNotNull`), which is the OPPOSITE of the SQL convention this
+-- file was first written against.  Without the `null` markers below, every
+-- optional column was silently mandatory: `insertMessage` passes a null
+-- `ReplyToId` and omits `EditedAt`, so sending a message failed with
+-- `NOT NULL constraint failed` — on a column this file declares optional.
+
 table Member (
     Id text primary key,                -- libp2p Peer ID of the participating member
     Name text not null check (length(Name) between 1 and 100),
-    AvatarUri text
+    AvatarUri text null                 -- optional; Quereus defaults to NOT NULL
 );
 
 table Message (
@@ -22,8 +30,8 @@ table Message (
     MemberId text not null,
     Content text not null,
     Timestamp datetime not null,        -- asserted by the sender; not authoritative
-    ReplyToId text,                     -- quote-reply target, null when not a reply
-    EditedAt datetime,                  -- set when edited in place; no version chain
+    ReplyToId text null,                -- quote-reply target, null when not a reply
+    EditedAt datetime null,             -- set when edited in place; no version chain
     foreign key (MemberId) references Member(Id)
 );
 
@@ -31,11 +39,11 @@ table Attachment (
     Id text primary key,
     MessageId text not null,
     Type text not null,                 -- image | video | file | voice
-    Uri text,                           -- null while not held locally; see `locality` in ops.md
-    MimeType text,
-    Name text,
-    ByteSize integer,
-    DurationMs integer,                 -- video and voice
+    Uri text null,                      -- null while not held locally; see `locality` in ops.md
+    MimeType text null,
+    Name text null,
+    ByteSize integer null,
+    DurationMs integer null,            -- video and voice
     foreign key (MessageId) references Message(Id)
 );
 

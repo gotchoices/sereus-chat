@@ -120,21 +120,35 @@ async function doEnsureDefaultChatStrand(): Promise<StrandInstance> {
     );
   }
 
-  // Idempotent self-registration as a Member of this strand.  Pull the
-  // display name from the local profile; fall back to a truncated peer id
-  // until the user enters one.
-  const peerId = cadreService.peerId;
-  if (peerId) {
-    try {
-      const name = await readProfileDisplayName(peerId);
-      await upsertMember(strand, peerId, name);
-    } catch (err) {
-      console.warn('[chat-strand] upsertMember failed:', err);
-    }
-  }
+  await registerSelfAsMember(strand);
 
   cachedStrand = strand;
   return strand;
+}
+
+/**
+ * Idempotent self-registration as a Member of `strand`.
+ *
+ * EVERY strand we attach, not just the one we founded.  A strand we JOINED used
+ * to get no `App.Member` row for us at all: registration lived inline in the
+ * default-strand path, and the only other writer was `saveProfile`.  So unless a
+ * joiner happened to edit their profile afterwards, they were a participant that
+ * the conversation had no record of — their own strand-details screen listed
+ * only the other party, and their messages rendered with no name behind them.
+ *
+ * Failure is logged, not thrown: not being listed yet is a smaller harm than a
+ * join that reports itself as failed after it actually succeeded.
+ */
+export async function registerSelfAsMember(strand: StrandInstance): Promise<void> {
+  const peerId = cadreService.peerId;
+  if (!peerId) return;
+  try {
+    // The local profile name, or a truncated peer id until they enter one.
+    const name = await readProfileDisplayName(peerId);
+    await upsertMember(strand, peerId, name);
+  } catch (err) {
+    console.warn('[chat-strand] self-registration failed for', strand.strandId, err);
+  }
 }
 
 /**
@@ -355,7 +369,8 @@ export async function attachJoinedStrands(): Promise<void> {
     if (attaching.has(row.Id) || node.getStrands().has(row.Id)) continue;
     attaching.add(row.Id);
     try {
-      await joinChatStrand(node, row);
+      const instance = await joinChatStrand(node, row);
+      await registerSelfAsMember(instance);
       console.info('[chat-strand] ✓ re-attached joined strand:', row.Id);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

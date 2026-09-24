@@ -22,10 +22,10 @@ export interface DataAdapter {
 
   // ---- Writes ------------------------------------------------------------
   send(strandId: string, input: SendInput): Promise<Message>;
-  editMessage(messageId: string, content: string): Promise<void>;
-  deleteMessage(messageId: string): Promise<void>;
-  react(messageId: string, symbol: string): Promise<void>;
-  unreact(messageId: string, symbol: string): Promise<void>;
+  editMessage(strandId: string, messageId: string, content: string): Promise<void>;
+  deleteMessage(strandId: string, messageId: string): Promise<void>;
+  react(strandId: string, messageId: string, symbol: string): Promise<void>;
+  unreact(strandId: string, messageId: string, symbol: string): Promise<void>;
 
   /** keepIdentity:false is permanent — a later return is as a new member. */
   leaveStrand(strandId: string, opts: { keepIdentity: boolean }): Promise<void>;
@@ -92,10 +92,14 @@ export const listAttachments = async (id: string, o?: { kind?: Attachment['type'
   (await getAdapter()).listAttachments(id, o);
 
 export const send = async (id: string, input: SendInput) => (await getAdapter()).send(id, input);
-export const editMessage = async (id: string, c: string) => (await getAdapter()).editMessage(id, c);
-export const deleteMessage = async (id: string) => (await getAdapter()).deleteMessage(id);
-export const react = async (id: string, s: string) => (await getAdapter()).react(id, s);
-export const unreact = async (id: string, s: string) => (await getAdapter()).unreact(id, s);
+export const editMessage = async (strandId: string, id: string, c: string) =>
+  (await getAdapter()).editMessage(strandId, id, c);
+export const deleteMessage = async (strandId: string, id: string) =>
+  (await getAdapter()).deleteMessage(strandId, id);
+export const react = async (strandId: string, id: string, s: string) =>
+  (await getAdapter()).react(strandId, id, s);
+export const unreact = async (strandId: string, id: string, s: string) =>
+  (await getAdapter()).unreact(strandId, id, s);
 export const leaveStrand = async (id: string, o: { keepIdentity: boolean }) =>
   (await getAdapter()).leaveStrand(id, o);
 export const resignManager = async (id: string) => (await getAdapter()).resignManager(id);

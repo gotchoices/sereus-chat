@@ -28,6 +28,11 @@ import {
   type RelayReservationState,
   type StrandInstance,
 } from '@serfab/cadre-core';
+import {
+  buildNoiseCrypto,
+  DEFAULT_NOISE_CRYPTO_MODE,
+  type NoiseCryptoMode,
+} from './noise-crypto';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import {
@@ -82,6 +87,11 @@ class CadreServiceImpl {
    * machine's STRAND nodes as well as its control node — see `applyRelays`.
    */
   private _relayAddrs: string[] = [];
+  /**
+   * Which Noise primitives to run natively. Read at node CONSTRUCTION, like
+   * `relayAddrs` — see `setNoiseCryptoMode`.
+   */
+  private _noiseCryptoMode: NoiseCryptoMode = DEFAULT_NOISE_CRYPTO_MODE;
   /**
    * The address set the formation responder was last installed with, and the
    * timer that notices when reality diverges from it. See `watchReachability`.
@@ -392,6 +402,18 @@ class CadreServiceImpl {
           // other. `reference-app-rn/src/phone-node-config.ts` warns about this in
           // as many words.
           relayAddrs: this._relayAddrs,
+          // NATIVE CRYPTO FOR CONNECTION ENCRYPTION (cadre-core 1.3+).
+          //
+          // Metro resolves libp2p-noise's browser build, whose crypto is pure
+          // JavaScript; on Hermes that runs 11x-198x slower than Node's native
+          // path, measured on a desktop-class emulator, and it saturates the JS
+          // loop for long enough that libp2p's connection monitor tears down its
+          // own connections (gotchoices/sereus#13). cadre-core hands this to the
+          // control node AND every strand node.
+          //
+          // `undefined` when the mode is 'off', which is exactly stock behaviour —
+          // the switch exists so the timeout work can still be reproduced.
+          noiseCrypto: buildNoiseCrypto(this._noiseCryptoMode),
           // Fail-soft: a relay that is down leaves the app usable and merely
           // unreachable, which is the honest failure and the posture the old
           // `reserveRelays()` call was really after.
@@ -474,6 +496,41 @@ class CadreServiceImpl {
    * token is never actually checked.  Synchronous — `initializeStrandSolicitation`
    * only constructs + registers a responder; it performs no control-DB read.
    */
+  /**
+   * Choose how much of Noise's crypto runs natively, and rebuild the node if it
+   * is already up.
+   *
+   * A SWITCH rather than a constant, because it is also a measuring instrument:
+   *
+   *   off        stock — pure JS, the state every RN app is in today. Keep the
+   *              connection-monitor / timeout work reproducible.
+   *   symmetric  native sha256 + chacha20-poly1305. These are the PER-FRAME costs
+   *              (561x and 146x slower than native on our measurements) and a
+   *              bring-up pushes thousands of frames, so this is most of the win
+   *              for the least native surface.
+   *   full       adds x25519. ~22x, but paid per handshake rather than per frame.
+   *
+   * Like `relayAddrs`, this is read when the node is BUILT, so changing it on a
+   * running node means rebuilding — the same few seconds of reconnect, and the
+   * same reasoning (no identity change; the peer key is reloaded from the control
+   * store). Idempotent when unchanged.
+   */
+  async setNoiseCryptoMode(mode: NoiseCryptoMode): Promise<void> {
+    if (mode === this._noiseCryptoMode) return;
+    this._noiseCryptoMode = mode;
+    if (!this.node?.isRunning) return;
+
+    console.info(`[CadreService] noise crypto mode -> ${mode}; restarting node`);
+    await this.stop();
+    this._startPromise = null;
+    await this.ensureStarted();
+  }
+
+  /** What the node is currently built with. */
+  get noiseCryptoMode(): NoiseCryptoMode {
+    return this._noiseCryptoMode;
+  }
+
   /**
    * Point this machine at `addrs` as its relays, and make that true of the
    * running node.
