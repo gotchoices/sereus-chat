@@ -240,7 +240,33 @@ What this run proved, and the two app bugs it exposed:
       per the release notes must be redeployed for its side to take effect; the running relay has
       not been.
 
+- [x] **A founder is now a Member of its own strand.** Founding did not make it one, and
+      `Message.MemberId` is a foreign key into `App.Member` — so whoever STARTED a conversation
+      could not say anything in it (`CHECK constraint failed: _fk_Message_MemberId`) while whoever
+      JOINED could write freely, because the accept path registered them. Found device-to-device:
+      the emulator founded, the S20 joined, S20 → emulator messages worked, emulator → S20 failed,
+      and the founder's own strand listed exactly one member — the joiner. `createInvitation` now
+      calls `registerSelfAsMember` after founding, and `attachDiscoveredStrand` does too, which is
+      what heals strands founded before this: a founded strand returns through DISCOVERY on restart,
+      not through the remembered-joins list, so that is the only path that can repair one. Verified
+      by restart — the founder then listed both parties and its next message was accepted.
+
 Still open, and the reason a two-party conversation is not yet dependable:
+
+- [ ] **Founder → joiner replication silently does nothing (device-to-device).** With the
+      membership bug above fixed, the founder's writes commit locally and reach the other device
+      never: over five minutes, across a full app restart and re-attach on the joiner, the S20 saw
+      neither the emulator's new `App.Member` row nor its message, and listed only itself as a
+      member. The reverse direction worked throughout in the same conversation. No error on either
+      side — the sending app believes it succeeded. This is the shape of optimystic#19 ("a commit
+      whose cohort could not be resolved at all is reported to the caller as an ordinary success"):
+      a plausible reading is that the joiner learned the founder's addresses from the invitation
+      seed while the founder never learned the joiner's, so the founder resolves no cohort, takes
+      the solo branch, and writes to itself. NOT yet proven — the debug logging to confirm it has
+      not been run, and the asymmetry could equally be something in our own attach path.
+      **This is now the top blocker for a usable two-party chat**, ahead of the contention outage,
+      because it needs no contention at all: one person starting a conversation and typing once is
+      enough.
 
 - [ ] **Concurrent writes can wedge a collection permanently, on both machines.** When the
       device and the host both wrote `App.Message` at about the same moment, every subsequent write

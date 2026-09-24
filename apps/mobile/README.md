@@ -26,7 +26,7 @@ With Metro running, open a new terminal window/pane from the root of your React 
 
 ```sh
 # Using npm
-npm run android
+yarn android
 
 # OR using Yarn
 yarn android
@@ -52,7 +52,7 @@ For more information, please visit [CocoaPods Getting Started guide](https://gui
 
 ```sh
 # Using npm
-npm run ios
+yarn ios
 
 # OR using Yarn
 yarn ios

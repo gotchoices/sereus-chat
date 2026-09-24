@@ -259,7 +259,13 @@ async function attachDiscoveredStrand(strandId: string, strandRow: StrandRow): P
 
   attaching.add(strandId);
   try {
-    await joinChatStrand(node, strandRow);
+    const instance = await joinChatStrand(node, strandRow);
+    // Also here, not only on the join and re-attach paths. A strand this device
+    // FOUNDED comes back through discovery after a restart, not through the
+    // remembered-joins list, so this is where such a strand gets its self Member
+    // row if it is missing one — including strands founded before the founding
+    // path registered at all, which are otherwise permanently unable to send.
+    await registerSelfAsMember(instance);
     console.info('[chat-strand] ✓ attached discovered strand:', strandId);
   } catch (err) {
     // Best-effort on purpose: a strand we cannot attach now (no peer reachable

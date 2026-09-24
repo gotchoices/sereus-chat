@@ -4,7 +4,7 @@ Validates the **sereus stack** against a new release, in Node — no app, no dev
 no emulator. Run it whenever `@serfab/cadre-core` or `@optimystic/*` moves.
 
 ```sh
-cd test/stack && npm install     # first run only
+cd test/stack && yarn install    # first run only
 yarn stack:check                 # from the repo root
 ```
 

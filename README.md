@@ -2,7 +2,7 @@
 
 Quick commands
 - Start Metro: `npm start -- --reset-cache`
-- Run Android: `npm run android`
+- Run Android: `yarn android`
 - Build Android APK (CI/local): `cd android && ./gradlew clean assembleDebug`
 
 Deep linking (Android emulator)

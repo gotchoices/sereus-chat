@@ -291,6 +291,17 @@ export class SereusAdapter implements DataAdapter {
       ? await this.attachedStrandById(input.strandId)
       : (await createChatStrand(node, generateUuid(), input.visibility ?? 'private')).instance;
 
+    // THE FOUNDER HAS TO BE A MEMBER OF ITS OWN STRAND, and founding does not make
+    // it one. `Message.MemberId` is a foreign key into `App.Member`, so a founder
+    // with no row there cannot say anything in the conversation it just started —
+    // every send fails the check constraint while the person who JOINED can write
+    // freely, because the accept path registers them. Exactly that asymmetry was
+    // seen between two devices: the joiner's messages arrived, the founder's were
+    // refused, and the founder's own strand listed one member who was the joiner.
+    // Idempotent, so inviting a second person into an existing strand re-runs it
+    // harmlessly.
+    await registerSelfAsMember(strand);
+
     const invitation = await node.createOpenInvitation(CHAT_SAPP_ID, INVITE_EXPIRY_MS);
 
     await withTimeout(

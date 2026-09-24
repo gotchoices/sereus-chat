@@ -1,2 +1,11 @@
 node_modules/
+# This project uses yarn; an npm lockfile here means someone ran `npm install`.
 package-lock.json
+
+# Yarn's local install state — machine-specific, same set apps/mobile ignores.
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions

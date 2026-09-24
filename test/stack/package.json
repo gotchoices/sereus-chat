@@ -1,8 +1,9 @@
 {
   "name": "@sereus-chat/stack-check",
+  "packageManager": "yarn@4.3.1",
   "private": true,
   "type": "module",
-  "description": "Validates the sereus stack in Node — no app, no device. See README.md.",
+  "description": "Validates the sereus stack in Node \u2014 no app, no device. See README.md.",
   "scripts": {
     "check": "node found-strand.mjs",
     "two-party": "node two-party-formation.mjs"

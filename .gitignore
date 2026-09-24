@@ -35,3 +35,8 @@ tmp/
 # verify the watch is live, then deletes them; one got committed because it
 # happened to exist when something ran `git add`. They are never ours to keep.
 .watchman-cookie-*
+
+# This project uses yarn. An npm lockfile here means someone ran `npm install`,
+# which resolves independently of yarn.lock and silently drifts the two apart —
+# apps/mobile carried both for a while and they disagreed.
+package-lock.json
