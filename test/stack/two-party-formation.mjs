@@ -64,6 +64,17 @@ import { openTestDb } from './classic-level-driver.mjs';
 
 const FIRST_SYNC_TIMEOUT_MS = Number(process.env.FIRST_SYNC_TIMEOUT_MS ?? 120_000);
 const HOST_ONLY = process.argv.includes('--host');
+// `--join <sereus://invite/...>` runs ONLY the joiner, in its own process.
+// Separate processes are the point: with both parties in one process there is a
+// single global WebSocket and a single event loop, so one party cannot be made
+// unreachable without taking the other down with it. As two processes, the joiner
+// can be frozen with SIGSTOP — alive, sockets still open, answering nothing —
+// which is what the device looked like when its relay reservation lapsed
+// mid-commit and both sides then reported the same unresolved rival action.
+const JOIN_ARG = (() => {
+  const i = process.argv.indexOf('--join');
+  return i >= 0 ? process.argv[i + 1] : null;
+})();
 
 /** The relay the phones use. Read from the running relay's log unless overridden. */
 function resolveRelayAddr() {
@@ -181,17 +192,69 @@ try {
   const relayAddr = resolveRelayAddr();
   log('relay', relayAddr);
 
-  host = await makeParty('HOST', relayAddr);
-  await awaitReachable(host, 'HOST');
+  // A joiner-only process builds NO host party: the host is a different process,
+  // and standing one up here would only compete for the same relay and, under the
+  // slow-device knobs, fail its own reservation before the joiner ever starts.
+  if (!JOIN_ARG) {
+    host = await makeParty('HOST', relayAddr);
+    await awaitReachable(host, 'HOST');
+  }
   if (!HOST_ONLY) {
     joiner = await makeParty('JOINER', relayAddr);
-    await awaitReachable(joiner, 'JOINER');
+    await awaitReachable(joiner, 'JOINER', Number(process.env.REACHABLE_MS ?? 60_000));
   }
 
   // ── Host founds a CLOSED strand and binds an invitation to it ──────────────
   const strandId = randomUUID();
   const memberPrivateKey = await generateStrandMemberKey();
   log('HOST: founding closed strand', strandId);
+  // ── Joiner-only process ───────────────────────────────────────────────────
+  if (JOIN_ARG) {
+    const encoded = JOIN_ARG.replace(/^sereus:\/\/invite\//, '').trim();
+    const invite = joiner.decodeInvitation(encoded);
+    log(`JOINER: redeeming ${invite.token}`);
+
+    const r = await joiner.formStrand(invite, {
+      partyId: joiner.peerId?.toString(),
+      purpose: 'abandoned-commit check',
+      metadata: { app: SAPP.id },
+    });
+    log(`JOINER: formed strand ${r.strandId}, memberKey=${!!r.memberPrivateKey}`);
+
+    const inst = await joiner.addStrand({
+      strandRow: {
+        Id: r.strandId,
+        MemberPrivateKey: r.memberPrivateKey ?? null,
+        Type: 'c',
+        FounderOwnerKey: null,
+      },
+      sAppConfig: SAPP,
+      founder: false,
+    });
+    log(`JOINER: attached, status ${inst.status}, database ${!!inst.database}`);
+
+    const jdb = inst.database.getDatabase();
+    await jdb.exec(`insert into App.Member (Id, Name, AvatarUri) values (?, ?, ?)`,
+      ['joiner-proc', 'Joiner Process', null]);
+    log('JOINER: registered as a Member — READY');
+
+    // Write forever, so the parent can freeze this process mid-commit.
+    let n = 0;
+    for (;;) {
+      n += 1;
+      try {
+        await jdb.exec(
+          `insert into App.Message (Id, MemberId, Content, Timestamp, ReplyToId, EditedAt)
+           values (?, ?, ?, ?, ?, ?)`,
+          [randomUUID(), 'joiner-proc', `joiner write ${n}`, new Date().toISOString(), null, null]);
+        log(`JOINER: write ${n} ✓`);
+      } catch (e) {
+        log(`JOINER: write ${n} ✗ ${e?.message ?? e}`);
+      }
+      await new Promise(res => setTimeout(res, Number(process.env.JOIN_WRITE_MS ?? 1500)));
+    }
+  }
+
   const founded = await host.foundStrand({
     strandId, type: 'c', memberPrivateKey, sAppConfig: SAPP,
   });
@@ -398,6 +461,42 @@ try {
       [randomUUID(), 'host-1', text, new Date().toISOString(), null, null]);
   };
 
+  // ── An abandoned commit ──────────────────────────────────────────────────
+  // ABANDON=1 models what the device did: `myAddrs` flapped 4 → 0 → 4 mid-write,
+  // i.e. its relay reservation lapsed while a commit was in flight. Both machines
+  // then reported the SAME unresolved rival action id forever after, which is what
+  // an action that reserved blocks and never came back to release them would look
+  // like. Here: the joiner starts a write, and its node is stopped without ever
+  // awaiting that write — then we ask whether the host can still write at all.
+  if (process.env.ABANDON === '1') {
+    log('ABANDON: joiner starts a write, then its node is stopped mid-flight…');
+    const abandoned = joinerSays('abandoned write').catch(e =>
+      log(`  (joiner's own write rejected: ${e?.message ?? e})`));
+    await new Promise(r => setTimeout(r, Number(process.env.ABANDON_AFTER_MS ?? 150)));
+    try { await joiner.stop(); log('ABANDON: joiner node stopped'); }
+    catch (e) { log(`ABANDON: stop threw ${e?.message ?? e}`); }
+    void abandoned;
+
+    let blocked = null;
+    for (let i = 1; i <= 8; i++) {
+      try {
+        await hostSays(`after-abandon ${i}`);
+        log(`ABANDON: host write ${i} ✓ accepted`);
+        blocked = null;
+        break;
+      } catch (e) {
+        blocked = e?.message ?? String(e);
+        log(`ABANDON: host write ${i} ✗ ${blocked}`);
+        await new Promise(r => setTimeout(r, 5000));
+      }
+    }
+    log(blocked
+      ? 'REPRODUCED: an abandoned commit leaves the collection unwritable for the surviving party.'
+      : 'Not reproduced: the host still writes after the joiner vanished mid-commit.');
+    exitCode = blocked ? 2 : 0;
+    throw new Error('__done__');
+  }
+
   const ROUNDS = Number(process.env.ROUNDS ?? 5);
   let wedged = null;
   for (let i = 1; i <= ROUNDS && !wedged; i++) {
@@ -438,7 +537,8 @@ try {
   }
   exitCode = late ? 0 : 1;
 } catch (err) {
-  log('✗ FAILED:', err?.name ?? 'Error', '—', err?.message ?? String(err));
+  if (err?.message === '__done__') { /* abandon mode finished */ }
+  else log('✗ FAILED:', err?.name ?? 'Error', '—', err?.message ?? String(err));
   if (err?.stack) console.log(err.stack.split('\n').slice(1, 6).join('\n'));
 } finally {
   for (const n of [joiner, host]) { try { await n?.stop?.(); } catch { /* best effort */ } }

@@ -180,6 +180,19 @@ runtime schema are one file. `newId()` in `chat-operations.ts` mints UUIDs via t
       different keys; the wrong one yields a strand you cannot write to). Disclosure carries only
       the display name. Cannot be exercised on one device, so this is written from the cadre-core
       signatures rather than a passing run
+- [ ] **Offer our RN native-crypto module upstream.** `src/cadre/noise-crypto.ts` has nothing
+      chat-specific in it: it ports `@chainsafe/libp2p-noise`'s own `nodeCrypto` onto
+      `react-native-quick-crypto`, behind the `NoiseCryptoMode` switch that keeps pure-JS crypto
+      available for timeout debugging. The SEAM is already upstream — cadre-core 1.3.0 honours
+      `network.noiseCrypto` and passes it to the control node and every strand node, and optimystic
+      exports `NoiseCryptoInterface` and `noisePureJsCrypto` from `@optimystic/db-p2p` and `/rn` —
+      but no implementation or guidance ships anywhere, and the cadre-core ticket says so outright:
+      "Wiring an actual native library into `reference-app-rn` is a separate decision; don't do it
+      here." So today every sereus RN app must write this itself, including the PKCS8 and X25519 DER
+      prefixes and the Buffer aliasing against `@craftzdog/react-native-buffer` rather than the
+      global — the kind of detail that should not travel by copy-paste the way the polyfills do.
+      Proposed home: `@optimystic/db-p2p/rn`, beside `noisePureJsCrypto`, with
+      `react-native-quick-crypto` as an optional peer dependency.
 - [ ] `inspectInvitation`, `leaveStrand`, `resignManager`, `removeMember`
 - [ ] Blocked by platform: per-party identity not landed (every joiner presents the founding key,
       so there is no real sender attribution); RBAC not switched on in production. See
@@ -222,6 +235,36 @@ Still open, and the reason a two-party conversation is not yet usable:
       attach window. That was wrong. Late writes do cross — verified host-side — right up until a
       concurrent-write conflict wedges the collection, after which nothing crosses in either
       direction and the earlier evidence reads the same way.
+
+      **Reproduced device-free, 2026-09-23** — `test/stack/contention-repro.sh` (run it against the
+      dev relay). Two parties write the same collection at once and one of them is loop-starved;
+      the starved party is then refused with the same errors the phone produced, including the
+      exact one:
+
+          exhausted 10 retries: pending conflict: block(s) held by unresolved rival action(s) <id>
+          exhausted 10 retries: Pend blocks held: 2/2 member(s) hold an unresolved rival action (0/2 approvals)
+          exhausted 10 retries: stale revision: block X at rev N, requested rev N, last seen block X at rev N
+
+      The last one calls a revision stale while printing the same number three times. What does NOT
+      reproduce is the permanence: on device both machines reported one rival action id for as long
+      as they were watched, whereas here the starved party recovers after a few failures.
+
+      What it took, and what failed to provoke it: full-speed concurrency (60 rounds), 60 ms of
+      injected link latency, a joiner stopped mid-commit, and a joiner frozen with SIGSTOP and
+      resumed — none collided. Only a writer that cannot keep up does it, which is the one thing
+      Hermes does to a phone that Node does not do to itself. Two processes are required: one
+      process has a single global WebSocket and a single event loop, so "slow" cannot be applied to
+      one party alone. `--join <invite>` was added to `two-party-formation.mjs` for this.
+
+      **Do not upgrade past optimystic 1.4 before running this**, or a fix and a masking are
+      indistinguishable. 1.5.0 looks directly relevant and is worth testing against it:
+      `every-member-votes-for-whichever-racing-write-reached-it-first` states that on a two-member
+      cohort where each writer coordinates through its own node, a first-round collision was "a
+      guaranteed double loss" — which is what `0/2 approvals` above is — and that one writer now
+      wins outright at cohort sizes 2 and 3, with the old behaviour remaining at 4 and up. Also in
+      1.5: `bug-concurrent-unique-refusal-is-not-a-constraint-error`,
+      `debt-a-contended-two-party-commit-settles-into-a-per-run-retry-pattern`, and
+      `connection-monitor-deadline-is-capped-by-the-ping-interval` (ours, from PR #15).
 - [ ] **First sync needs a settled node, not just a longer deadline.** `addStrand` fails with
       `StrandAwaitingFirstSyncError` — "no member of this strand has been reachable since this
       machine joined" — when the invitation is redeemed too soon after app start. Seven consecutive
