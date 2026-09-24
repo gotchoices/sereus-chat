@@ -193,7 +193,17 @@ runtime schema are one file. `newId()` in `chat-operations.ts` mints UUIDs via t
       global — the kind of detail that should not travel by copy-paste the way the polyfills do.
       Proposed home: `@optimystic/db-p2p/rn`, beside `noisePureJsCrypto`, with
       `react-native-quick-crypto` as an optional peer dependency.
-- [ ] `inspectInvitation`, `leaveStrand`, `resignManager`, `removeMember`
+- [ ] **`leaveStrand` has no upstream surface to call.** Story 33 specifies three distinct
+      outcomes — mute, leave (stop taking part, keep identity so a re-invite returns you as
+      yourself) and forget entirely (leave, then discard identity and held data). cadre-core 1.4.0
+      exposes `stopStrand()` and nothing else: no leave, no revocation, no `removeMember`. So
+      `SereusAdapter.leaveStrand` is `notImplemented` and throws, which is the error a user gets
+      from the strand menu today. A local-only "forget" (stopStrand + drop it from our list) is
+      buildable now and would cover testing hygiene, but it is NOT story 33's leave: the other
+      members would never learn, and the spec is explicit that leaving is visible as "gone quiet"
+      rather than silent. Decide whether to ship the local version, or hide the option until
+      upstream has the surface.
+- [ ] `inspectInvitation`, `resignManager`, `removeMember`
 - [ ] Blocked by platform: per-party identity not landed (every joiner presents the founding key,
       so there is no real sender attribution); RBAC not switched on in production. See
       [`domain/sereus.md`](../domain/sereus.md)
@@ -253,20 +263,28 @@ What this run proved, and the two app bugs it exposed:
 
 Still open, and the reason a two-party conversation is not yet dependable:
 
-- [ ] **Founder → joiner replication silently does nothing (device-to-device).** With the
-      membership bug above fixed, the founder's writes commit locally and reach the other device
-      never: over five minutes, across a full app restart and re-attach on the joiner, the S20 saw
-      neither the emulator's new `App.Member` row nor its message, and listed only itself as a
-      member. The reverse direction worked throughout in the same conversation. No error on either
-      side — the sending app believes it succeeded. This is the shape of optimystic#19 ("a commit
-      whose cohort could not be resolved at all is reported to the caller as an ordinary success"):
-      a plausible reading is that the joiner learned the founder's addresses from the invitation
-      seed while the founder never learned the joiner's, so the founder resolves no cohort, takes
-      the solo branch, and writes to itself. NOT yet proven — the debug logging to confirm it has
-      not been run, and the asymmetry could equally be something in our own attach path.
-      **This is now the top blocker for a usable two-party chat**, ahead of the contention outage,
-      because it needs no contention at all: one person starting a conversation and typing once is
-      enough.
+- [x] **Founder → joiner replication — OURS, not optimystic#19.** This was recorded here as a
+      suspected upstream fault ("a commit whose cohort could not be resolved is reported as
+      success"). That was wrong, and nothing was posted upstream claiming it. Two of our own bugs,
+      both now fixed and verified device-to-device on 2026-09-24:
+
+      1. **The founder was not a Member of its own strand** (above) — `Message.MemberId` is a
+         foreign key, so the founder could not write at all.
+      2. **A founder re-attached its own strand as a joiner.** `attachDiscoveredStrand` passed
+         `founder: false` unconditionally, and cadre-core documents that "an explicit `true`/`false`
+         wins over the derivation" from `FounderOwnerKey`. A founded strand comes back through
+         DISCOVERY after a restart, so the founder told cadre-core it was a joiner of its own
+         strand — and a joiner "writes nothing; it receives those rows via Optimystic sync", so it
+         skipped its own membership bootstrap and waited for rows only it could have written.
+         `joinChatStrand` now takes `deriveFounder`, and the discovery path passes it so
+         founder-ness is derived from the row. The explicit `false` is kept where it is correct:
+         the formation flow's consent-seated row carries `FounderOwnerKey: null`, which matches
+         nobody, so there the derivation would be an accident rather than a decision.
+
+      Verified end to end, emulator (founder) ↔ Galaxy S7 (joiner), both relay-only over the local
+      relay: founder → joiner before a restart, founder → joiner AFTER a restart (the case bug 2
+      broke), and joiner → founder. All three messages present on both devices, in order. The S7's
+      join took 142 s, which is slow but succeeded first try.
 
 - [ ] **Concurrent writes can wedge a collection permanently, on both machines.** When the
       device and the host both wrote `App.Message` at about the same moment, every subsequent write

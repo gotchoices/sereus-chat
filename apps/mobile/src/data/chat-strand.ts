@@ -259,7 +259,12 @@ async function attachDiscoveredStrand(strandId: string, strandRow: StrandRow): P
 
   attaching.add(strandId);
   try {
-    const instance = await joinChatStrand(node, strandRow);
+    // `deriveFounder`: this row came from the CONTROL NETWORK, so it carries a real
+    // `FounderOwnerKey` — and a strand THIS device founded arrives here after a
+    // restart, not through the remembered-joins list. Forcing `founder: false`
+    // told cadre-core we were a joiner of our own strand, which skips the founding
+    // membership bootstrap.
+    const instance = await joinChatStrand(node, strandRow, { deriveFounder: true });
     // Also here, not only on the join and re-attach paths. A strand this device
     // FOUNDED comes back through discovery after a restart, not through the
     // remembered-joins list, so this is where such a strand gets its self Member

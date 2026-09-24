@@ -238,6 +238,32 @@ try {
       ['joiner-proc', 'Joiner Process', null]);
     log('JOINER: registered as a Member — READY');
 
+    // READ-ONLY MODE (`JOIN_WRITE_MS=0`): report what the founder's writes actually
+    // deliver here. This is the instrument for "a device founds a strand and its
+    // messages never reach the other party" — as a Node joiner it prints exactly
+    // what it can see, with none of the device's UI in the way.
+    if (Number(process.env.JOIN_WRITE_MS ?? 1500) === 0) {
+      let last = '';
+      for (;;) {
+        try {
+          let members = 0; const said = [];
+          for await (const _r of jdb.eval('select Id from App.Member')) members += 1;
+          for await (const r of jdb.eval('select Content from App.Message')) {
+            said.push(r?.Content ?? r?.content ?? JSON.stringify(r));
+          }
+          const now = `${members} Member row(s), ${said.length} Message row(s)`;
+          if (now !== last) {
+            log(`JOINER SEES: ${now}`);
+            for (const c of said) log(`JOINER SEES:   ${JSON.stringify(c)}`);
+            last = now;
+          }
+        } catch (e) {
+          log(`JOINER read failed: ${e?.message ?? e}`);
+        }
+        await new Promise(res => setTimeout(res, 5000));
+      }
+    }
+
     // Write forever, so the parent can freeze this process mid-commit.
     let n = 0;
     for (;;) {

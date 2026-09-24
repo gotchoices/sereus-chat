@@ -1,3 +1,8 @@
 <resources>
-    <string name="app_name">mobile</string>
+    <!-- The launcher label. Was "mobile" — React Native's default, taken from the
+         directory name, which is what the phone showed under the icon. iOS has said
+         "Sereus Chat" since it was set up (CFBundleDisplayName); this matches it.
+         Matters more than cosmetics here: health and chat both install on the same
+         test devices, so an app called "mobile" is genuinely ambiguous. -->
+    <string name="app_name">Sereus Chat</string>
 </resources>

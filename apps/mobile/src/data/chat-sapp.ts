@@ -151,16 +151,26 @@ export async function createChatStrand(
 export async function joinChatStrand(
   cadreNode: CadreNode,
   strandRow: StrandRow,
+  opts: { deriveFounder?: boolean } = {},
 ): Promise<StrandInstance> {
   return cadreNode.addStrand({
     strandRow,
     sAppConfig: getChatSAppConfig(),
-    // EXPLICIT, not omitted.  Left unset, founder-ness is derived by comparing the
-    // row's `FounderOwnerKey` to this node's own owner key — and a consent-seated
-    // row carries `null` there, which matches nobody.  cadre-core's own docs say
-    // the formation flows pass this deliberately for exactly that reason.
-    // A joiner also writes nothing: it receives `Strand.Header`, `Member` and
-    // `Manager` by sync from the party that founded the strand.
-    founder: false,
+    // `founder: false` is EXPLICIT for a consent-seated row, and OMITTED when the
+    // row carries real founder provenance — the difference matters more than it
+    // looks, because cadre-core documents that "an explicit true/false wins over
+    // the derivation".
+    //
+    // A row from the formation flow has `FounderOwnerKey: null`, which matches
+    // nobody, so the derivation would make a joiner a non-founder by accident
+    // rather than on purpose; those callers pass `false` deliberately.
+    //
+    // But a row that came from the CONTROL NETWORK carries the real founder key,
+    // and forcing `false` there tells this node it is a joiner OF A STRAND IT
+    // FOUNDED. A joiner "writes nothing — it receives those rows via Optimystic
+    // sync", so the founder skips its own membership bootstrap and waits forever
+    // for rows only it could have written. Pass `deriveFounder` for such a row and
+    // let cadre-core compare `FounderOwnerKey` to this node's owner key.
+    ...(opts.deriveFounder ? {} : { founder: false as const }),
   });
 }

@@ -141,14 +141,36 @@ export class SereusAdapter implements DataAdapter {
       } catch (err) {
         console.warn('[SereusAdapter] last-message preview failed for', id, err);
       }
+      // WHO ELSE IS IN IT is the title. `domain/ops.md`: "`title` is the app's,
+      // not sereus's — no strand-title slot exists upstream. Two-party strands
+      // fall back to the other member's name; unnamed groups compose from member
+      // names." There is no screen for naming a strand and there is not meant to
+      // be one. This used to render `Strand ${id.slice(0, 8)}`, which is a
+      // placeholder the spec never asked for — a list of hex is unreadable, and
+      // it made the app look like it had lost a feature it never had.
+      let members: Awaited<ReturnType<typeof queryMembers>> = [];
+      try {
+        members = await queryMembers(strand);
+      } catch (err) {
+        console.warn('[SereusAdapter] member names unavailable for', id, err);
+      }
+      const me = cadreService.peerId ?? '';
+      const others = members.filter(m => m.Id !== me);
+      const nameOf = (m: { Id: string; Name?: string }) => m.Name?.trim() || m.Id.slice(0, 8);
+      // Until the other side's Member row arrives, `others` is empty and there is
+      // nothing truthful to call it — say so rather than invent a name.
+      const title =
+        id === defaultId ? 'My Notes'
+        : others.length === 0 ? 'New strand'
+        : others.length === 1 ? nameOf(others[0])
+        : others.map(nameOf).join(', ');
+
       summaries.push({
         id,
-        // Solo placeholder until partner metadata exists.  Strand titles are
-        // the app's to own — sereus has no title slot (domain/schema.md).
-        title: id === defaultId ? 'My Notes' : `Strand ${id.slice(0, 8)}`,
+        title,
         avatarUri: null,
-        isGroup: false,
-        memberCount: 1,
+        isGroup: others.length > 1,
+        memberCount: Math.max(members.length, 1),
         lastMessage: preview,
         unreadCount: 0,
         mentioned: false,

@@ -2,6 +2,17 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Scanning an invitation QR code (story 03: "she scans the code again").
+         The scanner already calls `Camera.requestCameraPermission()`, but Android
+         refuses to grant a permission the manifest never declared, so the request
+         came back denied and `useCameraDevice('back')` returned null — which the
+         screen honestly reported as "Camera unavailable". It reads like the camera
+         is missing, e.g. on an emulator; on a real phone it was this.
+         `required="false"` so a device with no camera can still install and use
+         links instead. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
