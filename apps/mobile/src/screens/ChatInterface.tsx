@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Clipboard from '@react-native-clipboard/clipboard';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import {
   listMessages, listMembers, getStrandState, send, deleteMessage, react, editMessage,
 } from '../data/adapter';
@@ -107,6 +107,36 @@ export default function ChatInterface() {
   }, [strandId]);
 
   useEffect(() => { void load(); }, [load, rev]);
+
+  /**
+   * Incoming messages, which otherwise never arrive.
+   *
+   * This screen used to read once on mount and never again, so a message the
+   * other party sent while you were looking at the conversation simply did not
+   * appear — you had to leave the screen and come back. For a chat app that is
+   * the difference between working and not.
+   *
+   * A POLL, not a subscription, because there is nothing to subscribe to yet:
+   * cadre-core emits strand LIFECYCLE events only (`strand:started`,
+   * `strand:writable`, …) and nothing per row, and optimystic's
+   * `onCollectionChange` is explicitly a no-op unless a `localChangeNotifier`
+   * was supplied at construction, which cadre-core does not do. Replace this the
+   * day either of those changes.
+   *
+   * WHILE FOCUSED ONLY, and not fast. Each pass is three Quereus queries
+   * (messages, reactions, attachments) plus members, and CPU is the scarce
+   * resource on a phone here — the stack's own sync work is what competes with
+   * it, and starving that is how joins and writes start failing. Ten seconds is
+   * slow for a conversation and is deliberately the conservative end; it is a
+   * stopgap for a missing notification, not a design.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+      const t = setInterval(() => { void load(); }, 10_000);
+      return () => clearInterval(t);
+    }, [load]),
+  );
 
   // Draft and read cursor are device-local.  Nothing unsent leaves the phone.
   useEffect(() => {

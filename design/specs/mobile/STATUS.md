@@ -218,15 +218,47 @@ What this run proved, and the two app bugs it exposed:
       strand and did not then edit their profile was a participant the conversation had no record
       of. Now `registerSelfAsMember` runs on first join and on every re-attach.
 
-Still open, and the reason a two-party conversation is not yet usable:
+- [x] **Incoming messages appear without leaving the screen.** `ChatInterface` read once on mount
+      and never again, so a message the other party sent while you were looking at the conversation
+      did not show up until you navigated away and back — for a chat app, the difference between
+      working and not. It now refreshes on focus and polls every 10 s while focused. A POLL because
+      there is nothing to subscribe to: cadre-core emits strand lifecycle events only
+      (`strand:started`, `strand:writable`, …) and nothing per row, and optimystic's
+      `onCollectionChange` is a documented no-op unless a `localChangeNotifier` was supplied at
+      construction, which cadre-core does not do. Ten seconds is deliberately conservative — each
+      pass is four Quereus queries, and CPU is what the stack's own sync work competes for.
+- [x] **Full two-party round trip verified on device**, 2026-09-24. Emulator joined a Node host in
+      24 s; the host's messages appeared on an untouched screen (ticks 14 → 30 with no interaction);
+      a message typed on the device reached the host. Both directions, one conversation, live.
+
+- [x] **Stack upgraded to sereus 1.4.0 / optimystic 1.5.0**, 2026-09-24, app and
+      `test/stack` together (cadre-core 1.4.0 requires `@optimystic/*` ^1.5.0, so they move as a
+      pair). `tsc` clean, Node two-party green, and the device join got FASTER — 18 s, against 24 s
+      on 1.3.0/1.4.0 and 36-94 s before that. We pass no `connectionMonitor`, so the node now
+      inherits 1.4.0's new default (30 s ping deadline, 35 s interval) — the fix for our own #13.
+      NOTE: the reference relay container (`ops/docker/libp2p-infra`) carries the same values and
+      per the release notes must be redeployed for its side to take effect; the running relay has
+      not been.
+
+Still open, and the reason a two-party conversation is not yet dependable:
 
 - [ ] **Concurrent writes can wedge a collection permanently, on both machines.** When the
       device and the host both wrote `App.Message` at about the same moment, every subsequent write
       on *either* side failed with `sync for collection default/app/Message exhausted 10 retries:
       pending conflict: block(s) held by unresolved rival action(s) <id>` — the same rival action id
-      each time. The host's unrelated 60 s writer stopped too, and the device still reported the
-      identical id long afterwards; nothing observed clears it. For a chat app this is fatal: two
-      people typing at once is the normal case, not an edge case. **Not yet reproduced device-free** —
+      each time. The host's unrelated 60 s writer stopped too. For a chat app this is bad enough as
+      observed: two people typing at once is the normal case, not an edge case.
+
+      **How long it lasted, precisely.** The host made zero successful writes for about eight
+      minutes — five consecutive rival-action failures on one id, its peer alive and writing
+      throughout — and the run then ended because the host process was killed. So the honest claim
+      is "at least eight minutes with no progress", NOT "permanent". An earlier version of this note
+      cited the device's error banner as evidence it never cleared; that was wrong. `ChatInterface`
+      clears `error` only inside `load`, so the banner is a static record of the last send attempt,
+      and by the time it was read the host had already been killed — the device had no peer at all.
+      That strand cannot be revisited either: the harness stores under `mkdtempSync` and removes it
+      on close. `contention-repro.sh` now reports the longest unbroken run of host failures, so this
+      is a number to compare across versions rather than a yes/no to guess at. **Not yet reproduced device-free** —
       60 concurrent rounds in `two-party-formation.mjs` never collided, because both in-process
       parties write with almost no latency between them. Reproducing it probably needs the link
       latency injector (`ws-latency.mjs`) to widen the conflict window.
@@ -256,15 +288,40 @@ Still open, and the reason a two-party conversation is not yet usable:
       process has a single global WebSocket and a single event loop, so "slow" cannot be applied to
       one party alone. `--join <invite>` was added to `two-party-formation.mjs` for this.
 
-      **Do not upgrade past optimystic 1.4 before running this**, or a fix and a masking are
-      indistinguishable. 1.5.0 looks directly relevant and is worth testing against it:
-      `every-member-votes-for-whichever-racing-write-reached-it-first` states that on a two-member
-      cohort where each writer coordinates through its own node, a first-round collision was "a
-      guaranteed double loss" — which is what `0/2 approvals` above is — and that one writer now
-      wins outright at cohort sizes 2 and 3, with the old behaviour remaining at 4 and up. Also in
-      1.5: `bug-concurrent-unique-refusal-is-not-a-constraint-error`,
-      `debt-a-contended-two-party-commit-settles-into-a-per-run-retry-pattern`, and
-      `connection-monitor-deadline-is-capped-by-the-ping-interval` (ours, from PR #15).
+      **Tested against optimystic 1.5.0 — NOT fixed there**, 2026-09-24. Two 600 s runs per
+      version, same parameters, harness only (the app stayed on 1.4):
+
+      | version | host ok | failed | rival-action | stale-revision | longest outage |
+      | --- | --- | --- | --- | --- | --- |
+      | 1.4.0 | 144 | 22 | 1 | 21 | 455 s / 21 |
+      | 1.4.0 | 206 | 20 | 0 | 20 | 376 s / 16 |
+      | 1.5.0 | 269 | 20 | 0 | 20 | 323 s / 15 |
+      | 1.5.0 | 239 | 18 | 1 | 17 | 356 s / 17 |
+
+      `rival-action` comes out {1, 0} on 1.4 and {0, 1} on 1.5 — the same distribution, so there is
+      no evidence it is gone. (A first single run showed 1 → 0 and looked like a fix; the second
+      pair is why one run per version is not enough to claim one.) Failure counts and outage lengths
+      overlap across versions; the slower party is still shut out for five to seven minutes either
+      way. The one metric that does separate is successful host writes — 1.4 {144, 206} against
+      1.5 {239, 269}, non-overlapping — which fits
+      `every-member-votes-for-whichever-racing-write-reached-it-first`: on a two-member cohort a
+      first-round collision used to be "a guaranteed double loss" (the `0/2 approvals` above) and
+      one writer now wins outright, so more rounds make progress. It does not shorten the outages.
+
+      **Confirmed on device on the upgraded stack (sereus 1.4.0 / optimystic 1.5.0), 2026-09-24,
+      and it is WORSE there than in Node.** A single message typed in the app collided with the
+      host's periodic writer; the host then failed every write for **1097 s and counting** (7
+      consecutive), against a 455 s worst case in Node. The app's own message never reached the host
+      at all, and took ~90 s even to commit locally. Incoming replication kept working throughout —
+      the app went on displaying the host's earlier messages — so this is specifically the write
+      path, and it is silent: no error reached the app, the composer simply cleared and the message
+      sat there. One person typing one message is enough to trigger it. This, not the join path, is
+      what stands between us and a usable chat app.
+
+      The dominant failure on BOTH versions is `stale revision`, which 1.5 does not address and
+      whose message contradicts itself — same block, same number, three times:
+      `stale revision: block X at rev 376, requested rev 376, last seen block X at rev 376`.
+      That is the thing to report upstream, with this script attached.
 - [ ] **First sync needs a settled node, not just a longer deadline.** `addStrand` fails with
       `StrandAwaitingFirstSyncError` — "no member of this strand has been reachable since this
       machine joined" — when the invitation is redeemed too soon after app start. Seven consecutive

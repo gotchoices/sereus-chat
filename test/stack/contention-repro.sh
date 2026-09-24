@@ -61,6 +61,16 @@ REACHABLE_MS=${REACHABLE_MS:-180000} \
 echo "running ${RUN_S}s…"
 sleep "$RUN_S"
 
+# LONGEST OUTAGE, in seconds — the number that matters. The open question about
+# this bug was never whether a write can fail; it is whether the loser gets back
+# in, and how long it is shut out for. On device the host made no progress for
+# about eight minutes and the run then ended, so "permanent" was never actually
+# established. Measuring the same quantity here makes that observation comparable
+# rather than anecdotal. Baseline on optimystic 1.4.0: 455s across 21 consecutive
+# failures, then recovery — i.e. the device's eight minutes was very likely this
+# same outage rather than a terminal state.
+outage=$(python3 "$HERE/longest-outage.py" "$HOST_LOG")
+
 ok=$(grep -ac 'wrote "host tick' "$HOST_LOG" || true)
 bad=$(grep -ac 'tick write failed' "$HOST_LOG" || true)
 rival=$(grep -ac 'unresolved rival action' "$HOST_LOG" || true)
@@ -70,6 +80,7 @@ jok=$(grep -ac 'JOINER: write .* ✓' "$JOIN_LOG" || true)
 echo
 echo "host writes:   $ok ok, $bad failed  (rival-action: $rival, stale-revision: $stale)"
 echo "joiner writes: $jok ok"
+echo "longest outage:  $outage"
 echo
 if [ "$bad" -gt 0 ]; then
   echo "REPRODUCED — the slower party is refused under contention."
