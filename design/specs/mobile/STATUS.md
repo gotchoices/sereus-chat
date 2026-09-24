@@ -207,15 +207,31 @@ What this run proved, and the two app bugs it exposed:
 
 Still open, and the reason a two-party conversation is not yet usable:
 
-- [ ] **A device's writes replicate only during the attach window.** Controlled run: the host wrote
-      a new message every 60 s and the device received all thirteen, so host → device streams
-      continuously. In the same session, on the same strand, a message typed on the device was still
-      absent from the host two minutes later — while those ticks kept arriving. The variable is
-      timing, not the table: a probe message inserted from the device *inside* the attach window did
-      reach the host, as did the `App.Member` row written there. So outbound writes propagate while
-      the strand is attaching and stop afterwards; the device reports `peers=0` throughout, and a
-      restart does not flush what is pending. Not yet reported upstream — decide sereus vs
-      optimystic first.
+- [ ] **Concurrent writes can wedge a collection permanently, on both machines.** When the
+      device and the host both wrote `App.Message` at about the same moment, every subsequent write
+      on *either* side failed with `sync for collection default/app/Message exhausted 10 retries:
+      pending conflict: block(s) held by unresolved rival action(s) <id>` — the same rival action id
+      each time. The host's unrelated 60 s writer stopped too, and the device still reported the
+      identical id long afterwards; nothing observed clears it. For a chat app this is fatal: two
+      people typing at once is the normal case, not an edge case. **Not yet reproduced device-free** —
+      60 concurrent rounds in `two-party-formation.mjs` never collided, because both in-process
+      parties write with almost no latency between them. Reproducing it probably needs the link
+      latency injector (`ws-latency.mjs`) to widen the conflict window.
+
+      This supersedes an earlier note here claiming a device's writes replicate *only* during the
+      attach window. That was wrong. Late writes do cross — verified host-side — right up until a
+      concurrent-write conflict wedges the collection, after which nothing crosses in either
+      direction and the earlier evidence reads the same way.
+- [ ] **First sync needs a settled node, not just a longer deadline.** `addStrand` fails with
+      `StrandAwaitingFirstSyncError` — "no member of this strand has been reachable since this
+      machine joined" — when the invitation is redeemed too soon after app start. Seven consecutive
+      failures cleared as soon as the device was given several more minutes to settle before Join
+      was pressed. Raising the budget alone does not help: with
+      `strandFirstSync.timeoutMs: 120_000` it waited the full 120 s and still found no member. The
+      relay and the pure-Node path were healthy throughout (Node first sync: 1.4 s), so this is
+      device-side readiness, not infrastructure. `myAddrs` was also seen flapping 4 → 0 → 4 mid-attach.
+      **Open question for upstream:** what a joiner should wait on before redeeming, since
+      "the responder has addresses" is evidently not sufficient.
 - [ ] **Schema changes strand existing data.** Adding `null` to columns in `chat-sapp.qsql` made
       already-founded strands fail on open with `ALTER TABLE App.Member ALTER COLUMN AvatarUri DROP
       NOT NULL` → `Module for table 'Member' does not support ALTER COLUMN`. Dev worked around it by

@@ -37,3 +37,12 @@ if (!globalThis.process.env) globalThis.process.env = {};
 
 // globalThis.process.env.DEBUG = 'sereus:cadre:relay-reservation';
 // globalThis.process.env.DEBUG = 'sereus:cadre:*,optimystic:*';
+// Tracing why a device's own writes stop crossing once the strand is attached:
+// this is the transaction/cluster path, which is where an outbound commit would
+// either fail to find a cluster or quietly succeed locally.
+// NARROW ON PURPOSE. `optimystic:*` emits thousands of lines a minute, and every
+// console call crosses the RN bridge — enough to starve the JS loop and make
+// first sync time out, so the tracing changes the outcome it is meant to observe.
+// Three clean joins failed in a row with it on; they succeed with it off.
+// globalThis.process.env.DEBUG = 'optimystic:db-core:network-transactor';
+// globalThis.process.env.DEBUG = 'optimystic:db-p2p:protocol-client,optimystic:db-p2p:sync-service,optimystic:fret*,sereus:cadre:relay*';

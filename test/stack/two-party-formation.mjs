@@ -256,7 +256,7 @@ try {
       } catch (err) {
         log('HOST: tick write failed —', err?.message ?? String(err));
       }
-    }, 60_000);
+    }, Number(process.env.TICK_MS ?? 60_000));
 
     setInterval(async () => {
       try {
@@ -338,11 +338,105 @@ try {
     await new Promise(r => setTimeout(r, 1000));
   }
   if (seen > 0) {
-    log(`JOINER: ✓ READ THE HOST'S ROW — ${seen} Member row(s). Two-party chat works in Node.`);
-    exitCode = 0;
+    log(`JOINER: ✓ READ THE HOST'S ROW — ${seen} Member row(s). Host → joiner works.`);
   } else {
     log('JOINER: ✗ attached and writable, but the host\'s row never arrived within 60s');
   }
+
+  // ── Does the joiner's own write ever come back? ───────────────────────────
+  // On a device it does, but only if it happens while the strand is still
+  // attaching: a message typed minutes later never reaches the host, even as the
+  // host's own new messages keep arriving on the device. Two writes, identical
+  // except for WHEN, is what separates "the joiner cannot write outward" from
+  // "the joiner can only write outward during the attach window".
+  const hostSees = async (needle, budgetMs) => {
+    const until = Date.now() + budgetMs;
+    while (Date.now() < until) {
+      for await (const r of hostDb.eval(`select Content from App.Message`)) {
+        if ((r?.Content ?? r?.content) === needle) return true;
+      }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    return false;
+  };
+  const joinerSays = async (text) => {
+    await joinerDb.exec(
+      `insert into App.Message (Id, MemberId, Content, Timestamp, ReplyToId, EditedAt)
+       values (?, ?, ?, ?, ?, ?)`,
+      [randomUUID(), 'joiner-1', text, new Date().toISOString(), null, null]);
+  };
+
+  // The joiner must exist as a Member before it can be the author of a Message:
+  // `Message.MemberId` is a foreign key, and a joiner that never registers itself
+  // cannot say anything at all. (The app had exactly this gap until 2026-09-23.)
+  await joinerDb.exec(`insert into App.Member (Id, Name, AvatarUri) values (?, ?, ?)`,
+    ['joiner-1', 'Joiner Party', null]);
+  log('JOINER: registered itself as a Member');
+
+  await joinerSays('joiner in-window');
+  const early = await hostSees('joiner in-window', 45_000);
+  log(`JOINER: in-window write ${early ? '✓ reached the host' : '✗ never reached the host (45s)'}`);
+
+  const IDLE_MS = Number(process.env.IDLE_MS ?? 30_000);
+  log(`JOINER: idling ${IDLE_MS / 1000}s so the next write is clearly outside the attach window…`);
+  await new Promise(r => setTimeout(r, IDLE_MS));
+
+  await joinerSays('joiner late');
+  const late = await hostSees('joiner late', 90_000);
+  log(`JOINER: late write ${late ? '✓ reached the host' : '✗ never reached the host (90s)'}`);
+
+  // ── Concurrent writes from both parties ──────────────────────────────────
+  // The device found this: host and joiner each wrote App.Message at about the
+  // same moment, and afterwards NEITHER could write again — every attempt, on
+  // both machines, ends "sync for collection default/app/Message exhausted 10
+  // retries: pending conflict: block(s) held by unresolved rival action(s) <id>".
+  // Sequential writes never show it, which is why every earlier Node run passed.
+  const hostSays = async (text) => {
+    await hostDb.exec(
+      `insert into App.Message (Id, MemberId, Content, Timestamp, ReplyToId, EditedAt)
+       values (?, ?, ?, ?, ?, ?)`,
+      [randomUUID(), 'host-1', text, new Date().toISOString(), null, null]);
+  };
+
+  const ROUNDS = Number(process.env.ROUNDS ?? 5);
+  let wedged = null;
+  for (let i = 1; i <= ROUNDS && !wedged; i++) {
+    const results = await Promise.allSettled([
+      hostSays(`concurrent host ${i}`),
+      joinerSays(`concurrent joiner ${i}`),
+    ]);
+    for (const r of results) {
+      if (r.status === 'rejected') {
+        wedged = r.reason?.message ?? String(r.reason);
+        log(`round ${i}: ✗ ${wedged}`);
+      }
+    }
+    if (!wedged) log(`round ${i}: both writes accepted`);
+    await new Promise(r => setTimeout(r, 2000));
+  }
+
+  if (wedged) {
+    log('WEDGED by concurrent writes — now checking whether it ever recovers…');
+    let recovered = false;
+    for (let i = 0; i < 10 && !recovered; i++) {
+      await new Promise(r => setTimeout(r, 6000));
+      try { await hostSays(`recovery probe ${i}`); recovered = true; }
+      catch (e) { log(`  still wedged: ${e?.message ?? e}`); }
+    }
+    log(recovered
+      ? 'RECOVERED after waiting — the conflict clears on its own.'
+      : 'PERMANENTLY WEDGED — the collection never accepts another write.');
+    exitCode = recovered ? 0 : 2;
+  } else {
+    log(`${ROUNDS} concurrent rounds with no conflict — not reproduced here.`);
+  }
+
+  if (early && !late) {
+    log('REPRODUCED IN NODE: outward writes propagate during the attach window and stop afterwards.');
+  } else if (early && late) {
+    log('NOT reproduced in Node — both writes crossed. The device-only failure is RN-specific.');
+  }
+  exitCode = late ? 0 : 1;
 } catch (err) {
   log('✗ FAILED:', err?.name ?? 'Error', '—', err?.message ?? String(err));
   if (err?.stack) console.log(err.stack.split('\n').slice(1, 6).join('\n'));

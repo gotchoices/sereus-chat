@@ -443,6 +443,25 @@ class CadreServiceImpl {
         // unlike the reference's Persistent*Store — chat uses the `privateKey`
         // identity path, so there is no expo-secure-store slot to hang them off).
         requireSignedSchemas: false,
+
+        // FIRST SYNC NEEDS LONGER THAN 30s ON A PHONE.
+        //
+        // cadre-core's default budget is 30 s, and the failure it produces says
+        // exactly what ran out: "no member of this strand has been reachable
+        // since this machine joined (waited 30118 ms)". That budget has to cover
+        // dialling EVERY seed address, and a relay advertises addresses this
+        // device cannot use — a LAN address the emulator reaches only through
+        // NAT, alongside the loopback one that works. Time spent on the
+        // unreachable ones is spent from the same 30 s, and on Hermes each dial
+        // also pays a Noise handshake.
+        //
+        // 30 s is enough often enough to look like an intermittent bug: joins
+        // here have both succeeded (36-94 s of wall clock, i.e. across retries)
+        // and failed seven times running, with no change but timing. Nothing is
+        // lost by waiting longer — the strand stays launched and keeps trying
+        // either way, so this only decides how long `addStrand` waits before
+        // handing the caller an error to show.
+        strandFirstSync: { timeoutMs: 120_000 },
       };
 
       console.info('[CadreService] creating CadreNode...');
