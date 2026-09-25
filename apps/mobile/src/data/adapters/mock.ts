@@ -48,6 +48,11 @@ export class MockAdapter implements DataAdapter {
   private profile: Profile = { ...(profileHappy as Profile) };
 
   // ---- Strands ------------------------------------------------------------
+  /** The mock answers from memory; there is never a bring-up to wait for. */
+  async strandsSettling(): Promise<boolean> { return false; }
+  async setStrandMuted(): Promise<void> {}
+  async setStrandArchived(): Promise<void> {}
+
   async listStrands(): Promise<StrandSummary[]> {
     if (isError()) fail((strandsError as any).error);
     return (isEmpty() ? strandsEmpty : strandsHappy) as StrandSummary[];

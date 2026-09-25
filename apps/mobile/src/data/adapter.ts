@@ -15,6 +15,21 @@ import { USE_SEREUS } from './config';
 export interface DataAdapter {
   // ---- Strands -----------------------------------------------------------
   listStrands(): Promise<StrandSummary[]>;
+  /**
+   * Is the node still bringing strands up? An empty `listStrands()` means one of
+   * two very different things — "you are in no conversations" or "we have not
+   * finished attaching them yet" — and a screen that cannot tell them apart shows
+   * a first-run message to someone who has strands. Attaching takes seconds on a
+   * phone, so this is the normal case at launch, not an edge case.
+   */
+  strandsSettling(): Promise<boolean>;
+  /**
+   * Device-local strand settings (story 33's mute and archive). Both are this
+   * device's alone — `ops.md` is explicit that they "never touch strand data" —
+   * so neither reaches the other members.
+   */
+  setStrandMuted(strandId: string, muted: 'none' | 'soft' | 'hard'): Promise<void>;
+  setStrandArchived(strandId: string, archived: boolean): Promise<void>;
   getStrandState(strandId: string): Promise<StrandState>;
   listMembers(strandId: string): Promise<Member[]>;
   listMessages(strandId: string, opts?: { before?: string; limit?: number }): Promise<Message[]>;
@@ -84,6 +99,11 @@ export function __setAdapter(a: DataAdapter | null): void {
 // Convenience wrappers ------------------------------------------------------
 
 export const listStrands = async () => (await getAdapter()).listStrands();
+export const strandsSettling = async () => (await getAdapter()).strandsSettling();
+export const setStrandMuted = async (id: string, m: 'none' | 'soft' | 'hard') =>
+  (await getAdapter()).setStrandMuted(id, m);
+export const setStrandArchived = async (id: string, a: boolean) =>
+  (await getAdapter()).setStrandArchived(id, a);
 export const getStrandState = async (id: string) => (await getAdapter()).getStrandState(id);
 export const listMembers = async (id: string) => (await getAdapter()).listMembers(id);
 export const listMessages = async (id: string, o?: { before?: string; limit?: number }) =>

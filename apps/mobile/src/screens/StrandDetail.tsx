@@ -10,7 +10,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import {
-  getStrandState, listMembers, listAttachments,
+  getStrandState, listMembers, listAttachments, setStrandMuted, setStrandArchived,
   leaveStrand, resignManager, removeMember,
 } from '../data/adapter';
 import type { StrandState, Member, Attachment } from '../data/types';
@@ -18,6 +18,7 @@ import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { Avatar, ListRow, Banner, SectionHeader, StrandStatus } from '../components';
 import { useTheme, typography, spacing } from '../theme';
+import { getStrandPrefs } from '../data/strand-prefs';
 
 export default function StrandDetail() {
   const navigation: any = useNavigation();
@@ -31,6 +32,9 @@ export default function StrandDetail() {
   const [members, setMembers] = useState<Member[]>([]);
   const [media, setMedia] = useState<Attachment[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /** Device-local, per story 33 — neither reaches the other members. */
+  const [muted, setMuted] = useState<'none' | 'soft' | 'hard'>('none');
+  const [archived, setArchived] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -44,6 +48,11 @@ export default function StrandDetail() {
       setError(e?.message ?? 'Could not load members');
     }
     listAttachments(strandId).then(setMedia).catch(() => {});
+    // Device-local settings, read straight from storage — never a reason to fail
+    // the screen, so they are fetched apart from the strand's own data.
+    getStrandPrefs(strandId)
+      .then(p => { setMuted(p.muted); setArchived(p.archived); })
+      .catch(() => {});
   }, [strandId]);
 
   useEffect(() => { void load(); }, [load, rev]);
@@ -166,8 +175,40 @@ export default function StrandDetail() {
 
       <SectionHeader label={t('screens.strand.thisConversation', 'This conversation')} />
       <View style={styles.rows}>
-        <ListRow title={t('actions.mute', 'Mute')} subtitle={t('screens.strand.muteHint', 'Quiet, unless somebody names you')} />
-        <ListRow title={t('actions.archive', 'Archive')} subtitle={t('screens.strand.archiveHint', 'Hide it from your list; nothing changes for anyone else')} />
+        {/* Story 33 offers mute in two depths, and says which you are in — "He
+            chooses how quiet: silent unless somebody names him, or silent whatever
+            happens." Tapping cycles none → soft → hard → none, and the subtitle
+            reports the state rather than making the user open something to find
+            out. Both settings are device-local and reversible, which is why they
+            sit above Leave. */}
+        <ListRow
+          title={t('actions.mute', 'Mute')}
+          subtitle={
+            muted === 'soft' ? t('screens.strand.muteSoftOn', 'Quiet, unless somebody names you')
+            : muted === 'hard' ? t('screens.strand.muteHardOn', 'Silent, whatever happens')
+            : t('screens.strand.muteHint', 'Quiet, unless somebody names you')
+          }
+          onPress={() => {
+            const next = muted === 'none' ? 'soft' : muted === 'soft' ? 'hard' : 'none';
+            setMuted(next);
+            setStrandMuted(strandId, next).catch((e: any) => {
+              setMuted(muted);   // put the switch back; it did not take
+              setError(e?.message ?? 'That setting could not be saved');
+            });
+          }}
+        />
+        <ListRow
+          title={archived ? t('screens.strand.unarchive', 'Unarchive') : t('actions.archive', 'Archive')}
+          subtitle={t('screens.strand.archiveHint', 'Hide it from your list; nothing changes for anyone else')}
+          onPress={() => {
+            const next = !archived;
+            setArchived(next);
+            setStrandArchived(strandId, next).catch((e: any) => {
+              setArchived(!next);
+              setError(e?.message ?? 'That setting could not be saved');
+            });
+          }}
+        />
         <ListRow title={t('actions.leave', 'Leave')} onPress={confirmLeave} />
         <ListRow title={t('screens.strand.forget', 'Forget entirely')} onPress={confirmForget} />
       </View>

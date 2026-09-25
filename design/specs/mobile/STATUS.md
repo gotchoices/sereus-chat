@@ -69,6 +69,91 @@ their variants. Calls are parked (story 90).
 - [ ] Consider adding `needs:` frontmatter (domain primitives) to the screen specs — appeus's
       `spec-schema.md` offers it and it would tighten dependency tracking
 
+## Next steps — UI pass of 2026-09-24
+
+Ordered by what stops a person using the app. Everything here was found by walking the
+screens on a device, then reading back to the story or spec that governs it.
+
+### Landed in this pass
+
+- [x] **Strand titles come from members**, per `domain/ops.md` ("two-party strands fall back to
+      the other member's name"). Was `Strand <hex>`; now the other person's profile name, their
+      peer id when they have not set one, and "New strand" before anyone joins. There is no
+      screen for naming a strand and the spec does not ask for one.
+- [x] **Leave and Forget entirely work** (story 33). `stopStrand` + `unpublishStrand`: the first
+      alone is session-only, and cadre-core says the strand "is rediscovered on the next node
+      RESTART", so a leave without the second comes back tomorrow. Removes the row from THIS
+      party's control database only — story 33 forbids an option that removes it from the world.
+      Verified: left strand vanished and did NOT return across a restart.
+- [x] **Mute and Archive are wired** — they were rendered rows with no `onPress`. Device-local
+      per `ops.md` ("never touch strand data"), stored in `src/data/strand-prefs.ts`. Mute cycles
+      none → soft → hard, matching story 33's "silent unless somebody names him, or silent
+      whatever happens". NOT yet exercised on a device.
+- [x] **The strand list says when it is still looking.** It claimed "No strands yet" — story 01's
+      first-run text — while strands were still attaching, which reads as data loss to someone who
+      has several. Keyed to whether the default strand ("My Notes") has attached, which every
+      account has. A wall-clock timeout was tried first and is worse: on a loaded emulator cadre
+      took minutes and the timer fired first, reproducing the original bug.
+- [x] **Profile's save moved into the header**, disabled until the page is dirty — the pattern
+      `ser/health` already uses (`EditItem.tsx`). A footer button cannot be seen without
+      scrolling, gives no clue whether the screen saves automatically, and is exactly what the
+      soft keyboard covers.
+- [x] **QR scanning works on a real phone.** Two faults: `AndroidManifest.xml` never declared
+      `android.permission.CAMERA`, so the request came back denied and the screen honestly said
+      "Camera unavailable"; and ANY clip of the preview (`overflow: 'hidden'`, with or without
+      `borderRadius`) blanks the native surface on a Galaxy S7 — camera running, frames produced,
+      white rectangle on screen. `resizeMode="contain"` is not a fix: it fails the session with
+      `session/invalid-output-configuration`. Verified live on the S7.
+- [x] **App name is "Sereus Chat"**, matching iOS's existing `CFBundleDisplayName`. Was "mobile",
+      React Native's default from the directory name — genuinely ambiguous with health installed.
+
+### Next — blocked on nothing
+
+- [ ] **Keyboard handling across the app.** `ser/health` uses `react-native-keyboard-controller`'s
+      `KeyboardAwareScrollView` with `keyboardShouldPersistTaps="handled"`; chat has the dependency
+      nowhere and relies on plain `ScrollView`. Moving Profile's action to the header sidesteps it
+      there, but every other screen with an input still has the problem. Adopting health's
+      dependency is a native rebuild, so it wants doing deliberately rather than mid-test.
+- [ ] **Header actions on the remaining screens.** Only Profile has been moved. Settings and any
+      other screen with a page-level action should follow, so the position is learnable.
+- [ ] **Progress indication beyond the strand list.** `ChatInterface`, `StrandDetail` and
+      `SearchInterface` each open on an empty state while their first query runs.
+- [ ] **QR overlay alignment.** With clipping removed the preview renders at its natural size and
+      the dashed guide no longer lines up with it. Cosmetic; needs a device to tune.
+- [ ] **Swipe-to-archive** (30), now that archive itself exists.
+
+### Next — needs upstream
+
+- [ ] **Per-strand peer nicknames.** `30-my-strands.md` says private names for partners are
+      "provided by sereus and surfaced here rather than invented", and anticipates sereus grouping
+      a user's strands across sApps by that name. **Sereus has no such surface today** — cadre-core
+      1.4.0 has no nickname, alias or label on `StrandRow` or `CadrePeerRow` (the "Label" in
+      `control-database.d.ts` is a log label). So the app can only show the peer's own profile
+      name. See the proposal below.
+- [ ] **"Forget entirely" cannot erase the local copy.** `unpublishStrand` is documented as
+      control-plane only: "the strand's local durable storage is retained ... If a caller ever
+      needs removal to mean 'and erase the local copy', that is a separate purge step". No such
+      step exists, so forgetting discards the membership key but leaves the blocks on disk. Story
+      33 promises "discarding what identifies him and what he holds of the strand" — we deliver
+      the first half. The confirmation text should not claim the second until upstream can.
+- [ ] **`resignManager`, `removeMember`, `inspectInvitation`, `listOutstandingInvitations`** remain
+      `notImplemented`; cadre-core exposes no membership-revocation surface.
+
+### Proposals for the human specs (NOT applied — need your consent)
+
+1. **`domain/ops.md`** — add setters beside the read shape. It defines `muted` and `archived` on
+   `StrandSummary` but nothing that changes them, so the operations I had to add
+   (`setStrandMuted`, `setStrandArchived`) are unspecified. One line each would close that.
+2. **`30-my-strands.md`** — it states partner names are "provided by sereus". That is an intention,
+   not a present fact, and reads today as though the app is failing to use something that exists.
+   Suggest noting that until sereus carries a private name, the peer's own profile name stands in,
+   and that a device-local nickname is the app's to own in the meantime — which is what would let
+   someone file a strand under "Dad" regardless of what that person calls themselves.
+3. **A screen spec for keyboard and page-level actions.** The feedback that prompted this pass
+   (action in the header, enabled only when dirty, never covered by the keyboard) is a global UI
+   rule, and `specs/mobile/global/` is where it would belong so every screen inherits it rather
+   than each one re-deciding.
+
 ## To do — behaviour the stories specify but no screen does yet
 
 - [ ] **Edit a message** (13) — long-press offers Reply, React, Delete; no Edit

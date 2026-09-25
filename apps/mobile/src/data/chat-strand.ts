@@ -44,6 +44,13 @@ type JoinedStrand = {
   MemberPrivateKey: string | null;
   Type: 'c' | 'o';
   FounderOwnerKey: null;
+  /**
+   * Left, but with the membership key kept — story 33's "leave" as distinct from
+   * "forget entirely". The row stays so a later invitation can return this user as
+   * themselves; it must never be re-attached on its own, which is what the filter
+   * in `attachJoinedStrands` is for.
+   */
+  Left?: boolean;
 };
 
 let cachedStrand: StrandInstance | null = null;
@@ -317,6 +324,9 @@ async function readJoinedStrands(): Promise<JoinedStrand[]> {
         MemberPrivateKey: typeof row.MemberPrivateKey === 'string' ? row.MemberPrivateKey : null,
         Type: row.Type === 'o' ? 'o' as const : 'c' as const,
         FounderOwnerKey: null,
+        // Carried through deliberately: drop this and a strand the user left comes
+        // back on the next launch, which is the bug the flag exists to prevent.
+        Left: row.Left === true,
       }));
   } catch {
     // A corrupt entry must not brick startup — the strands are still on disk and
@@ -355,6 +365,63 @@ async function readJoinedStrands(): Promise<JoinedStrand[]> {
  * after a successful attach would drop exactly the memberships that most need
  * retrying.
  */
+/**
+ * Stop taking part in a strand, for good, on this device's party.
+ *
+ * TWO CALLS, and the second is the one that makes it stick. `stopStrand` stops the
+ * local instance and suppresses the id for THIS SESSION only — cadre-core is
+ * explicit that "the shared `Strand` row is left intact, so on the next node
+ * RESTART the strand is rediscovered and surfaces as `strand:discovered` again".
+ * A leave that comes back tomorrow is not a leave. `unpublishStrand` removes the
+ * control row, which is what keeps it gone.
+ *
+ * It removes the row from THIS PARTY's control database — this user's own devices —
+ * and not from anyone else's. That is the shape story 33 asks for: "There is no
+ * fourth option that removes the strand from the world — it is not his to remove."
+ * The others keep the conversation and simply see this party go quiet.
+ *
+ * WHAT IT DOES NOT DO: erase the local copy. cadre-core says so at
+ * `unpublishStrand` — "the strand's local durable storage is retained ... If a
+ * caller ever needs removal to mean 'and erase the local copy', that is a separate
+ * purge step", and no such step exists yet. So story 33's "forget it entirely"
+ * ("discarding what identifies him and what he holds of the strand") is only
+ * partly honoured: the membership key goes, the blocks stay on disk. The caller is
+ * told which of the two it got, rather than the screen promising the stronger one.
+ */
+export async function leaveStrandLocally(
+  strandId: string,
+  opts: { keepIdentity: boolean },
+): Promise<{ purged: boolean }> {
+  await cadreService.ensureStarted();
+  const node = cadreService.cadreNode;
+  if (!node) throw new Error('Cadre is not running.');
+
+  // Stop first: unpublishing a running strand would leave an instance meshing for
+  // a row that no longer exists.
+  try {
+    await node.stopStrand(strandId);
+  } catch (err) {
+    // Already stopped, or never started — not a reason to abandon the removal.
+    console.warn('[chat-strand] stopStrand during leave:', strandId, err);
+  }
+
+  await node.unpublishStrand(strandId);
+
+  // `keepIdentity` decides whether the membership key survives. Keeping it is what
+  // lets a later invitation return this user AS THEMSELVES rather than as a
+  // stranger, which is the whole distinction story 33 draws between leaving and
+  // forgetting.
+  const list = await readJoinedStrands();
+  const remaining = opts.keepIdentity
+    ? list.map(s => (s.Id === strandId ? { ...s, Left: true } : s))
+    : list.filter(s => s.Id !== strandId);
+  await AsyncStorage.setItem(JOINED_STRANDS_KEY, JSON.stringify(remaining));
+
+  console.info(`[chat-strand] left strand ${strandId} (identity ${opts.keepIdentity ? 'kept' : 'discarded'})`);
+  // Never true today; the caller uses it to avoid claiming the local copy is gone.
+  return { purged: false };
+}
+
 export async function rememberJoinedStrand(row: JoinedStrand): Promise<void> {
   const list = await readJoinedStrands();
   const next = [...list.filter(s => s.Id !== row.Id), row];
@@ -377,6 +444,7 @@ export async function attachJoinedStrands(): Promise<void> {
   if (!node) return;
 
   for (const row of remembered) {
+    if (row.Left) continue;   // left on purpose; kept only for its membership key
     if (attaching.has(row.Id) || node.getStrands().has(row.Id)) continue;
     attaching.add(row.Id);
     try {

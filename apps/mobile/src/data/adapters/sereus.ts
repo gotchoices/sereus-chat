@@ -9,7 +9,12 @@ import type {
   SearchBatch, SearchOptions, Invitation, InvitationPreview, Visibility,
   Prefs, StorageUsage, SendInput,
 } from '../types';
-import { ensureDefaultChatStrand, generateUuid, getDefaultChatStrand, registerSelfAsMember, rememberJoinedStrand, syncProfileNameToStrands } from '../chat-strand';
+import {
+  getAllStrandPrefs,
+  setStrandMuted as setStrandMutedLocal,
+  setStrandArchived as setStrandArchivedLocal,
+} from '../strand-prefs';
+import { ensureDefaultChatStrand, generateUuid, getDefaultChatStrand, leaveStrandLocally, registerSelfAsMember, rememberJoinedStrand, syncProfileNameToStrands } from '../chat-strand';
 import { createChatStrand, joinChatStrand } from '../chat-sapp';
 import type { StrandInstance } from '@serfab/cadre-core';
 import {
@@ -115,6 +120,36 @@ export class SereusAdapter implements DataAdapter {
   // the default chat strand; cross-party strands surfaced via the Control
   // DB will join this list once invitation/formation flow is wired (step 8).
 
+  async setStrandMuted(strandId: string, muted: 'none' | 'soft' | 'hard'): Promise<void> {
+    await setStrandMutedLocal(strandId, muted);
+  }
+
+  async setStrandArchived(strandId: string, archived: boolean): Promise<void> {
+    await setStrandArchivedLocal(strandId, archived);
+  }
+
+  async strandsSettling(): Promise<boolean> {
+    // A strand with no `database` yet is mid-attach — `listStrands` skips exactly
+    // those, so they are the ones that would otherwise read as "no strands".
+    // Before the node is even running there is nothing in the map at all, which
+    // also counts as settling rather than as an answer.
+    // THE DEFAULT STRAND IS THE SIGNAL. Every account has "My Notes" — the app
+    // founds it on first run — so once it is attached there is always at least one
+    // row, and an empty list after that is a real answer rather than a slow start.
+    //
+    // The two obvious alternatives are both wrong. "Some strand is still opening"
+    // never stops being true if one of them cannot open (an invitation nobody
+    // accepted, a host that never answers), so a fault in one row hides the whole
+    // list forever. "Nothing is readable yet" cannot tell a cold start from an
+    // account with no strands, which is the very distinction this exists to draw.
+    //
+    // A wall-clock timeout in the screen was tried and is worse than either: on a
+    // loaded emulator cadre took minutes to start and the timer fired first,
+    // putting "No strands yet" in front of someone who has several — exactly the
+    // bug this was written to fix.
+    return getDefaultChatStrand() === null;
+  }
+
   async listStrands(): Promise<StrandSummary[]> {
     // Kick the default-strand attach in the BACKGROUND — never block the list
     // on it.  Attaching a strand reads the control DB (queryCadrePeers), which
@@ -127,6 +162,8 @@ export class SereusAdapter implements DataAdapter {
     const defaultId = getDefaultChatStrand()?.strandId ?? null;
 
     const strands = cadreService.getStrands();
+    // One read for the whole list, not one per strand.
+    const prefs = await getAllStrandPrefs();
     const summaries: StrandSummary[] = [];
 
     for (const [id, strand] of strands) {
@@ -174,9 +211,9 @@ export class SereusAdapter implements DataAdapter {
         lastMessage: preview,
         unreadCount: 0,
         mentioned: false,
-        muted: 'none',
+        muted: prefs[id]?.muted ?? 'none',
         draftPreview: null,
-        archived: false,
+        archived: prefs[id]?.archived ?? false,
         pending: false,
       });
     }
@@ -557,7 +594,23 @@ export class SereusAdapter implements DataAdapter {
     if (!peerId) throw new Error('Peer ID not available; cadre may not be running');
     await removeReaction(await this.strandFor(strandId), id, peerId, symbol);
   }
-  async leaveStrand(_id: string, _o: { keepIdentity: boolean }): Promise<void> { this.notImplemented('leaveStrand'); }
+  /**
+   * Leave a strand, or forget it entirely (story 33).
+   *
+   * `keepIdentity: true` is LEAVE — stop taking part, keep what identifies this
+   * user in the strand so a later invitation returns them as themselves.
+   * `false` is FORGET — the membership key goes too, so a re-invite arrives as a
+   * stranger. Both remove the strand from this party's control database, which is
+   * what stops it coming back on the next launch; neither removes it from anybody
+   * else, and the screen must not offer an option that claims to.
+   *
+   * CAVEAT the caller should know: "forget" does NOT erase the local copy. See
+   * `leaveStrandLocally` — cadre-core retains the strand's durable storage and
+   * offers no purge step, so the blocks stay on disk.
+   */
+  async leaveStrand(id: string, o: { keepIdentity: boolean }): Promise<void> {
+    await leaveStrandLocally(id, o);
+  }
   async resignManager(_id: string): Promise<void> { this.notImplemented('resignManager'); }
   async removeMember(_s: string, _m: string): Promise<void> { this.notImplemented('removeMember'); }
   async listOutstandingInvitations(): Promise<Invitation[]> { this.notImplemented('listOutstandingInvitations'); }

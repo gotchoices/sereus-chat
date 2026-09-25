@@ -46,8 +46,45 @@ export default function Profile() {
     }
   };
 
+  /**
+   * THE ACTION LIVES IN THE HEADER, not at the foot of the page.
+   *
+   * Three reasons, all of them things that bite on a real phone. A button at the
+   * bottom of a scroll view cannot be seen without scrolling, so there is no way
+   * to tell whether the screen even HAS a save or quietly saves as you type. The
+   * soft keyboard then covers that region exactly when you are most likely to
+   * want it — you have just finished typing — so it has to be dismissed first.
+   * And a header button is in the same place on every screen.
+   *
+   * `disabled` until there is something to save, so the control itself says
+   * whether the page is dirty. This is the pattern ser/health already uses
+   * (`EditItem.tsx`: a header save icon gated on `canSave`).
+   */
+  React.useLayoutEffect(() => {
+    const canSave = (dirty || firstRun) && profile.name.trim().length > 0;
+    navigation.setOptions({
+      headerRight: () => (
+        <IconButton
+          name="checkmark-outline"
+          size={22}
+          variant={canSave ? 'accent' : 'plain'}
+          disabled={!canSave}
+          accessibilityLabel={firstRun ? t('common.continue', 'Continue') : t('common.save', 'Save')}
+          onPress={save}
+          style={canSave ? undefined : styles.dim}
+        />
+      ),
+    });
+  }, [navigation, dirty, firstRun, profile, t, save]);
+
   return (
-    <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={{ backgroundColor: theme.background }}
+      contentContainerStyle={styles.content}
+      // Let a tap on a control work while the keyboard is up, instead of the
+      // first tap only dismissing it.
+      keyboardShouldPersistTaps="handled"
+    >
       {error ? <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: save }} /> : null}
 
       <View style={styles.avatarBlock}>
@@ -126,16 +163,6 @@ export default function Profile() {
         </Text>
       )}
 
-      <View style={styles.actions}>
-        <IconButton
-          name="checkmark-outline"
-          size={22}
-          variant="accent"
-          accessibilityLabel={firstRun ? t('common.continue', 'Continue') : t('common.save', 'Save')}
-          onPress={save}
-          style={dirty || firstRun ? undefined : styles.dim}
-        />
-      </View>
     </ScrollView>
   );
 }

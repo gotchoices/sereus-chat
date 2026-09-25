@@ -5,9 +5,9 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, SectionList, StyleSheet, RefreshControl, Alert, Pressable } from 'react-native';
+import { View, Text, TextInput, SectionList, StyleSheet, RefreshControl, Alert, Pressable, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { listStrands, listOutstandingInvitations, listMembers } from '../data/adapter';
+import { listStrands, strandsSettling, listOutstandingInvitations, listMembers } from '../data/adapter';
 import type { StrandSummary, Invitation } from '../data/types';
 import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
@@ -47,6 +47,17 @@ export default function StrandList() {
   const rev = useDataRevision();
   const theme = useTheme();
   const [strands, setStrands] = useState<StrandSummary[]>([]);
+  /**
+   * Has the first read finished? Until it has, an empty list means "not asked
+   * yet", not "nothing here" — and those must not look the same. Attaching
+   * strands takes seconds on a phone, so the screen used to open on "No strands
+   * yet. Until you have one, nobody can reach you" and then quietly fill in. That
+   * sentence is story 01's introduction to the whole idea; showing it to someone
+   * who HAS strands reads as data loss.
+   */
+  const [loaded, setLoaded] = useState(false);
+  /** True while the node is still opening strands — see `strandsSettling`. */
+  const [settling, setSettling] = useState(true);
   const [invites, setInvites] = useState<Invitation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -73,10 +84,27 @@ export default function StrandList() {
       setMemberNames(names);
     } catch (e: any) {
       setError(e?.message || 'Could not reach your strands right now');
+    } finally {
+      setLoaded(true);
     }
+    // Asked AFTER the read, so the two agree: if a strand finished opening while
+    // the read was in flight, the next poll picks it up rather than this one
+    // declaring the list empty.
+    try { setSettling(await strandsSettling()); } catch { setSettling(false); }
   }, []);
 
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  /**
+   * Re-read while the node is still bringing strands up. There is no event to
+   * wait on — cadre-core emits strand lifecycle events, but the adapter boundary
+   * deliberately does not expose them — so the list polls itself awake and stops
+   * as soon as everything has opened. Idle screens do no work.
+   */
+  useFocusEffect(useCallback(() => {
+    void load();
+    if (!settling) return;
+    const timer = setInterval(() => { void load(); }, 3000);
+    return () => clearInterval(timer);
+  }, [load, settling]));
   useEffect(() => { void load(); }, [load, rev]);
 
   // Narrowing is free: a string match over names already held.  No adapter
@@ -170,6 +198,15 @@ export default function StrandList() {
       <View style={styles.flex1}>
       {error ? (
         <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: load }} />
+      ) : (!loaded || settling) ? (
+        // Waiting, not empty. A spinner says "still looking"; the empty state
+        // would say "there is nothing", which we do not yet know.
+        <View style={styles.loading}>
+          <ActivityIndicator />
+          <Text style={[typography.small, { color: theme.textMuted }]}>
+            {t('screens.strands.loading', 'Looking for your strands…')}
+          </Text>
+        </View>
       ) : isEmpty ? (
         // First run.  This is where the word "strand" is introduced, attached to
         // something the user is looking at (story 01).  Not an error, and it
@@ -276,6 +313,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   controls: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: spacing[3], paddingVertical: spacing[1] },
   flex1: { flex: 1 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[2] },
   flex2: { flex: 2 },
   list: { paddingHorizontal: spacing[3], paddingTop: spacing[1], paddingBottom: spacing[2] },
   nothingNew: { paddingTop: spacing[2] },

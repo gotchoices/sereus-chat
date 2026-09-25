@@ -102,9 +102,22 @@ const styles = StyleSheet.create({
   title: { ...typography.title, marginBottom: spacing[2] },
   cameraWrap: {
     height: 260,
-    borderRadius: radius.card,
-    overflow: 'hidden',
     marginBottom: spacing[3],
+    // CLIPPED BUT NOT ROUNDED. vision-camera's preview is a native surface, and
+    // clipping one to a ROUNDED parent makes Android composite it away on a number
+    // of devices: the camera runs and frames are produced while the app shows a
+    // blank rectangle. A Galaxy S7 did exactly that — `mm-camera-CORE` processing
+    // frames while `CameraView` reported 0 fps to the view. Plain `overflow`
+    // still keeps the preview inside its box; only `borderRadius` has to go.
+    //
+    // CORRECTION, measured on the S7 (Android 8): plain `overflow: 'hidden'` blanks
+    // it too — ANY clip of this surface does, not just a rounded one. And
+    // `resizeMode="contain"` is not the way out: it makes the session fail with
+    // `session/invalid-output-configuration` and renders black. So the preview is
+    // left unclipped at its natural size, which can overflow this box slightly.
+    // That is deliberate and is the only combination measured to actually show a
+    // picture on that device. Do not reintroduce `overflow` or `resizeMode` without
+    // re-testing on a real phone; the emulator does not reproduce this.
   },
   camera: { flex: 1 },
   overlay: {
