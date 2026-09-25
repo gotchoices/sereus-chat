@@ -16,6 +16,8 @@ export { EmptyState } from './EmptyState';
 export type { EmptyStateProps } from './EmptyState';
 export { Banner } from './Banner';
 export type { BannerProps } from './Banner';
+export { ActionSheet } from './ActionSheet';
+export type { ActionSheetProps, ActionSheetOption } from './ActionSheet';
 export { IconButton } from './IconButton';
 export type { IconButtonProps } from './IconButton';
 export { SectionHeader } from './SectionHeader';

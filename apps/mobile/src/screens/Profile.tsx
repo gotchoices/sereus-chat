@@ -16,7 +16,17 @@ import { useTheme, typography, spacing, radius } from '../theme';
 export default function Profile() {
   const navigation: any = useNavigation();
   const route: any = useRoute();
-  const firstRun: boolean = route?.params?.firstRun ?? false;
+  /**
+   * SELF-DETERMINED, not taken on trust from a route param.
+   *
+   * First run means "this person has not told us their name yet" (story 01), and
+   * this screen is the only place that can see whether they have. A param would
+   * go stale the moment they save — reopening Profile from the footer would then
+   * show the first-run wording to someone who is plainly not on their first run.
+   * The param is still honoured as the initial guess so the screen does not
+   * flicker between the two wordings while the profile loads.
+   */
+  const [firstRun, setFirstRun] = useState<boolean>(route?.params?.firstRun ?? false);
   const t = useT();
   const theme = useTheme();
 
@@ -25,7 +35,9 @@ export default function Profile() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getProfile().then(setProfile).catch(e => setError(e?.message ?? 'Could not load your profile'));
+    getProfile()
+      .then(p => { setProfile(p); setFirstRun(!p?.name?.trim()); })
+      .catch(e => setError(e?.message ?? 'Could not load your profile'));
   }, []);
 
   const update = (patch: Partial<ProfileT>) => { setProfile(p => ({ ...p, ...patch })); setDirty(true); };
@@ -38,6 +50,8 @@ export default function Profile() {
     try {
       await saveProfile(profile);
       setDirty(false);
+      // They have a name now, whatever they had before.
+      setFirstRun(false);
       if (firstRun) navigation.replace('StrandList');
       else navigation.goBack();
     } catch (e: any) {

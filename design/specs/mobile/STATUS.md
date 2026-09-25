@@ -107,6 +107,102 @@ screens on a device, then reading back to the story or spec that governs it.
 - [x] **App name is "Sereus Chat"**, matching iOS's existing `CFBundleDisplayName`. Was "mobile",
       React Native's default from the directory name — genuinely ambiguous with health installed.
 
+### Second pass, same day — menus, stories, release
+
+- [x] **Menus lost their options on Android.** `Alert.alert` takes at most THREE buttons there
+      (an Android dialog has a positive, negative and neutral slot); a fourth is dropped silently.
+      Four menus were over the limit, and the entry that went missing was Cancel — reported from
+      testing as "there is no way to cancel out of that dialog". New `components/ActionSheet.tsx`:
+      any number of options, a Cancel that is always present, and dismissal by backdrop or Back.
+      Applied to the strand long-press, the sort menu and the message menu.
+- [x] **The long-press menu did nothing.** Mute and Leave both just navigated to StrandDetail
+      (which is why leaving "took me to a strand edit screen") and Archive had no handler at all.
+      Now: Mute cycles, Hide toggles, and "Open…" is the one that navigates. Leave and Forget are
+      deliberately NOT here — they are irreversible, and story 33 says each is offered with its
+      cost stated first, which is the detail screen's job, not a press-and-hold's.
+- [x] **"Forget entirely" no longer over-promises.** It claimed to discard "everything you hold";
+      `unpublishStrand` is control-plane only and no purge step exists, so the copy now says the
+      identity is discarded and the messages remain on the device.
+- [x] **Release path documented and pre-flighted.** `yarn ship:apk` (build then publish, chained
+      so a failed build cannot upload a stale APK); both halves already existed as
+      `build:android:apk` and `publish:apk`. Production bundle verified to build clean
+      (`--dev false --minify true`, 9.8 MB). Only `STORE_PASSWORD_CHAT` is missing from the
+      environment; the keystore is present.
+
+### Crash on launch after the activity's state was saved — FIXED
+
+- [x] **`MainActivity` restored Android's saved fragment state, and `react-native-screens` refuses
+      to be restored.** `java.lang.IllegalStateException: Screen fragments should never be
+      restored`, thrown before the app could draw, so EVERY subsequent launch died. Found by
+      clearing app storage on the S7 — that kills the process while its state is saved — but that
+      is not the only way in: the activity is recreated from saved state whenever the OS reclaims
+      the app in the background and the user comes back, and after a configuration change. The
+      standard fix, which this app never had: `onCreate` passes `null` to `super` instead of the
+      bundle. Navigation state lives in JavaScript and is rebuilt on launch, so Android's copy is
+      not merely redundant, it is wrong. Verified on the S7 both ways — clear-storage-then-launch,
+      and background-and-return under "don't keep activities". No crash, app renders.
+      **`ser/health` has the same omission in its own `MainActivity` and is presumably exposed to
+      the same crash.**
+
+### Story 01 now runs as written — default strand removed, first run implemented
+
+Two departures from the stories, both corrected rather than papered over.
+
+- [x] **The auto-created "My Notes" strand is gone.** Its origin, from the commit that introduced
+      it (`00ca773`, "Basic sereus persistence working", May 2026): *"a single chat strand that the
+      app auto-creates on first run so the user has somewhere to write before any partner strand
+      has been formed."* That was scaffolding for the first persistence slice — there was no way to
+      form a real strand yet and something was needed to read and write against. It outlived its
+      purpose when invitations landed and was never removed. **No story or spec ever asked for
+      it**, and it contradicted story 01 outright: the app cannot be "an app with nothing in it"
+      while quietly founding a strand, and "My Notes" is a title no story uses. `ensureCadreUp()`
+      replaces `ensureDefaultChatStrand()`: it brings the node up and creates nothing.
+- [x] **First launch asks for a name** (story 01 steps 2-3). `firstRun` was read in `Profile.tsx`
+      and set NOWHERE, so the flow never ran. The navigator now opens on Profile when no name has
+      been set, and Profile decides that for itself from the stored profile rather than trusting a
+      route param that goes stale the moment it is saved. The gate is the NAME, not the strand
+      count — "a returning user with still no strands is not nagged" is its own criterion.
+- [x] **`strandFor` has no fallback left.** It used to open the default strand when given no id;
+      every caller now names the strand it means, and a missing or unattached id throws.
+
+Verified on a wiped emulator, against story 01's acceptance criteria:
+
+| Criterion | Result |
+| --- | --- |
+| First launch asks for a name and nothing else, and states no account is being created | Profile opens with the name field and "No account is being created. There is no password and nothing to sign in to." |
+| A user with no strands sees a deliberate empty state | "No strands yet", no spinner left running, no invented strand |
+| The empty state explains nobody can reach them until a strand exists | verbatim in the copy |
+| The way to start a strand is the most prominent action | "Start a strand" is the only call to action |
+| A returning user with still no strands is not nagged | relaunch went straight to the strand list |
+
+Still open from the same reading: **the strand-list settling signal** now keys off whether the
+node has finished its first sweep for strands (`hasSweptForStrands`), since there is no longer a
+default strand to wait for. That is what lets an empty list be an honest answer for a new user
+instead of a permanent spinner.
+
+### Stories changed for review (2026-09-24, at the user's request)
+
+- `33-managing-a-strand.md` — **hide** added as a distinct act beside mute, with the meanings
+  confirmed in testing: muted stays in the list and stops telling you; hidden leaves the list and
+  can be found and restored. Four acceptance criteria added.
+- `30-my-strands.md` — **the user can name the other party themselves** ("Dad", "Aunt Beulah"),
+  falling back to the name they gave themselves and then to a stable identifier. The "Open" section
+  now records that sereus carries no such field today, so the app holds these names on the device
+  and they move upstream if and when it does.
+- `specs/mobile/global/ui.md` — new **Actions on a page** and **The on-screen keyboard** sections:
+  page-level action in the header at the trailing edge, disabled until dirty, and the sheet-vs-alert
+  rule with the Android three-button reason stated.
+
+### Open question — "My Notes" is not in any story or spec
+
+The app founds a default strand on first run and titles it "My Notes". Neither the strand nor the
+title appears in any story or human spec; the only mention is an engineering aside in
+`domain/sereus.md`. It also **contradicts story 01**, which has the new user arrive at "an app with
+nothing in it" and be told "he has no strands yet" — which cannot happen while the app creates one
+for him. Either the story should describe a place to write to yourself, or the default strand should
+go. Not changed either way; it needs a decision, and a fair amount of code assumes
+`ensureDefaultChatStrand`.
+
 ### Next — blocked on nothing
 
 - [ ] **Keyboard handling across the app.** `ser/health` uses `react-native-keyboard-controller`'s

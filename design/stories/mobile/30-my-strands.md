@@ -86,10 +86,39 @@ is the screen he opens the app to, so it is the screen that has to be honest at 
 - empty: no strands yet — the first-run state, which is also where an invitation starts
 - error: the list itself cannot be built
 
+## Naming the people in a strand
+
+A strand has no title of its own and is not something the user names. What appears in the list is
+WHO IS IN IT, and there are three sources for that, in order:
+
+1. **The name the user gave them.** Bob can call a strand's other party whatever he likes — "Dad",
+   "Aunt Beulah", "the roofer". This is his alone: it is never shown to them, never sent anywhere,
+   and does not change what they call themselves. It is what lets him recognise the same person
+   across several strands when the name they chose is a handle he does not associate with them.
+2. **The name they gave themselves**, from their own profile, when he has not named them.
+3. **Failing both**, something stable that at least identifies them unambiguously rather than
+   pretending to be a name.
+
+A group with no single partner composes from the same names.
+
+Changing what he calls someone changes it everywhere that person appears, at once, and touches
+nothing anyone else can see.
+
+### Acceptance criteria
+
+- [ ] A user can give the other party in a strand a name of his own choosing, and change it later
+- [ ] That name is used wherever the person appears, and reaches nobody else
+- [ ] Removing it falls back to the name they gave themselves, and then to a stable identifier
+- [ ] A person named in one strand is recognisable by that name in any other strand they share
+
 ## Open
 
-Nothing outstanding. How a group is titled and pictured when it has no single partner is settled by
-`ops.md` returning a strand title and member count. Private names for partners are **provided by
-sereus** and surfaced here rather than invented — sereus also intends, eventually, to group a user's
-strands across sApps by that same private name, which is what would one day let a user cross from a
-chat strand to a tally with the same person. Nothing here should make that harder.
+How a group is titled and pictured when it has no single partner is settled by `ops.md` returning a
+strand title and member count.
+
+**Where the user's own name for someone is kept is not settled.** Sereus intends, eventually, to
+carry a private name for a party and to group a user's strands across sApps by it — which is what
+would one day let a user cross from a chat strand to a tally with the same person. **It does not
+carry one today** (cadre-core 1.4.0 has no such field on a strand or a peer), so the app holds these
+names itself, on the device. If sereus gains the field, this moves there and the behaviour above
+does not change; nothing here should make that harder.

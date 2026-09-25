@@ -4,6 +4,7 @@ import type { LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, Text, Pressable, ScrollView, StyleSheet, Linking, Image } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { getProfile } from '../data/adapter';
 import StrandList from '../screens/StrandList';
 import SearchInterface from '../screens/SearchInterface';
 import InvitationGenerator from '../screens/InvitationGenerator';
@@ -31,6 +32,29 @@ const Stack = createNativeStackNavigator();
 export default function AppNavigator() {
   const theme = useTheme();
   const { scheme } = useThemeContext();
+
+  /**
+   * FIRST LAUNCH ASKS FOR A NAME (story 01, steps 2-3). The gate is whether a
+   * name has ever been set, NOT whether the user has strands — "a returning user
+   * with still no strands is not nagged" is its own acceptance criterion, and
+   * someone who has named themselves and is waiting for their first invitation
+   * has done everything first run asks of them.
+   *
+   * `null` means we have not looked yet, and nothing is rendered until we have:
+   * mounting the strand list first and then pushing Profile over it would show
+   * the new user an empty conversation list before asking who they are, which is
+   * the wrong order and looks like a glitch.
+   */
+  const [firstRun, setFirstRun] = React.useState<boolean | null>(null);
+  React.useEffect(() => {
+    let alive = true;
+    getProfile()
+      .then(p => { if (alive) setFirstRun(!p?.name?.trim()); })
+      // Unreadable profile: treat as a returning user rather than trapping them
+      // behind a form they may have already filled in.
+      .catch(() => { if (alive) setFirstRun(false); });
+    return () => { alive = false; };
+  }, []);
 
   // Bridge our tokens into React Navigation's container theme (drives header
   // background/tint, card background, and the back chevron).
@@ -78,9 +102,15 @@ export default function AppNavigator() {
     },
   };
 
+  // Nothing to draw until we know which of the two openings this is.
+  if (firstRun === null) return null;
+
   return (
     <NavigationContainer linking={linking} theme={navTheme}>
-      <Stack.Navigator screenOptions={screenOptions}>
+      <Stack.Navigator
+        screenOptions={screenOptions}
+        initialRouteName={firstRun ? 'Profile' : 'StrandList'}
+      >
         <Stack.Screen
           name="StrandList"
           component={StrandList}

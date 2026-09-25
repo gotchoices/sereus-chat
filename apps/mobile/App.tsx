@@ -24,24 +24,25 @@ function ThemedShell() {
 export default function App() {
   useEffect(() => {
     if (!USE_SEREUS) return;
-    // Boot the cadre layer in the background and attach the default chat
-    // strand so the live data path is warm by the time the user opens a
-    // chat screen.  Errors are logged; the rest of the app keeps running.
+    // Boot the cadre layer in the background so the live data path is warm by
+    // the time the user opens a chat screen. Nothing is CREATED here: a new user
+    // has no strands until they agree one with somebody (stories 01 and 02).
+    // Errors are logged; the rest of the app keeps running.
     (async () => {
       try {
-        const { attachJoinedStrands, ensureDefaultChatStrand, applySavedRelays, watchDiscoveredStrands } =
+        const { attachJoinedStrands, ensureCadreUp, applySavedRelays, watchDiscoveredStrands } =
           await import('./src/data/chat-strand');
         // Relays FIRST, and specifically before anything starts the node: they are
         // named at construction, and that is the only path that gives a circuit
         // address to the strand nodes a conversation actually lives on.
         await applySavedRelays();
-        // Before the default strand, because the strand watcher offers stored
-        // strands about 100 ms after the node starts and never re-offers them.
+        // Before anything else touches the node, because the strand watcher offers
+        // stored strands about 100 ms after it starts and never re-offers them.
         // Anything invited into existence by our own formation responder — which
         // writes the strand row but does not launch it — arrives this way, and a
         // listener attached later misses it for the life of the process.
         await watchDiscoveredStrands();
-        await ensureDefaultChatStrand();
+        await ensureCadreUp();
         // Strands joined through someone else's invitation. Last, because it is
         // the only step that dials other PARTIES — the two above are local — and a
         // host that is currently unreachable should not delay our own strands.

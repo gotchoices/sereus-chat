@@ -20,7 +20,6 @@ import { getPrefs } from './adapter';
 
 const PROFILE_KEY = '@sereus.chat/profile';
 
-const DEFAULT_STRAND_ID_KEY = '@sereus.chat/defaultStrandId';
 
 /** Strands joined through someone else's invitation — see `rememberJoinedStrand`. */
 const JOINED_STRANDS_KEY = '@sereus.chat/joinedStrands';
@@ -53,8 +52,21 @@ type JoinedStrand = {
   Left?: boolean;
 };
 
-let cachedStrand: StrandInstance | null = null;
-let inFlight: Promise<StrandInstance> | null = null;
+/** Collapses concurrent bring-up calls into one. */
+let bringUp: Promise<void> | null = null;
+
+/**
+ * Has the node finished its first look for strands?
+ *
+ * Before it has, an empty list means "not asked yet"; after it, an empty list is
+ * an answer — and for someone who has just installed the app it is the right one,
+ * which is what story 01 needs to be able to say. Set once, because a later
+ * refresh finding nothing is not a reason to go back to "looking".
+ */
+let sweptForStrands = false;
+export function hasSweptForStrands(): boolean {
+  return sweptForStrands;
+}
 
 /**
  * Boot the cadre, attach the default chat strand (creating one on first run),
@@ -84,53 +96,33 @@ export async function applySavedRelays(): Promise<void> {
   await cadreService.applyRelays(relayAddrs);
 }
 
-export async function ensureDefaultChatStrand(): Promise<StrandInstance> {
-  if (cachedStrand?.database) return cachedStrand;
-  if (inFlight) return inFlight;
-
-  inFlight = doEnsureDefaultChatStrand().finally(() => {
-    inFlight = null;
-  });
-  return inFlight;
-}
-
-async function doEnsureDefaultChatStrand(): Promise<StrandInstance> {
-  if (cachedStrand?.database) return cachedStrand;
-
-  // BEFORE the node starts, every time — not only from App's boot effect.
-  // `listStrands()` kicks this off in the background as the strand list renders,
-  // which races that effect; whichever gets here first would otherwise build a
-  // node with no relays and force `applyRelays` to rebuild it a moment later.
-  // Idempotent, so the boot effect calling it too costs nothing.
-  await applySavedRelays();
-  await cadreService.ensureStarted();
-  const node = cadreService.cadreNode;
-  if (!node) throw new Error('CadreNode not running');
-
-  const strandId = await getOrCreateDefaultStrandId();
-  let strand = node.getStrands().get(strandId) ?? null;
-
-  if (!strand) {
-    console.info('[chat-strand] creating default chat strand:', strandId);
-    // CLOSED, like every other chat strand. This one is the user's own to begin
-    // with, so the gate is moot today — but a strand's type is fixed at founding,
-    // and "invite someone into this conversation" is a thing the app offers. An
-    // open strand could never honour that invitation, and there is no later act
-    // that closes it.
-    const created = await createChatStrand(node, strandId, 'private');
-    strand = created.instance;
-    console.info(
-      '[chat-strand] ✓ default chat strand attached. status:',
-      strand.status,
-      ' database:',
-      !!strand.database,
-    );
-  }
-
-  await registerSelfAsMember(strand);
-
-  cachedStrand = strand;
-  return strand;
+/**
+ * Bring the node up and start watching for strands. Nothing is created.
+ *
+ * THIS USED TO FOUND A STRAND. The app auto-created one on first run "so the user
+ * has somewhere to write before any partner strand has been formed" — scaffolding
+ * from the first persistence slice, when there was no way to form a real strand
+ * yet and something was needed to read and write against. It outlived its purpose
+ * and contradicted story 01, which has the new user arrive at "an app with
+ * nothing in it" and be told "he has no strands yet". It cannot be nothing while
+ * the app quietly makes one, and the strand it made was titled "My Notes", a name
+ * no story or spec ever asked for.
+ *
+ * A chat app's strands are agreed with somebody else (story 02); there is no
+ * such thing as a conversation with only yourself here. If a place to write
+ * alone is wanted, it needs a story first.
+ *
+ * Idempotent — safe on every start and from several callers at once.
+ */
+export async function ensureCadreUp(): Promise<void> {
+  if (bringUp) return bringUp;
+  bringUp = (async () => {
+    // BEFORE the node starts, every time. Relays are named at construction, so
+    // applying them afterwards forces a rebuild of the node just built.
+    await applySavedRelays();
+    await cadreService.ensureStarted();
+  })().finally(() => { bringUp = null; });
+  return bringUp;
 }
 
 /**
@@ -190,20 +182,9 @@ async function readProfileDisplayName(peerIdFallback: string): Promise<string> {
   return peerIdFallback.slice(0, 12);
 }
 
-/** Return the default strand if it's been attached; null otherwise. */
-export function getDefaultChatStrand(): StrandInstance | null {
-  return cachedStrand;
-}
 
 // ───────────────────────────────────────────────────────────────────────────
 
-async function getOrCreateDefaultStrandId(): Promise<string> {
-  const existing = await AsyncStorage.getItem(DEFAULT_STRAND_ID_KEY);
-  if (existing) return existing;
-  const id = generateUuid();
-  await AsyncStorage.setItem(DEFAULT_STRAND_ID_KEY, id);
-  return id;
-}
 
 /** Lightweight UUID v4 using crypto.getRandomValues (polyfilled in polyfills/hermes.js). */
 export function generateUuid(): string {
@@ -256,13 +237,6 @@ async function attachDiscoveredStrand(strandId: string, strandRow: StrandRow): P
   if (!node) return;
   if (attaching.has(strandId) || node.getStrands().has(strandId)) return;
 
-  // Never the default strand: `ensureDefaultChatStrand` owns that one and founds
-  // it through `foundStrand`. The watcher offers it too (it is a stored strand
-  // like any other), and the `getStrands()` check above loses the race when the
-  // offer lands mid-founding — which is how this ended up attaching the same
-  // strand twice on every launch, once as founder and once as joiner.
-  const defaultId = await AsyncStorage.getItem(DEFAULT_STRAND_ID_KEY);
-  if (defaultId === strandId) return;
 
   attaching.add(strandId);
   try {
@@ -304,6 +278,11 @@ export async function watchDiscoveredStrands(): Promise<void> {
   for (const [strandId, strandRow] of node.getDiscoveredStrands()) {
     void attachDiscoveredStrand(strandId, strandRow);
   }
+
+  // The offers have been read. Attaching them is still in flight, and that is
+  // fine: the list shows what is ready and fills in the rest as it opens. What
+  // matters is that we have now ASKED, so "nothing here" is honest.
+  sweptForStrands = true;
 }
 
 async function readJoinedStrands(): Promise<JoinedStrand[]> {

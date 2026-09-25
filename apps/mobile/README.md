@@ -95,3 +95,21 @@ To learn more about React Native, take a look at the following resources:
 - [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
 - [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
 - [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+
+## Releasing an APK
+
+A signed release build for side-loading, and the upload that puts it on
+`sereus.org/chat/chat.apk`:
+
+```sh
+export STORE_FILE_CHAT=/path/to/chat.keystore   # already set on the dev machine
+export STORE_PASSWORD_CHAT=...                  # not stored anywhere in the repo
+export KEY_ALIAS_CHAT=org.sereus.chat           # optional; this is the default
+
+yarn ship:apk        # build, then publish — stops if the build fails
+```
+
+Or the two halves separately: `yarn build:android:apk`, then `yarn publish:apk`.
+
+`ship:apk` deliberately chains with `&&`: a failed build must not upload, or the
+previous APK stays on the server looking like the new one.

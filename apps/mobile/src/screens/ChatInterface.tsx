@@ -24,7 +24,7 @@ import {
 import type { Message, Member, StrandState, Attachment } from '../data/types';
 import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
-import {
+import { ActionSheet,
   MessageBubble, EmptyState, Banner, IconButton, Avatar, StrandStatus,
 } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
@@ -208,23 +208,32 @@ export default function ChatInterface() {
     }
   };
 
-  const messageActions = (m: Message) => {
+  /**
+   * Message menu. An ActionSheet rather than `Alert.alert`, for the same reason
+   * as the strand list's: three of these four entries fit an Android dialog and
+   * the fourth — Cancel — was being dropped, leaving a menu with no way out.
+   */
+  const [msgMenu, setMsgMenu] = useState<Message | null>(null);
+  const messageActions = (m: Message) => setMsgMenu(m);
+
+  // Human spec: own → edit / delete / copy;  another's → reply / copy / react.
+  const messageOptions = (m: Message) => {
     const mine = m.memberId === me?.id;
-    // Human spec: own → edit / delete / copy;  another's → reply / copy / react.
-    Alert.alert(nameOf(m.memberId), m.content, [
+    return [
       ...(mine
         ? [
-            { text: t('actions.edit', 'Edit'), onPress: () => { setEditing(m); setReplyTo(null); setDraft(m.content); } },
-            { text: t('actions.delete', 'Delete'), style: 'destructive' as const,
-              onPress: () => deleteMessage(strandId, m.id).then(load).catch(() => {}) },
+            { label: t('actions.edit', 'Edit'),
+              onPress: () => { setEditing(m); setReplyTo(null); setDraft(m.content); } },
+            { label: t('actions.delete', 'Delete'), destructive: true,
+              onPress: () => { void deleteMessage(strandId, m.id).then(load).catch(() => {}); } },
           ]
         : [
-            { text: t('actions.reply', 'Reply'), onPress: () => setReplyTo(m) },
-            { text: t('actions.react', 'React 👍'), onPress: () => react(strandId, m.id, '👍').then(load).catch(() => {}) },
+            { label: t('actions.reply', 'Reply'), onPress: () => setReplyTo(m) },
+            { label: t('actions.react', 'React 👍'),
+              onPress: () => { void react(strandId, m.id, '👍').then(load).catch(() => {}); } },
           ]),
-      { text: t('actions.copy', 'Copy'), onPress: () => Clipboard.setString(m.content) },
-      { text: t('common.cancel', 'Cancel'), style: 'cancel' as const },
-    ]);
+      { label: t('actions.copy', 'Copy'), onPress: () => Clipboard.setString(m.content) },
+    ];
   };
 
   const renderRow = ({ item }: { item: Row }) => {
@@ -371,6 +380,13 @@ export default function ChatInterface() {
               t('screens.chat.micBody', 'You can type for now.'))} />
         )}
       </View>
+      <ActionSheet
+        visible={msgMenu !== null}
+        title={msgMenu ? `${nameOf(msgMenu.memberId)} — ${msgMenu.content}` : undefined}
+        cancelLabel={t('common.cancel', 'Cancel')}
+        onDismiss={() => setMsgMenu(null)}
+        options={msgMenu ? messageOptions(msgMenu) : []}
+      />
     </KeyboardAvoidingView>
   );
 }

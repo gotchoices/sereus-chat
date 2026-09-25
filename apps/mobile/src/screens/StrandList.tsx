@@ -7,11 +7,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, SectionList, StyleSheet, RefreshControl, Alert, Pressable, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { listStrands, strandsSettling, listOutstandingInvitations, listMembers } from '../data/adapter';
+import { listStrands, strandsSettling, listOutstandingInvitations, listMembers, setStrandMuted, setStrandArchived } from '../data/adapter';
 import type { StrandSummary, Invitation } from '../data/types';
 import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
-import { Avatar, ListRow, Badge, EmptyState, Banner, IconButton, SectionHeader } from '../components';
+import { ActionSheet, Avatar, ListRow, Badge, EmptyState, Banner, IconButton, SectionHeader } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
 type SortMode = 'recent' | 'alpha' | 'unread';
@@ -142,20 +142,38 @@ export default function StrandList() {
     const out: Array<{ title: string | null; data: any[] }> = [];
     if (invites.length && !query.trim()) out.push({ title: t('screens.strands.pending', 'Pending'), data: invites });
     out.push({ title: null, data: sorted });
-    if (archived.length) out.push({ title: t('screens.strands.archived', 'Archived'), data: archived });
+    // "Hidden", matching the act that put them here. The data field is still
+    // `archived` (that is `ops.md`'s name for it), but the word the user sees is
+    // the one on the button they pressed — story 33 calls this hiding.
+    if (archived.length) out.push({ title: t('screens.strands.hidden', 'Hidden'), data: archived });
     return out;
   }, [strands, invites, sortMode, t, matches, query]);
 
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
-  const rowActions = (s: StrandSummary) => {
-    // No delete: a strand cannot be deleted, only left.
-    Alert.alert(s.title, undefined, [
-      { text: t('actions.mute', 'Mute'), onPress: () => navigation.navigate('StrandDetail', { strandId: s.id, title: s.title }) },
-      { text: s.archived ? t('actions.unarchive', 'Unarchive') : t('actions.archive', 'Archive') },
-      { text: t('actions.leave', 'Leave…'), style: 'destructive', onPress: () => navigation.navigate('StrandDetail', { strandId: s.id, title: s.title }) },
-      { text: t('common.cancel', 'Cancel'), style: 'cancel' },
-    ]);
+  /**
+   * Long-press menu. An ActionSheet, not `Alert.alert`: Android dialogs hold three
+   * buttons and this needs four, so the fourth — Cancel — was being dropped and
+   * the menu had no way out of it.
+   *
+   * The quick actions are the reversible ones, which is what a shortcut should
+   * carry. Mute and Hide take effect here and can be undone here. Leaving and
+   * forgetting are neither quick nor reversible, and story 33 says each is offered
+   * with its cost stated first, so they stay on the strand's own screen — reached
+   * through "Open…" below rather than fired from a press-and-hold.
+   */
+  const [rowMenu, setRowMenu] = useState<StrandSummary | null>(null);
+  const rowActions = (s: StrandSummary) => setRowMenu(s);
+
+  const applyMute = async (s: StrandSummary) => {
+    const next = s.muted === 'none' ? 'soft' : s.muted === 'soft' ? 'hard' : 'none';
+    try { await setStrandMuted(s.id, next); await load(); }
+    catch (e: any) { setError(e?.message ?? 'That setting could not be saved'); }
+  };
+
+  const applyHide = async (s: StrandSummary) => {
+    try { await setStrandArchived(s.id, !s.archived); await load(); }
+    catch (e: any) { setError(e?.message ?? 'That setting could not be saved'); }
   };
 
   const isEmpty = strands.length === 0 && invites.length === 0;
@@ -163,13 +181,9 @@ export default function StrandList() {
 
   const sortIcon = sortMode === 'recent' ? 'time-outline' : sortMode === 'alpha' ? 'text-outline' : 'mail-unread-outline';
 
-  const chooseSort = () =>
-    Alert.alert(t('screens.strands.sortTitle', 'Order by'), undefined, [
-      { text: t('screens.strands.sortRecent', 'Recent'), onPress: () => setSortMode('recent') },
-      { text: t('screens.strands.sortAlpha', 'Alphabetical'), onPress: () => setSortMode('alpha') },
-      { text: t('screens.strands.sortUnread', 'Unread first'), onPress: () => setSortMode('unread') },
-      { text: t('common.cancel', 'Cancel'), style: 'cancel' },
-    ]);
+  // Three choices plus Cancel is four, one more than an Android dialog holds.
+  const [sortMenu, setSortMenu] = useState(false);
+  const chooseSort = () => setSortMenu(true);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -298,6 +312,46 @@ export default function StrandList() {
         />
       )}
       </View>
+
+      <ActionSheet
+        visible={sortMenu}
+        title={t('screens.strands.sortTitle', 'Order by')}
+        cancelLabel={t('common.cancel', 'Cancel')}
+        onDismiss={() => setSortMenu(false)}
+        options={[
+          { label: t('screens.strands.sortRecent', 'Recent'), onPress: () => setSortMode('recent') },
+          { label: t('screens.strands.sortAlpha', 'Alphabetical'), onPress: () => setSortMode('alpha') },
+          { label: t('screens.strands.sortUnread', 'Unread first'), onPress: () => setSortMode('unread') },
+        ]}
+      />
+
+      <ActionSheet
+        visible={rowMenu !== null}
+        title={rowMenu?.title}
+        cancelLabel={t('common.cancel', 'Cancel')}
+        onDismiss={() => setRowMenu(null)}
+        options={rowMenu ? [
+          {
+            label: rowMenu.muted === 'none' ? t('actions.mute', 'Mute')
+              : rowMenu.muted === 'soft' ? t('screens.strands.muteHard', 'Silence completely')
+              : t('screens.strands.unmute', 'Unmute'),
+            hint: rowMenu.muted === 'none' ? t('screens.strands.muteHint', 'Stays in your list; you are just not told about it')
+              : rowMenu.muted === 'soft' ? t('screens.strands.muteSoftNow', 'Currently quiet unless somebody names you')
+              : t('screens.strands.muteHardNow', 'Currently silent whatever happens'),
+            onPress: () => { void applyMute(rowMenu); },
+          },
+          {
+            label: rowMenu.archived ? t('actions.unhide', 'Unhide') : t('actions.hide', 'Hide'),
+            hint: t('screens.strands.hideHint', 'Out of your list until you look for it; nothing changes for anyone else'),
+            onPress: () => { void applyHide(rowMenu); },
+          },
+          {
+            label: t('screens.strands.openDetails', 'Open…'),
+            hint: t('screens.strands.openDetailsHint', 'Members, what is shared, and leaving'),
+            onPress: () => navigation.navigate('StrandDetail', { strandId: rowMenu.id, title: rowMenu.title }),
+          },
+        ] : []}
+      />
 
       <View style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.divider }]}>
         <IconButton name="qr-code-outline" size={22} style={styles.flex1}

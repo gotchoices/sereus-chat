@@ -54,6 +54,46 @@ contrast against each theme's background (AA in both).
     android: ToastAndroid     # Prefer native toast
     ios: overlay              # Lightweight in-app overlay
 
+
+## Actions on a page
+
+Where a screen has one action that commits the whole page — Save, Continue, Done — it goes in the
+**header, at the trailing edge**, and not at the foot of the content.
+
+- It is in the same place on every screen, so it is found rather than hunted for.
+- A control at the bottom of a scrolling page cannot be seen without scrolling, so there is no way
+  to tell whether the screen even has one or saves quietly as you type.
+- The soft keyboard covers the bottom of the screen exactly when the user has finished typing and
+  wants that control, forcing them to dismiss the keyboard first to reach it.
+
+**It is disabled until there is something to do.** An action that is always available says nothing;
+one that becomes available when the page is dirty tells the user there is an unsaved change without
+a word of explanation. Disabled means visibly disabled, not hidden — a control that appears and
+disappears is harder to trust than one that greys.
+
+Actions that apply to one item rather than the page (a message, a strand in a list) stay with that
+item, not in the header.
+
+### Choosing between several things
+
+Use a sheet of options, not a system alert, whenever there are **more than two choices plus a
+cancel**. React Native's Android `Alert` accepts at most three buttons, because an Android dialog
+has exactly a positive, a negative and a neutral slot; a fourth is dropped with no warning. The
+option that goes missing is usually Cancel, which leaves a menu the user cannot back out of.
+
+Every such sheet can be dismissed three ways — an explicit Cancel, tapping outside it, and the
+Android Back button — and all three mean the same nothing-happened.
+
+## The on-screen keyboard
+
+A screen with a text input must stay usable while the keyboard is up.
+
+- Content the user is typing into stays visible; the view scrolls rather than being covered.
+- Tapping a control while the keyboard is open activates that control. The first tap must not be
+  spent only on dismissing the keyboard.
+- Nothing the user needs in order to finish — the page action especially — may sit under the
+  keyboard. Putting that action in the header, as above, is what usually settles this.
+
 ## Icon Conventions
 
 Prefer icons alone where sufficient:

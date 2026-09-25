@@ -126,8 +126,16 @@ export default function StrandDetail() {
   const confirmForget = () => {
     Alert.alert(
       t('screens.strand.forgetTitle', 'Forget this strand entirely?'),
+      // HONEST ABOUT WHAT IT CANNOT DO. Story 33 describes forgetting as
+      // "discarding what identifies him and what he holds of the strand", and we
+      // deliver the first half only: cadre-core's `unpublishStrand` is documented
+      // as control-plane only — "the strand's local durable storage is retained ...
+      // that is a separate purge step" — and no purge step exists. So the copy
+      // promises the identity discard, which is real, and says plainly that the
+      // messages stay on the device, rather than claiming an erasure that does not
+      // happen. Restore the stronger wording when upstream can back it.
       t('screens.strand.forgetBody',
-        'Permanent. What identifies you here is discarded along with everything you hold. If you are ever invited back you arrive as a stranger, and what you said before stays under who you used to be.'),
+        'Permanent. What identifies you here is discarded, so if you are ever invited back you arrive as a stranger and what you said before stays under who you used to be. The messages themselves remain stored on this device.'),
       [
         { text: t('common.cancel', 'Cancel'), style: 'cancel' },
         { text: t('common.continue', 'Continue'), style: 'destructive', onPress: () =>
@@ -198,8 +206,8 @@ export default function StrandDetail() {
           }}
         />
         <ListRow
-          title={archived ? t('screens.strand.unarchive', 'Unarchive') : t('actions.archive', 'Archive')}
-          subtitle={t('screens.strand.archiveHint', 'Hide it from your list; nothing changes for anyone else')}
+          title={archived ? t('actions.unhide', 'Unhide') : t('actions.hide', 'Hide')}
+          subtitle={t('screens.strand.hideHint', 'Out of your list until you look for it; nothing changes for anyone else')}
           onPress={() => {
             const next = !archived;
             setArchived(next);

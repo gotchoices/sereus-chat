@@ -16,6 +16,7 @@
     "build:ios:ipa": "cd ios && bundle exec fastlane build_ipa",
     "build:ios:beta": "cd ios && bundle exec fastlane beta",
     "publish:apk": "./publish",
+    "ship:apk": "yarn build:android:apk && yarn publish:apk",
     "icons:android": "sh ./scripts/logo-gen-android.sh",
     "icons:ios": "sh ./scripts/logo-gen-ios.sh",
     "detox:build:android": "detox build -c android.emu.debug",

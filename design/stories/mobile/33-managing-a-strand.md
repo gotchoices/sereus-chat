@@ -20,11 +20,17 @@ it. He wants to tidy up, and does not want to discover afterwards that he threw 
 ## Sequence
 
 1. Bob finds the strand with Dave in his list and looks at what he can do about it.
-2. He is offered three things, and told what each one costs before he picks. There is no fourth
+2. He is offered four things, and told what each one costs before he picks. There is no fifth
    option that removes the strand from the world — it is not his to remove.
-3. **Mute.** He stays in the strand and his machines carry on taking part. Messages still arrive; he
-   simply is not told about them. He chooses how quiet: silent unless somebody names him, or silent
-   whatever happens. Either way he finds everything when he looks. → [10](10-catching-up.md)
+3. **Mute.** He stays in the strand and his machines carry on taking part. The strand stays in his
+   list exactly where it was; messages still arrive and he simply is not told about them. He
+   chooses how quiet: silent unless somebody names him, or silent whatever happens. Either way he
+   finds everything when he looks. → [10](10-catching-up.md)
+3a. **Hide.** The strand stops appearing in his list. Nothing else changes: he is still in it,
+   messages still arrive, and the people in it see no difference. It is not gone — he can go
+   looking for hidden strands, find it, and put it back in his list. This is for the conversation
+   he does not want to see every day but is not ready to step out of. Muting and hiding are
+   independent: he may do either, both, or neither.
 4. **Leave.** His machines stop taking part. Nothing more reaches him, and the strand carries on
    without him for everyone still in it. He keeps what identifies him in that strand, so if Dave
    ever invites him back he returns as himself, with what was said before still his.
@@ -86,6 +92,10 @@ it. He wants to tidy up, and does not want to discover afterwards that he threw 
 - [ ] The user is offered muting, leaving, and forgetting entirely, and is told what each costs
       before choosing
 - [ ] No option claims to delete a strand for its other members
+- [ ] A muted strand still appears in the list, in its usual place
+- [ ] A hidden strand does not appear in the ordinary list, and there is a way to find it again
+- [ ] Un-hiding puts it back; nothing about hiding or un-hiding reaches the other members
+- [ ] Mute and hide can each be undone from the same place they were set
 - [ ] Muting keeps the user fully in the strand; only notification stops
 - [ ] The user chooses whether a mute still lets through messages that name them
 - [ ] Leaving stops the user's machines taking part, and the strand continues for everyone else

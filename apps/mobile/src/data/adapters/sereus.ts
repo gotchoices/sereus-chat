@@ -14,7 +14,7 @@ import {
   setStrandMuted as setStrandMutedLocal,
   setStrandArchived as setStrandArchivedLocal,
 } from '../strand-prefs';
-import { ensureDefaultChatStrand, generateUuid, getDefaultChatStrand, leaveStrandLocally, registerSelfAsMember, rememberJoinedStrand, syncProfileNameToStrands } from '../chat-strand';
+import { ensureCadreUp, generateUuid, hasSweptForStrands, leaveStrandLocally, registerSelfAsMember, rememberJoinedStrand, syncProfileNameToStrands } from '../chat-strand';
 import { createChatStrand, joinChatStrand } from '../chat-sapp';
 import type { StrandInstance } from '@serfab/cadre-core';
 import {
@@ -133,33 +133,23 @@ export class SereusAdapter implements DataAdapter {
     // those, so they are the ones that would otherwise read as "no strands".
     // Before the node is even running there is nothing in the map at all, which
     // also counts as settling rather than as an answer.
-    // THE DEFAULT STRAND IS THE SIGNAL. Every account has "My Notes" — the app
-    // founds it on first run — so once it is attached there is always at least one
-    // row, and an empty list after that is a real answer rather than a slow start.
+    // Settled once the node is up AND its first sweep for strands has run. Before
+    // that an empty list means "not asked yet"; after it, an empty list is a real
+    // answer — and for a new user it is the RIGHT answer, which is story 01's
+    // whole point.
     //
-    // The two obvious alternatives are both wrong. "Some strand is still opening"
-    // never stops being true if one of them cannot open (an invitation nobody
-    // accepted, a host that never answers), so a fault in one row hides the whole
-    // list forever. "Nothing is readable yet" cannot tell a cold start from an
-    // account with no strands, which is the very distinction this exists to draw.
-    //
-    // A wall-clock timeout in the screen was tried and is worse than either: on a
-    // loaded emulator cadre took minutes to start and the timer fired first,
-    // putting "No strands yet" in front of someone who has several — exactly the
-    // bug this was written to fix.
-    return getDefaultChatStrand() === null;
+    // "Some strand is still opening" would be wrong: it never stops being true if
+    // one of them cannot open (an invitation nobody accepted, a host that never
+    // answers), so a fault in one row would hide the list forever.
+    return !hasSweptForStrands();
   }
 
   async listStrands(): Promise<StrandSummary[]> {
-    // Kick the default-strand attach in the BACKGROUND — never block the list
-    // on it.  Attaching a strand reads the control DB (queryCadrePeers), which
-    // is slow/blocking on a solo node, and we want the list (empty or not) to
-    // render immediately.  Once the strand attaches it shows on the next
-    // refresh.  `defaultStrandId()` lets us still label it "My Notes".
-    void ensureDefaultChatStrand().catch(err =>
-      console.warn('[SereusAdapter] default strand attach deferred:', err instanceof Error ? err.message : err),
+    // Bring the node up in the BACKGROUND — never block the list on it, so an
+    // empty or partial list renders immediately and fills in as strands open.
+    void ensureCadreUp().catch(err =>
+      console.warn('[SereusAdapter] cadre bring-up deferred:', err instanceof Error ? err.message : err),
     );
-    const defaultId = getDefaultChatStrand()?.strandId ?? null;
 
     const strands = cadreService.getStrands();
     // One read for the whole list, not one per strand.
@@ -197,8 +187,7 @@ export class SereusAdapter implements DataAdapter {
       // Until the other side's Member row arrives, `others` is empty and there is
       // nothing truthful to call it — say so rather than invent a name.
       const title =
-        id === defaultId ? 'My Notes'
-        : others.length === 0 ? 'New strand'
+        others.length === 0 ? 'New strand'
         : others.length === 1 ? nameOf(others[0])
         : others.map(nameOf).join(', ');
 
@@ -228,7 +217,7 @@ export class SereusAdapter implements DataAdapter {
    * no cross-strand index, and hibernating strands are not woken here.
    */
   async *search(query: string, opts?: SearchOptions): AsyncIterable<SearchBatch> {
-    void ensureDefaultChatStrand().catch(() => {});
+    void ensureCadreUp().catch(() => {});
     const q = query.trim().toLowerCase();
     const entries = [...cadreService.getStrands()].filter(
       ([id]) => !opts?.strandId || id === opts.strandId,
@@ -397,18 +386,16 @@ export class SereusAdapter implements DataAdapter {
    * because the query ran against "My Notes", so replication looks broken when it
    * is working.  Resolve here, or not at all.
    *
-   * No id means the default strand, which is the one strand we can bring up on
-   * demand.  A named strand that is not attached THROWS rather than falling back
-   * to the default — reading the wrong conversation is worse than an error,
-   * because an error says so and a wrong read does not.
+   * THERE IS NO FALLBACK. Every caller names the strand it means; a missing or
+   * unattached id throws rather than quietly opening some other conversation,
+   * because a wrong read says nothing and an error says what happened. This used
+   * to fall back to the auto-created default strand, which is how a joined
+   * conversation came to render as empty while its rows sat in the database.
    */
   private async strandFor(strandId?: string | null): Promise<StrandInstance> {
-    if (!strandId) return ensureDefaultChatStrand();
+    if (!strandId) throw new Error('No strand was named.');
     const attached = cadreService.getStrands().get(strandId);
     if (attached) return attached;
-    // Not in the map yet — it may be the default strand, which attaches lazily.
-    const fallback = await ensureDefaultChatStrand();
-    if (getDefaultChatStrand()?.strandId === strandId) return fallback;
     throw new Error(`Strand ${strandId} is not attached on this device.`);
   }
 
