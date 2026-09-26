@@ -46,3 +46,14 @@ if (!globalThis.process.env) globalThis.process.env = {};
 // Three clean joins failed in a row with it on; they succeed with it off.
 // globalThis.process.env.DEBUG = 'optimystic:db-core:network-transactor';
 // globalThis.process.env.DEBUG = 'optimystic:db-p2p:protocol-client,optimystic:db-p2p:sync-service,optimystic:fret*,sereus:cadre:relay*';
+// Narrowed on purpose: cohort/coordinator resolution only. `optimystic:*` floods the
+// RN bridge badly enough to change the outcome it is meant to observe.
+// TRAILING `*` MATTERS: the logger appends the peer id, so the real namespace is
+// `optimystic:db-p2p:libp2p-key-network:12D3Koo…`, and `debug` matches exactly
+// unless told otherwise. Without the star this filter silently logs nothing.
+// globalThis.process.env.DEBUG = 'optimystic:db-p2p:coordinator-repo*,optimystic:db-p2p:protocol-client*,optimystic:db-p2p:sync-service*';
+// FULL FIRE HOSE, deliberately. This floods the RN bridge hard enough to change
+// timing — three clean JOINS failed in a row with it on — so it must not be used
+// while measuring anything join- or first-sync-related. It is safe here because
+// the strand is already attached and the thing under investigation is a READ.
+// globalThis.process.env.DEBUG = 'optimystic:*,sereus:cadre:*';

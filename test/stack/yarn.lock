@@ -702,6 +702,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@quereus/quereus@npm:^4.20.0":
+  version: 4.20.0
+  resolution: "@quereus/quereus@npm:4.20.0"
+  dependencies:
+    debug: "npm:^4.4.3"
+    fast-json-patch: "npm:^3.1.1"
+    inheritree: "npm:^1.0.1"
+    moat-maker: "npm:^2.2.0"
+    temporal-polyfill: "npm:^0.3.0"
+    uint8arrays: "npm:^6.1.1"
+  checksum: 10c0/a176397dddef8aab09d3ccb4c4a649e2249653782272a1cd93582865d12c89300e78d107e10b402d65607aa92ecb3049057ed9cce8f071e6dfccec3d9752bc06
+  languageName: node
+  linkType: hard
+
 "@sereus-chat/stack-check@workspace:.":
   version: 0.0.0-use.local
   resolution: "@sereus-chat/stack-check@workspace:."
@@ -714,7 +728,7 @@ __metadata:
     "@optimystic/db-core": "npm:^1.5.0"
     "@optimystic/db-p2p": "npm:^1.5.0"
     "@optimystic/db-p2p-storage-rn": "npm:^1.5.0"
-    "@quereus/quereus": "npm:^4.19.4"
+    "@quereus/quereus": "npm:^4.20.0"
     "@serfab/cadre-core": "npm:^1.4.0"
     classic-level: "npm:^3.0.0"
     libp2p: "npm:^3.1.3"

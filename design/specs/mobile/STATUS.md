@@ -107,6 +107,140 @@ screens on a device, then reading back to the story or spec that governs it.
 - [x] **App name is "Sereus Chat"**, matching iOS's existing `CFBundleDisplayName`. Was "mobile",
       React Native's default from the directory name — genuinely ambiguous with health installed.
 
+### Public relay (sereus.org), 2026-09-25
+
+- [x] **DNS is correct and propagated.** `_dnsaddr.relay.sereus.org` carries both records with the
+      relay's real peer id. Two faults were found and fixed during the session: both records first
+      advertised MISMATCHED peer ids (a live dial reported a different one than either claimed),
+      and the WebSocket record published container port **4002** instead of host port **4011** —
+      the exact silent mistake `ops/docs/dnsaddr.md` warns about. 4002 is closed from outside;
+      phones can only use WebSockets, so that one record made the relay unusable to them.
+- [x] **The relay itself is sound.** Two Node parties formed a strand through it in 3.2 s with
+      writes crossing both ways. So relay limits (`RELAY_APPLY_DEFAULT_LIMIT`) are not the problem.
+- [x] **Relay announce FIXED and verified, 2026-09-25.** `ANNOUNCE_ADDRS` now yields exactly
+      `/dns4/relay.sereus.org/tcp/4001` and `/dns4/relay.sereus.org/tcp/4011/ws`, with no container
+      addresses. Invitation seeds went from FIVE (four undialable) to TWO, both dialable. The join
+      that had failed twice at the 120 s timeout then succeeded — S7 attached in 179 s. So the
+      announce defect was real and its fix was necessary. It was not, however, sufficient: see
+      `cohort-unreachable` below.
+- [ ] **`cohort-unreachable` — narrowed further with FULL logging, 2026-09-25/26.** Turning on
+      `optimystic:*,sereus:cadre:*` and reading the whole trace was the right move; it is safe for
+      THIS investigation because the strand is already attached and only a read is being measured
+      (it is NOT safe while measuring a join — the flood changes join timing).
+
+      Two separate things came out, and only one is a candidate defect.
+
+      **1. A two-machine deployment has ZERO repair margin — optimystic says so at startup.**
+      `cluster-policy repair-fault-tolerance` warns: repair "converges only when 2 cohort peers
+      BESIDES the reader answer … 3 machines is therefore the MINIMUM that can repair at all, not a
+      safe size … 4 machines is the first size with any margin. This node resolved
+      `repairCorroborationClusterSize=2`, which leaves repair with NO fault tolerance: the reader
+      has 1 cohort peer(s) and needs 1 of them to answer, so losing one is not survivable." That is
+      exactly our shape — `cohortPeers: 1, silent: 1, required: 1`. So ONE unanswered consult is
+      not a blip; it permanently declines the read.
+      **But this is not by itself the cause**: the Node harness hits the identical condition
+      (`repairCorroborationClusterSize: 2`) through the same relay and works, because its single
+      cohort peer answers. Worth knowing anyway — see the product note below.
+
+      **2. The candidate defect: the peer is scored `silent` without ever being asked.** Across the
+      whole read, the only strand protocols on the wire are `block-transfer/1.0.0` (5, all to the
+      RELAY, all failing protocol negotiation) and one `sync/1.0.0` which is the inbound LISTENER
+      starting, not an outbound dial. `clusterLatestCallback` contacts a non-self peer through
+      `new SyncClient(peerId, keyNetwork, protocolPrefix).requestBlock(...)` — and **no such
+      outbound request appears at all**. The peer is nonetheless counted in `silent`, which
+      `queryClusterForLatest` fills from any callback that rejects or times out. So the callback is
+      failing before it reaches the wire, and `silent` conflates "asked and got nothing" with
+      "never asked". Whatever makes it fail early is the bug; the zero repair margin from (1) is
+      what turns it from a retryable miss into a permanent decline.
+
+      **Product consequence, independent of the bug.** If repair needs 3 machines minimum and 4 for
+      margin, two phones alone are below the floor by design. Story 42 already points at the answer
+      ("he adds a machine of his own"), but it presents borrowing a relay as a sufficient first
+      step — and a relay is NOT a cadre machine, so two phones plus a relay is still two machines.
+      That gap between what story 42 promises and what the platform needs deserves a decision.
+
+- [ ] ~~**`cohort-unreachable` — NARROWED TO UPSTREAM, 2026-09-25. Not our code.**~~ Earlier pass,
+      retained for its evidence: Two devices,
+      strand joined, both reserved on the public relay, every read of `App.Message` failing. Traced
+      with `optimystic:db-p2p:coordinator-repo*,protocol-client*,sync-service*` on BOTH devices at
+      once. What the wire shows:
+
+      1. The fetch fails as `cluster-fetch:no-quorum { blockId: 'default/app/Message',
+         cohortPeers: 1, holders: 0, absent: 0, silent: 1, required: 1 }` — the one non-self cohort
+         member never answers. `cohort-unreachable` is what the caller is then told, which
+         `coordinator-repo.js` produces from `absence === 'isolated'`: "no cohort member outside
+         this node could be asked at all".
+      2. **The only block-transfer dial either device ever makes is to the RELAY**, and it fails:
+         `dial:fail peer=12D3KooWMD7E… protocol=/optimystic/strand-<id>/db-p2p/block-transfer/1.0.0
+         msg='Protocol selection failed - could not negotiate …'`. That peer id is the relay, which
+         of course does not implement a strand's block-transfer protocol — it serves hop, ping and
+         identify only.
+      3. **Neither device ever dials the other.** The party that actually holds the block is never
+         contacted, and the joiner's `sync-service` records ZERO inbound sync requests.
+
+      So the read is aimed at a machine that cannot serve it, the real holder is never asked, the
+      attempt is counted as `silent`, and quorum can never be reached. Symmetric — both devices do
+      it.
+
+      **Why this is not ours.** The app calls `db.exec` on the instance `addStrand` returned, which
+      is exactly what `test/stack/two-party-formation.mjs` does; that harness forms a strand and
+      exchanges writes through the SAME relay in ~3.2 s, repeatedly.
+
+      **No device-free repro yet.** Two Node parties both loop-starved (`LOOP_HOG_DUTY=0.6`) over
+      the same public relay still work — the joiner read all the host's messages. So it is not
+      slowness alone, and the recipe that cracked the contention bug does not crack this one. The
+      reproduction is currently "two React Native devices over a circuit relay", which is poor for
+      a bug report; the compensation is that the evidence names the exact dial, protocol and
+      failure mode, so it should be findable from the code without reproducing it.
+      Candidate next step: find why the fetch targets the relay rather than the cohort member the
+      key-network layer resolved — the two disagree, and that disagreement is the bug.
+
+- [ ] ~~`cohort-unreachable` blocks two-device messaging over the public relay.~~ Superseded by the
+      entry above. Original symptom description: With everything
+      above correct — DNS right, announce right, both devices reserved, strand joined, titles
+      resolving to real names — the conversation still does not work. Both sides show
+      `Error during query on table 'Message': Block default/app/Message is unavailable
+      (cohort-unreachable): the repo could not determine whether it exists`. Tapping Retry clears
+      it for a while (both reached "Nothing said yet"), a message sent from the founder committed
+      locally, and then the error returned and the message had not reached the joiner after four
+      and a half minutes. Not a relay fault: two NODE parties through the same relay form a strand
+      in ~3.2 s and exchange writes both ways, repeatedly. Device-specific, and it is the last
+      thing standing between the app and a usable two-party conversation over the public relay.
+      Related to, and possibly the same thing as, the contention/convergence problems already
+      reported upstream (optimystic#18, #19).
+- [x] ~~THE RELAY ANNOUNCES ONLY CONTAINER ADDRESSES~~ — fixed above. Original finding retained
+      for the record: `check-node`
+      reports its known addrs as `127.0.0.1` and `172.18.0.2` — no public address. Every peer that
+      reserves there hands those out inside its own circuit addresses, so **four of the five
+      bootstrap addresses in every invitation are undialable**: a joiner tries `127.0.0.1` (its
+      OWN loopback) and a Docker bridge address that is nothing to it. Node shrugs this off — it
+      dials fast and discards them, which is why the harness passes. A phone pays a Noise handshake
+      per attempt and burns the whole 120 s first-sync budget before reaching the one good address.
+      Device-to-device join over this relay failed twice for that reason while Node succeeded
+      through the identical seeds.
+      **Fix is relay-side**: set `ANNOUNCE_ADDRS` to the public addresses, and per
+      `ops/docker/libp2p-infra/README.md` include the WebSocket one — a non-empty announce set
+      REPLACES the advertised addresses rather than adding to them. Shape:
+      `/dns4/relay.sereus.org/tcp/4001,/dns4/relay.sereus.org/tcp/4011/ws`
+
+### Quereus 4.20.0 — upgraded
+
+Reviewed before taking it. Relevant to chat: `exec-batch-as-one-transaction` (filed BY sereus —
+an indivisible multi-statement transaction, where a failed batch used to leave its transaction
+open for the next caller), `apply-schema-undo-plan` + `apply-schema-rollback-journal` (a failed
+`apply schema` used to leave earlier migration steps applied; it now restores the catalog, except
+after drop-table, drop-column or retype), and `bug-add-check-constraint-skips-existing-rows`.
+Not relevant: the colon-prefixed parameter fix (we bind positionally with `?`).
+
+The severe open bug in that release — `2-bug-sync-metadata-keyed-by-unstable-table-identity`,
+"corruption / normal-use" — is in **`quereus-sync`, which chat does not depend on** (verified: the
+tree contains `@quereus/quereus` only; chat syncs through optimystic). That is what made the
+upgrade safe to take.
+
+Note the pin lives in `resolutions`, not just `dependencies` — deliberately, to keep ONE quereus
+in the tree, since two copies would mean two catalogs. Both were moved together; verified a single
+copy resolves. `tsc` clean, harness green through the public relay.
+
 ### Second pass, same day — menus, stories, release
 
 - [x] **Menus lost their options on Android.** `Alert.alert` takes at most THREE buttons there

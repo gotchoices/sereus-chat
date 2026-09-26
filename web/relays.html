@@ -50,8 +50,16 @@
           <strong>sereus.org community relay</strong> — operated by the Sereus
           project. Free, no sign-up, a limited number of slots.
           <br />
-          <a class="btn-secondary relay-link" data-addr="" href="#">Use this relay</a>
-          <span class="note relay-pending">Not running yet — listed here ahead of the relay itself.</span>
+          <!-- The WEBSOCKET address on the HOST port. A phone cannot dial raw TCP, so
+               the /ws record is the only one that is any use here; and the relay maps
+               host 4011 to container 4002, so 4011 is the port that answers from
+               outside. Verified with ops/test/check-node.mjs before publishing.
+               This is a concrete multiaddr rather than /dnsaddr/relay.sereus.org
+               because the offer screen shows the exact machine being trusted, and a
+               dnsaddr carries no peer id to show. -->
+          <a class="btn-secondary relay-link"
+             data-addr="/dns4/relay.sereus.org/tcp/4011/ws/p2p/12D3KooWMD7E7UH4rkCqiFE69n7FNqrKo1Xx3yDUU8JvwtaH39bD"
+             href="#">Use this relay</a>
         </li>
       </ul>
       <p class="note">

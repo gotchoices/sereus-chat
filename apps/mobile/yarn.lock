@@ -3063,9 +3063,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@quereus/quereus@npm:^4.19.4":
-  version: 4.19.4
-  resolution: "@quereus/quereus@npm:4.19.4"
+"@quereus/quereus@npm:^4.20.0":
+  version: 4.20.0
+  resolution: "@quereus/quereus@npm:4.20.0"
   dependencies:
     debug: "npm:^4.4.3"
     fast-json-patch: "npm:^3.1.1"
@@ -3073,7 +3073,7 @@ __metadata:
     moat-maker: "npm:^2.2.0"
     temporal-polyfill: "npm:^0.3.0"
     uint8arrays: "npm:^6.1.1"
-  checksum: 10c0/c1d12fdd5d19ce35d8420c11fb771e85e79456c7cedd718eb507fb86d968cf3b6dc55009ff314d79163887b97fd5d37658560561197d8bff3eaa4ea0e7be538a
+  checksum: 10c0/a176397dddef8aab09d3ccb4c4a649e2249653782272a1cd93582865d12c89300e78d107e10b402d65607aa92ecb3049057ed9cce8f071e6dfccec3d9752bc06
   languageName: node
   linkType: hard
 
@@ -9183,7 +9183,7 @@ __metadata:
     "@optimystic/db-p2p-storage-rn": "npm:^1.5.0"
     "@optimystic/quereus-plugin-crypto": "npm:^1.5.0"
     "@optimystic/quereus-plugin-optimystic": "npm:^1.5.0"
-    "@quereus/quereus": "npm:^4.19.4"
+    "@quereus/quereus": "npm:^4.20.0"
     "@react-native-async-storage/async-storage": "npm:^2.1.0"
     "@react-native-clipboard/clipboard": "npm:^1.16.3"
     "@react-native-community/cli": "npm:20.0.0"
