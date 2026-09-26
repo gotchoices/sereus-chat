@@ -123,6 +123,109 @@ screens on a device, then reading back to the story or spec that governs it.
       that had failed twice at the 120 s timeout then succeeded — S7 attached in 179 s. So the
       announce defect was real and its fix was necessary. It was not, however, sufficient: see
       `cohort-unreachable` below.
+### Small-cohort behaviour in optimystic — mechanism established, 2026-09-26
+
+Full-log analysis (`optimystic:*,sereus:cadre:*`) plus source reading gives a complete account of
+why two phones cannot hold a conversation. Three interacting facts, all in db-p2p:
+
+1. **The consult budget is a hardcoded 1000 ms.** `coordinator-repo.js:16`,
+   `const LATEST_QUERY_TIMEOUT_MS = 1000`, with no configuration path. Its own comment: "a
+   LAN-shaped budget. A cohort whose round trip honestly exceeds it now reads as permanently
+   silent … If a WAN deployment shows steady `cluster-fetch:peers-silent` against healthy peers,
+   raise this." Two phones over a public circuit relay are precisely that deployment.
+2. **At two machines there is no repair margin at all.** `cluster-policy repair-fault-tolerance`
+   warns at startup: "3 machines is therefore the MINIMUM that can repair at all, not a safe size …
+   4 machines is the first size with any margin. This node resolved
+   `repairCorroborationClusterSize=2`, which leaves repair with NO fault tolerance: the reader has
+   1 cohort peer(s) and needs 1 of them to answer, so losing one is not survivable." So a single
+   missed answer is not a retryable blip; it is a permanent decline.
+3. **Cohort membership oscillates.** Some reads take `cluster-fetch:solo-self-skip` — fired only
+   when `findCluster` returns exactly one peer and that peer is self — and conclude an authoritative
+   "absent" ("Nothing said yet"). Others resolve `{self, peer}`, consult, miss the 1 s budget, and
+   report `cohort-unreachable`. That alternation is exactly what the UI showed: the error banner
+   appearing and clearing, messages present then absent.
+
+Together: membership is unstable, the consult is LAN-budgeted, and two machines have no margin to
+absorb either. The Node harness escapes all three because its round trip is milliseconds.
+
+**Repro progress.** `ws-latency.mjs` is now runtime-settable (`WS_DELAY_ARMED=1` +
+`setWsDelayMs()`), because injecting latency at startup kills FORMATION (700 ms blows the 5 s
+formation dial budget) before a read is ever reached. `READ_DELAY_MS` in
+`two-party-formation.mjs` raises the delay after the strand is up. At a 1800 ms round trip reads
+still SUCCEED — because the joiner already holds the block from first sync, so no consult runs.
+**The missing ingredient is a block the reader does not hold**: the consult only fires on a local
+miss. Next attempt: have the host write while the joiner is detached, then reattach under a slow
+link so the read must consult.
+
+### Posted upstream as optimystic#22, 2026-09-26
+
+https://github.com/gotchoices/Optimystic/issues/22 — the WAN first-sync failure, with the
+device-free reproduction, the control, and the `LATEST_QUERY_TIMEOUT_MS` reading.
+
+Checked for duplication against every open issue before posting. No overlap: #17 is a torn
+index commit, #18 is write contention (its only "latency" mention is our own comment, about an
+injection that did NOT reproduce that bug), #20 is a beta.3-specific read-after-write regression.
+The nearest neighbour is **#19** and it is genuinely distinct — there `findCluster` FAILS, the
+throw is swallowed, an empty cohort reads as solo, and a WRITE reports success; here `findCluster`
+SUCCEEDS and returns the right cohort, the consult then expires against it, and the READ fails
+loudly. The issue cross-references #19 and asks whether they share a root.
+
+The issue is deliberately careful about what is proven: latency is demonstrated as the only
+variable between a passing and failing run, and the one LAN-shaped deadline on that path is named
+— but it does NOT claim the constant is proven to be the cause. It offers a PR for the
+configurable-budget fix and asks where the knob should live.
+
+### Device-free reproduction achieved, 2026-09-26 — `test/stack/small-cohort-repro.sh`
+
+The device symptom now reproduces in Node, with a control. Two parties reachable only through a
+circuit relay; latency raised AFTER formation (injected from the start, 700 ms blows the 5 s
+formation dial budget and the run dies before reaching the part under test —
+`ws-latency.mjs` is now runtime-settable via `WS_DELAY_ARMED=1` + `setWsDelayMs()`).
+
+| case | LAN control (2 ms RTT) | WAN (1800 ms RTT) |
+| --- | --- | --- |
+| re-attach a detached strand | re-attached in ~5-10 s, reads fine | **fails after 120 s** |
+
+The WAN failure is the exact text two phones produce: `StrandAwaitingFirstSyncError — no member of
+this strand has been reachable since this machine joined … (waited 120005 ms)`. Reproduced twice.
+The only variable between the two rows is link latency, so this is a latency-budget problem, not a
+membership or addressing one — which retires the earlier relay-dial theory.
+
+Suspected cause, from the source: `LATEST_QUERY_TIMEOUT_MS` in
+`db-p2p/dist/src/repo/coordinator-repo.js:16` is a hardcoded **1000 ms** with no configuration
+path, and its own comment calls it "a LAN-shaped budget … If a WAN deployment shows steady
+`cluster-fetch:peers-silent` against healthy peers, raise this."
+
+**A second, weaker finding, stated accurately.** Immediately after a partner detaches there is a
+window in which the remaining party cannot write: "Failed to get super-majority: 1/2 approvals
+(needed 2, 0 rejections)" — the quorum is counted against a cohort that has not shrunk yet. It is
+TRANSIENT, not permanent: with `DETACH_SETTLE_MS=2000` the write fails, with `20000` it succeeds
+(2/2 runs). An earlier draft of this note called it a permanent inability to write; that was wrong
+and the script now says so. It still matters for chat in that a send during the window fails
+outright rather than retrying.
+
+### Algorithm suggestions for cohorts of 1-3 (for upstream discussion)
+
+The deployment curve is 1 → 2 → 3, and 1 and 2 are where every user starts. optimystic's quorum
+model is built for 4+ and degrades badly below it — not gracefully, but into permanent declines.
+
+1. **Make the consult budget adaptive or configurable.** A fixed 1000 ms cannot serve both a LAN
+   cohort and two phones on a relay. Scale it from observed RTT to the peer, or expose it. This is
+   the smallest change with the largest effect, and upstream's own comment already prescribes it.
+2. **At cohort ≤ 2, a miss must be retryable, not terminal.** With one peer and `required: 1`,
+   losing that answer should schedule a backoff retry, not decline the read for good.
+3. **Separate "never asked" from "asked, no answer".** Both land in `silent` today. The first is a
+   membership problem and the second a latency one; they want different responses.
+4. **Stabilise membership for tiny cohorts.** Deriving membership from live connections makes a
+   2-machine cohort flip between `{self}` and `{self, peer}`. For small strands the membership rows
+   are authoritative and known — prefer them over a connectivity snapshot.
+5. **Lean on the existing proof softener.** The policy text already says "a claim carrying a
+   VERIFIED cohort commit proof repairs at any size with no second voter". If small cohorts always
+   carried proofs, most of this class of failure would not arise.
+6. **Declare a pair mode.** `declaredCohortSize` already relaxes the requirement below 3. A strand
+   that knows it has two members could declare it and take the direct-sync path deliberately,
+   rather than applying a quorum model it can never satisfy.
+
 - [ ] **`cohort-unreachable` — narrowed further with FULL logging, 2026-09-25/26.** Turning on
       `optimystic:*,sereus:cadre:*` and reading the whole trace was the right move; it is safe for
       THIS investigation because the strand is already attached and only a read is being measured

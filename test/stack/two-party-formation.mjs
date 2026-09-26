@@ -47,7 +47,7 @@
 // FIRST: replaces the global WebSocket when WS_SEND_DELAY_MS is set, so every
 // socket libp2p opens below is already slowed. A no-op otherwise.
 import './ws-trace.mjs';
-import './ws-latency.mjs';
+import { setWsDelayMs } from './ws-latency.mjs';
 // Models a slow device's crypto CPU cost (CPU_SLOWDOWN). Must precede any node
 // construction: noise copies its crypto method references when it is built.
 import './cpu-cost.mjs';
@@ -473,6 +473,91 @@ try {
   await joinerSays('joiner late');
   const late = await hostSees('joiner late', 90_000);
   log(`JOINER: late write ${late ? '✓ reached the host' : '✗ never reached the host (90s)'}`);
+
+  // ── Read under a WAN-shaped round trip ────────────────────────────────────
+  // `READ_DELAY_MS` raises the link delay AFTER the strand is up, then reads.
+  // The target is `LATEST_QUERY_TIMEOUT_MS` in db-p2p's coordinator-repo, which is
+  // a hardcoded 1000 ms and whose own comment calls it "a LAN-shaped budget … If a
+  // WAN deployment shows steady `cluster-fetch:peers-silent` against healthy peers,
+  // raise this". Two phones over a public circuit relay are exactly that
+  // deployment. Latency cannot simply be set at startup: at 700 ms it blows the
+  // 5 s formation dial budget and the run dies before reaching a read.
+  const READ_DELAY_MS = Number(process.env.READ_DELAY_MS ?? 0);
+  if (READ_DELAY_MS > 0) {
+    log(`RAISING link delay to ${READ_DELAY_MS}ms one-way (round trip ~${READ_DELAY_MS * 2}ms) and reading…`);
+    setWsDelayMs(READ_DELAY_MS);
+
+    // THE READER MUST NOT ALREADY HOLD THE BLOCK. The consult only fires on a local
+    // miss, so a joiner that stayed attached through the write just answers from its
+    // own store and the slow link never matters — which is exactly what a first
+    // attempt at this showed (reads fine at a 1800 ms round trip). Detaching the
+    // strand first, writing while it is away, and re-attaching under the slow link
+    // is what the app does across a restart, and it is what forces the read down the
+    // cohort-consult path.
+    log('detaching the joiner\'s strand so it misses what comes next…');
+    try { await joiner.stopStrand(strandId); } catch (e) { log(`  stopStrand: ${e?.message ?? e}`); }
+    // Wait for the cohort to actually notice. Writing too soon after the detach can
+    // still collect the departing peer's approval, which is why this case reads as
+    // intermittent at a short settle — the quorum is counted against a cohort that
+    // has not shrunk yet.
+    const settleMs = Number(process.env.DETACH_SETTLE_MS ?? 15000);
+    log(`  waiting ${settleMs / 1000}s for the cohort to notice the departure…`);
+    await new Promise(r => setTimeout(r, settleMs));
+    // THE FIRST THING THAT BREAKS IS THE WRITE, not the read.
+    // With the partner detached this is a two-machine cohort down to one, and a
+    // commit needs a super-majority of the declared cohort — 2 of 2. One machine
+    // cannot reach it, so the REMAINING party cannot write to its own strand at
+    // all. For a chat app that is the everyday case: the other person's phone is
+    // asleep, and you cannot send.
+    let writeFailure = null;
+    try {
+      await hostDb.exec(
+        `insert into App.Message (Id, MemberId, Content, Timestamp, ReplyToId, EditedAt)
+         values (?, ?, ?, ?, ?, ?)`,
+        [randomUUID(), 'host-1', 'written while the partner is away', new Date().toISOString(), null, null]);
+      log('HOST: wrote while the partner was away — write path OK');
+    } catch (e) {
+      writeFailure = e?.message ?? String(e);
+      log(`HOST: ✗ CANNOT WRITE while the partner is away — ${writeFailure}`);
+    }
+    await new Promise(r => setTimeout(r, 3000));
+
+    log('re-attaching the joiner under the slow link…');
+    let reattached = null;
+    try {
+      reattached = await joiner.addStrand({
+        strandRow: { Id: strandId, MemberPrivateKey: memberPrivateKey, Type: 'c', FounderOwnerKey: null },
+        sAppConfig: SAPP,
+        founder: false,
+      });
+      log(`  re-attached, database ${!!reattached.database}`);
+    } catch (e) {
+      log(`  re-attach failed: ${e?.message ?? e}`);
+    }
+    const readDb = reattached?.database?.getDatabase?.() ?? joinerDb;
+
+    let seen = 0, failure = null;
+    for (let i = 0; i < 6; i++) {
+      try {
+        seen = 0;
+        for await (const _r of readDb.eval('select Id from App.Message')) seen += 1;
+        log(`slow-link read ${i + 1}: ${seen} Message row(s)`);
+      } catch (e) {
+        failure = e?.message ?? String(e);
+        log(`slow-link read ${i + 1}: ✗ ${failure}`);
+      }
+      await new Promise(r => setTimeout(r, 4000));
+    }
+    setWsDelayMs(0);
+    log('── small-cohort result ─────────────────────────────────────────────');
+    log(writeFailure
+      ? `WRITE while partner away: ✗ REPRODUCED — ${writeFailure}`
+      : 'WRITE while partner away: ok');
+    log(failure
+      ? `READ under ${READ_DELAY_MS * 2}ms round trip: ✗ ${failure}`
+      : `READ under ${READ_DELAY_MS * 2}ms round trip: ok (${seen} row(s))`);
+    exitCode = (writeFailure || failure) ? 2 : 0;
+  }
 
   // ── Concurrent writes from both parties ──────────────────────────────────
   // The device found this: host and joiner each wrote App.Message at about the

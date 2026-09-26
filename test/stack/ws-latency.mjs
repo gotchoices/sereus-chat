@@ -39,7 +39,25 @@
  * Import for side effects BEFORE libp2p is constructed; a zero/absent delay makes
  * it a no-op and leaves the global untouched.
  */
-const DELAY_MS = Number(process.env.WS_SEND_DELAY_MS ?? 0);
+/**
+ * MUTABLE, and armable with no delay.
+ *
+ * Some failures only live on one phase. Injecting latency from process start
+ * breaks FORMATION (a 700 ms link blows the 5 s formation dial budget), so a
+ * read-path failure could not be reached that way — the run died before it got
+ * there. `WS_DELAY_ARMED=1` installs the wrapper at zero cost and lets a caller
+ * raise the delay later, once the strand is up, which isolates the read.
+ */
+let delayMs = Number(process.env.WS_SEND_DELAY_MS ?? 0);
+const ARMED = process.env.WS_DELAY_ARMED === '1';
+
+/** Change the outbound delay at runtime. Returns the previous value. */
+export function setWsDelayMs(ms) {
+  const was = delayMs;
+  delayMs = Number(ms) || 0;
+  console.log(`[ws-latency] delay ${was}ms -> ${delayMs}ms`);
+  return was;
+}
 
 function byteLengthOf(data) {
   if (data == null) return 0;
@@ -78,7 +96,7 @@ if (COUNT_FRAMES && typeof globalThis.WebSocket === 'function') {
   });
 }
 
-if (DELAY_MS > 0 && typeof globalThis.WebSocket === 'function') {
+if ((delayMs > 0 || ARMED) && typeof globalThis.WebSocket === 'function') {
   const Native = globalThis.WebSocket;
 
   class LatentWebSocket extends Native {
@@ -102,14 +120,17 @@ if (DELAY_MS > 0 && typeof globalThis.WebSocket === 'function') {
 
       if (MODE === 'serial') {
         this.#chain = this.#chain
-          .then(() => new Promise(resolve => setTimeout(resolve, DELAY_MS)))
+          .then(() => new Promise(resolve => setTimeout(resolve, delayMs)))
           .then(flush);
         return;
       }
 
       // Independent timers of equal delay fire in the order they were scheduled,
       // so ordering is preserved without making the frames wait on each other.
-      setTimeout(flush, DELAY_MS);
+      // Zero delay: send inline, so an armed-but-idle injector costs nothing and
+      // cannot reorder frames relative to the native path.
+      if (delayMs <= 0) { flush(); return; }
+      setTimeout(flush, delayMs);
     }
 
     get bufferedAmount() {
@@ -118,5 +139,5 @@ if (DELAY_MS > 0 && typeof globalThis.WebSocket === 'function') {
   }
 
   globalThis.WebSocket = LatentWebSocket;
-  console.log(`[ws-latency] mode=${MODE} outbound frames delayed ${DELAY_MS}ms`);
+  console.log(`[ws-latency] mode=${MODE} outbound frames delayed ${delayMs}ms${ARMED ? ' (armed, settable)' : ''}`);
 }
