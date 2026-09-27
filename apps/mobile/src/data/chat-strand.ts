@@ -11,7 +11,7 @@
  * `insertMember`).
  */
 
-import type { StrandInstance, StrandRow } from '@serfab/cadre-core';
+import type { CadreNode, StrandInstance, StrandRow } from '@serfab/cadre-core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cadreService } from '../cadre';
 import { createChatStrand, joinChatStrand } from './chat-sapp';
@@ -367,6 +367,38 @@ async function readJoinedStrands(): Promise<JoinedStrand[]> {
  * partly honoured: the membership key goes, the blocks stay on disk. The caller is
  * told which of the two it got, rather than the screen promising the stronger one.
  */
+/**
+ * Attach a strand, and keep waiting if the first sync has not finished.
+ *
+ * `addStrand` rejects with `StrandAwaitingFirstSyncError` when its budget runs
+ * out, and that rejection is NOT a failure — the error says so itself: "The
+ * strand stays launched and keeps trying — call addStrand again, or wait for the
+ * 'strand:writable' event". Measured on a link with a 1.8 s round trip, the
+ * first sync completed at ~150 s against a 120 s budget: the strand became
+ * writable half a minute AFTER we had already told the user the join failed.
+ *
+ * So the timeout is a progress report, not an outcome. We surface a failure only
+ * when the strand never becomes writable within a budget generous enough to mean
+ * something is actually wrong.
+ */
+export async function attachAndAwaitWritable(
+  node: CadreNode,
+  strandRow: StrandRow,
+  opts: { deriveFounder?: boolean; patienceMs?: number } = {},
+): Promise<StrandInstance> {
+  try {
+    return await joinChatStrand(node, strandRow, opts);
+  } catch (err) {
+    if (!(err instanceof Error) || err.name !== 'StrandAwaitingFirstSyncError') throw err;
+    const patienceMs = opts.patienceMs ?? 240_000;
+    console.info(
+      `[chat-strand] first sync still arriving for ${strandRow.Id}; waiting up to ${patienceMs / 1000}s ` +
+      'for strand:writable rather than reporting a failure',
+    );
+    return await node.whenStrandWritable(strandRow.Id, { timeoutMs: patienceMs });
+  }
+}
+
 export async function leaveStrandLocally(
   strandId: string,
   opts: { keepIdentity: boolean },

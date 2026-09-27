@@ -12,7 +12,7 @@
  * REAL on-disk LevelDB under the adapter.
  */
 import { ClassicLevel } from 'classic-level';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -63,16 +63,31 @@ class ClassicLevelAdapter {
   async close() { await this.db.close(); }
 }
 
-/** One isolated, file-backed database in a fresh temp directory. */
-export function openTestDb(name = 'stack-check', opDelayMs = 0) {
-  const dir = mkdtempSync(join(tmpdir(), `${name}-`));
+/**
+ * One file-backed database.
+ *
+ * `persistRoot` makes it SURVIVE the process, which matters more than it sounds:
+ * with the default fresh temp directory, every run of every harness here starts
+ * from nothing and therefore only ever exercises FORM-and-converge. A phone that
+ * has been restarted is in a different situation entirely — it re-attaches a
+ * strand rediscovered from its own control database, with no formation in hand —
+ * and that path had never been run in Node at all. `restart-reconverge.mjs` is
+ * what uses this; pass a stable root and the same `name` to reopen.
+ *
+ * `cleanup()` removes the directory only when it created it; a caller that asked
+ * for persistence gets `close()` semantics instead, or the second run would have
+ * nothing to reopen.
+ */
+export function openTestDb(name = 'stack-check', opDelayMs = 0, persistRoot = null) {
+  const dir = persistRoot ? join(persistRoot, name) : mkdtempSync(join(tmpdir(), `${name}-`));
+  if (persistRoot) mkdirSync(dir, { recursive: true });
   const db = new ClassicLevel(dir, { keyEncoding: 'view', valueEncoding: 'view' });
   return {
     db: new ClassicLevelAdapter(db, opDelayMs),
     dir,
     async cleanup() {
       try { await db.close(); } catch { /* already closed */ }
-      rmSync(dir, { recursive: true, force: true });
+      if (!persistRoot) rmSync(dir, { recursive: true, force: true });
     },
   };
 }

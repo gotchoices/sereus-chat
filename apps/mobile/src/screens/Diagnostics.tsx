@@ -15,6 +15,8 @@ import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from
 import { runFoundStrandCheck } from '../diagnostics/found-strand-check';
 import type { CheckResult } from '../diagnostics/found-strand-check';
 import { runHandshakeCostCheck, runSocketFrameCost } from '../diagnostics/handshake-cost';
+import { runTwoPartyCheck } from '../diagnostics/two-party-check';
+import type { TwoPartyResult } from '../diagnostics/two-party-check';
 import { getPrefs } from '../data/adapter';
 import { SectionHeader } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
@@ -36,11 +38,13 @@ export default function Diagnostics() {
   const [running, setRunning] = useState<string | null>(null);
   const [lines, setLines] = useState<string[]>([]);
   const [result, setResult] = useState<CheckResult | null>(null);
+  const [twoParty, setTwoParty] = useState<TwoPartyResult | null>(null);
   const scroller = useRef<ScrollView | null>(null);
 
   const run = useCallback(async (v: Variant) => {
     setRunning(v.label);
     setResult(null);
+    setTwoParty(null);
     setLines([`Running "${v.label}" — this can take minutes; leave the screen open.`]);
     try {
       const r = await runFoundStrandCheck({
@@ -65,6 +69,7 @@ export default function Diagnostics() {
   const runCost = useCallback(async () => {
     setRunning('Handshake + frame cost');
     setResult(null);
+    setTwoParty(null);
     setLines(['Measuring crypto primitives — no network, no strand…']);
     try {
       const report = await runHandshakeCostCheck(l => setLines(p => [...p, l]));
@@ -94,6 +99,33 @@ export default function Diagnostics() {
       setLines(p => [...p, 'Compare with: node test/stack/handshake-cost.mjs']);
     } catch (err) {
       setLines(p => [...p, `failed: ${err instanceof Error ? err.message : String(err)}`]);
+    } finally {
+      setRunning(null);
+    }
+  }, []);
+
+  /**
+   * Both sides of a two-party strand, inside this one process.
+   *
+   * Two phones on the same relay never converge (Optimystic#23); two Node
+   * processes on two machines do. This is the experiment that separates those:
+   * same runtime, no second device, no topology to blame. A failure here is the
+   * reproduction the issue needs; a pass moves the fault to whatever happens
+   * BETWEEN two devices.
+   */
+  const runTwoParty = useCallback(async () => {
+    setRunning('Two parties, one process');
+    setResult(null);
+    setTwoParty(null);
+    setLines(['Starting two parties — this takes minutes; leave the screen open.']);
+    try {
+      const r = await runTwoPartyCheck({
+        timeoutMs: TIMEOUT_MS,
+        onProgress: line => setLines(p => [...p, line]),
+      });
+      setTwoParty(r);
+    } catch (err) {
+      setLines(p => [...p, `harness error: ${err instanceof Error ? err.message : String(err)}`]);
     } finally {
       setRunning(null);
     }
@@ -151,6 +183,44 @@ export default function Diagnostics() {
         </View>
         {running === 'Handshake + frame cost' ? <ActivityIndicator /> : null}
       </Pressable>
+
+      <Pressable
+        disabled={running !== null}
+        onPress={runTwoParty}
+        style={[
+          styles.row,
+          { borderColor: theme.border, backgroundColor: theme.surfaceAlt },
+          running !== null && styles.dim,
+        ]}
+      >
+        <View style={styles.flex1}>
+          <Text style={[typography.body, styles.rowTitle, { color: theme.textPrimary }]}>
+            Two parties, one process
+          </Text>
+          <Text style={[typography.small, { color: theme.textMuted }]}>
+            can this device replicate with itself? needs a relay
+          </Text>
+        </View>
+        {running === 'Two parties, one process' ? <ActivityIndicator /> : null}
+      </Pressable>
+
+      {twoParty ? (
+        <View
+          style={[
+            styles.verdict,
+            { borderColor: twoParty.ok ? theme.accent : theme.border, backgroundColor: theme.surfaceAlt },
+          ]}
+        >
+          <Text style={[typography.title, { color: theme.textPrimary }]}>
+            {twoParty.ok ? 'Both parties converged' : 'Did not converge'}
+          </Text>
+          <Text style={[typography.body, { color: theme.textMuted }]}>{twoParty.detail}</Text>
+          <Text style={[typography.small, styles.compare, { color: theme.textSecondary }]}>
+            The same two parties in Node converge in seconds, on one machine or on two —
+            see test/stack/two-party-formation.mjs.
+          </Text>
+        </View>
+      ) : null}
 
       {result ? (
         <View

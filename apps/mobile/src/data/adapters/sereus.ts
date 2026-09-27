@@ -14,7 +14,7 @@ import {
   setStrandMuted as setStrandMutedLocal,
   setStrandArchived as setStrandArchivedLocal,
 } from '../strand-prefs';
-import { ensureCadreUp, generateUuid, hasSweptForStrands, leaveStrandLocally, registerSelfAsMember, rememberJoinedStrand, syncProfileNameToStrands } from '../chat-strand';
+import { attachAndAwaitWritable, ensureCadreUp, generateUuid, hasSweptForStrands, leaveStrandLocally, registerSelfAsMember, rememberJoinedStrand, syncProfileNameToStrands } from '../chat-strand';
 import { createChatStrand, joinChatStrand } from '../chat-sapp';
 import type { StrandInstance } from '@serfab/cadre-core';
 import {
@@ -496,7 +496,7 @@ export class SereusAdapter implements DataAdapter {
         );
       }, 5000);
       try {
-        const instance = await joinChatStrand(node, joinedRow);
+        const instance = await attachAndAwaitWritable(node, joinedRow);
         // Put ourselves in App.Member before declaring the join done — otherwise
         // we are in the conversation but absent from it, and the other party has
         // no row saying we arrived.
@@ -506,7 +506,7 @@ export class SereusAdapter implements DataAdapter {
         clearInterval(tick);
       }
     } else {
-      await registerSelfAsMember(await joinChatStrand(node, joinedRow));
+      await registerSelfAsMember(await attachAndAwaitWritable(node, joinedRow));
     }
 
     return { strandId };

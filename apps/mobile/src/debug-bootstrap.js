@@ -57,3 +57,30 @@ if (!globalThis.process.env) globalThis.process.env = {};
 // while measuring anything join- or first-sync-related. It is safe here because
 // the strand is already attached and the thing under investigation is a READ.
 // globalThis.process.env.DEBUG = 'optimystic:*,sereus:cadre:*';
+// Wire-level only: does either device ever CONTACT the other at strand level?
+// globalThis.process.env.DEBUG = 'optimystic:db-p2p:protocol-client*,optimystic:db-p2p:sync-service*,optimystic:db-p2p:coordinator-repo*';
+// THE COHORT MEMBERSHIP VERDICT, and nothing else. One line per cohort assembly:
+//   cohort:membership key=… band=N serves=N unknown=N foreign=N cohort=N selfInCohort=…
+// This is the decisive measurement for gotchoices/Optimystic#23. `membershipOf`
+// answers 'unknown' for any peer whose peerStore protocol list is empty, and the
+// cohort builder NEVER admits an 'unknown'; upstream's own comment says such a
+// peer "flips to 'serves' once identify completes". So if a phone that can see
+// its partner reports `band=2 serves=1 unknown=1 cohort=1`, identify is not
+// completing on this runtime and that — not findCluster itself — is why every
+// read takes `cluster-fetch:solo-self-skip`.
+// Narrow enough to be safe: one line per assembly, not the per-dial fire hose
+// that changed outcomes above, and read-path only on an already-attached strand.
+// THE #23 MEASUREMENT, 2026-09-26. Left commented out, but do not delete — this
+// is the namespace that found the cause, and it is cheap (two lines per boot).
+//
+// On BOTH devices, the only fret activity in a whole session is:
+//   fret:error announce to <THE RELAY>: foreign-protocol   (x2)
+//
+// That is the whole of gotchoices/Optimystic#23. A relay-only phone's only
+// connected peer is the relay; `announce` is how a node enters the FRET ring;
+// the relay rejects it as `foreign-protocol` because a relay does not speak the
+// party's fret protocol. So the ring never gains a member, `fret.assembleCohort`
+// returns a band of one, findCluster yields a cohort of one, and every read takes
+// `cluster-fetch:solo-self-skip`. Nothing is misclassified — see the
+// libp2p-key-network line above, which reports unknown=0 foreign=0.
+// globalThis.process.env.DEBUG = 'optimystic:fret*';

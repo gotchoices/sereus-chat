@@ -157,6 +157,477 @@ still SUCCEED — because the joiner already holds the block from first sync, so
 miss. Next attempt: have the host write while the joiner is detached, then reattach under a slow
 link so the read must consult.
 
+### Upgraded to sereus 1.5.0 / optimystic 1.6.0 / quereus 4.20.0 — 2026-09-26
+
+Single copy of every package verified after the bump (`resolutions` now pins all five
+`@optimystic/*` packages and `@serfab/cadre-core`, as it already did quereus). We were previously
+in a pairing the 1.5.0 notes explicitly warn against — optimystic 1.5.0 with Quereus 4.20.0, where
+"after a failed `apply schema`, the schema in memory and the one in storage could disagree".
+
+Our duplicate-copy finding is in the release notes, and the notes now expose
+`network.cohortQueryTimeoutMs` and `network.linkRoundTripMs`. The platform defaults are now the
+values we had been setting by hand — 120 s first-sync wait, 5 s cohort read deadline — so the
+local `strandFirstSync` override was REMOVED in favour of inheriting them.
+
+**No RN native-crypto module shipped.** `reference-app-rn/polyfills/node-crypto.js` is a pure-JS
+SHA shim for multiformats, and the reference app still does not pass `noiseCrypto`. Keep
+`src/cadre/noise-crypto.ts`; the upstream todo stands.
+
+### Is optimystic#22 resolved? The fix is real, reachable, and NOT sufficient for our repro
+
+- **Reachable, proven.** `network.cohortQueryTimeoutMs` now flows to optimystic: an absurd value
+  throws at node construction (`clusterPolicy.cohortQueryTimeoutMs must be … no greater than
+  429496729`). That positive control is what distinguishes this from the last attempt, where the
+  setting silently never arrived.
+- **Still fails.** The WAN arm (1800 ms round trip) fails at the default 5000 ms AND at an explicit
+  15000 ms. So the cohort read deadline is not the binding constraint for this scenario.
+- **Why, from the trace.** The first-sync gate DOES open — `strand-first-sync … gate opened` at
+  ~150 s after arming — but `addStrand` gives up at its 120 s budget. The strand becomes writable
+  roughly half a minute AFTER we have already told the user the join failed. `cluster-fetch`
+  outcomes in that window: 293 `solo-self-skip`, 22 `no-quorum`, 2 `peers-silent` — the membership
+  oscillation is unchanged.
+- **Our side, fixed.** `attachAndAwaitWritable` (chat-strand.ts) now treats
+  `StrandAwaitingFirstSyncError` as the progress report the error text says it is — "The strand
+  stays launched and keeps trying … wait for the 'strand:writable' event" — and waits on
+  `whenStrandWritable` for up to 240 s instead of reporting a failure.
+
+### ANSWERED: the cohort-of-one is React Native, not machine separation — 2026-09-27
+
+Nate's question on #23 was whether the failure appears with two parties on separate machines as
+two Node processes. **It does not.**
+
+Ran it on `saturn` (LAN host, Node 22, workspace `/opt/sereus-test`, nothing installed globally)
+against this Mac. Both `listenAddrs: []`, so neither can accept a direct connection and all
+traffic is forced through relay.sereus.org. Same versions on both, single deduped copy each.
+Relay round trip 70 ms / 79 ms.
+
+```
+host   (saturn)   2 Member row(s), 10 Message row(s)
+joiner (mac)      2 Member row(s), 10 Message row(s)
+```
+
+Full bidirectional convergence in ~4.5 minutes. No `solo-self-skip`, no cohort of one. So the
+variable is NOT separation and NOT relay-only operation — the Node pair is relay-only too. It is
+the React Native runtime. Posted to #23.
+
+NAT topology is held constant across both arms and is therefore not the explanation either: the
+two machines share a LAN and one NAT egress, and so do the phones (emulator on this laptop,
+handset on the same wifi).
+
+**Next arm: both parties inside one RN process.** `src/diagnostics/two-party-check.ts`, surfaced
+as "Two parties, one process" on the Diagnostics screen, is the Node harness run on-device: two
+`CadreNode`s with their own keys and their own `diag2-` databases, host founds a closed strand and
+publishes a bound invitation, joiner redeems it, then each side is polled for rows. It removes
+every variable except the runtime — one device, no second phone, no topology to argue about.
+
+Two details in it are not incidental. It waits for a relay reservation BEFORE
+`initializeStrandSolicitation`, because that call snapshots `getMultiaddrs()` and a responder that
+snapshots nothing burns the invitation and fails on the joiner, which reads like the bug under
+test. And it reports each side's strand-level peer count from `libp2pNode.getPeers()` rather than
+enabling `debug`, because the stack's own tracing floods the RN bridge hard enough to change the
+outcome it is observing. That count is the verdict: never connected is the #23 shape, connected
+but not replicating is a different and new finding.
+
+**First runs, 2026-09-26 (emulator, relay.sereus.org).** The check does not yet reach the
+question it was built to ask, and what stops it is worth recording on its own.
+
+A THIRD cadre node on a device cannot get a relay reservation, while the app's own node can. In
+the same minute, on the same emulator and the same relay:
+
+```
+app's own node          reserveRelays:  3871 ms   →  2 addresses
+diagnostic host node    reserveRelays: 24026 ms   →  0 addresses
+```
+
+The second number is the budget, not a measurement: `DEFAULT_RELAY_RESERVE_TIMEOUT_MS` is
+`RELAY_RESERVATION_ROUND_TRIPS` (4) x the declared link round trip, so the first attempt timed out
+at exactly 8033 ms on the 2000 ms default, and raising `network.linkRoundTripMs` to 6000 simply
+moved the timeout to exactly 24026 ms.
+
+Reporting `getRelayReservationState()` rather than a bare "no address" named the cause on the
+first try, and it is not the relay:
+
+```
+status dialing, error The connection gater denied all addresses in the dial request
+for peer 12D3KooWMD7E…  (the relay)
+```
+
+That is cadre-core's own `membership-connection-gater`. Its BRING-UP QUIET PERIOD composes
+`denyDialPeer` and refuses every outbound dial — the relay included — from just before the control
+libp2p node is created until `ControlDatabase.initialize()` settles. And that initialize is what
+degrades, catastrophically, per additional node on the device:
+
+| node                | `controlDatabase.initialize` | `reserveRelays`        |
+|---------------------|------------------------------|------------------------|
+| the app's own       | **761 ms**                   | 3871 ms → 2 addresses  |
+| diagnostic host     | **3060 ms**                  | 24026 ms → none        |
+| diagnostic joiner   | **43252 ms**                 | —                      |
+
+4x, then 57x. Nothing about the relay changed between those three rows; what changed is how many
+cadre nodes share the one JS loop. A node whose bring-up takes 43 s holds its own dial gate shut
+for 43 s, and a reservation drive inside that window cannot dial out at all.
+
+This is the JS-loop starvation hypothesis with a number attached: per-node cost on this runtime
+does not merely add, it compounds.
+
+**Two controls settle what it means, and both are device-free.**
+
+*The relay is innocent.* `test/stack/relay-reservation-cap.mjs` (new) opens N plain libp2p nodes
+from one Mac process against relay.sereus.org and counts circuit addresses. Four of four reserved,
+in 826 / 412 / 400 / 523 ms, from the same NAT the phones use. There is no per-peer, per-IP or
+global cap being hit.
+
+*The runtime is not.* `two-party-formation.mjs` with `RELAY_ADDR` pointed at that same public relay
+— two `CadreNode`s, one Node process, the same package versions, the same two-parties-one-process
+topology the in-app check builds:
+
+| | Node, one process | React Native, one process |
+|---|---|---|
+| relay reservation | **1.2 s**, 2 addresses | **never** — 24 s budget, 0 addresses, 3 attempts |
+| formation | 640 ms | not reached |
+| first sync | 5112 ms | not reached |
+| outcome | full convergence, ~80 s | nothing crosses |
+
+So the in-app check never reached the cohort question it was built to ask — and did not need to.
+It found a harder failure in front of it: **on React Native a SECOND cadre node cannot obtain a
+relay reservation at all**, while the first one on the same device reserved in 3-4 s and Node
+manages four in under a second each. Every other variable is held: same relay, same versions, same
+topology, no second device, no network between the parties.
+
+That is a cleaner reproduction than the two-phone setup it was meant to support, and it is the
+thing to put on #23 next. One honest caveat to carry with it: the two parties share a JS event
+loop, which two phones do not, so this is strictly harder than the phone case rather than
+identical to it — but the phone case fails too, and the Node arm with the SAME sharing succeeds.
+
+One more control falls out of the run's own teardown, and it is the tightest of the lot: when the
+check finishes it restarts the app's node, and THAT node reserved again immediately —
+`reserveRelays: 8348 ms`, `reachability 0 to 2 address(es)`. Same device, same relay, same process,
+seconds after two other nodes had failed three attempts each. So it is not the device, the relay,
+the NAT or the process: it is specifically an ADDITIONAL CONCURRENT cadre node that cannot
+reserve.
+
+The reservation state also names a suspect worth passing on: `status dialing, error The connection
+gater denied all addresses in the dial request`. cadre-core's `membership-connection-gater`
+composes `denyDialPeer` for the whole control-DB bring-up window, and the error may simply be
+stale from it — `status dialing` says the retry is still in flight, not refused. Sereus can tell
+which; we cannot from outside.
+
+That is why the check now stops the app's own node (`cadreService.stop()`) for the duration and
+restarts it in `finally`. Fairness demands it independently of the reservation problem: the claim
+under test is "two nodes, one runtime" against "two nodes, two devices", and leaving the app up
+was comparing two nodes on two devices against four on one.
+
+Also seen, and dev-only: a Metro `/reload` leaves the app on a white screen with no CadreService
+startup at all. A force-stop and cold start is the reliable way to load new code on a device.
+
+**Reusable rig**: `/opt/sereus-test/{test/stack,design/specs/domain}` on saturn mirrors the repo
+layout the harness expects (it reads `../../design/specs/domain/chat-sapp.qsql`). Two traps worth
+remembering, both of which cost a run: `pkill -f two-party-formation` matches the ssh command line
+carrying that string and kills the session itself — match `formation.mjs` instead; and a detached
+`setsid`/`nohup` on the remote side does not survive, so hold the process on an `ssh -n` session
+backgrounded locally.
+
+### The restart path had never been tested in Node, 2026-09-26
+
+Every harness in `test/stack` opens storage with `mkdtempSync`, so every Node run we have ever
+done starts from nothing and exercises exactly one path: FORM, then converge. The phones fail on a
+different one — restart, rediscover from the control DB, re-attach, re-find the partner — and that
+path had never been run in Node at all.
+
+That is the confound under every "Node works, React Native does not" claim in this file: the two
+arms were not running the same experiment. Node had just formed; the phones had just restarted.
+`restart-reconverge.mjs` (new, with `openTestDb` taking an optional persistent root) runs both
+phases over the same storage so that fresh-vs-restarted is the only variable.
+
+**A trap worth remembering, because it nearly became a filed bug.** The first version reported
+phase 2 as "host strand ABSENT, joiner strand ABSENT" — a spectacular-looking stack failure. It
+was this file's own fault: cadre-core does NOT auto-attach a rediscovered strand. `StrandWatcher`
+polls and emits `strand:discovered`, and the EMBEDDER must call `addStrand` — which the app does
+(`chat-strand.ts`'s subscription) and the harness did not. Three checks caught it before it was
+believed: storage really had persisted (676K/176K per party), the poll interval is 5 s so 120 s
+was ample, and the app's own logs show phones DO re-attach after a restart.
+
+**Then it happened twice more.** Modelling a restarted phone faithfully turned out to need THREE
+things the first draft lacked, and each omission produced output that reads as a serious upstream
+failure:
+
+| omission | what it looked like | what it actually was |
+|---|---|---|
+| storage in `mkdtempSync` | nothing survives a restart | the harness threw the state away |
+| no `strand:discovered` handler | "host strand ABSENT, joiner strand ABSENT" | cadre-core never auto-attaches; the embedder must |
+| no remembered-joins list | "joiner strand ABSENT" after restart | documented, expected — see below |
+
+The third is spelled out in our own code, in `rememberJoinedStrand`: "NOTHING ELSE REMEMBERS THESE.
+`addStrand` is the attach half only and never publishes the `Strand` row — correct for a joiner,
+since cadre-core expects a joiner's row to have arrived over its own control network. Across
+PARTIES it never does... So without this list, a restart loses the strand outright." The host
+re-finds its strand through its own control DB; a cross-party joiner structurally cannot, and the
+`MemberPrivateKey` exists in exactly one place — the formation result — so the app keeps it.
+
+The lesson for any future harness: the app encodes hard-won restart knowledge that a naive rig does
+not have, and a rig missing it will manufacture upstream bugs. Mirror `chat-strand.ts`'s start
+path — `strand:discovered` subscription AND `reattachRememberedStrands` — or the run proves
+nothing.
+
+**With all three fixed, a candidate failure survives.** Measured on the public relay:
+
+```
+PHASE 1  ✓ joiner read the host's row                    (formation path works)
+CONTROL  ✓ a SECOND write crosses, pre-restart, in 2.5s  (the rig can see what phase 2 measures)
+         — both nodes destroyed and rebuilt over the same storage —
+after restart: host strand active, joiner strand active  (both re-attach, both hold reservations)
+PHASE 2  ✗ the host's post-restart write never reaches the joiner
+```
+
+The CONTROL line is what makes this different from the four retracted claims above: it proves the
+harness can observe exactly the thing phase 2 reports missing, on the same strand, minutes earlier.
+Pre-restart a second write crosses in 2.5 s; post-restart the same operation does not cross in
+180 s, with both parties attached, `active`, and relay-reachable.
+
+Reproduced across runs: run 3 (before the control existed) and run 4 (with it) both failed phase 2
+at the full 180 s budget, 197 s wall.
+
+Scope it honestly, because three claims died today from exactly this kind of over-reach:
+
+- It restarts `CadreNode` OBJECTS inside one Node process — not two OS processes, not two machines.
+  Module-level state survives here where it would not on a phone. Tighten this before calling it
+  settled.
+- Whether it is the SAME bug as the phones is unproven. It has the same shape, and shape-matching
+  has misled me twice today.
+- What it does establish, and what nothing else this session did: a path our test suite never
+  covered (restart → re-attach → write) fails under a control that passes minutes earlier on the
+  same strand.
+
+Reproduction: `RELAY_ADDR=… node test/stack/restart-reconverge.mjs`. One command, one relay, no
+phone, no React Native.
+
+**Filed as sereus#18**, 2026-09-26 — https://github.com/gotchoices/sereus/issues/18 — with the
+three-run table, the versions (single deduped `db-p2p@1.6.0`, checked, since that trap produced the
+false negative on #22), and both caveats stated in the body rather than buried: one Node process
+rather than two, and no claim that this is the phones' bug.
+
+It also asks Nate one thing back: the harness had to keep its own remembered-joins row to get a
+CROSS-PARTY joiner re-attached at all, which means a closed strand's `MemberPrivateKey` lives only
+in application storage. If that is the intended contract it is merely undocumented; if it is not,
+the joiner in this repro may be reaching the strand by a route he did not intend — which would
+change how phase 2 should be read.
+
+Nothing filed on optimystic. #23 stands as it is: the device measurements (`band=1 serves=1
+unknown=0 foreign=0`, and `announce → relay: foreign-protocol`) are sound, but the connection
+between them and sereus#18 is unproven, and shape-matching misled me twice in one afternoon.
+
+### #23 measured on the devices, 2026-09-26 — and my theory was wrong
+
+Armed `optimystic:db-p2p:libp2p-key-network*` (one line per cohort assembly, narrow enough not to
+change the outcome) on the S7 and the emulator, both holding the same strand. Every assembly on
+both devices, on BOTH the control node and the strand node, reports the same thing:
+
+```
+cohort:membership key=… band=1 serves=1 unknown=0 foreign=0 cohort=1 selfInCohort=true
+```
+
+**The theory this was meant to test is refuted.** I expected the partner to be present but
+classified `unknown` — `membershipOf` answers `unknown` for an empty peerStore protocol list, the
+cohort never admits an `unknown`, and upstream's own comment says such a peer "flips to 'serves'
+once identify completes", so a runtime where identify never completes would sit there forever.
+That is not what is happening: `unknown=0` and `foreign=0`. Nothing is being classified out.
+
+**`band=1` means the partner is never in the candidate set at all.** The band is
+`fret.assembleCohort(coord, wants)` — the nearest LIVE RING MEMBERS — so the failure is a ring
+membership / discovery failure one layer BELOW `findCluster`'s classification, and below where #23
+has been looking. The relay is not in the ring either (`foreign` would have counted it).
+
+So the corrected statement of #23 on our evidence: two relay-only peers each see a cohort of one
+because **neither one's FRET ring ever gains the other**, not because the cohort filter rejects
+them.
+
+**Round 2 found why.** `optimystic:fret*` is a near-silent namespace here — a whole session on
+each device produces exactly two lines, and they are the same two on both:
+
+```
+fret:error  announce to 12D3KooWMD7E7UH4rkCqiFE69n7FNqrKo1Xx3yDUU8JvwtaH39bD: foreign-protocol
+```
+
+That peer is THE RELAY. The chain is complete:
+
+1. A relay-only phone's only connected peer is the relay.
+2. `announce` is how a node enters the FRET ring.
+3. It is attempted against the relay, which rejects it `foreign-protocol` — a relay does not speak
+   the party's fret protocol.
+4. No announce ever reaches the partner: the phone holds no connection to it and no way to learn
+   of one.
+5. The ring holds only self, so `fret.assembleCohort` returns `band=1`.
+6. `findCluster` yields a cohort of one; every read takes `cluster-fetch:solo-self-skip`.
+
+And that is exactly why NODE converges where the phones do not — it is not the runtime after all.
+Formation hands the joiner the host's SEED STRAND ADDRESSES; the harness prints them
+(`JOINER: seed = 2 strand addr(s)`, each a `/p2p-circuit/p2p/<host>`). The Node joiner dials the
+host directly through the relay circuit, the two become connected peers, and `announce` then goes
+peer-to-peer instead of to the relay. On the phones — attaching a strand discovered at boot rather
+than completing a formation — that seed is not in hand, so each side is left with only the relay
+and announces into a void.
+
+This reframes #23 from "cohort resolution is wrong" to **"a relay-only peer that did not just
+complete a formation has no route into the ring"**, which is squarely the strand-discovery seam
+sereus said they would own. It also predicts the fix shape: a phone must re-derive (or persist)
+its partner's strand addresses on re-attach, the way formation supplies them once.
+
+### optimystic#22 CLOSED; membership split out as optimystic#23, 2026-09-27
+
+Nate confirmed the split. #22 closed on the deadline fix (the knob reaches optimystic, throws on
+an invalid value, 5000 ms default is right for relayed links). The phone behaviour is now
+**optimystic#23** — "Two relay-only peers each see a cohort of one" — filed with the full traces.
+
+His side of the remaining work:
+
+- **The 120 s first-sync wait is sereus's**, and he agrees it is too short for a RE-ATTACH (his
+  35-46 s figure was a fresh join; a re-attach after `stopStrand` with the partner writing
+  meanwhile was never measured). They will measure the re-attach shape and size the wait. Our
+  `whenStrandWritable` change is right regardless.
+- **Sereus will follow #23 from their side**, because how strand nodes find and dial each other
+  through a relay is theirs, while `findCluster`/`membershipOf` is optimystic's.
+- **2.5 s relayed ceiling**: the libp2p limit pass-through is on optimystic main, unreleased;
+  sereus will then support a 3 s relayed round trip. **One limit remains after that**: optimystic's
+  own request dials use 3 s budgets, so they still fail above about **375 ms one-way**. Tracked
+  upstream. That is the number to watch for phones on mobile data — our wifi round trip to the
+  relay is 79 ms, comfortably inside it.
+
+**The experiment he asked for is done** — see the separate-machine result above. Two Node
+processes on two machines converge fully, so "genuine separation" is ruled out and React Native
+is what remains.
+
+### Upstream exchange on #22, 2026-09-27 — and a ceiling worth knowing
+
+Nate's 1.5.0 announcement and our findings comment crossed (18 minutes apart), so his note asks
+for a re-run we had already posted. Replied pointing at it. Facts from his message worth keeping:
+
+- **`cohortQueryTimeoutMs: 5000` is now the cadre default** for the control node and every strand
+  node — chosen for two phones through a relay. We need set nothing. Verified in force here.
+- **`network.linkRoundTripMs` defaults to 2000 ms** and now drives cadre's dial and reservation
+  deadlines. Our measured round trip to relay.sereus.org is **79 ms**, so the default is ample;
+  no need to raise it.
+- **Known ceiling: above roughly a 2.5 s round trip a relayed connection cannot be opened at all** —
+  two libp2p 10 s limits (dial timeout and inbound upgrade timeout) give out first, and optimystic
+  does not expose them yet. Raising it to 3 s is queued upstream. **This matters for beta**: wifi
+  is comfortably under, but phones on mobile data may not be, and the failure would look like a
+  join that never completes.
+- His measured fresh join at 900 ms one-way is **35-46 s**. Ours: the scripted RE-ATTACH exceeds
+  120 s, and a real-device fresh join took **178 s**. Raised the gap with him — the re-attach path
+  (`stopStrand` then `addStrand`) may do more work than a fresh join, and our 178 s is an S7 paying
+  Hermes costs on top.
+- Duplicate check done as he asked: `npm ls @optimystic/db-p2p` shows one deduped 1.6.0.
+
+The membership finding below is the part still awaiting his read; we have offered to split it.
+
+### Root cause of "messages do not cross": each phone's cohort is ITSELF ALONE
+
+Traced on the upgraded stack with `protocol-client`/`sync-service`/`coordinator-repo` on both
+devices at once, over a 4-minute steady-state window.
+
+```
+emulator   143 cluster-fetch:solo-self-skip     (and nothing else)
+S7         183 cluster-fetch:solo-self-skip     (and nothing else)
+```
+
+No `no-quorum`, no `peers-silent`, no consult of any kind. `solo-self-skip` fires only when
+`findCluster` returns exactly one peer and that peer is self. Corroborated at the wire: the
+emulator dialled only the relay (8x), the S7 only the relay (14x), and **each served ZERO inbound
+sync requests**. Neither device ever dials the other.
+
+So the read path never runs out of time — it never starts. Every symptom follows from this one
+fact: no consult, no replication, reads concluding an authoritative "absent" ("Nothing said yet"),
+writes committing solo, and the occasional `cohort-unreachable` when membership briefly includes
+the peer and the consult then fails.
+
+This is a MEMBERSHIP fault, distinct from both open issues: #22 is a deadline (the read runs and
+expires), #19 is `findCluster` failing and the throw being swallowed. Here `findCluster` succeeds
+and returns a cohort of one.
+
+Unconfirmed mechanism, offered upstream as a guess only: `membershipOf` never admits an `unknown`
+peer, and two relay-only peers that have never identified each other have empty peerStore protocol
+lists — self-sustaining, since neither has reason to dial a peer that is not in its cohort.
+
+**Not reproducible in Node.** The harness, same relay and versions, forms a 2-member cohort and
+exchanges writes both ways in seconds. Both Node parties share one host; whatever breaks the mutual
+identify appears to need two genuinely separate machines. That is the gap to close if we want a
+repro upstream can run.
+
+Posted to optimystic#22 with the numbers and an offer to split it into its own issue.
+
+### Beta readiness on untethered phones: NOT YET — messages do not cross
+
+Measured on the upgraded stack (sereus 1.5.0 / optimystic 1.6.0 / quereus 4.20.0), two devices
+reachable only through the sereus.org relay:
+
+| step | result |
+| --- | --- |
+| join device-to-device over the public relay | **works** — 178 s, first time ever |
+| each device sees the other by profile name | **works** — "Emulator" / "S7" |
+| strand survives an app restart and re-attaches | **works** |
+| **a message sent on one device reaching the other** | **FAILS, both directions** |
+
+Final state after both sides sent and several minutes elapsed: the S7 holds only
+`hello from the S7`, the emulator only `hello from the emulator`. Each write commits locally and
+reaches nobody. Reads still intermittently report `cohort-unreachable`, clearing on Retry and
+returning.
+
+This is the same shape as optimystic#19 (a commit that resolves no cohort, reported as success)
+combined with the read-side declines of #22. **The #22 fix is in force and verified reachable, and
+it did not resolve the real-world two-phone case** — which is what Nate asked to be told.
+
+**The S7 crash was a one-off.** `TypeError: Cannot set property 'exports' of undefined` appeared
+once, immediately after the join and before an app restart, and has not recurred across several
+launches since. It sits next to a `Failed to get super-majority: 1/2 approvals` and a cancel that
+could not discharge its blocks, so it is plausibly an error-path module load rather than a
+product fault — and dev-mode Metro serves modules lazily (`lazy=true`), which a release APK does
+not. Not the beta blocker; the blocker is that messages do not cross.
+
+### Earlier assessment (superseded): NOT YET
+
+Real progress, and one new blocker.
+
+- [x] **Device-to-device join over the public relay WORKED for the first time** — S7 joined the
+      emulator's strand in 178 s, and the emulator's list showed "S7" by profile name. Every
+      previous attempt over sereus.org failed.
+- [ ] **The S7 crashed 11 minutes after joining**: `TypeError: Cannot set property 'exports' of
+      undefined`, surfacing in a SHA-256 module. The emulator never hits it (0 occurrences), so it
+      is device- or path-specific, and it appears LATE rather than at startup — consistent with a
+      lazily-bundled module (Metro serves `lazy=true`). New since the upgrade. **This alone rules
+      out a beta build**: a crash eleven minutes in, on the older of our two devices, is exactly
+      what a tester would hit and could not diagnose.
+- [ ] **Message delivery device-to-device is still unverified.** The emulator's message committed
+      locally (after a delay long enough that the 10 s list poll first overwrote the optimistic
+      row) but the S7 had crashed by then, so nothing can be concluded about replication.
+- [ ] After restart the S7 sat on "Looking for your strands…" for 6+ minutes without re-attaching.
+
+Next: identify the module behind the `exports` error (Metro interop, almost certainly a
+CommonJS/ESM boundary in a dependency the upgrade moved), then re-run the two-device round trip.
+
+### optimystic 1.6.0 fixes #22 — but it is unreachable, twice over, 2026-09-26
+
+Nate fixed #22 in 1.6.0 as `clusterPolicy.cohortQueryTimeoutMs` (it turned out to be THREE
+LAN-sized limits, not the one we found: the consult, the archive fetch that follows, and the
+whole acquisition pass). The default is unchanged, so a deployment has to set it. He then posted
+a correction: cadre-core builds the strand's `clusterPolicy` itself, so nothing an app passes
+reaches that field, and **upgrading optimystic alone changes nothing**.
+
+We tried anyway, to de-risk the Sereus release — he did say "if the new setting doesn't get your
+two-phone repro to green, tell us". Result: **do not trust a top-level optimystic upgrade.**
+
+- Patching `strandClusterPolicy` in `node_modules` to inject `cohortQueryTimeoutMs` did make the
+  field appear in the object cadre-core passes to `createLibp2pNode` (verified with a probe).
+- The WAN arm still failed — but that result was INVALID, and a deliberate positive control caught
+  it: a deliberately absurd value (999999999999, far above the documented ~4.97-day ceiling) should
+  throw at node construction in 1.6.0 and did not.
+- Cause: **there are five copies of `@optimystic/db-p2p` in the tree.** The top level is 1.6.0;
+  cadre-core carries its own nested **1.5.0**, and that is the one it loads. Confirmed by grep —
+  the nested copy contains no `cohortQueryTimeoutMs` at all, the top-level one has nine mentions.
+
+Worth telling upstream, because it will bite the Sereus release too: when the pass-through ships,
+a consumer who bumps optimystic without collapsing the duplicate copies gets no change and no
+error. Our own app carries a `resolutions` pin on quereus for exactly this reason (one catalog);
+optimystic needs the same treatment.
+
 ### Posted upstream as optimystic#22, 2026-09-26
 
 https://github.com/gotchoices/Optimystic/issues/22 — the WAN first-sync failure, with the

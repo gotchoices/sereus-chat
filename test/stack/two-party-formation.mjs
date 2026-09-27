@@ -148,6 +148,14 @@ async function makeParty(tag, relayAddr) {
       // not enough for formation, which is the lesson that cost us a day.
       listenAddrs: [],
       relayAddrs: [relayAddr],
+      // cadre-core 1.5.0 exposes the cohort read deadline (optimystic#22). Settable
+      // here so a run can prove the value is REACHING optimystic — an absurd value
+      // must throw at node construction. Without that control, a still-failing run
+      // cannot be told apart from a setting that never arrived, which is exactly
+      // how the first attempt at this went wrong.
+      ...(process.env.COHORT_QUERY_TIMEOUT_MS
+        ? { cohortQueryTimeoutMs: Number(process.env.COHORT_QUERY_TIMEOUT_MS) }
+        : {}),
       // Fail-soft, as the app runs it: a dead relay should leave the node usable
       // and merely unreachable rather than aborting start().
       requireRelay: false,

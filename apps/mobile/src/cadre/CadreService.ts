@@ -444,24 +444,13 @@ class CadreServiceImpl {
         // identity path, so there is no expo-secure-store slot to hang them off).
         requireSignedSchemas: false,
 
-        // FIRST SYNC NEEDS LONGER THAN 30s ON A PHONE.
-        //
-        // cadre-core's default budget is 30 s, and the failure it produces says
-        // exactly what ran out: "no member of this strand has been reachable
-        // since this machine joined (waited 30118 ms)". That budget has to cover
-        // dialling EVERY seed address, and a relay advertises addresses this
-        // device cannot use — a LAN address the emulator reaches only through
-        // NAT, alongside the loopback one that works. Time spent on the
-        // unreachable ones is spent from the same 30 s, and on Hermes each dial
-        // also pays a Noise handshake.
-        //
-        // 30 s is enough often enough to look like an intermittent bug: joins
-        // here have both succeeded (36-94 s of wall clock, i.e. across retries)
-        // and failed seven times running, with no change but timing. Nothing is
-        // lost by waiting longer — the strand stays launched and keeps trying
-        // either way, so this only decides how long `addStrand` waits before
-        // handing the caller an error to show.
-        strandFirstSync: { timeoutMs: 120_000 },
+        // NO `strandFirstSync` OVERRIDE, and no `cohortQueryTimeoutMs`: as of
+        // cadre-core 1.5.0 the platform defaults ARE the values we had been setting
+        // by hand — 120 s for the first-sync wait (was 30 s) and a 5 s cohort read
+        // deadline (was 1 s, the LAN-shaped budget behind optimystic#22). Inheriting
+        // them means a future adjustment upstream reaches us instead of being masked
+        // by a stale local number. `network.cohortQueryTimeoutMs` and
+        // `network.linkRoundTripMs` are the knobs if a deployment ever needs them.
       };
 
       console.info('[CadreService] creating CadreNode...');
