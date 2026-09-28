@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, SectionList, StyleSheet, RefreshControl, Alert, Pressable, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { listStrands, strandsSettling, listOutstandingInvitations, listMembers, setStrandMuted, setStrandArchived } from '../data/adapter';
+import { listStrands, strandsSettling, strandsBootError, retryBoot, listOutstandingInvitations, listMembers, setStrandMuted, setStrandArchived } from '../data/adapter';
 import type { StrandSummary, Invitation } from '../data/types';
 import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
@@ -58,6 +58,12 @@ export default function StrandList() {
   const [loaded, setLoaded] = useState(false);
   /** True while the node is still opening strands — see `strandsSettling`. */
   const [settling, setSettling] = useState(true);
+  /**
+   * Why start-up failed, if it did. Without this a failed boot renders as the
+   * same endless spinner as a slow one, which is how a broken app looks exactly
+   * like a patient one.
+   */
+  const [bootError, setBootError] = useState<string | null>(null);
   const [invites, setInvites] = useState<Invitation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,6 +97,7 @@ export default function StrandList() {
     // the read was in flight, the next poll picks it up rather than this one
     // declaring the list empty.
     try { setSettling(await strandsSettling()); } catch { setSettling(false); }
+    try { setBootError(await strandsBootError()); } catch { /* leave as-is */ }
   }, []);
 
   /**
@@ -212,6 +219,27 @@ export default function StrandList() {
       <View style={styles.flex1}>
       {error ? (
         <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: load }} />
+      ) : bootError ? (
+        // A FAILED start, not a slow one. Before this branch existed both looked
+        // like the spinner below, so "the app is broken" and "the app is working
+        // on it" were the same screen — and the only report of the difference
+        // went to a console no phone user can read.
+        <Banner
+          // `t` takes a key and a default, with no interpolation, so the reason
+          // is appended rather than substituted.
+          message={`${t('screens.strands.bootFailed', 'Could not start')}: ${bootError}`}
+          action={{
+            label: t('common.retry', 'Retry'),
+            onPress: () => {
+              void (async () => {
+                setBootError(null);
+                setSettling(true);
+                try { await retryBoot(); } catch { /* re-read reports it */ }
+                await load();
+              })();
+            },
+          }}
+        />
       ) : (!loaded || settling) ? (
         // Waiting, not empty. A spinner says "still looking"; the empty state
         // would say "there is nothing", which we do not yet know.

@@ -50,6 +50,9 @@ export class MockAdapter implements DataAdapter {
   // ---- Strands ------------------------------------------------------------
   /** The mock answers from memory; there is never a bring-up to wait for. */
   async strandsSettling(): Promise<boolean> { return false; }
+  /** The mock has no node to fail to start. */
+  async strandsBootError(): Promise<string | null> { return null; }
+  async retryBoot(): Promise<void> {}
   async setStrandMuted(): Promise<void> {}
   async setStrandArchived(): Promise<void> {}
 

@@ -327,6 +327,88 @@ carrying that string and kills the session itself — match `formation.mjs` inst
 `setsid`/`nohup` on the remote side does not survive, so hold the process on an `ssh -n` session
 backgrounded locally.
 
+### review.md items A3 and A2 fixed, 2026-09-28
+
+**A3 — `strand:discovered` was lost on every node rebuild.** `cadreService.on()` forwarded
+straight to `this.node.on()`, and `applyRelays` / `setNoiseCryptoMode` both `stop()` (nulling the
+node) and build a NEW one. `watchReachability` re-installed itself inside `doStart` and so survived;
+nothing else did. `watchDiscoveredStrands` subscribes exactly once at boot, and the formation
+responder writes a strand row WITHOUT launching it — so after any rebuild that row's event fired
+into nothing and the strand was never attached. The host then holds a strand it never runs while
+the joiner waits out its first-sync budget: the symptom Nate confirmed upstream, reached by a
+purely app-side route. A relay change is the worst possible moment for it, being exactly when a
+phone first becomes reachable AND exactly what rebuilds the node.
+
+Fixed in `CadreService`, not the caller, because the service outlives the node: `on()` retains each
+subscription and replays it onto every node built thereafter, so every subscriber is right by
+construction rather than by remembering. An `onRebuilt` hook covers the other half — an offer made
+DURING a rebuild went to a node that no longer exists and is not re-emitted — which `chat-strand`
+uses to re-drain `getDiscoveredStrands()`. Verified on device:
+
+```
+[two-party] app node stopped for the duration
+[CadreService] ✓ CadreNode running.                        (new node)
+[CadreService] re-applied 1 subscription(s) to the new node
+[two-party] app node restarted
+```
+
+**A2 — a failed boot was indistinguishable from a slow one.** `strandsSettling()` is
+`!hasSweptForStrands()`, and the flag was set only on the last line of a SUCCESSFUL
+`watchDiscoveredStrands`. Anything that threw first left it false forever, so the list showed
+"Looking for your strands…" for the life of the process while the only report went to a console no
+phone user can read. Given how much of this project has been spent deciding whether a hang is the
+stack or the app, that defect hid precisely the answer being looked for — and it cost time again
+today, when an S7 with dropped `adb reverse` ports showed the identical blank screen and was
+reported as a crash.
+
+Now the sweep flag is set in the failure path too, the reason is recorded (`getBootFailure`),
+`strandsBootError()` exposes it, and `StrandList` renders a distinct banner with a Retry wired to a
+new `retryBoot()` that re-runs the WHOLE boot sequence — closing the review's related point that
+the 3 s poll only nudges `ensureCadreUp` and can never re-run the discovery sweep, so a boot that
+failed once stayed failed however often the list refreshed.
+
+### ROOT CAUSE CONFIRMED by Nate, 2026-09-28 — sereus#18 and optimystic#23 are ONE bug
+
+From sereus#18: a cross-party strand learns the other party's addresses **once, during the
+invitation, and keeps them in memory only**. After a restart neither relay-only party knows how to
+reach the other — the relay cannot be asked who belongs to a strand, and a strand's FRET ring has
+no directory, so it needs at least one address of another member to join. Each restarted node's
+ring and cohort therefore contain only itself: it re-attaches, reports `active`, accepts local
+writes, and replicates nothing.
+
+> "This matches the 'cohort of one' you saw on the phones, and **on a phone every launch is a
+> restart**."
+
+That single sentence retires weeks of chasing. It explains why freshly-FORMED Node parties always
+converged (one machine or two) while two phones never did, and it confirms the two device
+measurements we took were pointing at the right layer all along: `band=1 serves=1 unknown=0
+foreign=0` (an empty candidate set, not a classification failure) and `announce → relay:
+foreign-protocol` (the relay being the only peer either phone had).
+
+**optimystic#22 is CLOSED** pointing here. **optimystic#23** had my "It is React Native" comment
+still standing, which was the two-variable error — the Node arm had just formed, the phones had
+just restarted — so it has been corrected there rather than left to mislead.
+
+**Their fix, next release:** a per-machine per-strand local address book dialled first on restart;
+signed address-book exchange when two strand members connect; **cadre-core remembering the strands
+it joined** (key included) and re-attaching them on start; and our repro adopted as a suite
+scenario. Also: the `peer-join block catch-up to peer <relay> has failed 3 times` line is a RED
+HERRING — catch-up tries every connected peer including the relay, which can never serve a strand's
+blocks. It will stop doing that.
+
+**Consequences for this app:**
+
+- `rememberJoinedStrand` / `reattachRememberedStrands` is a WORKAROUND WITH AN EXPIRY DATE. Nate:
+  "today a cross-party joiner has to keep `{Id, MemberPrivateKey, Type}` itself, because
+  `addStrand` records nothing cadre-core can rediscover. That was never documented, and it
+  shouldn't be the app's job." Remove it when the fix lands; do not build on it.
+- `review.md` B1 is DROPPED, not deferred. Its premise was that chat wires native Noise crypto
+  while the reference app deliberately does not — an unvalidated divergence. The kit now ships
+  native crypto as the DEFAULT and Nate calls it "the port of your chat app's quick-crypto
+  adapter", so we are on the prescribed path, not off it. No A/B needed.
+- sereus#13 is waiting on exactly what we just did: "It has been checked by bundling only so far; a
+  device run is still to come. Leaving this open until a device run confirms it, or you do."
+
 ### Upgraded to sereus 1.6.0 / optimystic 1.7.0 and adopted `@serfab/cadre-rn`, 2026-09-27
 
 App AND harness are now both on `@serfab/cadre-core` 1.6.0 / `@optimystic/*` 1.7.0, one copy of

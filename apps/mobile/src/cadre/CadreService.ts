@@ -82,6 +82,18 @@ function optimysticDbName(strandId: string): string {
 // Service
 // ---------------------------------------------------------------------------
 
+/**
+ * One retained `on()` registration. The handler is stored under the widened
+ * event union because the list is heterogeneous; `on()` is the type-safe door in
+ * and the cast is confined to that one push.
+ */
+type ServiceSubscription = {
+  [K in keyof CadreNodeEvents]: {
+    event: K;
+    handler: EventHandler<CadreNodeEvents[K]>;
+  };
+}[keyof CadreNodeEvents];
+
 class CadreServiceImpl {
   private node: CadreNode | null = null;
   private _partyId: string | null = null;
@@ -101,6 +113,15 @@ class CadreServiceImpl {
    * `relayAddrs` — see `setNoiseCryptoMode`.
    */
   private _noiseCryptoMode: NoiseCryptoMode = DEFAULT_NOISE_CRYPTO_MODE;
+
+  /**
+   * Service-level event subscriptions, replayed onto every node this service
+   * builds. See `on()` for why they cannot live on the node alone.
+   */
+  private subscriptions: ServiceSubscription[] = [];
+
+  /** Callbacks run after a rebuild-driven restart — see `onRebuilt`. */
+  private rebuildHooks: Array<() => void | Promise<void>> = [];
   /**
    * The address set the formation responder was last installed with, and the
    * timer that notices when reality diverges from it. See `watchReachability`.
@@ -497,6 +518,9 @@ class CadreServiceImpl {
       try {
         this.initializeFormationResponder();
         this.watchReachability();
+        // Re-arm everything the PREVIOUS node carried. Must happen on every
+        // start, not only the first — see `on()`.
+        this.reapplySubscriptions();
       } catch (err) {
         console.warn('[CadreService] formation responder init failed:', err);
       }
@@ -541,6 +565,7 @@ class CadreServiceImpl {
     await this.stop();
     this._startPromise = null;
     await this.ensureStarted();
+    await this.runRebuildHooks();
   }
 
   /** What the node is currently built with. */
@@ -593,6 +618,7 @@ class CadreServiceImpl {
     await this.stop();
     this._startPromise = null;
     await this.ensureStarted();
+    await this.runRebuildHooks();
   }
 
   /**
@@ -793,10 +819,35 @@ class CadreServiceImpl {
   // Events
   // -----------------------------------------------------------------------
 
+  /**
+   * Subscribe for the life of the SERVICE, not the life of the node.
+   *
+   * These used to forward straight to `this.node.on(...)`, which quietly made
+   * every subscription die at the next rebuild: `applyRelays` and
+   * `setNoiseCryptoMode` both `stop()` (which nulls the node) and then build a
+   * NEW `CadreNode`, and nothing re-registered what the old one carried.
+   *
+   * The consequence was not theoretical. `watchDiscoveredStrands` subscribes to
+   * `strand:discovered` exactly once, at boot, and a strand row is written by the
+   * formation responder WITHOUT being launched — so after a rebuild that row's
+   * event fired into nothing and the strand was never attached. The host then
+   * holds a strand it never runs while the joiner waits out its first-sync
+   * budget. That is indistinguishable from the upstream restart bug
+   * (gotchoices/sereus#18), arriving by a purely app-side route — precisely the
+   * kind of confound that has cost this project several wrong diagnoses.
+   *
+   * A relay change is the worst possible moment for it, because that is exactly
+   * when a phone first becomes reachable AND exactly what rebuilds the node.
+   *
+   * `watchReachability` always got this right by re-installing itself inside
+   * `doStart`; this makes every other subscriber right by construction instead
+   * of asking each one to remember.
+   */
   on<K extends keyof CadreNodeEvents>(
     event: K,
     handler: EventHandler<CadreNodeEvents[K]>,
   ): void {
+    this.subscriptions.push({ event, handler } as ServiceSubscription);
     this.node?.on(event, handler);
   }
 
@@ -804,7 +855,54 @@ class CadreServiceImpl {
     event: K,
     handler: EventHandler<CadreNodeEvents[K]>,
   ): void {
+    const i = this.subscriptions.findIndex(
+      s => s.event === event && s.handler === (handler as ServiceSubscription['handler']),
+    );
+    if (i >= 0) this.subscriptions.splice(i, 1);
     this.node?.off(event, handler);
+  }
+
+  /**
+   * Run after a REBUILD-driven restart (not the first start), so the data layer
+   * can re-read anything the old node was told while it was going away.
+   *
+   * The subscription replay above covers future events; this covers the window
+   * during the rebuild, when an offer was delivered to a node that no longer
+   * exists. Kept as a hook rather than an import so `CadreService` stays free of
+   * a dependency on the strand layer.
+   */
+  onRebuilt(cb: () => void | Promise<void>): void {
+    this.rebuildHooks.push(cb);
+  }
+
+  private async runRebuildHooks(): Promise<void> {
+    for (const cb of this.rebuildHooks) {
+      try {
+        await cb();
+      } catch (err) {
+        console.warn('[CadreService] rebuild hook failed:', err);
+      }
+    }
+  }
+
+  /**
+   * Re-apply every service-level subscription to a freshly built node. Called
+   * from `doStart` before anything can emit. Registering on the node directly
+   * (not through `on`) so the list is not appended to while it is being replayed.
+   */
+  private reapplySubscriptions(): void {
+    if (!this.node) return;
+    for (const sub of this.subscriptions) {
+      // The pair was type-checked at the `on()` call that created it; TypeScript
+      // cannot re-correlate event to handler while iterating the union, so the
+      // cast is confined to this one replay line rather than widening the store.
+      (this.node.on as (e: string, h: unknown) => void)(sub.event, sub.handler);
+    }
+    if (this.subscriptions.length > 0) {
+      console.info(
+        `[CadreService] re-applied ${this.subscriptions.length} subscription(s) to the new node`,
+      );
+    }
   }
 
   // -----------------------------------------------------------------------

@@ -69,6 +69,33 @@ export function hasSweptForStrands(): boolean {
 }
 
 /**
+ * Why the boot failed, when it did — so a failure can be TOLD APART from a slow
+ * start.
+ *
+ * `strandsSettling()` is `!hasSweptForStrands()`, and the flag used to be set
+ * only on the last line of a successful `watchDiscoveredStrands`. So anything
+ * that threw on the way — `ensureStarted()` failing on a missing native module,
+ * a control-DB that will not open, a bad relay — left the flag false forever and
+ * the strand list showed "Looking for your strands…" for the life of the
+ * process. A boot that FAILED and a boot still in progress rendered identically,
+ * and the only caller's catch merely warned to a console nobody on a phone can
+ * see.
+ *
+ * That is worse here than it sounds. This project has repeatedly had to decide
+ * whether a hang was the stack or the app, and this particular defect hides
+ * exactly that answer: it converts every startup fault into the same infinite
+ * spinner. (It cost us minutes again today when an S7 with dropped `adb reverse`
+ * ports showed the identical blank screen.)
+ *
+ * So: the sweep flag is now set in a `finally` — we did ask, even if asking
+ * failed — and the reason is recorded here for the UI to show instead of a lie.
+ */
+let bootFailure: string | null = null;
+export function getBootFailure(): string | null {
+  return bootFailure;
+}
+
+/**
  * Boot the cadre, attach the default chat strand (creating one on first run),
  * and ensure this device is registered as a Member.  Idempotent — repeated
  * calls return the same StrandInstance.
@@ -263,16 +290,45 @@ async function attachDiscoveredStrand(strandId: string, strandRow: StrandRow): P
   }
 }
 
-/** Idempotent — safe to call on every app start. */
+/**
+ * Idempotent — safe to call on every app start.
+ *
+ * The SUBSCRIPTION now survives a node rebuild on its own: `cadreService.on`
+ * retains it and replays it onto each new node (see `CadreService.on`). What
+ * does not survive is the DRAIN below — a strand offered while the node was
+ * being rebuilt was announced to a node that no longer exists — so
+ * `drainDiscoveredStrands` is exported for the rebuild path to call afterwards.
+ */
 export async function watchDiscoveredStrands(): Promise<void> {
-  await cadreService.ensureStarted();
+  try {
+    await cadreService.ensureStarted();
+  } catch (err) {
+    // RECORD, then rethrow. The caller decides what else to abandon; what must
+    // not happen is the sweep flag staying false and the list claiming forever
+    // that it is still looking. See `bootFailure`.
+    bootFailure = err instanceof Error ? err.message : String(err);
+    sweptForStrands = true;
+    throw err;
+  }
+
   const node = cadreService.cadreNode;
-  if (!node) return;
+  if (!node) {
+    bootFailure = 'the cadre node did not come up';
+    sweptForStrands = true;
+    return;
+  }
+
+  // Past here the node exists, so a previous failure no longer applies.
+  bootFailure = null;
 
   // Subscribe first …
   cadreService.on('strand:discovered', ({ strandId, strand }) => {
     void attachDiscoveredStrand(strandId, strand);
   });
+
+  // … and re-read the offers after any rebuild, for the window in which an
+  // offer went to a node that was on its way out.
+  cadreService.onRebuilt(() => drainDiscoveredStrands());
 
   // … then drain what was offered before we were listening.
   for (const [strandId, strandRow] of node.getDiscoveredStrands()) {
@@ -283,6 +339,23 @@ export async function watchDiscoveredStrands(): Promise<void> {
   // fine: the list shows what is ready and fills in the rest as it opens. What
   // matters is that we have now ASKED, so "nothing here" is honest.
   sweptForStrands = true;
+}
+
+/**
+ * Re-read the discovered-strand offers from whatever node is current.
+ *
+ * The event subscription is replayed onto a rebuilt node, but an offer made
+ * DURING the rebuild was delivered to the old node and is not re-emitted. A
+ * rebuilt node re-populates `getDiscoveredStrands()` from the control database,
+ * so draining it again closes that window. Idempotent: `attachDiscoveredStrand`
+ * guards on its in-flight set and on `getStrands()`.
+ */
+export async function drainDiscoveredStrands(): Promise<void> {
+  const node = cadreService.cadreNode;
+  if (!node) return;
+  for (const [strandId, strandRow] of node.getDiscoveredStrands()) {
+    void attachDiscoveredStrand(strandId, strandRow);
+  }
 }
 
 async function readJoinedStrands(): Promise<JoinedStrand[]> {

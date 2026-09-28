@@ -24,6 +24,19 @@ export interface DataAdapter {
    */
   strandsSettling(): Promise<boolean>;
   /**
+   * Why start-up failed, or null. Distinct from `strandsSettling` on purpose: a
+   * failed boot and a slow one are not the same thing to a person looking at an
+   * empty list.
+   */
+  strandsBootError(): Promise<string | null>;
+  /**
+   * Re-attempt start-up after a failure. Distinct from re-reading the list: the
+   * 3 s poll only ever nudges `ensureCadreUp`, which cannot re-run the discovery
+   * sweep, so without this a boot that failed once stays failed for the life of
+   * the process however many times the list refreshes.
+   */
+  retryBoot(): Promise<void>;
+  /**
    * Device-local strand settings (story 33's mute and archive). Both are this
    * device's alone — `ops.md` is explicit that they "never touch strand data" —
    * so neither reaches the other members.
@@ -100,6 +113,8 @@ export function __setAdapter(a: DataAdapter | null): void {
 
 export const listStrands = async () => (await getAdapter()).listStrands();
 export const strandsSettling = async () => (await getAdapter()).strandsSettling();
+export const strandsBootError = async () => (await getAdapter()).strandsBootError();
+export const retryBoot = async () => (await getAdapter()).retryBoot();
 export const setStrandMuted = async (id: string, m: 'none' | 'soft' | 'hard') =>
   (await getAdapter()).setStrandMuted(id, m);
 export const setStrandArchived = async (id: string, a: boolean) =>

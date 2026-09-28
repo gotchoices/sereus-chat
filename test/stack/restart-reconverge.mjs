@@ -56,6 +56,26 @@ if (!RELAY_ADDR) {
 }
 const STORE_ROOT = process.env.STORE_ROOT ?? join(tmpdir(), 'restart-reconverge');
 const FRESH = process.env.FRESH !== '0';
+/**
+ * Which half to run. `both` (the default) does what it always did — one process,
+ * `CadreNode` objects destroyed and rebuilt. `1` and `2` split the halves across
+ * SEPARATE OS PROCESSES, which is what a restarted phone actually is and the one
+ * caveat left on the sereus#18 report: module-level state, libp2p internals and
+ * any process-lifetime caches survive an in-process rebuild and do not survive a
+ * real restart.
+ *
+ *   PHASE=1 FRESH=1 node restart-reconverge.mjs     # form, converge, exit
+ *   PHASE=2 FRESH=0 node restart-reconverge.mjs     # new process, same storage
+ */
+const PHASE = process.env.PHASE ?? 'both';
+if (!['both', '1', '2'].includes(PHASE)) {
+  console.error(`PHASE must be 1, 2 or both — got ${PHASE}`);
+  process.exit(2);
+}
+if (PHASE === '2' && FRESH) {
+  console.error('PHASE=2 needs FRESH=0, or it wipes the storage phase 1 just wrote.');
+  process.exit(2);
+}
 /** How long phase 2 is given to re-find the partner. Generous: the claim is "never", not "slow". */
 const RECONVERGE_MS = Number(process.env.RECONVERGE_MS ?? 180_000);
 const REACHABLE_MS = Number(process.env.REACHABLE_MS ?? 60_000);
@@ -244,7 +264,9 @@ function rememberedJoins() {
 }
 
 let host, joiner;
+let strandId;
 try {
+ if (PHASE !== '2') {
   // ─────────────────────────── PHASE 1: form ───────────────────────────
   log('PHASE 1 — form and converge (the path every other harness here tests)');
   host = await startParty('host', partyHost);
@@ -252,7 +274,7 @@ try {
   joiner = await startParty('joiner', partyJoiner);
   if (!await awaitReachable(joiner, 'JOINER')) process.exit(3);
 
-  const strandId = randomUUID();
+  strandId = randomUUID();
   writeFileSync(strandIdFile, strandId);
   const memberPrivateKey = await generateStrandMemberKey();
   const founded = await host.foundStrand({ strandId, type: 'c', memberPrivateKey, sAppConfig: SAPP });
@@ -319,14 +341,31 @@ try {
     process.exit(4);
   }
 
+  if (PHASE === '1') {
+    log('');
+    log('PHASE 1 complete. Storage is on disk; run phase 2 in a NEW process:');
+    log(`  PHASE=2 FRESH=0 STORE_ROOT=${STORE_ROOT} RELAY_ADDR=… node restart-reconverge.mjs`);
+    process.exitCode = 0;
+    throw { __phase1Done: true };
+  }
+ }
+
+ {
   // ─────────────────── PHASE 2: restart, re-attach ────────────────────
   log('');
-  log('PHASE 2 — destroying both nodes and rebuilding them over the SAME storage');
-  log('          (no formation this time — exactly a restarted phone)');
-  await host.stop(); await joiner.stop();
-  await closeDbs();
-  host = null; joiner = null;
-  await new Promise(r => setTimeout(r, 5000));
+  if (PHASE === '2') {
+    // A genuinely new OS process: nothing of the first run survives except what
+    // is on disk, which is the whole point of splitting the phases.
+    strandId = readFileSync(strandIdFile, 'utf8').trim();
+    log(`PHASE 2 — separate process, reopening ${strandId} from storage alone`);
+  } else {
+    log('PHASE 2 — destroying both nodes and rebuilding them over the SAME storage');
+    log('          (no formation this time — exactly a restarted phone)');
+    await host.stop(); await joiner.stop();
+    await closeDbs();
+    host = null; joiner = null;
+    await new Promise(r => setTimeout(r, 5000));
+  }
 
   host = await startParty('host', partyHost);
   joiner = await startParty('joiner', partyJoiner);
@@ -393,9 +432,14 @@ try {
     log('formed successfully cannot re-find each other after a restart.');
   }
   process.exitCode = crossed ? 0 : 1;
+ }
 } catch (err) {
-  log(`harness error: ${err?.stack ?? err}`);
-  process.exitCode = 2;
+  // The phase-1-only exit is a control-flow signal, not a failure.
+  if (err?.__phase1Done) { /* handled: storage is written, exit clean */ }
+  else {
+    log(`harness error: ${err?.stack ?? err}`);
+    process.exitCode = 2;
+  }
 } finally {
   try { await host?.stop(); } catch { /* best effort */ }
   try { await joiner?.stop(); } catch { /* best effort */ }

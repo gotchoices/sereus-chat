@@ -14,7 +14,7 @@ import {
   setStrandMuted as setStrandMutedLocal,
   setStrandArchived as setStrandArchivedLocal,
 } from '../strand-prefs';
-import { attachAndAwaitWritable, ensureCadreUp, generateUuid, hasSweptForStrands, leaveStrandLocally, registerSelfAsMember, rememberJoinedStrand, syncProfileNameToStrands } from '../chat-strand';
+import { attachAndAwaitWritable, attachJoinedStrands, ensureCadreUp, generateUuid, getBootFailure, hasSweptForStrands, watchDiscoveredStrands, leaveStrandLocally, registerSelfAsMember, rememberJoinedStrand, syncProfileNameToStrands } from '../chat-strand';
 import { createChatStrand, joinChatStrand } from '../chat-sapp';
 import type { StrandInstance } from '@serfab/cadre-core';
 import {
@@ -142,6 +142,20 @@ export class SereusAdapter implements DataAdapter {
     // one of them cannot open (an invitation nobody accepted, a host that never
     // answers), so a fault in one row would hide the list forever.
     return !hasSweptForStrands();
+  }
+
+  async strandsBootError(): Promise<string | null> {
+    return getBootFailure();
+  }
+
+  async retryBoot(): Promise<void> {
+    // The same sequence App.tsx runs at start, in the same order and for the
+    // same reasons: the discovery sweep must be re-armed before anything else
+    // touches the node, and remembered joins come last because they are the only
+    // step that dials another party.
+    await watchDiscoveredStrands();
+    await ensureCadreUp();
+    await attachJoinedStrands();
   }
 
   async listStrands(): Promise<StrandSummary[]> {
