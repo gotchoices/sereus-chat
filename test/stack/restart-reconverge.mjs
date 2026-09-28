@@ -46,6 +46,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-file';
 import { openTestDb } from './classic-level-driver.mjs';
 
 const RELAY_ADDR = process.env.RELAY_ADDR;
@@ -141,9 +142,28 @@ function autoAttach(node, tag) {
 }
 
 async function startParty(tag, partyId) {
+  /**
+   * THE RETAINED DIAL TARGETS, and they must outlive the process.
+   *
+   * `CadreNodeConfig.bootstrapPeers.store` is documented as: "Absent ⇒ an
+   * in-memory store is created at start() (ephemeral: the retry set does not
+   * survive the process, and such a node is stranded permanently if it restarts
+   * before connecting)" — and cadre-node's own field doc calls these entries "the
+   * node's only way back to those peers if it is ever stranded again".
+   *
+   * That is this script's exact scenario, so omitting the store made the harness
+   * itself the likely cause of the phase-2 failure. The Node CLI, the browser and
+   * React Native all inject a durable backend; only this rig did not.
+   *
+   * ONE VARIABLE: this is the sole change from the run that produced sereus#18.
+   */
+  const bootstrapStore = await FileBootstrapPeerStore.open(
+    join(STORE_ROOT, `${tag}-bootstrap`), partyId);
+
   const node = new CadreNode({
     privateKey: await identityFor(tag),
     controlNetwork: { partyId, bootstrapNodes: [] },
+    bootstrapPeers: { store: bootstrapStore },
     profile: 'transaction',
     strandFilter: { mode: 'all' },
     storage: { provider: storageFor(tag) },

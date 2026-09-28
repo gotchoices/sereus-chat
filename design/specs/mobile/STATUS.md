@@ -327,6 +327,80 @@ carrying that string and kills the session itself — match `formation.mjs` inst
 `setsid`/`nohup` on the remote side does not survive, so hold the process on an `ssh -n` session
 backgrounded locally.
 
+### sereus 1.6.0 reviewed, 2026-09-27 — and it nearly retracted sereus#18
+
+Three changes, all touching us:
+
+- **`@serfab/cadre-rn`** — polyfills, `boot-check`, `withCadreMetro`, and `noise-crypto`'s
+  `buildNoiseCrypto(mode)` over `react-native-quick-crypto`: the same API, the same three modes and
+  the same `symmetric` default as the module we wrote, on a native dep we already have. Two
+  consequences. The standing TODO to OFFER our RN native-crypto module upstream is moot —
+  equivalent functionality shipped. And `index.js` already says our polyfills are copied verbatim
+  from `reference-app-rn/polyfills` with "Fix bugs UPSTREAM and re-copy; do not patch these files
+  locally" — the kit turns that copy-paste into a real dependency, which is what that comment has
+  been asking for. Worth adopting as cleanup, not as a fix.
+- **Re-attach first-sync wait 120 s → 300 s**, on their measurements of a re-attach taking ~80 s to
+  become writable, an outside report at ~150 s, and a real phone's first public-relay join at 178 s.
+- **Relayed links to a 3 s round trip**, via libp2p's `connectionManager.dialTimeout` /
+  `inboundUpgradeTimeout` derived from `linkRoundTripMs`, whose default rises 2000 → 3500 ms.
+  Requires `@optimystic/*` 1.7.0 — so the floors are raised and the 1.7.0 upgrade held last turn is
+  unblocked. Our relay is 70-79 ms, so this changes nothing for us directly.
+
+**The second item nearly invalidated sereus#18.** Their numbers say a re-attach can need ~150 s;
+our phase 2 gave the post-restart write 180 s. That is close enough that the issue could have been
+nothing but an impatient test, so it was retested BEFORE upgrading anything:
+
+```
+current stack (cadre-core 1.5.0 / optimystic 1.6.0), RECONVERGE_MS=600000
+  CONTROL ✓ second write crossed pre-restart
+  PHASE 2 ✗ joiner stuck at 2 rows for the full 617 s
+```
+
+617 s is more than double their new 300 s default. The budget was not the flaw, and the most
+plausible way #18 could have been wrong is eliminated.
+
+**The upgrade does not change sereus#18.** On cadre-core 1.6.0 / optimystic 1.7.0, verified
+resolved:
+
+```
+PHASE 1 ✓   CONTROL ✓ (2.1 s)   after restart: both strands active
+PHASE 2 ✗   joiner stuck at 2 rows for the full 420 s budget (438 s wall)
+```
+
+Five runs now, three stacks, budgets from 180 s to 600 s — the post-restart write never crosses.
+Expected: #18 was filed after this release branched.
+
+**B2 from `apps/mobile/review.md` tested and eliminated, 2026-09-27.** The review asked whether
+chat persists partner strand addresses on re-attach or only the member key — only the key, in both
+the app and the harness. cadre-core's `bootstrapPeers.store` doc made that look decisive: "Absent
+⇒ an in-memory store is created at start() (ephemeral: the retry set does not survive the process,
+and such a node is stranded permanently if it restarts before connecting)", and "the Node CLI, the
+browser, and React Native all inject a durable backend today". Our harness injected nothing, so
+sereus#18 looked like confound #4.
+
+Tested by injecting a `FileBootstrapPeerStore` and changing NOTHING else:
+
+```
+PHASE 1 ✓   CONTROL ✓   after restart: both strands active
+PHASE 2 ✗   318 s
+bootstrap store directories after the run: NONE — nothing was ever recorded
+```
+
+Not the explanation, for two independent reasons. The failure is unchanged, and the store stays
+EMPTY: it retains same-party dial targets (an owner peer a seed nominated, a machine this node
+added; `warmSiblingAddrBook` fills it for siblings), and our host and joiner are separate parties
+that never seed each other. Durable or not, a cross-party strand partner was never going to be in
+it.
+
+That sharpens the open question, and it is a better one than #18 was filed with: **what surface is
+a cross-party strand partner's address supposed to persist in?** Formation supplies them exactly
+once, the app keeps only `MemberPrivateKey`, and the bootstrap-peer store is the wrong shape.
+
+**One trap on the upgrade**, the same one that produced the false negative on optimystic#22:
+`test/stack/package.json` carries a `resolutions` block as well as `dependencies`, and raising only
+the latter would have silently kept the old versions. Both were raised; verified afterwards by
+reading `node_modules/@optimystic/db-p2p/package.json` (1.7.0) and confirming exactly one copy.
+
 ### The restart path had never been tested in Node, 2026-09-26
 
 Every harness in `test/stack` opens storage with `mkdtempSync`, so every Node run we have ever
