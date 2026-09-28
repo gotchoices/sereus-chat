@@ -62,8 +62,17 @@ const sharedNodeStubs = {
   // resolution error that names the importer rather than the cause.
   stream: require.resolve('readable-stream'),
   'node:stream': require.resolve('readable-stream'),
-  buffer: require.resolve('buffer'),
-  'node:buffer': require.resolve('buffer'),
+  // TRAILING SLASH, and it is not cosmetic. `buffer` is ALSO a Node builtin, so
+  // bare `require.resolve('buffer')` returns the string "buffer" — the builtin's
+  // name, not a path — and this map then points Metro at nothing. That stayed
+  // invisible for as long as nothing in the graph imported `buffer`; the moment
+  // something did (react-native-svg's `fetchData.ts`, pulled in when a dependency
+  // change re-hoisted it to its `src`), the whole bundle failed with "Unable to
+  // resolve module buffer", naming the importer rather than this line. The slash
+  // forces package resolution. `readable-stream` is not a builtin, so it needs no
+  // such guard.
+  buffer: require.resolve('buffer/'),
+  'node:buffer': require.resolve('buffer/'),
 };
 
 const localOnlyNodeStubs = {

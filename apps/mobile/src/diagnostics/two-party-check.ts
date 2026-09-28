@@ -43,7 +43,7 @@ import { LevelDB, LevelDBWriteBatch } from 'rn-leveldb';
 import { getChatSAppConfig, CHAT_SAPP_ID } from '../data/chat-sapp';
 import { getPrefs } from '../data/adapter';
 import { cadreService } from '../cadre/CadreService';
-import { buildNoiseCrypto, DEFAULT_NOISE_CRYPTO_MODE } from '../cadre/noise-crypto';
+import { buildNoiseCrypto, DEFAULT_NOISE_CRYPTO_MODE } from '@serfab/cadre-rn/noise-crypto';
 
 export type TwoPartyResult = {
   ok: boolean;

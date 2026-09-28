@@ -28,11 +28,20 @@ import {
   type RelayReservationState,
   type StrandInstance,
 } from '@serfab/cadre-core';
+// NATIVE NOISE CRYPTO — now the SEREUS KIT's, not our own copy.
+//
+// `@serfab/cadre-rn/noise-crypto` exports the same three modes, the same
+// `symmetric` default and the same `buildNoiseCrypto(mode)` signature over the
+// same `react-native-quick-crypto`, and it types the result from
+// `@optimystic/db-p2p` directly. We wrote an equivalent module before the kit
+// existed; keeping ours would mean maintaining a parallel implementation of a
+// published, upstream-maintained one — the same divergence cost `index.js`
+// already warns about for the polyfills.
 import {
   buildNoiseCrypto,
   DEFAULT_NOISE_CRYPTO_MODE,
   type NoiseCryptoMode,
-} from './noise-crypto';
+} from '@serfab/cadre-rn/noise-crypto';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import {

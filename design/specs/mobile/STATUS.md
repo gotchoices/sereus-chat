@@ -327,6 +327,43 @@ carrying that string and kills the session itself — match `formation.mjs` inst
 `setsid`/`nohup` on the remote side does not survive, so hold the process on an `ssh -n` session
 backgrounded locally.
 
+### Upgraded to sereus 1.6.0 / optimystic 1.7.0 and adopted `@serfab/cadre-rn`, 2026-09-27
+
+App AND harness are now both on `@serfab/cadre-core` 1.6.0 / `@optimystic/*` 1.7.0, one copy of
+`db-p2p` each, verified by reading `node_modules/.../package.json` rather than the manifest. **Both
+`dependencies` and `resolutions` had to be raised in each**: every one of these package.json files
+carries both blocks, and raising only `dependencies` leaves the resolution silently pinning the old
+version — the mechanism behind the false negative on optimystic#22.
+
+Chat's own `src/cadre/noise-crypto.ts` (203 lines) is **deleted**. `@serfab/cadre-rn/noise-crypto`
+is a drop-in: same three modes, same `symmetric` default, same `buildNoiseCrypto(mode)` signature,
+same `react-native-quick-crypto` underneath, and it types its result from `@optimystic/db-p2p`
+directly. Verified in a fresh standalone bundle — kit crypto present, our module absent, the native
+path reached. We had been maintaining a parallel implementation of a published upstream one.
+
+NOT adopted yet, deliberately: the kit's `polyfills`, `boot-check` and `withCadreMetro`. Those move
+the bundler seam, and the crypto swap was worth confirming on its own first.
+
+**A latent Metro bug the adoption flushed out, and it had been there since the config was written.**
+Adding the kit re-hoisted `react-native-svg` to its `src`, which imports `buffer`, and the whole
+bundle failed with "Unable to resolve module buffer" — naming the importer, not the cause:
+
+```js
+require.resolve('buffer')   // → "buffer"  — the Node BUILTIN's NAME, not a path
+require.resolve('buffer/')  // → /…/node_modules/buffer/index.js
+```
+
+`buffer` is also a Node builtin, so `extraNodeModules.buffer` had been pointing at nothing for as
+long as nothing in the graph imported it. `readable-stream` is not a builtin and was never
+affected. Fixed with the trailing slash. This is `review.md`'s C2 confirmed by events — "they
+resolve transitively today and can vanish on a dependency change" — so `buffer`, `readable-stream`
+and `@craftzdog/react-native-buffer` (imported directly by the old crypto module) are now all
+declared.
+
+**Metro caches `metro.config.js`**: a running packager keeps serving the old config and the old
+error. Restart with `--reset-cache` after touching it. The fix here was verified with a standalone
+`react-native bundle --reset-cache` (33.7 MB, clean) rather than by restarting the user's packager.
+
 ### sereus 1.6.0 reviewed, 2026-09-27 — and it nearly retracted sereus#18
 
 Three changes, all touching us:
