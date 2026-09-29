@@ -47,6 +47,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-file';
+import { FileStrandPeerBookStore } from '@serfab/cadre-core/strand-peer-book-file';
+import { FileKeyStore } from '@serfab/cadre-core/key-store-file';
+import { KeyStoreJoinedStrandStore } from '@serfab/cadre-core';
 import { openTestDb } from './classic-level-driver.mjs';
 
 const RELAY_ADDR = process.env.RELAY_ADDR;
@@ -68,6 +71,15 @@ const FRESH = process.env.FRESH !== '0';
  *   PHASE=2 FRESH=0 node restart-reconverge.mjs     # new process, same storage
  */
 const PHASE = process.env.PHASE ?? 'both';
+/**
+ * Which side restarts, on the in-process path. `both` is the phone-to-phone
+ * steady state; `joiner` answers a different and more practical question — does
+ * a conversation survive when only ONE participant's app is restarted, the
+ * other still running and still holding whatever it learned at invitation time?
+ * That is the difference between "no beta is possible" and "a beta is possible
+ * if one side stays up", so it is worth measuring rather than assuming.
+ */
+const RESTART_SIDE = process.env.RESTART_SIDE ?? 'both';
 if (!['both', '1', '2'].includes(PHASE)) {
   console.error(`PHASE must be 1, 2 or both — got ${PHASE}`);
   process.exit(2);
@@ -180,10 +192,32 @@ async function startParty(tag, partyId) {
   const bootstrapStore = await FileBootstrapPeerStore.open(
     join(STORE_ROOT, `${tag}-bootstrap`), partyId);
 
+  /**
+   * THE TWO STORES sereus 1.7.0's fix depends on. Its release notes are blunt
+   * about it — "either store left in memory reproduces the old behaviour" — so a
+   * rig that omits them would report the bug as still present and be wrong.
+   *
+   *   strandPeers   the per-strand peer book: who else is on this strand and
+   *                 where they were last seen, seeded before anything else on
+   *                 launch. This is what replaces the address knowledge that
+   *                 used to die with the process.
+   *   joinedStrands the strands this party joined from ANOTHER party. cadre-core
+   *                 now re-offers them as `strand:discovered` on every start,
+   *                 which is what retires the app-side remembered-joins list.
+   *                 A node configured with `privateKey` (as this one is) has no
+   *                 keyStore of its own, so the store is injected explicitly.
+   */
+  const strandPeerStore = await FileStrandPeerBookStore.open(
+    join(STORE_ROOT, `${tag}-strandpeers`), partyId);
+  const joinedStore = new KeyStoreJoinedStrandStore(
+    new FileKeyStore(join(STORE_ROOT, `${tag}-keys`)), partyId);
+
   const node = new CadreNode({
     privateKey: await identityFor(tag),
     controlNetwork: { partyId, bootstrapNodes: [] },
     bootstrapPeers: { store: bootstrapStore },
+    strandPeers: { store: strandPeerStore },
+    joinedStrands: { store: joinedStore },
     profile: 'transaction',
     strandFilter: { mode: 'all' },
     storage: { provider: storageFor(tag) },
@@ -359,16 +393,27 @@ try {
     strandId = readFileSync(strandIdFile, 'utf8').trim();
     log(`PHASE 2 — separate process, reopening ${strandId} from storage alone`);
   } else {
-    log('PHASE 2 — destroying both nodes and rebuilding them over the SAME storage');
-    log('          (no formation this time — exactly a restarted phone)');
-    await host.stop(); await joiner.stop();
-    await closeDbs();
-    host = null; joiner = null;
-    await new Promise(r => setTimeout(r, 5000));
+    if (RESTART_SIDE === 'joiner') {
+      log('PHASE 2 — restarting ONLY THE JOINER; the host stays up throughout');
+      await joiner.stop();
+      for (const [name, h] of openDbs) {
+        if (name.startsWith('joiner-')) { try { await h.cleanup(); } catch { /* best effort */ } openDbs.delete(name); }
+      }
+      joiner = null;
+      await new Promise(r => setTimeout(r, 5000));
+      joiner = await startParty('joiner', partyJoiner);
+    } else {
+      log('PHASE 2 — destroying both nodes and rebuilding them over the SAME storage');
+      log('          (no formation this time — exactly a restarted phone)');
+      await host.stop(); await joiner.stop();
+      await closeDbs();
+      host = null; joiner = null;
+      await new Promise(r => setTimeout(r, 5000));
+    }
   }
 
-  host = await startParty('host', partyHost);
-  joiner = await startParty('joiner', partyJoiner);
+  if (!host) host = await startParty('host', partyHost);
+  if (!joiner) joiner = await startParty('joiner', partyJoiner);
   const hostUp = await awaitReachable(host, 'HOST(restarted)');
   const joinerUp = await awaitReachable(joiner, 'JOINER(restarted)');
   if (!hostUp || !joinerUp) {

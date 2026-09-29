@@ -38,6 +38,11 @@ import {
 // published, upstream-maintained one — the same divergence cost `index.js`
 // already warns about for the polyfills.
 import {
+  PersistentStrandPeerBookStore,
+  KeyStoreJoinedStrandStore,
+} from '@serfab/cadre-core';
+import { strandPeerBookSlot, RNKeyStore } from './rn-durable-slot';
+import {
   buildNoiseCrypto,
   DEFAULT_NOISE_CRYPTO_MODE,
   type NoiseCryptoMode,
@@ -376,12 +381,42 @@ class CadreServiceImpl {
       const privateKey = await loadOrCreateRNPeerKey(controlDb);
       console.info('[CadreService] loaded peer identity from control store');
 
+      /**
+       * THE TWO STORES sereus 1.7.0's restart fix depends on (gotchoices/sereus#18).
+       *
+       * Its release notes put it plainly: "either store left in memory reproduces
+       * the old behaviour" — two relay-only parties that both restart never find
+       * each other again, which on a phone means every conversation dies the
+       * first night both handsets sleep. There is no error when that happens:
+       * the strand still reports `active` and still accepts local writes.
+       *
+       *   strandPeers    where the other members' machines were last seen,
+       *                  seeded before anything else on launch. Replaces the
+       *                  address knowledge that used to die with the process.
+       *   joinedStrands  the strands this party joined from ANOTHER party.
+       *                  cadre-core re-offers them as `strand:discovered` every
+       *                  start. A node given `privateKey` — as this one is —
+       *                  carries no keyStore of its own, so the store is passed
+       *                  explicitly; the notes name the web reference app, which
+       *                  has this same shape, as still losing such strands.
+       */
+      const strandPeerStore = await PersistentStrandPeerBookStore.open(
+        strandPeerBookSlot(this._partyId),
+        this._partyId,
+      );
+      const joinedStrandStore = new KeyStoreJoinedStrandStore(
+        new RNKeyStore(),
+        this._partyId,
+      );
+
       const config: CadreNodeConfig = {
         privateKey,
         controlNetwork: {
           partyId: this._partyId,
           bootstrapNodes: [],
         },
+        strandPeers: { store: strandPeerStore },
+        joinedStrands: { store: joinedStrandStore },
         profile: 'transaction',
         // Only join strands tagged with our chat sAppId.
         strandFilter: { mode: 'sAppId', sAppId: CHAT_SAPP_ID },
@@ -448,6 +483,16 @@ class CadreServiceImpl {
           // unreachable, which is the honest failure and the posture the old
           // `reserveRelays()` call was really after.
           requireRelay: false,
+          // NO `linkRoundTripMs` OVERRIDE — measured, not assumed.
+          //
+          // Declaring 8000 (a 32 s relayed-dial budget, against the 3500 ms
+          // default's 14 s) was tested on two devices on 1.7.0: the budget in the
+          // log changed and nothing else did. Two restarted phones still failed
+          // to open a relayed dial to each other's strand nodes and no message
+          // crossed. So this is not the constraint, and carrying a non-default we
+          // cannot justify would only make the next measurement harder to read —
+          // the release notes warn that a MISMATCH between a party's machines is
+          // itself a failure mode.
           // libp2p's default gater refuses to dial private/loopback addresses
           // and insecure WebSockets — which covers an emulator's `10.0.2.2`, a
           // phone reaching a relay on the house wifi, and any relay not behind

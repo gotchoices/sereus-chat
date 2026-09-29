@@ -390,6 +390,22 @@ async function readJoinedStrands(): Promise<JoinedStrand[]> {
 /**
  * Record a strand this device joined, so a restart can get back into it.
  *
+ * SUPERSEDED BY cadre-core 1.7.0, BUT NOT YET REMOVABLE.
+ *
+ * `joinedStrands: { store }` now records a cross-party join inside the node and
+ * re-offers it as `strand:discovered` on every start, which is what this list
+ * was standing in for — and Nate's words on sereus#18 were that keeping it "was
+ * never documented, and it shouldn't be the app's job".
+ *
+ * It stays for MIGRATION. Every join made before the upgrade lives here and
+ * nowhere else: cadre-core's store is empty for those strands, so deleting this
+ * list now would strand existing conversations behind a fix meant to save them.
+ * `attachDiscoveredStrand` guards on an in-flight set and on `getStrands()`, so
+ * a strand offered by both paths attaches once.
+ *
+ * Remove it once every install has started at least once on 1.7.0 — at which
+ * point `forgetJoinedStrand(strandId)` is the leave path.
+ *
  * NOTHING ELSE REMEMBERS THESE. `addStrand` is the attach half only and never
  * publishes the `Strand` row — correct for a joiner, since cadre-core expects a
  * joiner's row to have arrived over its own control network. Across PARTIES it

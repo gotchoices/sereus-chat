@@ -94,6 +94,38 @@ export class SereusAdapter implements DataAdapter {
     const peerId = cadreService.peerId;
     if (!peerId) throw new Error('Peer ID not available; cadre may not be running');
 
+    // MEMBERSHIP FIRST, because a sender that is not a Member cannot write.
+    //
+    // `App.Message` declares `foreign key (MemberId) references Member(Id)`, so
+    // this device must hold its own `App.Member` row before it can say anything.
+    // That row is written by `registerSelfAsMember` on the attach/join/invite
+    // paths — and those are the ONLY places it was written. When the write there
+    // fails (measured on a phone: `SyncRetryExhaustedError`, because the strand
+    // was attached while the only other member was still unreachable), the
+    // failure is caught, warned to a console no phone user can read, and NEVER
+    // RETRIED. The device is then permanently unable to send in that strand: the
+    // insert fails the constraint, the composer restores the draft, and nothing
+    // on screen says why.
+    //
+    // `registerSelfAsMember` is an idempotent upsert, so doing it here costs a
+    // no-op on the normal path and repairs the broken one at the only moment
+    // that matters — when the user is actually trying to speak, which is also
+    // when a cohort is most likely to be available.
+    await registerSelfAsMember(strand);
+
+    // …and SAY SO if it still did not take. `registerSelfAsMember` swallows its
+    // own failure by design (one strand failing must not stop the others during
+    // a boot sweep), so without this check a repair that did not work produces
+    // the same silent constraint failure as before — the draft reappears and the
+    // user is told nothing. Better a sentence they can act on.
+    const members = await queryMembers(strand);
+    if (!members.some(m => m.Id === peerId)) {
+      throw new Error(
+        'Could not register you in this conversation yet — no other member was reachable. ' +
+        'Try again in a moment.',
+      );
+    }
+
     // A local write.  There is no pending state to surface — the phone holds
     // the strand, so this either lands or genuinely fails.
     const row = await insertMessage(strand, peerId, input.content, input.replyToId);

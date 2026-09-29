@@ -367,6 +367,142 @@ new `retryBoot()` that re-runs the WHOLE boot sequence — closing the review's 
 the 3 s poll only nudges `ensureCadreUp` and can never re-run the discovery sweep, so a boot that
 failed once stayed failed however often the list refreshed.
 
+### TWO-PHONE VERDICT on 1.7.0: messages still do not cross, 2026-09-28
+
+Ran the test that actually decides beta readiness — a FRESH cross-party strand formed on 1.7.0
+(the pre-1.7.0 strand cannot work: its peer book is empty and nothing can populate it), both
+devices restarted simultaneously, then a message sent.
+
+| step | result |
+|---|---|
+| both re-attach the 1.7.0 strand after restart | ✓ |
+| self-registration on that strand | ✓ (only the PRE-1.7.0 strand fails) |
+| each learns the other's STRAND peer id | ✓ — the 1.7.0 peer book works |
+| relayed dial between the two strand nodes | ✗ `catch-up ... failed 3 times in a row` |
+| message crosses | ✗ "No messages yet" |
+
+**The failure moved down a layer.** Before 1.7.0 the two phones never learned of each other at all;
+now they dial each other's strand nodes by peer id (`12D3KooWBerA…`, `12D3KooWN9Ub…` — neither is
+the relay) and the dial does not complete. Addressing is fixed; connection establishment is not.
+
+**Not a budget problem.** Declaring `network.linkRoundTripMs: 8000` raised the relayed dial budget
+from 14 s to 32 s — confirmed in the logs — and the message still did not cross. So cadre-core's
+"a link slower than that declaration cannot open a relayed connection at all" is not what we are
+hitting.
+
+One asymmetry worth keeping: with the larger declaration the S7 logged ZERO catch-up failures while
+the emulator still logged one. That is consistent with the emulator being the slower of the two
+here, but a single run is not evidence of anything.
+
+**DO NOT SHIP AN APK.** Two restarted phones cannot exchange a message, which is the product's only
+job, and a tester would hit it immediately.
+
+### Read the upstream issue list before filing anything else
+
+sereus#18 was CLOSED as fixed in 1.7.0 at 21:16 today, and the same triage pass filed **#19-#23**.
+Four are adjacent to our symptom and all came from "the same multi-peer device runs (2 Android
+phones + 2 Node relay drones)" — i.e. sereus is running our test shape themselves:
+
+- **#22** strand-addr responder answers a FAILED request as "no addresses", and `initialize()`
+  drops its `node.handle` promise — would present exactly as addresses that look resolvable and
+  dials that never land.
+- **#21** `refreshStrandPeerAddrs`' 10-minute throttle never resets when the cohort grows.
+- **#19** `network.relayServerInit` never forwarded, so every cadre relay runs on
+  circuit-relay-v2's 128 KiB / 2 min defaults.
+- **#20** control-cohort reconcile dials its own peer id through a self-relayed circuit address.
+
+So: **do not file a fifth issue describing the same runs from outside.** Check our device logs
+against #19-#22 and, if one matches, add a device-side confirmation to it.
+
+Also from #18's closing comment: the `strandPeers` book is **interim** — the job moves into FRET's
+neighbour exchange, after which cadre-core drops its own book and the `strandPeers` store.
+`joinedStrands` stays. And Nate explicitly said "We'll look for your React Native report with
+platform-backed stores", so a report IS wanted — just on the right issue.
+
+### A SEND-BLOCKING APP BUG, found by the two-phone test on 1.7.0, 2026-09-28
+
+With the upstream restart bug fixed, a second failure became visible — and it is ours.
+
+Both devices re-attached the shared strand after a full restart, both held relay reservations, and
+the S7's chat screen said "it is just the two of you", so membership had replicated. **But sending
+failed silently**: the composer cleared, then the draft reappeared, and nothing was logged or shown.
+
+The chain:
+
+1. The S7 attached the strand at 14:10:35, when the emulator's node was not yet reachable (it came
+   up at 14:11:59).
+2. `registerSelfAsMember` therefore failed — `SyncRetryExhaustedError`, no cohort to commit to.
+3. That failure is caught and only `console.warn`ed (`chat-strand.ts`), and **nothing retries it**.
+   All five call sites are attach/join/invite paths.
+4. `App.Message` declares `foreign key (MemberId) references Member(Id)`, so a device that is not a
+   Member of its own strand **cannot insert a message**.
+5. The send fails the constraint, `ChatInterface` restores the draft, and the user is told nothing.
+
+So a device that attaches while its partner is briefly unreachable is PERMANENTLY unable to speak
+in that strand — a state no retry, restart or reconnect clears, because nothing re-runs the
+registration.
+
+**Fixed** by making `send` ensure membership first: `registerSelfAsMember` is an idempotent upsert,
+so it is a no-op on the healthy path and repairs the broken one at the moment the user actually
+tries to speak — which is also when a cohort is most likely to be reachable. And because that
+function swallows its own failure by design (one strand must not stop a boot sweep), `send` now
+verifies the row landed and throws a sentence the user can act on instead of failing the constraint
+silently.
+
+Worth noting what this says about the earlier beta assessment: the upstream reconnect bug was
+masking this one. Fixing #18 did not make the app work — it made the next fault visible.
+
+### sereus 1.7.0 FIXES IT — verified here, 2026-09-28
+
+The repro that failed seven consecutive times on 1.5.0 and 1.6.0 — at 180 s, 300 s, 420 s and
+600 s budgets, in-process and across separate OS processes — now converges about 10 s after the
+restart:
+
+```
+[22.2s] after restart: host strand active, joiner strand starting
+[22.3s] HOST(restarted): wrote a new Member
+[22.3s] joiner: attached rediscovered strand 5a17b206-…
+[32.7s]   joiner sees 3 Member row(s)
+[32.7s] PHASE 2 ✓ the restarted parties re-converged.
+```
+
+`joiner: attached rediscovered strand` is the new behaviour visible in our own log line: cadre-core
+now re-offers a JOINED strand as `strand:discovered` by itself, where before only our
+remembered-joins list could bring it back.
+
+**What 1.7.0 contains** (our repro is now their integration scenario
+`strand-relay-only-restart-reconverges`): a per-strand **strand peer book** in each node's own
+storage, seeded before anything else on launch and aged out at 14 days; **signed address exchange**
+when two strand members connect (`/sereus/strand-peers/1.0.0`, newest-by-signer-clock wins, only
+self-signed entries travel); and **cadre-core remembering joined strands** in its `keyStore`,
+re-offering them every start. Nate's short note had described only the exchange half — the
+persistence half is there too, so the both-down bootstrap concern is answered.
+
+Also gone: the `peer-join block catch-up to peer <relay>` warning, now that catch-up only schedules
+peers whose libp2p identify names the block-transfer protocol. That red herring cost real time here.
+
+**THE OBLIGATION THIS PUTS ON US, and it fails silently.** The release notes: "either store left in
+memory reproduces the old behaviour". An embedder must inject:
+
+- `strandPeers: { store }` — durable strand peer book
+  (`FileStrandPeerBookStore.open(dir, partyId)` on Node;
+  `PersistentStrandPeerBookStore.open(slot, partyId)` over any `DurableSlot` elsewhere)
+- a `keyStore`, **or** `joinedStrands: { store }` for a node configured with `privateKey` —
+  `new KeyStoreJoinedStrandStore(<durable KeyStore>, partyId)`
+
+Chat passes `privateKey` and has no keyStore, so it needs BOTH injected explicitly. The notes name
+the web reference app, which has the same shape, as still losing a cross-party strand on restart
+for exactly this reason. Upgrade without the stores and the bug looks unfixed.
+
+`DurableSlot` is small — `load(): Promise<string | undefined>` and `save(text)` — so an
+AsyncStorage backing is straightforward. One subtlety is load-bearing and stated in its own doc: a
+read FAULT must THROW, never return `undefined`, because `undefined` means "cold start, nothing was
+ever here" and callers then snapshot-write the whole record — turning a recoverable I/O error into
+destruction of an intact one.
+
+**Retired by this release:** `rememberJoinedStrand` / `reattachRememberedStrands` (cadre-core owns
+it now; `forgetJoinedStrand(strandId)` is the leave path), and the STATUS TODO to remove them.
+
 ### ROOT CAUSE CONFIRMED by Nate, 2026-09-28 — sereus#18 and optimystic#23 are ONE bug
 
 From sereus#18: a cross-party strand learns the other party's addresses **once, during the
@@ -2194,7 +2330,13 @@ outlives its cause.
       last stretch of instability was traced to a relay this session had killed, and
       the environment must be trustworthy before the app's behaviour is.
 
-- [ ] **The invitation screen's Private/Open choice does nothing.**
+- [x] **FIXED — the invitation screen's Private/Open choice now decides the strand type.**
+      `createInvitation` without a `strandId` founds a new strand through
+      `createChatStrand(node, uuid, visibility)`, and `chat-sapp.ts` maps it to
+      `type: closed ? 'c' : 'o'` at founding — the only place a strand's type can be
+      decided. Verified 2026-09-28 while assessing beta readiness; the entry below
+      described the old behaviour and is kept for the reasoning.
+      ~~The invitation screen's Private/Open choice does nothing.~~
       `InvitationGenerator` collects `visibility` and passes it to
       `createInvitation`, which accepts the parameter and never reads it. The
       invitation always binds to the default strand, whose type was fixed when it was
