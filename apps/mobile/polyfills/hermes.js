@@ -446,3 +446,32 @@ globalThis.clearInterval = function patchedClearInterval(handle) {
 };
 
 markPolyfilled('setTimeout.ref');
+
+// ── crypto.subtle Ed25519 (native, via react-native-quick-crypto) ──────────
+// LOCAL DIVERGENCE from sereus/packages/reference-app-rn/polyfills — proposed
+// upstream 2026-09-30; drop this note when the reference copy carries it.
+//
+// @libp2p/crypto signs and verifies Ed25519 through WebCrypto when a probe
+// `subtle.generateKey({ name: 'Ed25519' })` succeeds, and otherwise through pure-JS
+// @noble/curves. Under Hermes that fallback measured 169 ms per verify on a Galaxy
+// S7 (33 ms on an x86 emulator), against 0.72 ms for quick-crypto's native subtle.
+// optimystic 1.8 verifies cohort commit proofs on every read-repair consult, so
+// with noble a two-member strand pinned the S7's JS thread at 100% and it stopped
+// answering its peer's writes in time ("Failed to get super-majority: 1/2").
+// Signatures are byte-identical to noble's (Ed25519 is deterministic), checked on
+// device. LAST in this file on purpose: requiring quick-crypto loads its
+// readable-stream, which reads Symbol.asyncIterator and friends at module scope,
+// so it must come after every polyfill above. Only the methods libp2p's Ed25519 path calls are delegated, and only
+// where no native implementation is already present.
+{
+	const qc = require('react-native-quick-crypto');
+	const native = qc.subtle ?? qc.default?.subtle;
+	if (native) {
+		for (const m of ['generateKey', 'importKey', 'exportKey', 'sign', 'verify']) {
+			if (typeof globalThis.crypto.subtle[m] !== 'function') {
+				globalThis.crypto.subtle[m] = native[m].bind(native);
+			}
+		}
+		markPolyfilled('crypto.subtle.ed25519');
+	}
+}

@@ -84,10 +84,8 @@ const PROBES = [
 
 	// Known gaps — documented in docs/reference-app-rn.md § Key Dependencies.
 	{ path: 'RTCPeerConnection', gap: 'no WebRTC transport in this app; chat dials over WebSocket + circuit relay' },
-	{
-		path: 'crypto.subtle.importKey',
-		gap: 'WebCrypto beyond digest is absent; the phone uses Ed25519 (pure noble) and no libp2p keychain',
-	},
+	// Ed25519 only — see the quick-crypto block in hermes.js.
+	{ path: 'crypto.subtle.verify', key: 'crypto.subtle.ed25519' },
 	{
 		path: 'crypto.subtle.encrypt',
 		gap: 'AES-GCM is only reached through @libp2p/keychain, which this app does not use',

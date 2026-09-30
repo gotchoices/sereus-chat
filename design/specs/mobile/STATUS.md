@@ -367,6 +367,81 @@ new `retryBoot()` that re-runs the WHOLE boot sequence — closing the review's 
 the 3 s poll only nudges `ensureCadreUp` and can never re-run the discovery sweep, so a boot that
 failed once stayed failed however often the list refreshed.
 
+### CORRECTION to the 1.7.0 verdict below — it was a push refusal, not a dial failure, 2026-09-29
+
+Yesterday's diagnosis of the two-phone failure was wrong, and I reported it upstream as fact
+(sereus#18: "addressing is fixed; connection establishment is not"). What the evidence actually
+shows, from cadre-core 1.7.0's own `peer-join-backfill.js`:
+
+- the `peer-join block catch-up ... failed 3 times` warning comes from a **push**, not a dial;
+- that push is scheduled only on `peer:identify`, which "runs once per connection" — so when the S7
+  logged it against the emulator's strand peer, **the two strand nodes were already connected**;
+- and the same file says a push "carrying no proof is refused outright by a receiver running the
+  default `requirePushCertificate: true`", and that treating such a refusal as a timeout would
+  "report the failure below as a link budget problem **when nothing about the link is wrong**".
+
+That last sentence describes exactly the mistake. The warning printed `dial budget 14000ms`, I read
+it as a link failure, and raised `network.linkRoundTripMs` to 8000 — which changed the number in the
+log and nothing else, because the link was never the problem. The S7's blocks were committed while
+it was the strand's only member, carried no receipt, and the emulator refused them.
+
+**optimystic 1.8.0 fixes precisely that case** — its headline: "a commit to a cohort of one skipped
+consensus entirely. So it produced no receipt ... 0 of 18 blocks held a proof after bootstrap ...
+every one of 74 push rejections was reason=no-proof." A cohort of one now mints a real 1-of-1 proof.
+
+### optimystic 1.8.0 adopted, 2026-09-29
+
+App and harness on `@optimystic/*` 1.8.0 with `@serfab/cadre-core` 1.7.0 (whose `^1.7.0` range admits
+it), one copy of `db-p2p` each, `tsc` clean. Node regression: the restart repro still re-converges
+~10 s after restart.
+
+`restart-reconverge.mjs` gained `PRE_JOIN_ROWS=N`: the host writes N rows while it is still ALONE,
+before the invitation is redeemed — the case every real conversation starts in and that no path in
+the harness had exercised. **It does not discriminate 1.7 from 1.8 in Node**: an isolated 1.7.0
+control (exact pins, scratchpad copy) also hands all 5 founder-alone rows to the joiner. That is
+consistent rather than contradictory — a joiner's first sync PULLS those blocks, and 1.8's fix is to
+PUSHES. So Node cannot confirm the fix for our failure; only the two-phone run can.
+
+### TWO-PHONE VERDICT on 1.8.0: messages cross both ways, and survive a restart, 2026-09-30
+
+S7 (founder) + emulator (joiner) on strand `018d5dcb`, with two fixes described below. The founder
+wrote a message while alone; the joiner received it after redeeming. Then the phones exchanged
+messages in both directions. Both apps were cold-restarted twice, the strand re-attached, history
+was intact, and a message crossed each way after each restart. Latency is 21–54 s per message:
+usable for a beta, sluggish for a chat app, and not yet investigated.
+
+Two things stood in the way, and neither was the 1.7 bug:
+
+1. **The S7's JS thread was pegged at 100% by Ed25519 verification.** A CDP CPU profile put 98.7%
+   of JS time in `@noble/curves` `verify`, called from `countApprovals` → `certifyClaim` in 1.8's
+   coordinator read-repair. A lazy consult runs every `readRepairWindowMs` (10 s) per block read,
+   and the chat UI polls several blocks. Under Hermes, noble measured **169 ms per verify on the
+   S7** (33 ms on the emulator). `react-native-quick-crypto`'s native subtle measured **0.72 ms**.
+   @libp2p/crypto already prefers WebCrypto Ed25519 when a `subtle.generateKey` probe succeeds, but
+   the reference polyfill provides only `subtle.digest`, and the audit recorded this as a known gap
+   ("the phone uses Ed25519 (pure noble)"). Fixed in `polyfills/hermes.js` by delegating
+   generateKey/importKey/exportKey/sign/verify to quick-crypto. Its signatures are byte-identical
+   to noble's, it rejects tampered signatures, and this was checked on the device. After the fix
+   the S7 is about half idle. **This is a local divergence from the sereus reference copy and has
+   to go upstream.**
+2. **The emulator's clock was 29 h behind** (its time sync had stalled; `cmd
+   network_time_update_service force_refresh` fixed it). The S7 threw `Transaction expired` on
+   every emulator write, and the emulator saw only `Failed to get super-majority: 1/2 approvals
+   (needed 2, 0 rejections)` / `The stream has been reset`. The expiry is the sender's
+   `Date.now() + timeoutMs`, checked against the receiver's clock with no skew allowance, and the
+   refusal is a throw rather than a reject vote, so the sender never learns why. This was a test-rig
+   artifact, since real phones are NTP-synced. But a phone with a badly wrong clock would fail the
+   same way, and nothing would say so. **Check the emulator clock before every two-phone run.**
+
+**Verdict: solid enough for two-phone testing. Ship an APK (with fix 1).**
+
+Diagnostic tools this run produced, kept in the session scratchpad and worth promoting if reused:
+
+- a CDP CPU profiler;
+- a CDP logpoint counter;
+- in-app `Runtime.evaluate` benchmarks via `__r(<module id>)`;
+- runtime `enableOptimysticLogging('optimystic:*')` over CDP, which needs no rebuild.
+
 ### TWO-PHONE VERDICT on 1.7.0: messages still do not cross, 2026-09-28
 
 Ran the test that actually decides beta readiness — a FRESH cross-party strand formed on 1.7.0

@@ -90,6 +90,19 @@ if (PHASE === '2' && FRESH) {
 }
 /** How long phase 2 is given to re-find the partner. Generous: the claim is "never", not "slow". */
 const RECONVERGE_MS = Number(process.env.RECONVERGE_MS ?? 180_000);
+/**
+ * Rows the HOST writes while it is the strand's only member — after founding,
+ * before the invitation is redeemed. Default 0 keeps the original run exactly.
+ *
+ * WHY. Every other path in this script has the host write only AFTER the joiner
+ * attaches, so a cohort of one never commits user data here. But that is how
+ * every real conversation starts: the founder is alone until someone accepts.
+ * optimystic 1.8.0's headline fix is precisely this case — a commit to a cohort
+ * of one minted no receipt, so none of those blocks could ever be pushed to the
+ * second machine ("0 of 18 blocks held a proof"; "every one of 74 push
+ * rejections was reason=no-proof"). This knob is what exercises it.
+ */
+const PRE_JOIN_ROWS = Number(process.env.PRE_JOIN_ROWS ?? 0);
 const REACHABLE_MS = Number(process.env.REACHABLE_MS ?? 60_000);
 
 const SCHEMA = `table Member (
@@ -322,6 +335,12 @@ try {
     expiresAtMs: invitation.expiration.getTime(), strandId,
   });
 
+  for (let i = 1; i <= PRE_JOIN_ROWS; i++) {
+    await founded.instance.database.getDatabase().exec(
+      'insert into App.Member (Id, Name, AvatarUri) values (?, ?, ?)', [`alone-${i}`, `Alone ${i}`, null]);
+  }
+  if (PRE_JOIN_ROWS) log(`HOST: wrote ${PRE_JOIN_ROWS} row(s) ALONE, before anyone joined`);
+
   const formed = await joiner.formStrand(invitation, {
     partyId: joiner.peerId?.toString(), purpose: 'restart check', metadata: { app: SAPP.id },
   });
@@ -342,11 +361,17 @@ try {
   let sawIt = false;
   const untilP1 = Date.now() + 90_000;
   while (Date.now() < untilP1) {
-    if (await countMembers(joinedInst) >= 1) { sawIt = true; break; }
+    if (await countMembers(joinedInst) >= PRE_JOIN_ROWS + 1) { sawIt = true; break; }
     await new Promise(r => setTimeout(r, 3000));
   }
   log(sawIt ? 'PHASE 1 ✓ joiner read the host\'s row — formation path works'
             : 'PHASE 1 ✗ joiner never saw the host\'s row');
+  if (PRE_JOIN_ROWS) {
+    const got = await countMembers(joinedInst);
+    log(got >= PRE_JOIN_ROWS + 1
+      ? `HANDOFF ✓ joiner holds all ${PRE_JOIN_ROWS} row(s) the host wrote alone (${got} total)`
+      : `HANDOFF ✗ joiner holds ${got} row(s); the host wrote ${PRE_JOIN_ROWS} alone plus 1 after`);
+  }
 
   // THE CONTROL FOR PHASE 2's MEASUREMENT, and it is not optional.
   //
@@ -360,7 +385,7 @@ try {
   let sawSecond = false;
   const untilCtl = Date.now() + 90_000;
   while (Date.now() < untilCtl) {
-    if (await countMembers(joinedInst) >= 2) { sawSecond = true; break; }
+    if (await countMembers(joinedInst) >= PRE_JOIN_ROWS + 2) { sawSecond = true; break; }
     await new Promise(r => setTimeout(r, 3000));
   }
   log(sawSecond
@@ -463,7 +488,7 @@ try {
     const n = await countMembers(joinerInst ?? strandOf(joiner, strandId));
     log(`  joiner sees ${n} Member row(s)`);
     // 3 = the two written before the restart, plus the one written after it.
-    if (n >= 3) { crossed = true; break; }
+    if (n >= PRE_JOIN_ROWS + 3) { crossed = true; break; }
     await new Promise(r => setTimeout(r, 10_000));
   }
 
