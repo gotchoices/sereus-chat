@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, useFocusEffect } from '@react-navigation/native';
 import type { LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, Text, Pressable, ScrollView, StyleSheet, Linking, Image } from 'react-native';
@@ -24,7 +24,7 @@ import { CadreManager } from '../cadre-ui';
 import { cadreService } from '../cadre';
 import { Avatar, IconButton } from '../components';
 import { getPrefs, setPrefs } from '../data/adapter';
-import { useTheme, useThemeContext, typography } from '../theme';
+import { useTheme, useThemeContext, typography, radius } from '../theme';
 import { USE_SEREUS } from '../data/config';
 
 const Stack = createNativeStackNavigator();
@@ -238,7 +238,12 @@ function RelaySection() {
   const [addrs, setAddrs] = React.useState<string[]>([]);
   const [status, setStatus] = React.useState<string | null>(null);
 
-  React.useEffect(() => { getPrefs().then(p => setAddrs(p.relayAddrs ?? [])).catch(() => {}); }, []);
+  // Re-read on every focus, not once: accepting a relay on the offer screen
+  // returns HERE, and a mount-only read left "No relay yet" on screen beside a
+  // node that had just become reachable through the relay it names.
+  useFocusEffect(React.useCallback(() => {
+    getPrefs().then(p => setAddrs(p.relayAddrs ?? [])).catch(() => {});
+  }, []));
 
   /* Listing a relay under "How you are reachable" is a claim, and a configured
      relay is not a working one: the reservation is granted by the relay and can
@@ -278,8 +283,9 @@ function RelaySection() {
       </Text>
       {addrs.length === 0 ? (
         <Text style={{ ...typography.body, color: theme.textMuted, lineHeight: 22 }}>
-          Nothing yet. A phone on its own has no address the world can reach, so nobody you invite
-          can answer. Borrow a relay to get started, or run a machine of your own.
+          No relay yet. A phone cannot accept connections from the Internet on its own, so nobody
+          you invite can answer until you have one — a machine with a public address that passes
+          connections through to your phone.
         </Text>
       ) : (
         addrs.map(a => (
@@ -301,14 +307,40 @@ function RelaySection() {
               : 'Not working yet. Still trying — you are not reachable until it does.'}
         </Text>
       ) : null}
-      <Text
-        accessibilityRole="button"
-        onPress={() => Linking.openURL('https://sereus.org/chat/relays.html')}
-        style={{ ...typography.small, color: theme.accent, paddingTop: 4 }}
-      >
-        Find a relay →
-      </Text>
+      {/* Real buttons, not an accent-coloured line of text, which did not read as
+          tappable. Equal, and in the stories' order, as on the invite screen. */}
+      {addrs.length === 0 ? (
+        <>
+          <RelayLinkButton label="Run your own relay"
+            url="https://sereus.org/chat/relays.html#own" />
+          <RelayLinkButton label="Use an open relay"
+            url="https://sereus.org/chat/relays.html#borrow" />
+        </>
+      ) : (
+        <RelayLinkButton label="Find another relay" url="https://sereus.org/chat/relays.html" />
+      )}
     </View>
+  );
+}
+
+function RelayLinkButton({ label, url }: { label: string; url: string }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="link"
+      onPress={() => Linking.openURL(url)}
+      style={({ pressed }) => ({
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        paddingVertical: 12, paddingHorizontal: 16, borderRadius: radius.control,
+        borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
+        backgroundColor: theme.surface, opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      <Text style={{ ...typography.body, fontWeight: '600', color: theme.textPrimary }}>
+        {label}
+      </Text>
+      <Ionicons name="open-outline" size={18} color={theme.textMuted} />
+    </Pressable>
   );
 }
 

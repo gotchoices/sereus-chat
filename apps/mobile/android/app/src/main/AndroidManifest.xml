@@ -57,17 +57,21 @@
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
+            <!-- EXACT paths, matching the iOS association file. A bare prefix
+                 claimed more than the app handles: "/chat/relay" also matched
+                 /chat/relays.html, so every "find a relay" link the app opened was
+                 routed straight back into the app, which has no screen for it, and
+                 looked like a button that did nothing. -->
             <data
                 android:scheme="https"
                 android:host="sereus.org"
-                android:pathPrefix="/chat/invite" />
-            <!-- Relay offers come from a web page, so they must be App Links:
-                 browsers block or silently drop custom-scheme navigation, and an
-                 App Link falls back to the page when the app is not installed. -->
+                android:pathPrefix="/chat/invite/" />
+            <!-- Relay offers: /chat/relay?addr=… (the query is not part of the
+                 path). -->
             <data
                 android:scheme="https"
                 android:host="sereus.org"
-                android:pathPrefix="/chat/relay" />
+                android:path="/chat/relay" />
         </intent-filter>
       </activity>
     </application>

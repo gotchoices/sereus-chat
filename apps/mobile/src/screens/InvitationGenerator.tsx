@@ -18,6 +18,7 @@ import { createInvitation, listOutstandingInvitations, cancelInvitation, reachab
 import type { Invitation } from '../data/types';
 import { useT } from '../i18n';
 import { UnreachableError } from '../data/errors';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Banner, IconButton, ListRow, SectionHeader } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
@@ -137,11 +138,10 @@ export default function InvitationGenerator() {
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.content}>
       {error ? <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: generate }} /> : null}
 
-      {/* Story 02 Alt A — "nowhere to be reached yet".  Deliberately NOT the
-          error Banner: this is the ordinary starting position, not a mistake,
-          and a Retry button here would be a lie.  It sits ABOVE the terms and
-          leaves them mounted, so whatever he already chose is still chosen when
-          he comes back (6.4). */}
+      {/* Story 02 Alt A — not reachable yet. Deliberately NOT the error Banner:
+          this is where everyone starts, not a mistake, and a Retry here could not
+          work. While it shows, the terms collapse to one line (they are still
+          chosen — 6.4) so the screen asks one thing at a time. */}
       {unreachable && relayPending ? (
         <View style={[styles.unreachable, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
           <View style={styles.pendingRow}>
@@ -152,52 +152,84 @@ export default function InvitationGenerator() {
           </View>
           <Text style={[typography.body, styles.unreachableBody, { color: theme.textMuted }]}>
             {t('screens.invite.relayPendingBody',
-              'You have chosen a relay; it is not carrying anybody yet. This usually takes a few seconds. The invitation can be made as soon as it is ready.')}
+              'This usually takes a few seconds. You can make the invitation as soon as it is connected.')}
           </Text>
         </View>
       ) : unreachable ? (
         <View style={[styles.unreachable, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
           <Text style={[typography.title, { color: theme.textPrimary }]}>
-            {t('screens.invite.unreachableTitle', 'There is nowhere for them to answer yet')}
+            {t('screens.invite.unreachableTitle', 'Your phone needs a relay first')}
           </Text>
           <Text style={[typography.body, styles.unreachableBody, { color: theme.textMuted }]}>
             {t('screens.invite.unreachableBody',
-              'It is not that they may not reach you — that is the whole point of this app. It is that they could not. A phone on its own has no address the world can knock on, and nobody’s does. This is where everyone starts.')}
+              'A phone cannot accept connections from the Internet on its own, so the person you invite would have no way to answer. A relay fixes that: a machine with a public Internet address that passes connections through to your phone.')}
           </Text>
           <Text style={[typography.small, styles.unreachableLead, { color: theme.textSecondary }]}>
-            {t('screens.invite.unreachableWays', 'Two ways out:')}
+            {t('screens.invite.unreachableWays', 'Two ways to get one')}
           </Text>
+
+          {/* Two equal choices, in the stories' order (02 6.3, 42): neither is
+              styled or placed as the obvious one. Each says what it costs and
+              what happens when tapped, so it can be judged and acted on. Neither
+              names an operator — the list lives on sereus.org and may grow. */}
           <Pressable
-            onPress={() => navigation.navigate('CadreManager')}
-            style={[styles.wayOut, { borderColor: theme.border }]}
+            accessibilityRole="link"
+            onPress={() => Linking.openURL('https://sereus.org/chat/relays.html#own')}
+            style={({ pressed }) => [styles.wayOut, { borderColor: theme.border, backgroundColor: theme.surface },
+              pressed && styles.pressed]}
           >
-            <Text style={[typography.body, styles.wayOutTitle, { color: theme.textPrimary }]}>
-              {t('screens.invite.wayOwn', 'Something of your own that stays awake')}
-            </Text>
-            <Text style={[typography.small, { color: theme.textMuted }]}>
-              {t('screens.invite.wayOwnBody', 'Yours to run, nobody else involved.')}
-            </Text>
+            <View style={styles.flex1}>
+              <Text style={[typography.body, styles.wayOutTitle, { color: theme.textPrimary }]}>
+                {t('screens.invite.wayOwn', 'Run your own relay')}
+              </Text>
+              <Text style={[typography.small, { color: theme.textMuted }]}>
+                {t('screens.invite.wayOwnBody',
+                  'The private way: nobody else sees who you talk to. Needs a machine that stays on. Opens the instructions on sereus.org.')}
+              </Text>
+            </View>
+            <Ionicons name="open-outline" size={20} color={theme.textMuted} />
           </Pressable>
+
           <Pressable
-            onPress={() => Linking.openURL('https://sereus.org/chat/relays.html')}
-            style={[styles.wayOut, { borderColor: theme.border }]}
+            accessibilityRole="link"
+            onPress={() => Linking.openURL('https://sereus.org/chat/relays.html#borrow')}
+            style={({ pressed }) => [styles.wayOut, { borderColor: theme.border, backgroundColor: theme.surface },
+              pressed && styles.pressed]}
           >
-            <Text style={[typography.body, styles.wayOutTitle, { color: theme.textPrimary }]}>
-              {t('screens.invite.wayBorrow', 'Borrow somebody else’s for now')}
-            </Text>
-            <Text style={[typography.small, { color: theme.textMuted }]}>
-              {t('screens.invite.wayBorrowBody',
-                'Quicker, and it costs you something you should understand first.')}
-            </Text>
+            <View style={styles.flex1}>
+              <Text style={[typography.body, styles.wayOutTitle, { color: theme.textPrimary }]}>
+                {t('screens.invite.wayBorrow', 'Use an open relay')}
+              </Text>
+              <Text style={[typography.small, { color: theme.textMuted }]}>
+                {t('screens.invite.wayBorrowBody',
+                  'The quick way: free, nothing to set up. Whoever runs it can see that you talk to someone, when, and roughly how much — never what you say. Opens the list on sereus.org; you confirm your pick here.')}
+              </Text>
+            </View>
+            <Ionicons name="open-outline" size={20} color={theme.textMuted} />
           </Pressable>
-          <Text style={[typography.small, styles.unreachableKeep, { color: theme.textMuted }]}>
-            {t('screens.invite.unreachableKeep',
-              'What you chose here is kept. Come back and the invitation is there to be made.')}
+
+          <Text style={[typography.small, { color: theme.textMuted }]}>
+            {t('screens.invite.unreachableSwitch',
+              'You can start with one and change later.')}
           </Text>
         </View>
       ) : null}
 
-      {!addingToExisting ? (
+      {unreachable ? (
+        // The terms are still chosen; saying so in one line keeps them from
+        // reading as a second question while the relay is the only one.
+        <Text style={[typography.small, styles.keptTerms, { color: theme.textMuted }]}>
+          {t('screens.invite.termsKept', 'Kept for when you come back: {{kind}}, {{rights}}.')
+            .replace('{{kind}}', addingToExisting
+              ? t('screens.invite.existingStrand', 'this strand')
+              : visibility === 'private' ? t('screens.invite.private', 'Private') : t('screens.invite.public', 'Open to anyone'))
+            .replace('{{rights}}', grantsInviteRight
+              ? t('screens.invite.canInviteOnShort', 'they can add and remove people')
+              : t('screens.invite.canInviteOffShort', 'they cannot add or remove anyone'))}
+        </Text>
+      ) : null}
+
+      {unreachable ? null : !addingToExisting ? (
         <>
           <SectionHeader label={t('screens.invite.kind', 'What kind of strand')} />
           {(['private', 'public'] as const).filter(v => !foundedStrandId || v === visibility).map(v => (
@@ -222,6 +254,7 @@ export default function InvitationGenerator() {
         />
       )}
 
+      {unreachable ? null : (<>
       <SectionHeader label={t('screens.invite.rights', 'On this invitation')} />
       <Pressable onPress={() => setGrants(g => !g)}
         style={[styles.card, { borderColor: grantsInviteRight ? theme.accent : theme.border, backgroundColor: theme.surfaceAlt }]}>
@@ -260,6 +293,7 @@ export default function InvitationGenerator() {
           </Text>
         ) : null}
       </View>
+      </>)}
 
       {invitation ? (
         <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
@@ -333,13 +367,15 @@ const styles = StyleSheet.create({
     padding: spacing[3], gap: spacing[2],
   },
   unreachableBody: { lineHeight: 22 },
-  unreachableLead: { textTransform: 'uppercase', paddingTop: spacing[1] },
   wayOut: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.control,
-    padding: spacing[3], gap: spacing[1] / 2,
+    padding: spacing[3],
   },
   wayOutTitle: { fontWeight: '600' },
-  unreachableKeep: { lineHeight: 18, paddingTop: spacing[1] },
+  pressed: { opacity: 0.7 },
+  unreachableLead: { textTransform: 'uppercase', paddingTop: spacing[1] },
+  keptTerms: { textAlign: 'center', paddingVertical: spacing[1] },
   content: { padding: spacing[3], gap: spacing[1], paddingBottom: spacing[5] },
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.card, padding: spacing[2], gap: 4 },
   cardTitle: { fontWeight: '600' },

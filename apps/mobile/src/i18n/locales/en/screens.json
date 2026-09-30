@@ -59,14 +59,12 @@
     "rights": "On this invitation",
     "rightsBody": "Passing this on gives them the same reach you have — including over you.",
     "showQr": "Show QR code",
-    "unreachableBody": "It is not that they may not reach you — that is the whole point of this app. It is that they could not. A phone on its own has no address the world can knock on, and nobody’s does. This is where everyone starts.",
-    "unreachableKeep": "What you chose here is kept. Come back and the invitation is there to be made.",
-    "unreachableTitle": "There is nowhere for them to answer yet",
-    "unreachableWays": "Two ways out:",
-    "wayBorrow": "Borrow somebody else’s for now",
-    "wayBorrowBody": "Quicker, and it costs you something you should understand first.",
-    "wayOwn": "Something of your own that stays awake",
-    "wayOwnBody": "Yours to run, nobody else involved."
+    "unreachableBody": "A phone cannot accept connections from the Internet on its own, so the person you invite would have no way to answer. A relay fixes that: a machine with a public Internet address that passes connections through to your phone.",
+    "unreachableTitle": "Your phone needs a relay first",
+    "wayBorrow": "Use an open relay",
+    "wayBorrowBody": "The quick way: free, nothing to set up. Whoever runs it can see that you talk to someone, when, and roughly how much — never what you say. Opens the list on sereus.org; you confirm your pick here.",
+    "wayOwn": "Run your own relay",
+    "wayOwnBody": "The private way: nobody else sees who you talk to. Needs a machine that stays on. Opens the instructions on sereus.org."
   },
   "media": {
     "empty": "Photos, files and voice messages will collect here.",

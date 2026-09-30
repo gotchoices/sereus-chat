@@ -402,6 +402,31 @@ control (exact pins, scratchpad copy) also hands all 5 founder-alone rows to the
 consistent rather than contradictory — a joiner's first sync PULLS those blocks, and 1.8's fix is to
 PUSHES. So Node cannot confirm the fix for our failure; only the two-phone run can.
 
+### UI feedback on the "not reachable yet" path, 2026-09-30
+
+Fixes from `apps/mobile/tmp/ui-feedback.md`:
+
+- **Invite screen panel.** It is now titled "Your phone needs a relay first", with a plain definition
+  of a relay, then "Two ways to get one":
+  - "Run your own relay" opens `relays.html#own`. It used to go to My Network, which only confused.
+  - "Use an open relay" opens `relays.html#borrow`. Its subtitle states what the operator can see.
+  - The two are **equal bordered buttons in the stories' order**, so neither reads as the obvious
+    choice (stories 02 path A and 42 unchanged, the user's decision). Each says what it costs and
+    what happens when tapped.
+  - The wording is "an open relay", not "the Sereus relay", because the sereus.org list may grow.
+  - While the panel shows, the private/open and permission choices collapse to one "Kept for when
+    you come back" line.
+- **My Network.** "Find a relay →" was a line of accent-coloured text. It is now the same two
+  buttons (equal, same order) when there is no relay, or "Find another relay" when there is one. The section re-reads the
+  relay list on focus; it used to keep saying "No relay yet" after a relay had been accepted.
+- **Why "Find a relay" did nothing:** the Android App Link filter used `pathPrefix="/chat/relay"`,
+  which also matched `/chat/relays.html`. Every relays-page link the app opened was routed back into
+  the app. The filter is now `android:path="/chat/relay"` and `pathPrefix="/chat/invite/"`, matching
+  the iOS association file. Checked with an emulator debug build: `relays.html` resolves to Chrome,
+  and tapping the button opens `relays.html#borrow`. **This needs the native rebuild, and the APK
+  build will include it.**
+- **Web:** `relays.html` now has `id="borrow"` and `id="own"`.
+
 ### sereus 1.8.0 adopted, 2026-09-30
 
 App and harness are on `@serfab/cadre-core`/`cadre-rn` 1.8.0 (one copy each, with `@optimystic/*`
