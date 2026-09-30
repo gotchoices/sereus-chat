@@ -402,6 +402,52 @@ control (exact pins, scratchpad copy) also hands all 5 founder-alone rows to the
 consistent rather than contradictory — a joiner's first sync PULLS those blocks, and 1.8's fix is to
 PUSHES. So Node cannot confirm the fix for our failure; only the two-phone run can.
 
+### New-user invite flow reviewed and fixed in the app, 2026-09-30
+
+Walked stories 01 → 02 (path A) → 42 → 03 as a stranger would. Checked on the devices:
+
+- The invitation is now the `https://sereus.org/chat/invite/…` App Link, for the QR as well as the
+  text. It was `sereus://`, which opens nothing for someone without the app (story 03 step 2).
+  `parseInviteToken` now also accepts `sereus://`, which every older invitation used. An https link
+  opened on the S7 went to acceptance, and the S7 joined the emulator's new strand. That first join
+  took **343 s** on the S7.
+- Making an invitation founds its strand. "Make another" now reuses that strand instead of founding
+  a new one each time. The button is labelled and disabled while working, and shows what it is
+  doing. A double tap now mints exactly one invitation.
+- Outstanding invitations are kept locally (`data/outgoing-invitations.ts`) and listed in the
+  generator and under Pending. They can be re-shared, and they retire when the strand gains a
+  member. **They cannot be withdrawn:** the control schema has an owner-signed delete, but
+  cadre-core exposes no call for it, so "Take it off the list" says so.
+- Accepting a relay returns to the invitation. The generator shows "Connecting to your relay" and
+  clears it by itself; this was checked, and took about 2 s.
+- Shared text now says what the link is. The acceptance screen shows a spinner while loading and
+  progress text while joining.
+- The strand-list preview and the chat view showed the OLDEST messages (`order by asc limit`). They
+  now show the newest.
+- An invitee needs no relay. With the emulator's relay removed, it sent in 37 s but received in
+  **131 s** (31–54 s with a relay).
+
+Web (`web/`, awaiting deploy):
+
+- **Rewrites.** New `.htaccess` rewrites `/chat/invite/*` to `invite.html` and `/chat/relay` to the
+  new `relay.html`. These need `mod_rewrite` and `AllowOverride FileInfo`; both paths returned 404
+  live.
+- **Launching the app.** Links tapped on sereus.org pages now use a Chrome
+  `intent://…;scheme=sereus;package=org.sereus.chat;S.browser_fallback_url=…` URL on Android, because
+  Chrome keeps a same-site App Link in the browser. Checked from a locally served copy on the
+  emulator: "Use this relay" opened the app's relay offer, and the invite page's "Open it" opened
+  acceptance. The fallback, for when the app is not installed, was not exercised.
+- **Invite page.** The logo path was broken on `invite.html` and `relays.html`. The raw 600-character
+  token is no longer printed on the invite page.
+
+Stories:
+
+- **Story 02 now has the strand first**, which is the user's decision on 2026-09-30. An invitation
+  names its strand, so the strand exists from the first invitation, and later invitations lead into
+  it.
+- Story 03 step 7 now matches.
+- The generator now says "The strand is ready. Nobody else is in it until somebody accepts." 
+
 ### TWO-PHONE VERDICT on 1.8.0: messages cross both ways, and survive a restart, 2026-09-30
 
 S7 (founder) + emulator (joiner) on strand `018d5dcb`, with two fixes described below. The founder
@@ -432,6 +478,14 @@ Two things stood in the way, and neither was the 1.7 bug:
    refusal is a throw rather than a reject vote, so the sender never learns why. This was a test-rig
    artifact, since real phones are NTP-synced. But a phone with a badly wrong clock would fail the
    same way, and nothing would say so. **Check the emulator clock before every two-phone run.**
+   Reproduced in pure Node with reference-peer 1.8.0 (`apps/mobile/tmp/clock-skew-repro.sh`).
+   The window is the 30 s transactor timeout, and only a writer that is *behind* fails. No
+   upstream issue or ticket covers it, and correctness.md §7.4 documents the clock assumption
+   itself. Filed as optimystic#24 (2026-09-30). It is about the
+   handling:
+   - the refusal is counted as silence, so the error reads "0 rejections";
+   - cadre-core retries it as a silent cohort, which cannot succeed;
+   - the honest peer is charged `consensus-timeout`, 40 points from one write (ban is at 80).
 
 **Verdict: solid enough for two-phone testing. Ship an APK (with fix 1).**
 

@@ -3,7 +3,7 @@
     "cameraUnavailable": "Camera unavailable",
     "open": "Open",
     "pasteLabel": "Paste invite link",
-    "pastePlaceholder": "sereus://invite/abc123?variant=happy",
+    "pastePlaceholder": "https://sereus.org/chat/invite/abc123",
     "simulatorNote": "Camera not available in simulator. Paste an invite link below.",
     "title": "Scan QR"
   },
@@ -45,7 +45,7 @@
     "generate": "Make an invitation",
     "historyWarning": "Whoever takes this up will be able to read everything already said here, including what was said before they arrived.",
     "kind": "What kind of strand",
-    "nothingYet": "Nothing exists yet — there is no strand until somebody accepts.",
+    "nothingYet": "The strand is ready. Nobody else is in it until somebody accepts.",
     "outstanding": "Still outstanding",
     "post": "Post into the strand",
     "postBody": "Everyone in this strand will be able to use it. That hands every member a one-off ability to bring somebody in. If you can reach the person another way, do that instead.",

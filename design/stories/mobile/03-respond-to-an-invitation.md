@@ -34,7 +34,8 @@ the app. Mike is across town and already does — he was experimenting with it e
    softened. It means what she says here might one day be read by somebody she has never met.
 6. She can accept on those terms, decline, or ask Bob to close it first. She accepts — it is Bob,
    and she can see the situation rather than having to trust a claim about it.
-7. The strand exists from this moment; before it, there was nothing.
+7. She is in the strand from this moment. It was Bob's alone until now; nothing of hers was in it
+   before she accepted.
    → [04](04-our-first-conversation.md)
 
 ### Alternative Path A: asking for it to be closed

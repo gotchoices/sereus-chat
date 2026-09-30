@@ -9,7 +9,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { inspectInvitation, acceptInvitation } from '../data/adapter';
 import type { InvitationPreview } from '../data/types';
@@ -139,12 +139,22 @@ export default function InvitationAcceptance() {
               </Text>
             </Pressable>
             <Pressable onPress={accept} disabled={busy}
-              style={[styles.btn, { borderColor: theme.accent, backgroundColor: theme.accent }, busy && styles.dim]}>
+              style={[styles.btn, styles.btnRow, { borderColor: theme.accent, backgroundColor: theme.accent }, busy && styles.dim]}>
+              {busy ? <ActivityIndicator color={theme.accentText} /> : null}
               <Text style={[typography.body, styles.btnText, { color: theme.accentText }]}>
                 {t('screens.accept.accept', 'Join this strand')}
               </Text>
             </Pressable>
           </View>
+          {/* Joining reaches the other person's phone and copies the conversation
+              so far; on a slow phone that has been measured at minutes. Without
+              this, a dimmed button is the only sign anything is happening. */}
+          {busy ? (
+            <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
+              {t('screens.accept.joining',
+                'Joining — reaching them and copying the conversation so far. This can take a minute or two.')}
+            </Text>
+          ) : null}
 
           {strandStatusKind(preview.strandState) === 'canChange' ? (
             <Text
@@ -161,6 +171,10 @@ export default function InvitationAcceptance() {
               'Declining creates nothing, and they are not told who declined.')}
           </Text>
         </>
+      ) : !error ? (
+        // Reading the invitation is local but not instant on a slow phone, and a
+        // blank screen reads as broken.
+        <ActivityIndicator style={styles.loading} color={theme.textMuted} />
       ) : null}
     </ScrollView>
   );
@@ -180,4 +194,6 @@ const styles = StyleSheet.create({
   ask: { textAlign: 'center', paddingTop: spacing[1] },
   note: { textAlign: 'center', lineHeight: 18, paddingTop: spacing[2] },
   dim: { opacity: 0.5 },
+  btnRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
+  loading: { paddingTop: spacing[5] },
 });

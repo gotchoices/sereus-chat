@@ -10,7 +10,7 @@
 </head>
 <body>
   <header class="hero">
-    <img class="logo" src="/images/logo.svg" alt="Sereus Chat logo" width="88" height="88" />
+    <img class="logo" src="/chat/images/logo.svg" alt="Sereus Chat logo" width="88" height="88" />
     <h1>Being reachable</h1>
     <p class="tagline">So the person you invite can actually answer.</p>
   </header>
@@ -136,18 +136,33 @@
   </footer>
 
   <script>
-    // An App Link (https://sereus.org/chat/relay), not the custom scheme: from a
-    // web page, browsers block or silently drop `sereus://`, and an App Link
-    // falls back to this page when the app is not installed.
+    // How a relay offer gets from this page into the app.
+    //
+    // NOT a plain App Link on Android. `https://sereus.org/chat/relay` is an App
+    // Link, but Chrome does not hand a link to an app when the page it is tapped on
+    // is on the SAME site: it navigates in the browser instead (seen on a device
+    // with the app installed and the domain verified). So on Android the link is a
+    // Chrome `intent://` URL, which launches the app directly — and, when the app
+    // is not installed, falls back to the https page, which says to install it.
+    // Custom-scheme `sereus://` links are not used: browsers block or silently drop
+    // them from a web page.
+    //
+    // Elsewhere (desktop, iOS) the https link stands; it lands on the same page.
     //
     // The link PROPOSES a relay.  The app shows who runs it and what they would
     // see, and the person decides there — a web page never configures
     // reachability silently.  Empty data-addr = listed but not yet running.
+    var isAndroid = /Android/i.test(navigator.userAgent);
     for (const el of document.querySelectorAll('.relay-link')) {
       const addr = el.getAttribute('data-addr');
       const pending = el.parentElement.querySelector('.relay-pending');
       if (!addr) { el.setAttribute('aria-disabled', 'true'); continue; }
-      el.setAttribute('href', 'https://sereus.org/chat/relay?addr=' + encodeURIComponent(addr));
+      const q = 'addr=' + encodeURIComponent(addr);
+      const page = 'https://sereus.org/chat/relay?' + q;
+      el.setAttribute('href', isAndroid
+        ? 'intent://relay?' + q + '#Intent;scheme=sereus;package=org.sereus.chat;S.browser_fallback_url=' +
+            encodeURIComponent(page) + ';end'
+        : page);
       if (pending) pending.hidden = true;
     }
   </script>

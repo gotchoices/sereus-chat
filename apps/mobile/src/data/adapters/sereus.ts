@@ -23,6 +23,8 @@ import {
   insertAttachments,
 } from '../chat-operations';
 import { UnreachableError } from '../errors';
+import { buildInviteUrl } from '../inviteLink';
+import { rememberOutgoingInvitation, forgetOutgoingInvitation, listOutgoingInvitations } from '../outgoing-invitations';
 import { CHAT_SAPP_ID } from '../chat-sapp';
 import { cadreService } from '../../cadre';
 import { withTimeout, CONTROL_OP_TIMEOUT_MS } from '../../cadre/async';
@@ -408,11 +410,14 @@ export class SereusAdapter implements DataAdapter {
     );
 
     const token = node.encodeInvitation(invitation);
-    return {
+    const minted: Invitation = {
       id: token.slice(0, 12),
       token,
-      url: `sereus://invite/${token}`,
-      qrPayload: `sereus://invite/${token}`,
+      // The https App Link, for the QR as well as the text: the person scanning
+      // or tapping it may not have the app yet, and a `sereus://` link opens
+      // nothing on their phone — story 03 step 2 needs the web page.
+      url: buildInviteUrl(token),
+      qrPayload: buildInviteUrl(token),
       strandId: strand.strandId,
       expiresAt: invitation.expiration.toISOString(),
       // The platform seats a member from a bearer invitation; invite rights
@@ -421,6 +426,15 @@ export class SereusAdapter implements DataAdapter {
       spent: false,
       direction: 'outgoing',
     };
+
+    // Kept so it can be listed and shared again after this screen is left — see
+    // outgoing-invitations.ts. A failure to remember it must not cost the user
+    // the invitation they are looking at.
+    const membersAtMint = await queryMembers(strand).then(m => m.length).catch(() => 1);
+    await rememberOutgoingInvitation({ ...minted, membersAtMint, createdAt: new Date().toISOString() })
+      .catch(err => console.warn('[SereusAdapter] could not remember invitation:', err));
+
+    return minted;
   }
 
   /**
@@ -646,8 +660,24 @@ export class SereusAdapter implements DataAdapter {
   }
   async resignManager(_id: string): Promise<void> { this.notImplemented('resignManager'); }
   async removeMember(_s: string, _m: string): Promise<void> { this.notImplemented('removeMember'); }
-  async listOutstandingInvitations(): Promise<Invitation[]> { this.notImplemented('listOutstandingInvitations'); }
-  async cancelInvitation(_id: string): Promise<void> { this.notImplemented('cancelInvitation'); }
+  async listOutstandingInvitations(): Promise<Invitation[]> {
+    return listOutgoingInvitations(async strandId => {
+      const strand = cadreService.getStrands().get(strandId);
+      if (!strand?.database) return null;
+      return queryMembers(strand).then(m => m.length).catch(() => null);
+    });
+  }
+  /** Stops LISTING it; does not withdraw it — see outgoing-invitations.ts. */
+  async cancelInvitation(id: string): Promise<void> {
+    await forgetOutgoingInvitation(id);
+  }
+  async reachability(): Promise<{ reachable: boolean; relayPending: boolean }> {
+    const node = cadreService.cadreNode;
+    const reachable = !!node && node.getMultiaddrs().length > 0;
+    if (reachable) return { reachable, relayPending: false };
+    const { relayAddrs } = await this.getPrefs();
+    return { reachable, relayPending: relayAddrs.length > 0 };
+  }
   /**
    * Read an invitation without redeeming it.
    *

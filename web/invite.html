@@ -10,7 +10,7 @@
 </head>
 <body>
   <header class="hero">
-    <img class="logo" src="/images/logo.svg" alt="Sereus Chat logo" width="88" height="88" />
+    <img class="logo" src="/chat/images/logo.svg" alt="Sereus Chat logo" width="88" height="88" />
     <h1>You're invited to chat</h1>
     <p class="tagline">Someone wants to reach you privately on Sereus&nbsp;Chat.</p>
   </header>
@@ -28,7 +28,9 @@
         <a class="btn-secondary" id="open-app" href="#">Already installed? Open it</a>
       </div>
 
-      <p class="note" id="token-note" hidden>Invitation<br /><span class="token" id="token"></span></p>
+      <p class="note" id="no-token" hidden>
+        This link is missing its invitation. Ask whoever sent it for the full link.
+      </p>
     </section>
 
     <section class="how">
@@ -50,17 +52,20 @@
   </footer>
 
   <script>
-    // The token is the last path segment of /invite/<token> (or a ?token= fallback).
+    // Served at /chat/invite/<token> (see .htaccess), or ?token= as a fallback.
+    // Reached when the invitation link was not handed to the app — usually because
+    // the app is not installed yet.
     (function () {
       var m = location.pathname.match(/\/invite\/([^\/?#]+)/);
       var token = (m && m[1]) || new URLSearchParams(location.search).get('token') || '';
-      if (token) {
-        var el = document.getElementById('token');
-        el.textContent = decodeURIComponent(token);
-        document.getElementById('token-note').hidden = false;
-        // "Open it" tries the custom scheme, which launches the app if installed.
-        document.getElementById('open-app').setAttribute('href', 'chat://invite/' + token);
-      }
+      if (!token) { document.getElementById('no-token').hidden = false; return; }
+      // "Open it" launches the app with the invitation in hand. On Android that is a
+      // Chrome intent:// URL — a custom-scheme link is dropped by the browser — with
+      // this page as the fallback if the app turns out not to be installed.
+      document.getElementById('open-app').setAttribute('href', /Android/i.test(navigator.userAgent)
+        ? 'intent://invite/' + token + '#Intent;scheme=sereus;package=org.sereus.chat;S.browser_fallback_url=' +
+            encodeURIComponent(location.href) + ';end'
+        : 'sereus://invite/' + token);
     })();
   </script>
 </body>

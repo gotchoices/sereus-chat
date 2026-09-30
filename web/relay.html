@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Use a relay — Sereus Chat</title>
+  <meta name="description" content="A relay offer for Sereus Chat. Open it in the app on your phone to decide whether to use it." />
+  <link rel="icon" href="/chat/images/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/chat/styles.css" />
+</head>
+<body>
+  <!-- Served at /chat/relay?addr=… (see .htaccess). Reached when a relay link
+       could not be handed to the app: the app is not installed, or this is not a
+       phone. The app is where the decision is made; this page only gets you there. -->
+  <header class="hero">
+    <img class="logo" src="/chat/images/logo.svg" alt="Sereus Chat logo" width="88" height="88" />
+    <h1>Use this relay</h1>
+    <p class="tagline">This offer opens in the Sereus&nbsp;Chat app, where you decide.</p>
+  </header>
+
+  <main>
+    <section class="invite-card">
+      <p id="relay-where" hidden>
+        Relay at <strong id="relay-host"></strong>
+      </p>
+      <p>
+        The app shows you who runs it and what they would be able to see, and nothing
+        changes until you say so there. If you are reading this on a phone, you do not
+        have the app yet — install it, then come back and tap the relay again.
+      </p>
+
+      <div class="btn-row">
+        <a class="apk-btn" href="/chat/chat.apk" download>Get the app (Android) ↓</a>
+        <a class="btn-secondary" id="open-app" href="#">Already installed? Open it</a>
+      </div>
+    </section>
+
+    <section class="how">
+      <h2>On a computer?</h2>
+      <p class="note">
+        Relays are chosen on the phone. Open <a href="/chat/relays.html">sereus.org/chat/relays.html</a>
+        on your phone and pick one there.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <p>Part of the <a href="https://sereus.org/">Sereus</a> project. Proprietary — Sereus Chat.</p>
+  </footer>
+
+  <script>
+    (function () {
+      var addr = new URLSearchParams(location.search).get('addr') || '';
+      if (!addr) return;
+      // Host only — the same thing the app shows first. The peer id is the part
+      // that pins the machine, and the app displays it before anything is saved.
+      var m = addr.match(/\/(?:dns4|dns6|dnsaddr|ip4|ip6)\/([^\/]+)/);
+      if (m) {
+        document.getElementById('relay-host').textContent = m[1];
+        document.getElementById('relay-where').hidden = false;
+      }
+      var q = 'addr=' + encodeURIComponent(addr);
+      // Same launch as relays.html: an intent:// URL on Android (a custom scheme is
+      // dropped by the browser), with this page as the fallback.
+      document.getElementById('open-app').setAttribute('href', /Android/i.test(navigator.userAgent)
+        ? 'intent://relay?' + q + '#Intent;scheme=sereus;package=org.sereus.chat;S.browser_fallback_url=' +
+            encodeURIComponent(location.href) + ';end'
+        : 'sereus://relay?' + q);
+    })();
+  </script>
+</body>
+</html>

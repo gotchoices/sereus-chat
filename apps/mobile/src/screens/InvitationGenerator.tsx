@@ -2,16 +2,19 @@
  * InvitationGenerator — start a strand, or add somebody to one.
  * Spec: design/specs/mobile/screens/invitation-generator.md
  *
- * Nothing here may render a not-yet-accepted invitation as though it were a
- * strand: there is no strand until somebody accepts.
+ * The first invitation for a new strand founds it — in sereus an invitation
+ * names the strand it lets somebody into, so the strand comes first (story 02).
+ * Every later invitation from this screen goes into that same strand. Until
+ * somebody accepts, nobody else is in it, and nothing here may suggest a
+ * conversation is already under way.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Switch, StyleSheet, Share, Alert, Linking } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, ScrollView, Pressable, Switch, StyleSheet, Share, Alert, Linking, ActivityIndicator } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import QRCode from 'react-native-qrcode-svg';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { createInvitation, listOutstandingInvitations, cancelInvitation } from '../data/adapter';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { createInvitation, listOutstandingInvitations, cancelInvitation, reachability, getProfile } from '../data/adapter';
 import type { Invitation } from '../data/types';
 import { useT } from '../i18n';
 import { UnreachableError } from '../data/errors';
@@ -21,8 +24,15 @@ import { useTheme, typography, spacing, radius } from '../theme';
 export default function InvitationGenerator() {
   const navigation: any = useNavigation();
   const route: any = useRoute();
-  const strandId: string | undefined = route?.params?.strandId;
-  const addingToExisting = !!strandId;
+  const routeStrandId: string | undefined = route?.params?.strandId;
+  /** Set when opened from the strand list's Pending row: show that invitation. */
+  const routeToken: string | undefined = route?.params?.token;
+  // Making an invitation for a NEW strand founds it (the invitation has to name
+  // the strand it lets somebody into). Every later invitation from this screen —
+  // "Make a new one" included — must go into that same strand, not found another.
+  const [foundedStrandId, setFoundedStrandId] = useState<string | undefined>(undefined);
+  const strandId = routeStrandId ?? foundedStrandId;
+  const addingToExisting = !!routeStrandId;
   const t = useT();
   const theme = useTheme();
 
@@ -34,13 +44,48 @@ export default function InvitationGenerator() {
   const [showQr, setShowQr] = useState(true);   // human spec: default on
   const [error, setError] = useState<string | null>(null);
   const [unreachable, setUnreachable] = useState(false);
+  /** A relay has been chosen but is not carrying anybody yet. */
+  const [relayPending, setRelayPending] = useState(false);
+  const [inviterName, setInviterName] = useState('');
 
   const refresh = useCallback(() => {
     listOutstandingInvitations().then(setOutstanding).catch(() => {});
   }, []);
   useEffect(refresh, [refresh]);
+  useEffect(() => { getProfile().then(p => setInviterName(p.name?.trim() ?? '')).catch(() => {}); }, []);
+
+  // Opened from a Pending row: show the invitation it names, and let any new one
+  // go into the same strand.
+  useEffect(() => {
+    if (!routeToken) return;
+    listOutstandingInvitations().then(list => {
+      const found = list.find(i => i.token === routeToken);
+      if (found) {
+        setInvitation(found);
+        if (found.strandId) setFoundedStrandId(found.strandId);
+      }
+    }).catch(() => {});
+  }, [routeToken]);
+
+  // Coming back from choosing a relay (story 02 6.4, story 42 step 6): the
+  // "nowhere to answer" panel must not outlive the problem. Re-ask whenever the
+  // screen regains focus, and keep asking while a chosen relay is connecting.
+  const recheckRef = useRef<() => void>(() => {});
+  recheckRef.current = () => {
+    if (!unreachable) return;
+    reachability().then(r => {
+      setRelayPending(!r.reachable && r.relayPending);
+      if (r.reachable) setUnreachable(false);
+    }).catch(() => {});
+  };
+  useFocusEffect(useCallback(() => {
+    recheckRef.current();
+    const id = setInterval(() => recheckRef.current(), 3000);
+    return () => clearInterval(id);
+  }, []));
 
   const generate = useCallback(async () => {
+    if (loading) return;
     setLoading(true); setError(null); setUnreachable(false);
     try {
       const minted = await createInvitation({
@@ -53,18 +98,31 @@ export default function InvitationGenerator() {
       // the loop.  Logging the URL lets `link.sh` deliver it to the other device.
       if (__DEV__) console.info('[invite] minted:', minted.url);
       setInvitation(minted);
+      if (!strandId && minted.strandId) setFoundedStrandId(minted.strandId);
       refresh();
     } catch (err) {
       setInvitation(null);
       // Story 02 Alt A: "nowhere to be reached yet" is not an error he caused,
       // so it never goes through the error Banner (which offers a Retry that
       // could not possibly work).  It gets its own state, below.
-      if (err instanceof UnreachableError) { setUnreachable(true); setError(null); }
+      if (err instanceof UnreachableError) {
+        setUnreachable(true); setError(null);
+        reachability().then(r => setRelayPending(r.relayPending)).catch(() => {});
+      }
       else { setError(err instanceof Error ? err.message : String(err)); }
     } finally {
       setLoading(false);
     }
-  }, [strandId, addingToExisting, visibility, grantsInviteRight, refresh]);
+  }, [loading, strandId, addingToExisting, visibility, grantsInviteRight, refresh]);
+
+  // What goes in the message. A bare 600-character link says nothing about what
+  // it is to somebody who has never heard of the app.
+  const shareText = (url: string) =>
+    (inviterName
+      ? t('screens.invite.shareBodyNamed', '{{name}} invites you to talk privately on Sereus Chat. Open this link on your phone:')
+          .replace('{{name}}', inviterName)
+      : t('screens.invite.shareBody', 'You are invited to talk privately on Sereus Chat. Open this link on your phone:'))
+    + '\n' + url;
 
   const postIntoStrand = () =>
     Alert.alert(
@@ -84,7 +142,20 @@ export default function InvitationGenerator() {
           and a Retry button here would be a lie.  It sits ABOVE the terms and
           leaves them mounted, so whatever he already chose is still chosen when
           he comes back (6.4). */}
-      {unreachable ? (
+      {unreachable && relayPending ? (
+        <View style={[styles.unreachable, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
+          <View style={styles.pendingRow}>
+            <ActivityIndicator color={theme.textMuted} />
+            <Text style={[typography.title, styles.flex1, { color: theme.textPrimary }]}>
+              {t('screens.invite.relayPendingTitle', 'Connecting to your relay')}
+            </Text>
+          </View>
+          <Text style={[typography.body, styles.unreachableBody, { color: theme.textMuted }]}>
+            {t('screens.invite.relayPendingBody',
+              'You have chosen a relay; it is not carrying anybody yet. This usually takes a few seconds. The invitation can be made as soon as it is ready.')}
+          </Text>
+        </View>
+      ) : unreachable ? (
         <View style={[styles.unreachable, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
           <Text style={[typography.title, { color: theme.textPrimary }]}>
             {t('screens.invite.unreachableTitle', 'There is nowhere for them to answer yet')}
@@ -129,8 +200,8 @@ export default function InvitationGenerator() {
       {!addingToExisting ? (
         <>
           <SectionHeader label={t('screens.invite.kind', 'What kind of strand')} />
-          {(['private', 'public'] as const).map(v => (
-            <Pressable key={v} onPress={() => setVisibility(v)}
+          {(['private', 'public'] as const).filter(v => !foundedStrandId || v === visibility).map(v => (
+            <Pressable key={v} onPress={() => { if (!foundedStrandId) setVisibility(v); }}
               style={[styles.card, { borderColor: visibility === v ? theme.accent : theme.border, backgroundColor: theme.surfaceAlt }]}>
               <Text style={[typography.body, styles.cardTitle, { color: theme.textPrimary }]}>
                 {v === 'private' ? t('screens.invite.private', 'Private') : t('screens.invite.public', 'Open to anyone')}
@@ -166,9 +237,28 @@ export default function InvitationGenerator() {
       </Pressable>
 
       <View style={styles.actions}>
-        <IconButton name="qr-code-outline" size={22} variant="accent"
-          accessibilityLabel={t('screens.invite.generate', 'Make an invitation')}
-          onPress={generate} style={loading ? styles.dim : undefined} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: loading || (unreachable && relayPending), busy: loading }}
+          disabled={loading || (unreachable && relayPending)}
+          onPress={generate}
+          style={[styles.makeBtn, { backgroundColor: theme.accent, borderColor: theme.accent },
+            (loading || (unreachable && relayPending)) && styles.dim]}
+        >
+          {loading ? <ActivityIndicator color={theme.accentText} /> : null}
+          <Text style={[typography.body, styles.cardTitle, { color: theme.accentText }]}>
+            {invitation
+              ? t('screens.invite.generateAnother', 'Make another invitation')
+              : t('screens.invite.generate', 'Make an invitation')}
+          </Text>
+        </Pressable>
+        {loading ? (
+          <Text style={[typography.small, styles.progress, { color: theme.textMuted }]}>
+            {foundedStrandId || addingToExisting
+              ? t('screens.invite.working', 'Making the invitation…')
+              : t('screens.invite.workingFound', 'Setting up the strand. On some phones this takes up to a minute.')}
+          </Text>
+        ) : null}
       </View>
 
       {invitation ? (
@@ -189,15 +279,13 @@ export default function InvitationGenerator() {
           ) : null}
 
           <Text style={[typography.small, { color: theme.textMuted }]}>
-            {t('screens.invite.nothingYet', 'Nothing exists yet — there is no strand until somebody accepts.')}
+            {t('screens.invite.nothingYet', 'The strand is ready. Nobody else is in it until somebody accepts.')}
           </Text>
           <View style={styles.shareRow}>
             <IconButton name="copy-outline" size={20} accessibilityLabel={t('common.copy', 'Copy')}
               onPress={() => { Clipboard.setString(invitation.url); Alert.alert(t('common.copied', 'Copied')); }} />
-            <IconButton name="refresh-outline" size={20}
-              accessibilityLabel={t('screens.invite.regenerate', 'Make a new one')} onPress={generate} />
             <IconButton name="share-outline" size={20} accessibilityLabel={t('common.share', 'Share')}
-              onPress={() => Share.share({ message: invitation.url })} />
+              onPress={() => Share.share({ message: shareText(invitation.url) })} />
             {addingToExisting ? (
               <IconButton name="chatbubble-outline" size={20}
                 accessibilityLabel={t('screens.invite.post', 'Post into the strand')} onPress={postIntoStrand} />
@@ -213,13 +301,20 @@ export default function InvitationGenerator() {
             {outstanding.map(inv => (
               <ListRow
                 key={inv.id}
-                title={inv.label ?? inv.url}
+                title={inv.label ?? t('screens.invite.madeAt', 'Made {{when}}')
+                  .replace('{{when}}', (inv as { createdAt?: string }).createdAt
+                    ? new Date((inv as { createdAt?: string }).createdAt!).toLocaleString()
+                    : '')}
                 subtitle={inv.expiresAt
                   ? t('screens.invite.expires', 'Runs out {{when}}').replace('{{when}}', new Date(inv.expiresAt).toLocaleDateString())
                   : undefined}
-                onPress={() => Alert.alert(inv.label ?? t('screens.strands.invitation', 'Invitation'), undefined, [
-                  { text: t('common.shareAgain', 'Share again'), onPress: () => Share.share({ message: inv.url }) },
-                  { text: t('screens.invite.abandon', 'Abandon'), style: 'destructive',
+                onPress={() => Alert.alert(inv.label ?? t('screens.strands.invitation', 'Invitation'),
+                  // Honest about what removing it does: cadre-core cannot withdraw
+                  // an invitation yet — see data/outgoing-invitations.ts.
+                  t('screens.invite.forgetNote',
+                    'Taking it off this list does not cancel it: whoever holds it can still use it until it runs out.'), [
+                  { text: t('common.shareAgain', 'Share again'), onPress: () => Share.share({ message: shareText(inv.url) }) },
+                  { text: t('screens.invite.forget', 'Take it off the list'), style: 'destructive',
                     onPress: () => cancelInvitation(inv.id).then(refresh).catch(() => {}) },
                   { text: t('common.cancel', 'Cancel'), style: 'cancel' },
                 ])}
@@ -248,7 +343,15 @@ const styles = StyleSheet.create({
   content: { padding: spacing[3], gap: spacing[1], paddingBottom: spacing[5] },
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.card, padding: spacing[2], gap: 4 },
   cardTitle: { fontWeight: '600' },
-  actions: { alignItems: 'center', paddingVertical: spacing[2] },
+  actions: { alignItems: 'center', paddingVertical: spacing[2], gap: spacing[1] },
+  makeBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[1],
+    paddingVertical: spacing[2], paddingHorizontal: spacing[3],
+    borderRadius: radius.control, borderWidth: StyleSheet.hairlineWidth,
+  },
+  progress: { textAlign: 'center' },
+  pendingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  flex1: { flex: 1 },
   shareRow: { flexDirection: 'row', gap: spacing[1], paddingTop: spacing[1] },
   qrToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing[1] },
   qr: { alignItems: 'center', paddingVertical: spacing[2] },

@@ -76,6 +76,13 @@ export interface DataAdapter {
   }): Promise<Invitation>;
   listOutstandingInvitations(): Promise<Invitation[]>;
   cancelInvitation(id: string): Promise<void>;
+  /**
+   * Can anybody answer an invitation from this device right now — and if not,
+   * is a relay already chosen and still connecting? The second case must not be
+   * shown as "nowhere to be reached": the user has just done what that screen
+   * asked of them.
+   */
+  reachability(): Promise<{ reachable: boolean; relayPending: boolean }>;
   inspectInvitation(token: string): Promise<InvitationPreview>;
   acceptInvitation(token: string): Promise<{ strandId: string }>;
 
@@ -151,6 +158,7 @@ export const createInvitation = async (i: Parameters<DataAdapter['createInvitati
 export const listOutstandingInvitations = async () =>
   (await getAdapter()).listOutstandingInvitations();
 export const cancelInvitation = async (id: string) => (await getAdapter()).cancelInvitation(id);
+export const reachability = async () => (await getAdapter()).reachability();
 export const inspectInvitation = async (t: string) => (await getAdapter()).inspectInvitation(t);
 export const acceptInvitation = async (t: string) => (await getAdapter()).acceptInvitation(t);
 

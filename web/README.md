@@ -17,6 +17,9 @@ separate subdomain to provision). Three jobs:
 |------|------|
 | `index.html`, `styles.css` | The landing page |
 | `invite.html` | Fallback shown at `/chat/invite/<token>` when the app isn't installed |
+| `relays.html` | Where to get a relay; its "Use this relay" links hand an offer to the app |
+| `relay.html` | Fallback shown at `/chat/relay?addr=…` when the app isn't installed |
+| `.htaccess` | Rewrites `/chat/invite/*` and `/chat/relay` to the two fallback pages |
 | `images/logo.svg` | Logo |
 | `.well-known/assetlinks.json` | Chat's Android App-Links statement (merged into the apex on deploy) |
 | `.well-known/apple-app-site-association` | Chat's iOS Universal-Links detail (merged into the apex on deploy) |
@@ -62,21 +65,27 @@ Also required, once (app side): in Xcode, add the **Associated Domains** capabil
 to the `mobile` target so `ios/mobile/mobile.entitlements` (`applinks:sereus.org`)
 is compiled into the build.
 
-### `/chat/invite/<token>` routing
+### `/chat/invite/<token>` and `/chat/relay` routing
 
-For the browser fallback, the host must rewrite `/chat/invite/*` to
-`/chat/invite.html` (which reads the token client-side). Example nginx:
+Both are app deep links with no file behind them. When a link is not handed to
+the app, the browser requests the path, and `.htaccess` (deployed with the pages)
+serves `invite.html` or `relay.html`. That needs `mod_rewrite` and
+`AllowOverride FileInfo` for the `chat/` directory. Without them, both paths
+return 404; this was the live state on 2026-09-30.
 
-```nginx
-location /chat/invite/ { try_files $uri /chat/invite.html; }
-```
+### Launching the app from these pages
 
-Apache (`.htaccess` under the `chat/` dir):
+Two kinds of link, and the difference matters:
 
-```apache
-RewriteEngine On
-RewriteRule ^invite/.*$ /chat/invite.html [L]
-```
+- **Links arriving from outside** (a message, an email, a QR code) use the https
+  App Link. Android opens the app when it is installed, and otherwise loads the
+  page.
+- **Links tapped on a sereus.org page** cannot rely on that. Chrome does not hand
+  a same-site link to an app; it stays in the browser (seen on a device with the
+  app installed and verified). So `relays.html`, `relay.html` and `invite.html`
+  launch the app on Android with a Chrome `intent://…#Intent;scheme=sereus;package=org.sereus.chat;S.browser_fallback_url=…;end`
+  URL, which falls back to the https page when the app is missing.
+  A bare `sereus://` link is not used from a web page, because browsers drop it.
 
 ## Preview locally
 

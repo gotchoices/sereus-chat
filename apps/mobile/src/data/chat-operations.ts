@@ -132,12 +132,16 @@ export async function queryMessages(
 ): Promise<ChatMessageRow[]> {
   const db = getDb(strand);
   const out: ChatMessageRow[] = [];
+  // The NEWEST `limit` rows, returned oldest-first. Ordering ascending before the
+  // limit returned the OLDEST ones instead: the strand list's one-row preview
+  // showed a conversation's first message forever, and a conversation past 100
+  // messages stopped showing anything new.
   for await (const row of db.eval(
     `select M.Id, M.MemberId, M.Content, M.Timestamp, M.ReplyToId, M.EditedAt,
             Mem.Name as MemberName
      from App.Message M
      left join App.Member Mem on Mem.Id = M.MemberId
-     order by M.Timestamp asc, M.Id asc
+     order by M.Timestamp desc, M.Id desc
      limit ?`,
     [limit],
   )) {
@@ -151,7 +155,7 @@ export async function queryMessages(
       MemberName: (row.MemberName as string) ?? undefined,
     });
   }
-  return out;
+  return out.reverse();
 }
 
 // ── Editing, deleting, reacting ────────────────────────────────────────────

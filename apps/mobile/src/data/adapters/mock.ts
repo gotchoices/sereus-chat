@@ -3,6 +3,7 @@
 
 import type { DataAdapter } from '../adapter';
 import { UnreachableError } from '../errors';
+import { buildInviteUrl } from '../inviteLink';
 import type {
   Profile, StrandSummary, StrandState, Member, Message, Attachment,
   SearchBatch, SearchOptions, Invitation, InvitationPreview,
@@ -145,8 +146,8 @@ export class MockAdapter implements DataAdapter {
     const token = `tok-${Math.abs(Date.now() % 1e8)}`;
     return {
       id: `i-${token}`, token,
-      url: `sereus://invite/${token}`,
-      qrPayload: `sereus://invite/${token}`,
+      url: buildInviteUrl(token),
+      qrPayload: buildInviteUrl(token),
       strandId: input.strandId ?? null,
       expiresAt: new Date(Date.now() + 7 * 864e5).toISOString(),
       grantsInviteRight: input.grantsInviteRight,
@@ -161,6 +162,9 @@ export class MockAdapter implements DataAdapter {
   }
 
   async cancelInvitation(): Promise<void> {}
+  async reachability(): Promise<{ reachable: boolean; relayPending: boolean }> {
+    return { reachable: !isUnreachable(), relayPending: false };
+  }
 
   async inspectInvitation(_token: string): Promise<InvitationPreview> {
     if (isError()) {

@@ -49,7 +49,12 @@ export default function RelayOffer() {
         ? prefs.relayAddrs
         : [...prefs.relayAddrs, addr];   // append, never replace
       await setPrefs({ relayAddrs: next });
-      navigation.replace('CadreManager');
+      // Back to whatever sent them looking — usually the invitation they were
+      // making (story 42 step 6: "His invitation works"), which re-checks its
+      // reachability on focus. Only a cold arrival, with nothing underneath,
+      // goes to the machines screen, where the relay's status is shown.
+      if (navigation.canGoBack()) navigation.goBack();
+      else navigation.replace('CadreManager');
     } catch (e: any) {
       setError(e?.message ?? 'That relay could not be saved');
       setBusy(false);

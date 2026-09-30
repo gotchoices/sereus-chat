@@ -3,7 +3,7 @@
     "cameraUnavailable": "Cámara no disponible",
     "open": "Abrir",
     "pasteLabel": "Pegar enlace de invitación",
-    "pastePlaceholder": "sereus://invite/abc123?variant=happy",
+    "pastePlaceholder": "https://sereus.org/chat/invite/abc123",
     "simulatorNote": "Cámara no disponible en el simulador. Pega un enlace abajo.",
     "title": "Escanear QR"
   },

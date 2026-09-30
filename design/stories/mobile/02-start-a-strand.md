@@ -34,8 +34,10 @@ cubicle. Bob's brother Mike is not.
 7. He can share the link however he would normally reach that person — message, email, print. The
    app does not send it for him, because it has no way to reach anyone.
 8. Susan is right there, so he holds up his phone and says "scan this".
-9. He can see the invitation is outstanding, and that nothing exists yet — there is no strand until
-   someone accepts. → [03](03-respond-to-an-invitation.md)
+9. He can see the invitation is outstanding. The strand already exists — an invitation is a way into
+   a particular strand, so it has to be there first — but nobody else is in it until someone
+   accepts, and it says so rather than looking like a conversation already under way.
+   → [03](03-respond-to-an-invitation.md)
 
 ### Alternative Path A: nowhere to be reached yet
 
@@ -101,7 +103,9 @@ cubicle. Bob's brother Mike is not.
 - [ ] The invitation can be shared through any channel the user already has; the app does not send it
 - [ ] Outstanding invitations are visible, distinguishable from strands, and can be re-shared or abandoned
 - [ ] A spent invitation says so when used again, rather than failing obscurely
-- [ ] A strand does not exist until someone accepts
+- [ ] A new strand exists from the moment its first invitation is made, and reads as having nobody
+      else in it until someone accepts
+- [ ] Further invitations made for it lead into that same strand, never into a new one
 - [ ] A user who cannot yet be reached is told so at the moment they try to invite somebody, in
       terms of what it means rather than what is missing
 - [ ] That message is not a dead end: it offers running something of their own and borrowing
@@ -117,9 +121,17 @@ cubicle. Bob's brother Mike is not.
 ## Open
 
 Public strands are offered at creation but not developed this round ([sereus.md](../../specs/domain/sereus.md)). An
-invitation lost before anyone takes it up leaves a strand that cannot be added to; the practical
-answer is to abandon it and start another, which this story should make an easy thing to do rather
-than a dead end to discover.
+invitation lost before anyone takes it up is not a dead end: the strand is still there, and Bob makes
+another invitation into it. A strand nobody ever joins stays in his list until he leaves it.
+
+Why the strand comes first: in sereus an invitation names the strand it lets somebody into, so the
+strand must exist before the invitation can. An earlier version of this story had the strand come
+into being at acceptance; the platform does not work that way.
+
+Abandoning an invitation (path D) means withdrawing it, so that it no longer works. The control
+schema supports that (an owner-signed delete of the invitation's record), but cadre-core offers no
+call for it yet. Until it does, the app can stop listing an invitation, but cannot make it stop
+working before it expires, and has to say so.
 
 Step 3's choice is user-observable and stands, but the platform seats a member from a bearer
 invitation and confers the ability to invite by a separate signed act. Whether "invited as someone
