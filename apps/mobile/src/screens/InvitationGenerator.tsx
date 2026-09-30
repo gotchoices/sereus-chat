@@ -47,6 +47,23 @@ export default function InvitationGenerator() {
   const [unreachable, setUnreachable] = useState(false);
   /** A relay has been chosen but is not carrying anybody yet. */
   const [relayPending, setRelayPending] = useState(false);
+  /** When the current wait for a chosen relay began, to stop it spinning silently forever. */
+  const [pendingSince, setPendingSince] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (relayPending) setPendingSince(p => p ?? Date.now());
+    else setPendingSince(null);
+  }, [relayPending]);
+  useEffect(() => {
+    if (!relayPending) return;
+    const id = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, [relayPending]);
+  // A relay normally connects in seconds. Past this, say so: a network that
+  // blocks the relay's port, or a relay that is down, otherwise looks exactly
+  // like patience — the first published APK sat here for minutes, silently.
+  const RELAY_SLOW_MS = 30_000;
+  const relaySlow = pendingSince !== null && now - pendingSince > RELAY_SLOW_MS;
   const [inviterName, setInviterName] = useState('');
 
   const refresh = useCallback(() => {
@@ -154,6 +171,27 @@ export default function InvitationGenerator() {
             {t('screens.invite.relayPendingBody',
               'This usually takes a few seconds. You can make the invitation as soon as it is connected.')}
           </Text>
+          {relaySlow ? (
+            <>
+              <Text style={[typography.body, styles.unreachableBody, { color: theme.textPrimary }]}>
+                {t('screens.invite.relaySlow',
+                  'This is taking longer than it should. The relay may be down, or this network may block it — some work, school and public Wi-Fi do. Try another network, or choose another relay.')}
+              </Text>
+              <Pressable
+                accessibilityRole="link"
+                onPress={() => navigation.navigate('CadreManager')}
+                style={({ pressed }) => [styles.wayOut, { borderColor: theme.border, backgroundColor: theme.surface },
+                  pressed && styles.pressed]}
+              >
+                <View style={styles.flex1}>
+                  <Text style={[typography.body, styles.wayOutTitle, { color: theme.textPrimary }]}>
+                    {t('screens.invite.relaySlowManage', 'See or change your relay')}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
+              </Pressable>
+            </>
+          ) : null}
         </View>
       ) : unreachable ? (
         <View style={[styles.unreachable, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>

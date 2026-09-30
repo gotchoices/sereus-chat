@@ -402,6 +402,29 @@ control (exact pins, scratchpad copy) also hands all 5 founder-alone rows to the
 consistent rather than contradictory — a joiner's first sync PULLS those blocks, and 1.8's fix is to
 PUSHES. So Node cannot confirm the fix for our failure; only the two-phone run can.
 
+### First published APK: stuck at "Connecting to your relay" — release builds refused ws://, 2026-09-30
+
+On the user's phone, the relay was accepted and the app then spun indefinitely.
+
+- **Cause.** React Native's Gradle plugin sets `usesCleartextTraffic` to `true` for debug builds
+  and `false` for release builds. OkHttp, which carries React Native's WebSockets, enforces that
+  policy on `ws://`, and relay.sereus.org is `/tcp/4011/ws`. libp2p swallowed the refusal, so
+  nothing was logged. Every earlier test had used a debug build.
+- **Reproduced** with the published APK on the emulator: no relay address 20+ s after accepting.
+- **Fixed** by setting `android:usesCleartextTraffic="true"` in the manifest for every build. This is
+  safe because every libp2p connection inside the WebSocket is Noise-encrypted and pinned to its
+  peer id.
+- **Verified** with a local release build (x86_64, debug-signed): the relay address came up 4 s after
+  accepting.
+- **Longer term:** a `/wss` listener on 443 for the relay would also get through networks that block
+  port 4011.
+- **The "Connecting" panel no longer spins silently.** After 30 s it says the relay may be down or
+  the network may block it, and offers "See or change your relay". Checked on the S7 with an
+  unreachable relay address.
+- **Web:** `.htaccess` is deployed (it returns 403, as Apache does for `.ht*` files), but
+  `/chat/relay?addr=…` and `/chat/invite/…` still 404. Apache on sereus.org either lacks
+  `AllowOverride FileInfo` for `/var/www/sereus.org/chat` or does not have `mod_rewrite` enabled.
+
 ### UI feedback on the "not reachable yet" path, 2026-09-30
 
 Fixes from `apps/mobile/tmp/ui-feedback.md`:

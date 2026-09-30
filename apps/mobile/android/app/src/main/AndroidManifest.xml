@@ -13,6 +13,16 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- usesCleartextTraffic is "true" in EVERY build, not the template's
+         ${usesCleartextTraffic} placeholder (which React Native's Gradle plugin sets
+         to false for release). Relays are reached over ws:// — relay.sereus.org
+         listens on /tcp/4011/ws, and "run your own on a spare machine" means plain
+         ws on a home address — and a release build refused all of it: OkHttp
+         enforces the cleartext policy on WebSockets, libp2p swallowed the error, and
+         the app sat at "Connecting to your relay" forever. Found on the first
+         published APK, 2026-09-30; every earlier test was a debug build.
+         Safe because the WebSocket is only a wrapper: every libp2p connection
+         inside it is Noise-encrypted and authenticated to the pinned peer id. -->
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -20,7 +30,7 @@
       android:roundIcon="@mipmap/ic_launcher_round"
       android:allowBackup="false"
       android:theme="@style/AppTheme"
-      android:usesCleartextTraffic="${usesCleartextTraffic}"
+      android:usesCleartextTraffic="true"
       android:supportsRtl="true">
       <activity
         android:name=".MainActivity"
