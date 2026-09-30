@@ -402,6 +402,54 @@ control (exact pins, scratchpad copy) also hands all 5 founder-alone rows to the
 consistent rather than contradictory — a joiner's first sync PULLS those blocks, and 1.8's fix is to
 PUSHES. So Node cannot confirm the fix for our failure; only the two-phone run can.
 
+### sereus 1.8.0 adopted, 2026-09-30
+
+App and harness are on `@serfab/cadre-core`/`cadre-rn` 1.8.0 (one copy each, with `@optimystic/*`
+1.8.0). `tsc` is clean. None of the release's breaking changes hit our code:
+
+- strand ids are lowercase UUIDs;
+- `chat-sapp.qsql` uses only `table …` items;
+- we don't use `connectionManagerTimeouts`;
+- we have no config file.
+
+**Upgrading needs a wipe.** A 1.7 control store cannot be opened, so every install must clear app
+data and form its party again. Do this before the beta APK ships, not after.
+
+Results:
+
+- **Node restart repro:** passes, with the joiner writing while alone first. It re-converges about
+  16 s after a restart.
+- **Devices** (both wiped; emulator founds, S7 joins via the https link):
+
+  | measurement | 1.8 | before |
+  |---|---|---|
+  | S7 join | **58 s** | 343 s on 1.7 (not identical conditions) |
+  | messages S7 → emulator | 11–37 s | |
+  | messages emulator → S7 | 64–91 s | |
+
+  After a JS restart of both, messages crossed both ways.
+
+**App bug found and fixed:** after a restart, the S7's joined strand re-attached through discovery
+after the strand list's boot sweep. The list had stopped polling, so it showed "No strands yet"
+while the strand was active. The list now keeps a 10 s poll while it is on screen.
+
+**sereus#13 (Nate asked for per-frame latency numbers on 1.8):**
+`two-party-formation.mjs` now takes `LINK_RTT_MS`. Results with the public relay, default
+declaration:
+
+| per-frame delay | result |
+|---|---|
+| 0 / 10 / 50 / 150 / 500 ms | pass; first sync 3.5 / 3.9 / 5.9 / 9.7 / 24.8 s |
+| 1500 ms | fails 6.0 s into `formStrand`, on libp2p's `addressDialTimeout` (a fixed 6000 ms) |
+
+10 ms is the case that failed in the original report. At 1500 ms, a relayed dial needs about seven
+sequential frames, and 1.8 sizes libp2p's `dialTimeout` and `inboundUpgradeTimeout` from the link
+but not `addressDialTimeout`.
+
+**Confirmed:** with that constant temporarily raised to 30 s in the harness's `node_modules` (since
+restored), 1500 ms passes end to end. First sync took 70.8 s, and the joiner read the host's row and
+wrote back. Reported on #13.
+
 ### New-user invite flow reviewed and fixed in the app, 2026-09-30
 
 Walked stories 01 → 02 (path A) → 42 → 03 as a stranger would. Checked on the devices:

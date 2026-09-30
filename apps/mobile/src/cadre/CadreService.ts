@@ -493,6 +493,10 @@ class CadreServiceImpl {
           // cannot justify would only make the next measurement harder to read —
           // the release notes warn that a MISMATCH between a party's machines is
           // itself a failure mode.
+          // Since sereus 1.8.0 the same declaration (default 3500) also sizes
+          // Optimystic's request, push and libp2p connection limits, which used to
+          // be LAN-sized. That is where the 1.8 join-time improvement comes from,
+          // at the default — still no reason to override it.
           // libp2p's default gater refuses to dial private/loopback addresses
           // and insecure WebSockets — which covers an emulator's `10.0.2.2`, a
           // phone reaching a relay on the house wifi, and any relay not behind

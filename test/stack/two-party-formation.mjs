@@ -156,6 +156,13 @@ async function makeParty(tag, relayAddr) {
       ...(process.env.COHORT_QUERY_TIMEOUT_MS
         ? { cohortQueryTimeoutMs: Number(process.env.COHORT_QUERY_TIMEOUT_MS) }
         : {}),
+      // sereus 1.8.0 sizes formation, cohort-read and (through Optimystic 1.8)
+      // request/push/connection deadlines from the declared link round trip;
+      // 3500 ms when unset. sereus#13 asks for runs with it set to the link's
+      // worst round trip.
+      ...(process.env.LINK_RTT_MS
+        ? { linkRoundTripMs: Number(process.env.LINK_RTT_MS) }
+        : {}),
       // Fail-soft, as the app runs it: a dead relay should leave the node usable
       // and merely unreachable rather than aborting start().
       requireRelay: false,

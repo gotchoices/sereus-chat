@@ -101,15 +101,22 @@ export default function StrandList() {
   }, []);
 
   /**
-   * Re-read while the node is still bringing strands up. There is no event to
-   * wait on — cadre-core emits strand lifecycle events, but the adapter boundary
-   * deliberately does not expose them — so the list polls itself awake and stops
-   * as soon as everything has opened. Idle screens do no work.
+   * Re-read while the list is on screen. There is no event to wait on —
+   * cadre-core emits strand lifecycle events, but the adapter boundary
+   * deliberately does not expose them — so the list polls: every 3 s while the
+   * node is still bringing strands up, then every 10 s.
+   *
+   * The slow poll is not optional. "Settled" means the boot sweep is done, not
+   * that every strand is open: a strand joined from another party can be
+   * offered by discovery AFTER the sweep (seen on sereus 1.8, where joined
+   * strands are recorded party-wide), and with polling stopped it never
+   * appeared — a phone that had just rejoined its conversation showed "No
+   * strands yet", which reads as data loss. New messages' previews and a
+   * partner's first Member row arriving are the same kind of change.
    */
   useFocusEffect(useCallback(() => {
     void load();
-    if (!settling) return;
-    const timer = setInterval(() => { void load(); }, 3000);
+    const timer = setInterval(() => { void load(); }, settling ? 3000 : 10_000);
     return () => clearInterval(timer);
   }, [load, settling]));
   useEffect(() => { void load(); }, [load, rev]);
