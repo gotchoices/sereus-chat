@@ -41,6 +41,14 @@ const DEFAULT_PREFS: Prefs = {
 const INVITE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * Dev-only step timings for the message path, tagged `[perf]`. Messages took
+ * minutes between two phones while the same exchange takes under a second in
+ * Node (test/stack/message-latency.mjs); these say which step holds the time.
+ */
+const perf = (...a: unknown[]) => { if (__DEV__) console.info('[perf]', ...a); };
+const seenMessageIds = new Map<string, Set<string>>();
+
+/**
  * Retry a strand write that failed only because this node has just restarted.
  *
  * Sereus 1.9 notes: "A node that restarts while every other member of a strand is
@@ -57,6 +65,7 @@ async function retryAfterRestart<T>(write: () => Promise<T>): Promise<T> {
       return await write();
     } catch (e) {
       const transient = /Failed to get super-majority/i.test(e instanceof Error ? e.message : String(e));
+      perf('write attempt', i, 'failed:', e instanceof Error ? e.message : String(e));
       if (!transient || i >= attempts) throw e;
       await new Promise(r => setTimeout(r, 3000));
     }
@@ -78,12 +87,20 @@ export class SereusAdapter implements DataAdapter {
   // default strand.
 
   async listMessages(strandId: string, _opts?: { before?: string; limit?: number }): Promise<Message[]> {
+    const t0 = Date.now();
     const strand = await this.strandFor(strandId);
     const [rows, reactions, atts] = await Promise.all([
       queryMessages(strand),
       queryReactions(strand).catch(() => []),
       queryAttachments(strand).catch(() => []),
     ]);
+    if (__DEV__) {
+      const seen = seenMessageIds.get(strandId);
+      const fresh = rows.filter(r => !seen?.has(r.Id));
+      if (seen) for (const r of fresh) perf('first seen', r.Content.slice(0, 24), 'sent', r.Timestamp, 'UTC');
+      seenMessageIds.set(strandId, new Set(rows.map(r => r.Id)));
+      perf('listMessages', rows.length, 'rows in', Date.now() - t0, 'ms');
+    }
     const attByMessage = new Map<string, Attachment[]>();
     for (const a of atts) {
       const list = attByMessage.get(a.MessageId) ?? [];
@@ -115,7 +132,11 @@ export class SereusAdapter implements DataAdapter {
   }
 
   async send(strandId: string, input: SendInput): Promise<Message> {
+    const t0 = Date.now();
+    let t = t0;
+    const step = (name: string) => { const n = Date.now(); perf('send', name, n - t, 'ms'); t = n; };
     const strand = await this.strandFor(strandId);
+    step('strandFor');
     const peerId = cadreService.peerId;
     if (!peerId) throw new Error('Peer ID not available; cadre may not be running');
 
@@ -137,6 +158,7 @@ export class SereusAdapter implements DataAdapter {
     // that matters — when the user is actually trying to speak, which is also
     // when a cohort is most likely to be available.
     await registerSelfAsMember(strand);
+    step('registerSelfAsMember');
 
     // …and SAY SO if it still did not take. `registerSelfAsMember` swallows its
     // own failure by design (one strand failing must not stop the others during
@@ -144,6 +166,7 @@ export class SereusAdapter implements DataAdapter {
     // the same silent constraint failure as before — the draft reappears and the
     // user is told nothing. Better a sentence they can act on.
     const members = await queryMembers(strand);
+    step('queryMembers');
     if (!members.some(m => m.Id === peerId)) {
       throw new Error(
         'Could not register you in this conversation yet — no other member was reachable. ' +
@@ -154,7 +177,10 @@ export class SereusAdapter implements DataAdapter {
     // A local write.  There is no pending state to surface — the phone holds
     // the strand, so this either lands or genuinely fails.
     const row = await retryAfterRestart(() => insertMessage(strand, peerId, input.content, input.replyToId));
+    step('insertMessage');
     const saved = await insertAttachments(strand, row.Id, input.attachments ?? []);
+    step('insertAttachments');
+    perf('send total', Date.now() - t0, 'ms for', input.content.slice(0, 24));
     return {
       id: row.Id,
       memberId: peerId,

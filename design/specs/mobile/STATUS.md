@@ -105,8 +105,8 @@ their variants. Calls are parked (story 90).
 - **Fix,** the same library and setup as health/apps/mobile:
   - packages: `react-native-keyboard-controller` with Reanimated 4.3.2 and worklets 0.8.3;
   - `KeyboardProvider` at the root;
-  - the library's KeyboardAvoidingView in Chat, offset by the real header height
-    (`@react-navigation/elements`, now declared);
+  - Chat: the library's keyboard events plus bottom padding, the same approach as health's
+    Assistant screen (revised 2026-10-01, see below);
   - `KeyboardAwareScrollView` in Profile.
 - **Found on the way: our babel.config.js was never applied.** Metro's projectRoot is the repo root,
   and Babel looked for its config there. `metro.transformer.js` now passes the app directory as
@@ -116,7 +116,66 @@ their variants. Calls are parked (story 90).
   Text elements, and the paste field already sits above the keyboard.
 - **Not checked:** the two modals in My Network (key import, seed apply).
 - **Verified on the API 37 emulator:** the composer sits directly above the docked keyboard.
+- **Revised 2026-10-01: the S7 (Android 8) regressed.** Once `KeyboardProvider` was in place, the
+  library's KeyboardAvoidingView left the composer covered there, even though the library reported
+  the keyboard (height 291). Chat now listens for `keyboardDidShow`/`keyboardDidHide` and pads its
+  bottom by the keyboard height less the bottom inset.
+  - Health's Assistant also switches the input mode to `SOFT_INPUT_ADJUST_NOTHING`. **Don't:** on
+    Android 8 that mode suppresses the keyboard insets entirely, so neither the library nor React
+    Native's `Keyboard` saw the keyboard (height 0 with the keyboard up). Health may have the same
+    bug on older phones.
+  - Verified on the S7: the composer sits directly above the keyboard. Re-check on the S20 or the
+    emulator with a docked keyboard (the emulator's Gboard is currently floating).
 - **Needs a new APK** (native modules).
+
+### Two-phone test on fresh 1.9 data, 2026-10-01 (S7 Android 8 + API 37 emulator, relay only)
+
+- **Data-format gate:** both phones, which held 1.8 data, showed the "older version" screen, and
+  the node did not start. After a wipe, both set up cleanly.
+- **Join** via a `#` invite link: 150 s.
+- **Messages after a cold restart of both:** all delivered both ways, but the first writes took
+  5–10 min to commit.
+- **Warm messages:** 108 s (S7→emu) and 172–213 s (emu→S7).
+- **Gaps this exposed (not fixed):**
+  - [ ] The sender sees nothing until its own write commits, for minutes. The composer clears and
+        the message is just gone. Show an outgoing message as "sending" at once.
+  - [ ] Right after a cold start, the strand list says "No strands yet" for about 40 s while the
+        node starts. Show a loading state instead.
+  - [ ] Delivery in minutes is too slow for chat. Measure where the time goes (commit vs.
+        replication to the other phone) before raising it upstream.
+
+### Message latency diagnosis, 2026-10-01
+
+- **Node baseline** (`test/stack/message-latency.mjs`): the same 1.9 stack, relay, chat schema and
+  app node config. Commit about 0.8 s, visible on the other party about 1.0 s. That holds after a
+  restart of both and with 30 s or 150 s idle gaps between messages. Two parties use about 110 MB
+  of JS heap, flat.
+- **Found and fixed (ours):** `crypto.subtle.digest` was the pure-JS @noble/hashes polyfill, and
+  optimystic hashes every block (`canonicalBlockHash`). A Hermes CPU profile put **47% of all JS
+  time** in that digest. `polyfills/hermes.js` now routes SHA-256/512 through
+  react-native-quick-crypto's native `createHash`, checked against a known vector, with a warning
+  if it falls back. S7 after the fix: `reserveRelays` 18 s → 6.6 s; JS thread blocked 13% → 4–9%
+  once settled.
+- **The emulator is a starved peer, not a representative phone.** Its 4 GB image swaps (606 of
+  751 MB swap in use, load 10). Its JS thread is blocked 50–98% of the time, in stretches of up to
+  43 s, and a CPU profile shows few samples, so the thread isn't even scheduled. Any write needs
+  it to agree, so the S7's writes waited on it: `registerSelfAsMember` took 294 s with the S7
+  itself 5–30% blocked.
+- **Memory:** about 550 MB native heap on both devices, flat over 10 min (no leak). Hermes's own
+  heap is only 80–120 MB (28–54 MB live), so about 400 MB is native modules and/or dev-build
+  overhead. Re-measure on a release build.
+- **Dev tools added:**
+  - `[perf]` step timings in `send`/`listMessages`;
+  - `src/diagnostics/loop-lag.ts` (a 30 s loop-lag summary);
+  - read through Metro's inspector with a CDP client (the scratchpad `cdp-tail2.mjs`,
+    `cdp-profile.mjs`). `console.*` does not reach logcat on RN 0.82.
+- **Open:**
+  - [ ] Each send upserts the sender's Member row first: a second consensus write that doubles
+        send time. Read first, and upsert only when the row is missing or the name changed.
+  - [ ] Show an outgoing message as "sending" at once.
+  - [ ] Re-test on two real phones (S7 + S20), or give the emulator more RAM.
+  - [ ] Possible upstream question, still needs a two-process Node repro: with one member's loop
+        stalled, the other member's local reads took 60–200 s, not just its writes.
 
 ## Waiting on upstream — revisit when these land
 

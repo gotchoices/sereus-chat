@@ -25,7 +25,7 @@ if (__DEV__ && !process.env.DEBUG) {
 // Which patches below actually fired, for the at-boot audit in polyfills/audit.js.
 // Reading `typeof X === 'undefined'` at audit time cannot tell a native API from one
 // of ours; this can.
-const { markPolyfilled } = require('./registry');
+const { markPolyfilled, wasPolyfilled } = require('./registry');
 
 // Native CSPRNG — must be the very first import so globalThis.crypto.getRandomValues
 // is available before any library code. No-op if the native API already exists.
@@ -473,5 +473,46 @@ markPolyfilled('setTimeout.ref');
 			}
 		}
 		markPolyfilled('crypto.subtle.ed25519');
+	}
+
+	// SHA-256/512 DIGEST, native as well. The pure-JS digest above (@noble/hashes)
+	// is what multiformats' sha256 reaches, and optimystic hashes every block it
+	// stores or compares (`canonicalBlockHash`). A Hermes CPU profile of the
+	// emulator (2026-10-01) put 47% of all JS time in that digest; the JS thread
+	// was blocked up to 43 s at a stretch and a two-phone message took minutes,
+	// against ~1 s for the same exchange in Node, where the digest is native.
+	// Checked against a known vector before it is trusted; on any mismatch or
+	// error the JS digest stays.
+	const createHash = qc.createHash ?? qc.default?.createHash;
+	if (typeof createHash === 'function') {
+		const nativeDigest = (name, bytes) =>
+			new Uint8Array(createHash(name).update(bytes).digest());
+		let ok = false;
+		try {
+			const abc = new Uint8Array([0x61, 0x62, 0x63]);
+			const hex = Array.from(nativeDigest('sha256', abc), b => b.toString(16).padStart(2, '0')).join('');
+			ok = hex === 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+		} catch { /* keep the JS digest */ }
+		if (ok) {
+			const algos = { 'SHA-256': 'sha256', 'SHA-512': 'sha512' };
+			const jsDigest = globalThis.crypto.subtle.digest;
+			globalThis.crypto.subtle.digest = function digest(algorithm, data) {
+				const algo = algos[typeof algorithm === 'string' ? algorithm : algorithm?.name];
+				if (!algo) return jsDigest.call(this, algorithm, data);
+				try {
+					const bytes = data instanceof Uint8Array ? data
+						: ArrayBuffer.isView(data) ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+						: new Uint8Array(data);
+					const out = nativeDigest(algo, bytes);
+					return Promise.resolve(out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength));
+				} catch (e) {
+					return Promise.reject(e);
+				}
+			};
+			markPolyfilled('crypto.subtle.digest.native');
+		}
+	}
+	if (!wasPolyfilled('crypto.subtle.digest.native')) {
+		console.warn('[polyfills] native SHA digest unavailable — block hashing runs in pure JS and will be slow');
 	}
 }

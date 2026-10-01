@@ -15,8 +15,8 @@ import {
   View, Text, TextInput, FlatList, Pressable, Image, StyleSheet, Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { KeyboardEvents } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import {
@@ -74,8 +74,34 @@ export default function ChatInterface() {
   const navigation: any = useNavigation();
   const route: any = useRoute();
   const { strandId, title } = route.params ?? {};
-  /** The navigation header sits above this view; the avoider measures from the window top. */
-  const headerHeight = useHeaderHeight();
+  /**
+   * KEEPING THE COMPOSER ABOVE THE KEYBOARD (global/ui.md, "The on-screen
+   * keyboard"), on every Android version.
+   *
+   * The same approach as health/apps/mobile's Assistant screen: while this screen
+   * is focused the window is told not to resize at all, and the conversation is
+   * padded by the keyboard height react-native-keyboard-controller reports. Two
+   * other approaches failed on real devices:
+   *   - React Native's KeyboardAvoidingView relied on `adjustResize`, which an
+   *     edge-to-edge window never gets: the composer sat under the keyboard on an
+   *     S20 (Android 13), Nate's phone, and Android 17.
+   *   - The library's own KeyboardAvoidingView fixed those but did nothing on a
+   *     Galaxy S7 (Android 8): the library reported the keyboard (height 291) yet
+   *     the composer never moved.
+   * The keyboard height is measured from the screen bottom; this view already
+   * sits above the bottom safe-area inset, so that much is subtracted.
+   */
+  const insets = useSafeAreaInsets();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useFocusEffect(useCallback(() => {
+    const show = KeyboardEvents.addListener('keyboardDidShow', e => setKeyboardHeight(e.height));
+    const hide = KeyboardEvents.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+      setKeyboardHeight(0);
+    };
+  }, []));
   const t = useT();
   const rev = useDataRevision();
   const theme = useTheme();
@@ -303,14 +329,8 @@ export default function ChatInterface() {
   };
 
   return (
-    // The library's KeyboardAvoidingView, not React Native's: RN's relied on the
-    // window being resized (adjustResize), which an edge-to-edge window never is —
-    // the composer sat under the keyboard on an S20 and on Android 17.
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      behavior="padding"
-      keyboardVerticalOffset={headerHeight}
-    >
+    <View style={[styles.container, { backgroundColor: theme.background,
+      paddingBottom: Math.max(0, keyboardHeight - insets.bottom) }]}>
       {state ? (
         <Pressable onPress={() => navigation.navigate('StrandDetail', { strandId, title })}
           style={[styles.statusStrip, { borderBottomColor: theme.divider }]}>
@@ -421,7 +441,7 @@ export default function ChatInterface() {
         onDismiss={() => setMsgMenu(null)}
         options={msgMenu ? messageOptions(msgMenu) : []}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
