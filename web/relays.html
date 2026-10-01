@@ -148,7 +148,7 @@
     // Custom-scheme `sereus://` links are not used: browsers block or silently drop
     // them from a web page.
     //
-    // Elsewhere (desktop, iOS) the https link stands; it lands on the same page.
+    // Elsewhere (desktop, iOS) the link goes straight to that page.
     //
     // The link PROPOSES a relay.  The app shows who runs it and what they would
     // see, and the person decides there — a web page never configures
@@ -159,7 +159,10 @@
       const pending = el.parentElement.querySelector('.relay-pending');
       if (!addr) { el.setAttribute('aria-disabled', 'true'); continue; }
       const q = 'addr=' + encodeURIComponent(addr);
-      const page = 'https://sereus.org/chat/relay?' + q;
+      // The static page itself, not /chat/relay: that path has no file behind it
+      // and would need a server rewrite. A relay address is not a secret, so a
+      // query is fine here (contrast invitations, which go after '#').
+      const page = 'https://sereus.org/chat/relay.html?' + q;
       el.setAttribute('href', isAndroid
         ? 'intent://relay?' + q + '#Intent;scheme=sereus;package=org.sereus.chat;S.browser_fallback_url=' +
             encodeURIComponent(page) + ';end'

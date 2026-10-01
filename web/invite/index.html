@@ -52,20 +52,26 @@
   </footer>
 
   <script>
-    // Served at /chat/invite/<token> (see .htaccess), or ?token= as a fallback.
-    // Reached when the invitation link was not handed to the app — usually because
-    // the app is not installed yet.
+    // Served at /chat/invite/ as a plain static page (no server rewrite). The
+    // invitation arrives after the '#': https://sereus.org/chat/invite/#<token>.
+    // A fragment is never sent to the server, so the invitation (which works for
+    // whoever holds it) never reaches the access log. Reached when the link was
+    // not handed to the app, usually because the app is not installed yet.
     (function () {
-      var m = location.pathname.match(/\/invite\/([^\/?#]+)/);
-      var token = (m && m[1]) || new URLSearchParams(location.search).get('token') || '';
+      var token = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+      // Tolerated, never generated: ?t=<token>.
+      if (!token) token = new URLSearchParams(location.search).get('t') || '';
       if (!token) { document.getElementById('no-token').hidden = false; return; }
       // "Open it" launches the app with the invitation in hand. On Android that is a
-      // Chrome intent:// URL — a custom-scheme link is dropped by the browser — with
-      // this page as the fallback if the app turns out not to be installed.
+      // Chrome intent:// URL (a custom-scheme link is dropped by the browser), with
+      // this page as the fallback if the app turns out not to be installed. The
+      // token goes in the intent's path; the '#' here begins the intent's own
+      // parameters.
+      var t = encodeURIComponent(token);
       document.getElementById('open-app').setAttribute('href', /Android/i.test(navigator.userAgent)
-        ? 'intent://invite/' + token + '#Intent;scheme=sereus;package=org.sereus.chat;S.browser_fallback_url=' +
+        ? 'intent://invite/' + t + '#Intent;scheme=sereus;package=org.sereus.chat;S.browser_fallback_url=' +
             encodeURIComponent(location.href) + ';end'
-        : 'sereus://invite/' + token);
+        : 'sereus://invite/' + t);
     })();
   </script>
 </body>

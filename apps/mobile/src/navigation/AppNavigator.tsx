@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer, DefaultTheme, DarkTheme, useFocusEffect } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, useFocusEffect, getStateFromPath as defaultGetStateFromPath } from '@react-navigation/native';
 import type { LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, Text, Pressable, ScrollView, StyleSheet, Linking, Image } from 'react-native';
@@ -99,6 +99,15 @@ export default function AppNavigator() {
         Diagnostics: 'diagnostics',
         RelayOffer: 'relay',
       },
+    },
+    // Invitations are shared as https://sereus.org/chat/invite/#<token> — the
+    // token after `#` so it never reaches the web server (data/inviteLink.ts).
+    // The path parser knows nothing of fragments, so map that form onto the
+    // existing `invite/:token` route; every other path, including the older
+    // `invite/<token>` links already sent, parses as before.
+    getStateFromPath: (path, options) => {
+      const m = path.match(/^\/?invite\/?#([^?#/]+)/);
+      return defaultGetStateFromPath(m ? `invite/${m[1]}` : path, options);
     },
   };
 

@@ -6,7 +6,7 @@ separate subdomain to provision). Three jobs:
 
 1. **Learn** about Sereus Chat and **download** the app (the landing page).
 2. **Handle invitation links** for people who don't have the app yet
-   (`/chat/invite/<token>` → a "you're invited, get the app" page).
+   (`/chat/invite/#<token>` → a "you're invited, get the app" page).
 3. **Contribute the deep-link association entries** so
    `https://sereus.org/chat/invite/…` opens the app directly on phones that have
    it (Android App Links / iOS Universal Links).
@@ -16,10 +16,9 @@ separate subdomain to provision). Three jobs:
 | Path | What |
 |------|------|
 | `index.html`, `styles.css` | The landing page |
-| `invite.html` | Fallback shown at `/chat/invite/<token>` when the app isn't installed |
+| `invite/index.html` | Shown at `/chat/invite/#<token>` when the app isn't installed; reads the token from the fragment |
 | `relays.html` | Where to get a relay; its "Use this relay" links hand an offer to the app |
-| `relay.html` | Fallback shown at `/chat/relay?addr=…` when the app isn't installed |
-| `.htaccess` | Rewrites `/chat/invite/*` and `/chat/relay` to the two fallback pages |
+| `relay.html` | Shown at `/chat/relay.html?addr=…` when a relay link can't reach the app |
 | `images/logo.svg` | Logo |
 | `.well-known/assetlinks.json` | Chat's Android App-Links statement (merged into the apex on deploy) |
 | `.well-known/apple-app-site-association` | Chat's iOS Universal-Links detail (merged into the apex on deploy) |
@@ -32,7 +31,7 @@ leave it alone.
 
 ## Deep links (App Links / Universal Links) — and the apex `.well-known`
 
-The app registers `https://sereus.org/chat/invite/<token>` (see `../apps/mobile` —
+The app registers `https://sereus.org/chat/invite/` (invitation after `#`) (see `../apps/mobile` —
 `AndroidManifest.xml`, `ios/mobile/mobile.entitlements`, `src/data/inviteLink.ts`).
 
 **Important:** App Links (Android) and Universal Links (iOS) only read the
@@ -65,13 +64,22 @@ Also required, once (app side): in Xcode, add the **Associated Domains** capabil
 to the `mobile` target so `ios/mobile/mobile.entitlements` (`applinks:sereus.org`)
 is compiled into the build.
 
-### `/chat/invite/<token>` and `/chat/relay` routing
+### Invitation and relay pages: static files, no rewrites
 
-Both are app deep links with no file behind them. When a link is not handed to
-the app, the browser requests the path, and `.htaccess` (deployed with the pages)
-serves `invite.html` or `relay.html`. That needs `mod_rewrite` and
-`AllowOverride FileInfo` for the `chat/` directory. Without them, both paths
-return 404; this was the live state on 2026-09-30.
+**Invitations: `https://sereus.org/chat/invite/#<token>`.**
+- **App installed:** the phone hands the link to the app, and the server is never asked.
+- **No app:** the browser requests `/chat/invite/`, which Apache serves from `invite/index.html`.
+  The page reads the token from after the `#`.
+- **Why `#`:** an invitation works for whoever holds it, and a fragment is never sent to the
+  server, so it never reaches the access log. A path form (`/chat/invite/<token>`) would need a
+  server rewrite; a query (`?t=`) would be logged.
+- **Older links:** the app still opens the path-form links handed out before this change, but in a
+  browser they 404.
+
+**Relays:** pages link to `relay.html?addr=…` directly. A relay address isn't secret, so a query is
+fine.
+
+Nothing here needs `mod_rewrite` or `AllowOverride`; plain static hosting serves it all.
 
 ### Launching the app from these pages
 
@@ -82,7 +90,7 @@ Two kinds of link, and the difference matters:
   page.
 - **Links tapped on a sereus.org page** cannot rely on that. Chrome does not hand
   a same-site link to an app; it stays in the browser (seen on a device with the
-  app installed and verified). So `relays.html`, `relay.html` and `invite.html`
+  app installed and verified). So `relays.html`, `relay.html` and `invite/index.html`
   launch the app on Android with a Chrome `intent://…#Intent;scheme=sereus;package=org.sereus.chat;S.browser_fallback_url=…;end`
   URL, which falls back to the https page when the app is missing.
   A bare `sereus://` link is not used from a web page, because browsers drop it.
@@ -94,7 +102,7 @@ Two kinds of link, and the difference matters:
 ```
 
 `http.server` does no rewriting, so preview the invite page directly at
-`/chat/invite.html?token=DEMO`.
+`/chat/invite/#DEMO`.
 
 ## Publish
 

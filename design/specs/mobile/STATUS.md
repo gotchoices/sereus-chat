@@ -402,6 +402,36 @@ control (exact pins, scratchpad copy) also hands all 5 founder-alone rows to the
 consistent rather than contradictory — a joiner's first sync PULLS those blocks, and 1.8's fix is to
 PUSHES. So Node cannot confirm the fix for our failure; only the two-phone run can.
 
+### Invitation links carry the token after `#`; web pages are static, 2026-09-30
+
+- **Format:** invitations are now `https://sereus.org/chat/invite/#<token>`.
+  - Without the app, the browser loads `/chat/invite/` from `web/invite/index.html` (moved from
+    `invite.html`), which reads the token from the fragment.
+  - The fragment is never sent to the server, so the invitation stays out of its logs.
+  - No rewrite is needed. The previous path form returned 404 because the host ignored
+    `.htaccess`, which is now deleted.
+- **Compatibility:** the app still accepts the path form, `?t=`, `sereus://` and `chat://`.
+  The Android pathPrefix `/chat/invite/` already covers the new form, and the iOS association file
+  adds `/chat/invite/`. `navigation.md`'s deep-link row is updated (user-approved format).
+- **Relays:** sereus.org pages fall back to the static `relay.html?addr=…`.
+- **Checked:**
+  - the parser unit cases (8/8);
+  - on the emulator, the `#` link and the old path link both open acceptance (the `#` one needs
+    the linking hook, applied at app start);
+  - the local `/chat/invite/#…` page renders, and its "Open it" opens acceptance.
+
+### optimystic 1.8.1 + p2p-fret 1.0.0 adopted, 2026-09-30
+
+- **The release:** optimystic 1.8.1 has no code change. It requires Fret 1.0.0, which signs address
+  records in the neighbour exchange and the saved routing table.
+- **Installed:** app and harness each have one copy of `@optimystic/*` 1.8.1 and `p2p-fret` 1.0.0.
+  `tsc` is clean.
+- **Node restart repro:** passes, including the founder-alone handoff. It re-converged 23 s after
+  the restart.
+- **Devices:** the emulator got the new debug build over its existing data. Both phones
+  cold-restarted onto Fret 1.0.0 over storage written by the beta, re-attached their shared strand,
+  and messages crossed both ways (S7 → emulator 42 s, emulator → S7 27 s).
+
 ### A strand is a container: one row per strand; members and invitations inside, 2026-09-30
 
 - **Stories amended** (user's direction):

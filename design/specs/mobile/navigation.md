@@ -66,7 +66,7 @@ reliable route from the web.
 
 | Path | Goes to |
 |------|---------|
-| `/chat/invite/{token}` | InvitationAcceptance |
+| `/chat/invite/#{token}` | InvitationAcceptance. The invitation goes after `#`, so it is never sent to the web server; without the app, `/chat/invite/` is a static page that reads it |
 | `/chat/relay?addr={multiaddr}` | Relay offer — **proposes**, never applies (story 42) |
 
 **Custom scheme — `sereus://`** for QR codes, in-app links and local testing, where there is no

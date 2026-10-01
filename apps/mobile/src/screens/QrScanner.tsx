@@ -74,7 +74,7 @@ export default function QrScanner() {
       <Text style={[styles.label, { color: theme.textSecondary }]}>{t('screens.QrScanner.pasteLabel', 'Paste invite link')}</Text>
       <TextInput
         style={[styles.input, { backgroundColor: theme.surfaceAlt, borderColor: theme.border, color: theme.textPrimary }]}
-        placeholder={t('screens.QrScanner.pastePlaceholder', 'https://sereus.org/chat/invite/abc123')}
+        placeholder={t('screens.QrScanner.pastePlaceholder', 'https://sereus.org/chat/invite/#abc123')}
         placeholderTextColor={theme.textMuted}
         value={value}
         onChangeText={setValue}

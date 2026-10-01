@@ -3,7 +3,7 @@
     "cameraUnavailable": "Camera unavailable",
     "open": "Open",
     "pasteLabel": "Paste invite link",
-    "pastePlaceholder": "https://sereus.org/chat/invite/abc123",
+    "pastePlaceholder": "https://sereus.org/chat/invite/#abc123",
     "simulatorNote": "Camera not available in simulator. Paste an invite link below.",
     "title": "Scan QR"
   },
