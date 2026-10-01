@@ -38,10 +38,10 @@ import {
 // published, upstream-maintained one — the same divergence cost `index.js`
 // already warns about for the polyfills.
 import {
-  PersistentStrandPeerBookStore,
+  PersistentStrandNetworkStateStore,
   KeyStoreJoinedStrandStore,
 } from '@serfab/cadre-core';
-import { strandPeerBookSlot, RNKeyStore } from './rn-durable-slot';
+import { strandNetworkStateSlot, RNKeyStore, LEGACY_STRAND_PEER_BOOK_PREFIX } from './rn-durable-slot';
 import {
   buildNoiseCrypto,
   DEFAULT_NOISE_CRYPTO_MODE,
@@ -390,9 +390,12 @@ class CadreServiceImpl {
        * first night both handsets sleep. There is no error when that happens:
        * the strand still reports `active` and still accepts local writes.
        *
-       *   strandPeers    where the other members' machines were last seen,
-       *                  seeded before anything else on launch. Replaces the
-       *                  address knowledge that used to die with the process.
+       *   strandNetworkState  each strand node's routing table, with every
+       *                  peer's signed address record (sereus 1.9; it replaced
+       *                  1.7's strand peer book). Saved and reloaded across a
+       *                  restart, so a restarted phone reaches the other members
+       *                  without a fresh invitation. In memory, it dies with the
+       *                  process and so does every conversation's way back.
        *   joinedStrands  the strands this party joined from ANOTHER party.
        *                  cadre-core re-offers them as `strand:discovered` every
        *                  start. A node given `privateKey` — as this one is —
@@ -400,10 +403,15 @@ class CadreServiceImpl {
        *                  explicitly; the notes name the web reference app, which
        *                  has this same shape, as still losing such strands.
        */
-      const strandPeerStore = await PersistentStrandPeerBookStore.open(
-        strandPeerBookSlot(this._partyId),
+      const strandNetworkStore = await PersistentStrandNetworkStateStore.open(
+        strandNetworkStateSlot(this._partyId),
         this._partyId,
       );
+      // The 1.7–1.8 peer book is no longer read (1.9 notes: "can be deleted").
+      void AsyncStorage.getAllKeys()
+        .then(keys => keys.filter(k => k.startsWith(LEGACY_STRAND_PEER_BOOK_PREFIX)))
+        .then(old => (old.length ? AsyncStorage.multiRemove(old) : undefined))
+        .catch(() => { /* best effort; nothing reads it */ });
       const joinedStrandStore = new KeyStoreJoinedStrandStore(
         new RNKeyStore(),
         this._partyId,
@@ -415,7 +423,7 @@ class CadreServiceImpl {
           partyId: this._partyId,
           bootstrapNodes: [],
         },
-        strandPeers: { store: strandPeerStore },
+        strandNetworkState: { store: strandNetworkStore },
         joinedStrands: { store: joinedStrandStore },
         profile: 'transaction',
         // Only join strands tagged with our chat sAppId.

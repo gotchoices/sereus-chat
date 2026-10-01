@@ -69,6 +69,32 @@ their variants. Calls are parked (story 90).
 - [ ] Consider adding `needs:` frontmatter (domain primitives) to the screen specs — appeus's
       `spec-schema.md` offers it and it would tighten dependency tracking
 
+### sereus 1.9.0 adopted; an in-place 1.8 → 1.9 upgrade strands relay-only parties, 2026-10-01
+
+- **Adopted:** `@serfab/cadre-core`/`cadre-rn` 1.9.0.
+  - The strand peer book is replaced by `strandNetworkState`
+    (`PersistentStrandNetworkStateStore` over the `@sereus.chat/strandNetworkState/<party>` slot).
+    Old `strandPeerBook` keys are deleted at start.
+  - Send retries `Failed to get super-majority` 5× at 3 s, as the 1.9 notes say to.
+  - The harnesses use `FileStrandNetworkStateStore`, and `restart-reconverge.mjs` adapts to 1.8 or
+    1.9.
+  - `tsc` is clean.
+- **Node results on 1.9:** the restart repro passes, re-converging about 15 s after the restart.
+  The #25 repro still exits 1, as expected.
+- **Upgrade bug.** Both phones upgraded from 1.8 to 1.9 in place and restarted, and the strand nodes
+  never reconnected (`peers=0` after 12+ min).
+  - Reproduced in Node: phase 1 on 1.8 in `scratchpad/stack-v18`, phase 2 on 1.9 → no
+    re-convergence in 180 s.
+  - Control, 1.9 → 1.9: re-converged in 9 s.
+  - Cause: 1.9 no longer reads the peer book, and the new state starts empty. Draft:
+    `apps/mobile/tmp/sereus-19-upgrade-issue.md`.
+  - **Consequence: the beta APK must start on 1.9.** The current test devices need a fresh strand.
+- **Upstream replies:**
+  - #25 is accepted with a party-wide scope. Every always-on machine retries, and the inviter's
+    always-on machine will answer joins.
+  - #13: the `addressDialTimeout` fix goes to optimystic, and Nate closes the issue once we confirm
+    1500 ms passes unpatched.
+
 ### Keyboard covered the composer on modern Android — fixed with react-native-keyboard-controller, 2026-09-30
 
 - **Seen on:** the user's S20, Nate's phone, and the API 37 emulator. The S7 (Android 8) was fine,

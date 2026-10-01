@@ -47,7 +47,12 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-file';
-import { FileStrandPeerBookStore } from '@serfab/cadre-core/strand-peer-book-file';
+// Version-adaptive, so one script can run phase 1 under sereus 1.8 and phase 2
+// under 1.9 over the same storage (the in-place upgrade case): 1.9 saves strand
+// network state; 1.7–1.8 kept a strand peer book instead.
+let FileStrandNetworkStateStore = null, FileStrandPeerBookStore = null;
+try { ({ FileStrandNetworkStateStore } = await import('@serfab/cadre-core/strand-network-state-file')); }
+catch { ({ FileStrandPeerBookStore } = await import('@serfab/cadre-core/strand-peer-book-file')); }
 import { FileKeyStore } from '@serfab/cadre-core/key-store-file';
 import { KeyStoreJoinedStrandStore } from '@serfab/cadre-core';
 import { openTestDb } from './classic-level-driver.mjs';
@@ -210,7 +215,7 @@ async function startParty(tag, partyId) {
    * about it — "either store left in memory reproduces the old behaviour" — so a
    * rig that omits them would report the bug as still present and be wrong.
    *
-   *   strandPeers   the per-strand peer book: who else is on this strand and
+   *   strandNetworkState (was the strand peer book until sereus 1.9): who else is on this strand and
    *                 where they were last seen, seeded before anything else on
    *                 launch. This is what replaces the address knowledge that
    *                 used to die with the process.
@@ -220,8 +225,9 @@ async function startParty(tag, partyId) {
    *                 A node configured with `privateKey` (as this one is) has no
    *                 keyStore of its own, so the store is injected explicitly.
    */
-  const strandPeerStore = await FileStrandPeerBookStore.open(
-    join(STORE_ROOT, `${tag}-strandpeers`), partyId);
+  const strandPeerStore = FileStrandNetworkStateStore
+    ? await FileStrandNetworkStateStore.open(join(STORE_ROOT, `${tag}-strandnet`), partyId)
+    : await FileStrandPeerBookStore.open(join(STORE_ROOT, `${tag}-strandpeers`), partyId);
   const joinedStore = new KeyStoreJoinedStrandStore(
     new FileKeyStore(join(STORE_ROOT, `${tag}-keys`)), partyId);
 
@@ -229,7 +235,9 @@ async function startParty(tag, partyId) {
     privateKey: await identityFor(tag),
     controlNetwork: { partyId, bootstrapNodes: [] },
     bootstrapPeers: { store: bootstrapStore },
-    strandPeers: { store: strandPeerStore },
+    ...(FileStrandNetworkStateStore
+      ? { strandNetworkState: { store: strandPeerStore } }
+      : { strandPeers: { store: strandPeerStore } }),
     joinedStrands: { store: joinedStore },
     profile: 'transaction',
     strandFilter: { mode: 'all' },

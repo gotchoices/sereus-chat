@@ -40,6 +40,29 @@ const DEFAULT_PREFS: Prefs = {
 /** Open invitations are valid for 24h — matches the cadre-core default. */
 const INVITE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Retry a strand write that failed only because this node has just restarted.
+ *
+ * Sereus 1.9 notes: "A node that restarts while every other member of a strand is
+ * offline now remembers them, so its first writes to that strand can fail for a few
+ * seconds (`Failed to get super-majority`) until it finds them unreachable. Retry
+ * the write." A failed super-majority committed nothing, so retrying cannot
+ * duplicate the message. Any other error, or the same one after ~12 s, is the
+ * caller's to report — the draft is kept.
+ */
+async function retryAfterRestart<T>(write: () => Promise<T>): Promise<T> {
+  const attempts = 5;
+  for (let i = 1; ; i++) {
+    try {
+      return await write();
+    } catch (e) {
+      const transient = /Failed to get super-majority/i.test(e instanceof Error ? e.message : String(e));
+      if (!transient || i >= attempts) throw e;
+      await new Promise(r => setTimeout(r, 3000));
+    }
+  }
+}
+
 export class SereusAdapter implements DataAdapter {
   private notImplemented(op: string): never {
     throw new Error(
@@ -130,7 +153,7 @@ export class SereusAdapter implements DataAdapter {
 
     // A local write.  There is no pending state to surface — the phone holds
     // the strand, so this either lands or genuinely fails.
-    const row = await insertMessage(strand, peerId, input.content, input.replyToId);
+    const row = await retryAfterRestart(() => insertMessage(strand, peerId, input.content, input.replyToId));
     const saved = await insertAttachments(strand, row.Id, input.attachments ?? []);
     return {
       id: row.Id,

@@ -2,10 +2,11 @@
  * rn-durable-slot.ts — a `DurableSlot` over AsyncStorage, and a `KeyStore` on top
  * of the same storage.
  *
- * WHY BOTH EXIST. sereus 1.7.0 fixes the bug where two relay-only parties that
+ * WHY BOTH EXIST. sereus 1.7.0 fixed the bug where two relay-only parties that
  * both restarted could never find each other again (gotchoices/sereus#18). The
  * fix is two pieces of state a node must keep across restarts — where the other
- * members were last seen, and which strands it joined from another party — and
+ * members were last seen (since 1.9, the strand nodes' saved routing table), and
+ * which strands it joined from another party — and
  * its release notes are blunt about what happens if an app does not supply
  * somewhere to keep them: "either store left in memory reproduces the old
  * behaviour". cadre-core ships file-backed versions for Node and expects a
@@ -58,10 +59,20 @@ export class AsyncStorageDurableSlot implements DurableSlot {
   }
 }
 
-/** Slot names are namespaced by party: two parties on one device must not share. */
-export function strandPeerBookSlot(partyId: string): DurableSlot {
-  return new AsyncStorageDurableSlot(`@sereus.chat/strandPeerBook/${partyId}`);
+/**
+ * Where the strand nodes' saved network state lives (sereus 1.9: each strand
+ * node's routing table, with every peer's signed address record). Slot names are
+ * namespaced by party: two parties on one device must not share.
+ */
+export function strandNetworkStateSlot(partyId: string): DurableSlot {
+  return new AsyncStorageDurableSlot(`@sereus.chat/strandNetworkState/${partyId}`);
 }
+
+/**
+ * The 1.7–1.8 strand peer book's slot. Sereus 1.9 removed the book and no longer
+ * reads it, so it is only ever deleted.
+ */
+export const LEGACY_STRAND_PEER_BOOK_PREFIX = '@sereus.chat/strandPeerBook/';
 
 /**
  * A `KeyStore` over AsyncStorage.

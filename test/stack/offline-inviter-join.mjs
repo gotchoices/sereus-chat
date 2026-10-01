@@ -39,7 +39,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-file';
-import { FileStrandPeerBookStore } from '@serfab/cadre-core/strand-peer-book-file';
+import { FileStrandNetworkStateStore } from '@serfab/cadre-core/strand-network-state-file';
 import { FileKeyStore } from '@serfab/cadre-core/key-store-file';
 import { openTestDb } from './classic-level-driver.mjs';
 
@@ -119,7 +119,7 @@ async function startParty(tag, partyId) {
     privateKey: await identityFor(tag),
     controlNetwork: { partyId, bootstrapNodes: [] },
     bootstrapPeers: { store: await FileBootstrapPeerStore.open(join(STORE_ROOT, `${tag}-bootstrap`), partyId) },
-    strandPeers: { store: await FileStrandPeerBookStore.open(join(STORE_ROOT, `${tag}-strandpeers`), partyId) },
+    strandNetworkState: { store: await FileStrandNetworkStateStore.open(join(STORE_ROOT, `${tag}-strandnet`), partyId) },
     joinedStrands: { store: new KeyStoreJoinedStrandStore(new FileKeyStore(join(STORE_ROOT, `${tag}-keys`)), partyId) },
     profile: 'transaction',
     strandFilter: { mode: 'all' },
