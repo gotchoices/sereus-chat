@@ -66,6 +66,20 @@ export async function insertMember(
 }
 
 /**
+ * A stored datetime as an ISO 8601 UTC string. This app writes DATETIME in UTC as
+ * 'YYYY-MM-DD HH:MM:SS' (`insertMessage`), and Quereus reads it back as
+ * 'YYYY-MM-DDTHH:MM:SS', still with no zone. Parsed as it is, `Date` reads that as
+ * LOCAL time: every message showed the hour of UTC, six hours off in Mountain time.
+ * Anything already zoned passes through.
+ */
+export function storedUtcToIso(stored: string): string;
+export function storedUtcToIso(stored: string | null): string | null;
+export function storedUtcToIso(stored: string | null): string | null {
+  if (!stored) return stored;
+  return /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(stored) ? `${stored.replace(' ', 'T')}Z` : stored;
+}
+
+/**
  * Upsert a member's display name.  Inserts if absent, updates if present.
  * Used when the local profile name changes and we want every attached
  * strand's Member row to reflect it.
@@ -130,7 +144,7 @@ export async function insertMessage(
     [id, memberId, content, now, replyToId ?? null],
   );
 
-  return { Id: id, MemberId: memberId, Content: content, Timestamp: now, ReplyToId: replyToId ?? null };
+  return { Id: id, MemberId: memberId, Content: content, Timestamp: storedUtcToIso(now), ReplyToId: replyToId ?? null };
 }
 
 /** Newest last; capped to `limit`. */
@@ -157,9 +171,9 @@ export async function queryMessages(
       Id: row.Id as string,
       MemberId: row.MemberId as string,
       Content: row.Content as string,
-      Timestamp: row.Timestamp as string,
+      Timestamp: storedUtcToIso(row.Timestamp as string),
       ReplyToId: (row.ReplyToId as string) ?? null,
-      EditedAt: (row.EditedAt as string) ?? null,
+      EditedAt: storedUtcToIso((row.EditedAt as string) ?? null),
       MemberName: (row.MemberName as string) ?? undefined,
     });
   }

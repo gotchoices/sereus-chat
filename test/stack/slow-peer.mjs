@@ -29,8 +29,8 @@ import { CadreNode, ControlFormationUsageRecorder, generateStrandMemberKey, KeyS
 import { LevelDBRawStorage } from '@optimystic/db-p2p-storage-rn';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
-import { generateKeyPair } from '@libp2p/crypto/keys';
-import { readFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { generateKeyPair, privateKeyToProtobuf, privateKeyFromProtobuf } from '@libp2p/crypto/keys';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -58,8 +58,14 @@ let writing = false, lastWriteEnd = Date.now();
  * PEER_MODE=stall (default) blocks the peer's loop for the middle window.
  * PEER_MODE=offline stops the peer's node instead (the other phone switched off),
  * and there is no "recovered" window.
+ * PEER_MODE=return stops the peer, writes LONE_WRITES messages alone, restarts the peer
+ * with the same identity and storage, and times how long until it holds them.
  */
 const PEER_MODE = process.env.PEER_MODE ?? 'stall';
+/** PEER_MODE=return: messages written while the peer is down, how long it stays down after, how long to wait for it. */
+const LONE_WRITES = Number(process.env.LONE_WRITES ?? 3);
+const OFFLINE_MS = Number(process.env.OFFLINE_MS ?? 20_000);
+const RETURN_WAIT_MS = Number(process.env.RETURN_WAIT_MS ?? 180_000);
 
 const here = dirname(fileURLToPath(import.meta.url));
 // The chat schema when run from the chat repo; the two tables this script touches otherwise.
@@ -100,10 +106,19 @@ function storageFor(tag) {
   };
 }
 
+/** A machine keeps its peer id across a restart (PEER_MODE=return restarts the peer). */
+async function identityFor(tag) {
+  const file = join(STORE_ROOT, `${tag}.key`);
+  if (existsSync(file)) return privateKeyFromProtobuf(readFileSync(file));
+  const key = await generateKeyPair('Ed25519');
+  writeFileSync(file, privateKeyToProtobuf(key));
+  return key;
+}
+
 /** The app's node configuration (CadreService.ts), minus RN-only noiseCrypto. */
 async function startParty(tag, partyId) {
   const node = new CadreNode({
-    privateKey: await generateKeyPair('Ed25519'),
+    privateKey: await identityFor(tag),
     controlNetwork: { partyId, bootstrapNodes: [] },
     bootstrapPeers: { store: await FileBootstrapPeerStore.open(join(STORE_ROOT, `${tag}-bootstrap`), partyId) },
     strandNetworkState: { store: await FileStrandNetworkStateStore.open(join(STORE_ROOT, `${tag}-strandnet`), partyId) },
@@ -143,17 +158,36 @@ const insertMessage = (inst, memberId, content) => db(inst).exec(
 // ───────────────────────────── PEER (child) ─────────────────────────────
 if (ROLE === 'peer') {
   let stallTimer = null, stalledMs = 0;
-  const node = await startParty('peer', `slowpeer-peer-${randomUUID().slice(0, 8)}`);
+  // The same party across a restart; a restarted peer re-attaches its strand the way
+  // the app does, from the joined-strand record cadre-core re-offers at start.
+  const node = await startParty('peer', process.env.PEER_PARTY_ID);
+  const attaching = new Set();
+  node.on('strand:discovered', ({ strandId, strand }) => {
+    if (attaching.has(strandId) || node.getStrands().has(strandId)) return;
+    attaching.add(strandId);
+    void node.addStrand({ strandRow: strand, sAppConfig: SAPP })
+      .then(() => { log(`re-attached ${strandId}`); process.send({ type: 'attached' }); })
+      .catch(e => log(`re-attach of ${strandId} failed — ${e?.message ?? e}`))
+      .finally(() => attaching.delete(strandId));
+  });
+  // The app keeps its own list of joined strands and re-adds them at boot
+  // (chat-strand.ts attachJoinedStrands); so does this peer.
+  const joinedFile = join(STORE_ROOT, 'peer-joined.json');
+  if (existsSync(joinedFile)) {
+    const row = JSON.parse(readFileSync(joinedFile, 'utf8'));
+    void node.addStrand({ strandRow: row, sAppConfig: SAPP, founder: false })
+      .then(() => log(`re-added joined strand ${row.Id}`))
+      .catch(e => log(`re-add of joined strand failed — ${e?.name}: ${e?.message ?? e}`));
+  }
   process.send({ type: 'ready' });
   process.on('message', async (m) => {
     try {
       if (m.type === 'join') {
         const formed = await node.formStrand(m.invitation, { partyId: 'peer', purpose: 'slow-peer', metadata: { name: 'Peer' } });
+        const row = { Id: formed.strandId, MemberPrivateKey: formed.memberPrivateKey ?? null, Type: 'c', FounderOwnerKey: null };
+        writeFileSync(join(STORE_ROOT, 'peer-joined.json'), JSON.stringify(row));
         let inst = node.getStrand(formed.strandId);
-        if (!inst) inst = await node.addStrand({
-          strandRow: { Id: formed.strandId, MemberPrivateKey: formed.memberPrivateKey ?? null, Type: 'c', FounderOwnerKey: null },
-          sAppConfig: SAPP, founder: false,
-        });
+        if (!inst) inst = await node.addStrand({ strandRow: row, sAppConfig: SAPP, founder: false });
         while (!inst?.database?.getDatabase?.()) { await sleep(500); inst = node.getStrand(formed.strandId); }
         await db(inst).exec('insert into App.Member (Id, Name, AvatarUri) values (?, ?, ?)', [node.peerId.toString(), 'Peer', null]);
         process.send({ type: 'joined' });
@@ -169,6 +203,14 @@ if (ROLE === 'peer') {
       } else if (m.type === 'unstall') {
         clearInterval(stallTimer); stallTimer = null;
         log(`healthy again (${stalledMs / 1000} s blocked in total)`);
+      } else if (m.type === 'has') {
+        // Which of these message ids does this peer hold? Read locally.
+        const inst = node.getStrand(m.strandId);
+        const held = [];
+        if (inst?.database?.getDatabase?.()) {
+          for await (const row of db(inst).eval('select Id from App.Message')) if (m.ids.includes(row.Id)) held.push(row.Id);
+        }
+        process.send({ type: 'held', held, attached: !!inst?.database });
       } else if (m.type === 'stop') {
         await node.stop();
         process.exit(0);
@@ -181,7 +223,10 @@ if (ROLE === 'peer') {
 // ───────────────────────────── HOST (measures) ─────────────────────────────
   rmSync(STORE_ROOT, { recursive: true, force: true });
   mkdirSync(STORE_ROOT, { recursive: true });
-  const child = fork(fileURLToPath(import.meta.url), [], { env: { ...process.env, SLOW_PEER_ROLE: 'peer', STORE_ROOT } });
+  const PEER_PARTY_ID = `slowpeer-peer-${randomUUID().slice(0, 8)}`;
+  const spawnPeer = () => fork(fileURLToPath(import.meta.url), [], { env: { ...process.env, SLOW_PEER_ROLE: 'peer', STORE_ROOT, PEER_PARTY_ID } });
+  let child = spawnPeer();
+  const ask = (msg, type) => { const p = next(type); child.send(msg); return p; };
   const next = type => new Promise((res, rej) => {
     const on = m => {
       if (m.type === type) { child.off('message', on); res(m); }
@@ -209,6 +254,66 @@ if (ROLE === 'peer') {
     log('peer joined and wrote its Member');
     for (let i = 1; i <= 5; i++) await insertMessage(inst, me, `seed ${i}`);
     log('wrote 5 messages to read back');
+
+    measure: {
+    if (PEER_MODE === 'return') {
+      // WRITTEN ALONE, THEN THE PEER COMES BACK. Does what was written alone reach it,
+      // and how soon? Also: how does that compare with one ordinary write after its return?
+      child.send({ type: 'stop' });
+      await new Promise(r => child.once('exit', r));
+      log('peer offline');
+      const lone = [];
+      for (let i = 1; i <= LONE_WRITES; i++) {
+        const id = randomUUID(), s0 = Date.now();
+        for (let attempt = 1; ; attempt++) {
+          try {
+            await db(inst).exec('insert into App.Message (Id, MemberId, Content, Timestamp, ReplyToId) values (?, ?, ?, ?, ?)',
+              [id, me, `alone ${i}`, stamp(), null]);
+            break;
+          } catch (e) {
+            if (attempt >= 5 || !/super-majority/.test(e?.message ?? '')) throw e;
+            log(`lone write ${i} attempt ${attempt} failed (${Date.now() - s0} ms): super-majority — retrying, as the app does`);
+            await sleep(3000);
+          }
+        }
+        lone.push(id);
+        log(`lone write ${i} committed in ${Date.now() - s0} ms`);
+      }
+      await sleep(OFFLINE_MS);
+      const back = Date.now();
+      child = spawnPeer();
+      await next('ready');
+      log(`peer back online after ${(OFFLINE_MS / 1000)} s more (same identity and storage)`);
+      let after = null, afterMs = null, heldAt = null, attached = false;
+      const until = back + RETURN_WAIT_MS;
+      while (Date.now() < until) {
+        const r = await ask({ type: 'has', strandId, ids: lone }, 'held');
+        attached ||= r.attached;
+        if (attached && after === null) {
+          // One ordinary write once the peer has its strand back, to compare with.
+          after = randomUUID();
+          const s0 = Date.now();
+          try {
+            await db(inst).exec('insert into App.Message (Id, MemberId, Content, Timestamp, ReplyToId) values (?, ?, ?, ?, ?)',
+              [after, me, 'after return', stamp(), null]);
+            afterMs = Date.now() - s0;
+            log(`write after return committed in ${afterMs} ms, ${Date.now() - back} ms after the peer came back`);
+          } catch (e) { log(`write after return failed — ${e?.message ?? e}`); }
+        }
+        if (r.held.length === lone.length && heldAt === null) {
+          heldAt = Date.now() - back;
+          log(`peer holds all ${lone.length} lone-written messages, ${heldAt} ms after it came back`);
+          break;
+        }
+        await sleep(1000);
+      }
+      if (heldAt === null) {
+        const r = await ask({ type: 'has', strandId, ids: lone }, 'held');
+        log(`FINDING: after ${RETURN_WAIT_MS / 1000} s back online the peer holds ${r.held.length} of ${lone.length} lone-written messages (strand attached: ${r.attached})`);
+        code = 1;
+      }
+      break measure;
+    }
 
     /** One window: reads every READ_EVERY_MS and a write every WRITE_EVERY_MS, in parallel. */
     async function window(name) {
@@ -268,6 +373,7 @@ if (ROLE === 'peer') {
     } else {
       log('Local reads were not materially affected by the stalled member.');
     }
+    } // measure
   } catch (e) {
     log('rig error:', e?.stack ?? e);
     code = 2;

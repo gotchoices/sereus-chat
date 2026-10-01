@@ -35,7 +35,8 @@
     "micTitle": "Voice messages are not built yet",
     "placeholder": "Message",
     "replyingTo": "Replying to {{name}}",
-    "unread": "New"
+    "unread": "New",
+    "sending": "Sending…"
   },
   "invite": {
     "abandon": "Abandon",

@@ -31,6 +31,14 @@ export interface MessageBubbleProps {
   senderName?: string | null;
   timestamp?: string | null;
   edited?: boolean;
+  /**
+   * A word about where this message stands, shown beside the time (story 04): "Sending…"
+   * while its write is in flight, later "Not yet delivered". Null when there is nothing
+   * to say, which is the normal case. Never a read state.
+   */
+  status?: string | null;
+  /** Dim the bubble while its write is in flight. */
+  sending?: boolean;
   replyTo?: ReplyQuote | null;
   reactions?: Array<{ symbol: string; count: number; mine: boolean }>;
   attachment?: React.ReactNode;
@@ -47,6 +55,8 @@ export function MessageBubble({
   senderName,
   timestamp,
   edited,
+  status,
+  sending = false,
   replyTo,
   reactions,
   attachment,
@@ -68,7 +78,7 @@ export function MessageBubble({
         onPress={onPress}
         onLongPress={onLongPress}
         accessibilityLabel={accessibilityLabel}
-        style={[styles.bubble, { backgroundColor: bg }]}
+        style={[styles.bubble, { backgroundColor: bg }, sending && styles.sending]}
       >
         {senderName ? (
           <Text style={[typography.small, styles.sender, { color: meta }]}>{senderName}</Text>
@@ -101,13 +111,16 @@ export function MessageBubble({
         {attachment ? <View style={styles.attachment}>{attachment}</View> : null}
         {text ? <Text style={[typography.body, { color: fg }]}>{text}</Text> : null}
 
-        {(timestamp || edited) && (
+        {(timestamp || edited || status) && (
           <View style={styles.metaRow}>
             {timestamp ? (
               <Text style={[typography.small, { color: meta }]}>{timestamp}</Text>
             ) : null}
             {edited ? (
               <Text style={[typography.small, { color: meta }]}>edited</Text>
+            ) : null}
+            {status ? (
+              <Text style={[typography.small, { color: meta }]} testID="message-status">{status}</Text>
             ) : null}
           </View>
         )}
@@ -140,6 +153,7 @@ export function MessageBubble({
 }
 
 const styles = StyleSheet.create({
+  sending: { opacity: 0.6 },
   row: { marginVertical: 2, maxWidth: '80%' },
   rowLeft: { alignSelf: 'flex-start' },
   rowRight: { alignSelf: 'flex-end' },

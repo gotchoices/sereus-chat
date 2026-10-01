@@ -8,6 +8,7 @@
     "title": "Escanear QR"
   },
   "chat": {
-    "empty": "Di algo: sois solo vosotros dos hasta que se invite a alguien más."
+    "empty": "Di algo: sois solo vosotros dos hasta que se invite a alguien más.",
+    "sending": "Enviando…"
   }
 }

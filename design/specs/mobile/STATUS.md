@@ -169,6 +169,8 @@ their variants. Calls are parked (story 90).
   - `src/diagnostics/loop-lag.ts` (a 30 s loop-lag summary);
   - read through Metro's inspector with a CDP client (the scratchpad `cdp-tail2.mjs`,
     `cdp-profile.mjs`). `console.*` does not reach logcat on RN 0.82.
+- **Fixed alongside:** every message time showed UTC as local time (six hours off in Mountain
+  time). Stored DATETIME has no zone; `storedUtcToIso` in chat-operations now marks it UTC.
 - **Open:**
   - [x] Each send upserted the sender's Member row first (insert-or-ignore + update: two extra
         commits). `upsertMember` now reads first and writes at most one statement, only when the
@@ -181,9 +183,18 @@ their variants. Calls are parked (story 90).
         2026-10-01, with consent, to match sereus 1.9:
         - a write with the others reachable commits only once they agree;
         - with nobody reachable, the first write fails and later ones commit alone (milliseconds).
-        Specs and the chat screen still need to follow. "Sending" is the in-flight write. Open:
-        how the app learns that a lone write has since reached another member, so the "not yet
-        delivered" mark can clear (may need a stack API).
+        - [x] "Sending…" built (2026-10-01): outgoing messages are kept apart from the reloaded
+              list, shown dimmed with "Sending…", and replaced when the write returns (draft
+              restored on failure). Seen on the S7.
+        - [ ] "Not yet delivered": waiting on gotchoices/Optimystic#26 (filed 2026-10-01).
+              Optimystic already computes `WriteDurability` per commit (`local` = nobody else holds
+              it, `isFullyDurable` = delivered). `coordinator.commit()` drops it, so the SQL path
+              (`db.exec`) never sees it. Asked for: return it, expose it through the plugin and
+              cadre-core, and signal when `local` becomes `full`. Lone writes reach the returning
+              peer in about 8 s on their own (`slow-peer.mjs` PEER_MODE=return). A timing
+              heuristic was rejected as device-dependent.
+        - [ ] `screens/chat-interface.md` doesn't mention either state yet (needs the user's
+              consent to edit).
   - [ ] Re-test on two real phones (S7 + S20), or give the emulator more RAM.
   - [ ] Reads wait on a slow peer: a local `select` periodically asks the other member for the
         latest revision (`db-p2p/sync`), and blocks until that dial answers or aborts at 7.0 s.

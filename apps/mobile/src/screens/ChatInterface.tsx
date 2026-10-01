@@ -4,8 +4,9 @@
  *
  * Deliberately absent, and not to be added back:
  *   · delivery / read indicators — none is tracked
- *   · a pending or "sending" state — the phone holds the strand, so a send is
- *     a local write; only a genuine write failure surfaces
+ *   · an outbox, or any wait on the other person's phone. A message shows
+ *     "Sending…" only while its own write is in flight (story 04); a write
+ *     agreed by the other members means their machines hold it.
  *   · link previews — nothing is fetched from a pasted URL
  *   · a manufactured "message deleted" placeholder
  */
@@ -32,6 +33,8 @@ import { ActionSheet,
 import { useTheme, typography, spacing, radius } from '../theme';
 
 const DRAFT_KEY = (id: string) => `@sereus.chat/draft/${id}`;
+/** Id prefix of a message whose write is still in flight. Never a stored id (those are UUIDs). */
+const SENDING_PREFIX = 'sending-';
 const READ_KEY = (id: string) => `@sereus.chat/read/${id}`;
 const GROUP_GAP_MS = 5 * 60 * 1000;
 
@@ -108,6 +111,14 @@ export default function ChatInterface() {
   const listRef = useRef<FlatList<Row>>(null);
 
   const [messages, setMessages] = useState<Message[]>([]);
+  /**
+   * Messages whose write is still in flight, shown at once and marked "Sending…".
+   * Kept apart from `messages` so the periodic reload cannot drop them, and removed
+   * when the write returns: replaced by the stored message, or taken back into the
+   * composer if it failed.
+   */
+  const [outgoing, setOutgoing] = useState<Message[]>([]);
+  const shown = useMemo(() => (outgoing.length ? [...messages, ...outgoing] : messages), [messages, outgoing]);
   /** False until the first read answers. Before that, "nothing said yet" would be a guess. */
   const [loaded, setLoaded] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
@@ -191,8 +202,8 @@ export default function ChatInterface() {
     const out: Row[] = [];
     let lastDay = '';
     let unreadPlaced = false;
-    messages.forEach((m, i) => {
-      const prev = messages[i - 1];
+    shown.forEach((m, i) => {
+      const prev = shown[i - 1];
       const day = dayOf(m.timestamp);
       if (day !== lastDay) { out.push({ kind: 'day', label: day }); lastDay = day; }
       if (!unreadPlaced && readCursor && m.id > readCursor && m.memberId !== me?.id) {
@@ -204,7 +215,7 @@ export default function ChatInterface() {
         prev.memberId === m.memberId &&
         Date.parse(m.timestamp) - Date.parse(prev.timestamp) < GROUP_GAP_MS &&
         dayOf(prev.timestamp) === day;
-      const next = messages[i + 1];
+      const next = shown[i + 1];
       const lastOfGroup =
         !next || next.memberId !== m.memberId ||
         Date.parse(next.timestamp) - Date.parse(m.timestamp) >= GROUP_GAP_MS;
@@ -217,7 +228,7 @@ export default function ChatInterface() {
       });
     });
     return out.reverse();
-  }, [messages, readCursor, me?.id, isGroup]);
+  }, [shown, readCursor, me?.id, isGroup]);
 
   const doSend = async () => {
     const text = draft.trim();
@@ -239,14 +250,27 @@ export default function ChatInterface() {
     setDraft('');
     const pendingReply = replyTo?.id ?? null;
     setReplyTo(null);
+    const temp: Message = {
+      id: `${SENDING_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      memberId: me?.id ?? '',
+      content: text,
+      timestamp: new Date().toISOString(),
+      replyToId: pendingReply,
+      editedAt: null,
+      attachments: [],
+      reactions: [],
+    };
+    setOutgoing(prev => [...prev, temp]);
     try {
       const msg = await send(strandId, { content: text, replyToId: pendingReply });
-      setMessages(prev => [...prev, msg]);
+      setMessages(prev => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]));
       await AsyncStorage.setItem(READ_KEY(strandId), msg.id);
     } catch (e: any) {
       // A genuine write failure — keep what they wrote.
       setDraft(text);
       setError(e?.message ?? 'That message could not be written');
+    } finally {
+      setOutgoing(prev => prev.filter(m => m.id !== temp.id));
     }
   };
 
@@ -293,6 +317,7 @@ export default function ChatInterface() {
     }
     const m = item.msg;
     const mine = m.memberId === me?.id;
+    const sending = m.id.startsWith(SENDING_PREFIX);
     const parent = m.replyToId ? messages.find(x => x.id === m.replyToId) : undefined;
     const grouped = m.reactions.reduce<Record<string, { count: number; mine: boolean }>>((acc, r) => {
       const e = (acc[r.symbol] ||= { count: 0, mine: false });
@@ -307,6 +332,8 @@ export default function ChatInterface() {
         senderName={item.showSender ? nameOf(m.memberId) : null}
         timestamp={item.showMeta ? clock(m.timestamp) : null}
         edited={!!m.editedAt}
+        sending={sending}
+        status={sending ? t('screens.chat.sending', 'Sending…') : null}
         replyTo={
           m.replyToId
             ? {
@@ -326,7 +353,7 @@ export default function ChatInterface() {
               ))
             : undefined
         }
-        onLongPress={() => messageActions(m)}
+        onLongPress={sending ? undefined : () => messageActions(m)}
       />
     );
   };
@@ -363,7 +390,7 @@ export default function ChatInterface() {
         <View style={styles.loading} testID="messages-loading">
           <ActivityIndicator color={theme.textMuted} />
         </View>
-      ) : messages.length === 0 && !error ? (
+      ) : shown.length === 0 && !error ? (
         <EmptyState icon="chatbubble-ellipses-outline"
           title={t('screens.chat.emptyTitle', 'Nothing said yet')}
           hint={awaitingJoin
