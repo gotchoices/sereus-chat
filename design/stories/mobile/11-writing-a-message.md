@@ -25,19 +25,21 @@ paragraphs and a link, and he is on a train.
    to keep it.
 3. He pastes a link. It stays as he pasted it — nothing goes off to fetch the page.
 4. He finishes and sends.
-5. He can see the message has left his phone. That is the whole of what he is told, because it is
-   the whole of what the app knows ([04](04-our-first-conversation.md)).
+5. The message is in the conversation at once, marked as sending for the moment it takes to record.
+   Then the mark goes, because Susan's machines took it in as it was recorded. That is the whole of
+   what he is told: whether it reached her machines, never whether she has read it
+   ([04](04-our-first-conversation.md)).
 6. Susan later wants a line of it in a document, and can select and copy the text out. Messages are
    text, not something locked behind a bubble.
 
 ### Alternative Path A: sending with nothing reachable
 
 4.1. The train goes into a tunnel as Bob taps send.
-4.2. Nothing remarkable happens. His phone holds the conversation itself, so the message is written
-     there and then and takes its place in the conversation like any other. He is not shown a
-     pending state, an outbox, or a spinner, because there is nothing waiting on anybody.
-4.3. It reaches Susan when their machines can next reach each other. Bob does not have to be
-     watching, in the app, or even awake for that.
+4.2. Nothing is asked of him. His phone holds the conversation itself, so the message is recorded
+     there and takes its place like any other. It is marked as not yet delivered, because nothing
+     of Susan's has it yet. There is no outbox to manage, and nothing he must retry.
+4.3. It reaches Susan when their machines can next reach each other, and the mark clears. Bob does
+     not have to be watching, in the app, or even awake for that.
      → [04](04-our-first-conversation.md)
 
 ### Alternative Path A2: a message that could not be written at all
@@ -73,7 +75,10 @@ paragraphs and a link, and he is on a train.
 - [ ] Message text can be selected and copied out
 - [ ] A sent message takes its place in the conversation immediately, whether or not anything else is
       reachable
-- [ ] No pending, sending or outbox state is shown for the ordinary case of being unreachable
+- [ ] A message shows as sending only while it is being recorded, and never asks the user to wait
+      for anyone else
+- [ ] A message recorded while nobody else's machine could take it is marked as not yet delivered
+      until one has it. There is no outbox to manage and no read state
 - [ ] A message that genuinely could not be recorded says so, keeps what the user wrote, and can be
       retried or set aside
 - [ ] Nothing is silently dropped
@@ -92,10 +97,13 @@ third party that a conversation exists. If they are ever wanted, the setting bel
 when a message was read and by someone. A sender-side toggle would not protect the person who
 matters.
 
-Sending while unreachable is written as a non-event because the phone holds the strand itself. That
-is the platform's intent and is partly there — Optimystic short-circuits cluster consensus for a
-solo node, and `strand-backfill.ts` pushes blocks written while alone once a peer appears — but not
-yet dependable: `CadreNode` hardcodes a cluster size that makes the solo escape hatch unreachable
-([gotchoices/sereus#2](https://github.com/gotchoices/sereus/issues/2)), and a block written while
-alone can still be unreadable by others (`tickets/blocked/block-held-by-only-one-machine-is-unreadable.md`).
-If that does not resolve, Alt A2 becomes the common case rather than the rare one.
+Sending while unreachable is recorded on the phone because the phone holds the strand itself. As of
+sereus 1.9 this works:
+- With the other member offline, the first write fails (`Failed to get super-majority: 1/2`) and
+  the following ones commit alone in milliseconds (`test/stack/slow-peer.mjs`, PEER_MODE=offline).
+- The app retries that first failure, so the user does not see it.
+- A write with the others reachable commits only once they agree, which is what "sending" covers:
+  about a second between two healthy phones.
+
+Still open: how the app learns that a message written alone has since reached another member's
+machine, so its "not yet delivered" mark can clear. That may need the stack to report it.

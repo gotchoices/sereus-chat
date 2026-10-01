@@ -76,14 +76,22 @@ export async function upsertMember(
   name: string,
 ): Promise<void> {
   const db = getDb(strand);
-  await db.exec(
-    'insert or ignore into App.Member (Id, Name) values (?, ?)',
-    [id, name],
-  );
-  await db.exec(
-    'update App.Member set Name = ? where Id = ?',
-    [name, id],
-  );
+  // READ FIRST, write only what changed. Every send calls this, and each write is
+  // a strand commit that the other members must agree to. Writing the row
+  // unconditionally (an insert-or-ignore plus an update) took a send from 0.6 s to
+  // 3.4 s in Node, and bundling both into the message's transaction still cost
+  // 2.6 s, because the commit then spans two tables
+  // (test/stack/message-latency.mjs, SEND_MODE=app|bundled|check).
+  let current: string | null | undefined;
+  for await (const row of db.eval('select Name from App.Member where Id = ?', [id])) {
+    current = row.Name as string | null;
+  }
+  if (current === name) return;
+  if (current === undefined) {
+    await db.exec('insert or ignore into App.Member (Id, Name) values (?, ?)', [id, name]);
+  } else {
+    await db.exec('update App.Member set Name = ? where Id = ?', [name, id]);
+  }
 }
 
 export async function queryMembers(strand: StrandInstance): Promise<ChatMember[]> {

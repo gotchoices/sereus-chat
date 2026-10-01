@@ -89,7 +89,7 @@ one is about being on the other end of that.
 - [ ] The user can mark a strand unread again after reading it
 - [ ] Muting stops interruption and never hides what happened
 - [ ] The user chooses whether a mute still lets messages naming them through
-- [ ] Nothing the reader does here is reported to anyone else; there is no delivered or read state
+- [ ] Nothing the reader does here is reported to anyone else; there is no read state
 - [ ] How far a user has read is the same across their own devices
 - [ ] With nothing new, the app says so plainly rather than inventing activity
 
@@ -101,9 +101,11 @@ one is about being on the other end of that.
 
 ## Open
 
-Everything here is the reader's own bookkeeping. **Nothing is reported back to the sender** — there
-is no delivered or read state, and none is tracked. A reply is the evidence that a message was read;
-that is the whole of it. `specs/domain/schema.md`'s `Status` column is to be removed (`STATUS.md`
+Everything here is the reader's own bookkeeping. **Nothing the reader does is reported back to the
+sender**: there is no read state, and none is tracked. A reply is the evidence that a message was
+read; that is the whole of it. The sender may see that a message has not yet reached any other
+member's machine ([04](04-our-first-conversation.md)). That is a fact about the machines, and no
+action of the reader's sets it. `specs/domain/schema.md`'s `Status` column is to be removed (`STATUS.md`
 §F).
 
 Reading back far enough may reach content this device is not holding, which is then fetched from the

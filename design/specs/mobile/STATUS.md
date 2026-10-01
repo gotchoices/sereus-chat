@@ -170,12 +170,29 @@ their variants. Calls are parked (story 90).
   - read through Metro's inspector with a CDP client (the scratchpad `cdp-tail2.mjs`,
     `cdp-profile.mjs`). `console.*` does not reach logcat on RN 0.82.
 - **Open:**
-  - [ ] Each send upserts the sender's Member row first: a second consensus write that doubles
-        send time. Read first, and upsert only when the row is missing or the name changed.
-  - [ ] Show an outgoing message as "sending" at once.
+  - [x] Each send upserted the sender's Member row first (insert-or-ignore + update: two extra
+        commits). `upsertMember` now reads first and writes at most one statement, only when the
+        row is missing or the name changed. Node, median per send: message alone 0.58 s;
+        old shape 3.4 s; the same three statements in one transaction 2.6 s (a commit spanning two
+        tables costs nearly as much); read-first 0.8 s.
+  - [x] The chat screen showed "Nothing said yet" until its first read returned. It now shows a
+        spinner until the first read answers. Not in `screens/chat-interface.md`'s variants.
+  - [ ] "Sending" and "not yet delivered" message states. Stories 04, 10 and 11 amended
+        2026-10-01, with consent, to match sereus 1.9:
+        - a write with the others reachable commits only once they agree;
+        - with nobody reachable, the first write fails and later ones commit alone (milliseconds).
+        Specs and the chat screen still need to follow. "Sending" is the in-flight write. Open:
+        how the app learns that a lone write has since reached another member, so the "not yet
+        delivered" mark can clear (may need a stack API).
   - [ ] Re-test on two real phones (S7 + S20), or give the emulator more RAM.
-  - [ ] Possible upstream question, still needs a two-process Node repro: with one member's loop
-        stalled, the other member's local reads took 60–200 s, not just its writes.
+  - [ ] Reads wait on a slow peer: a local `select` periodically asks the other member for the
+        latest revision (`db-p2p/sync`), and blocks until that dial answers or aborts at 7.0 s.
+        - About two slow reads every 30 s; free if the peer is offline; 150–650 ms with a healthy
+          peer.
+        - Repro: `test/stack/slow-peer.mjs` (PEER_MODE=stall|offline, WRITES=0).
+        - Posted as gotchoices/Optimystic#25 (2026-10-01). Revisit when answered.
+  - [ ] Draft for the user's review: `apps/mobile/tmp/cadre-rn-native-digest-issue.md` (the kit's
+        digest polyfill is pure JS).
 
 ## Waiting on upstream — revisit when these land
 

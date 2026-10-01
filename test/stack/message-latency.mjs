@@ -46,6 +46,15 @@ const VISIBLE_MS = Number(process.env.VISIBLE_MS ?? 300_000);
 const REACHABLE_MS = Number(process.env.REACHABLE_MS ?? 60_000);
 /** Idle time between messages. People don't chat in a tight loop; links idle out. */
 const GAP_MS = Number(process.env.GAP_MS ?? 0);
+/**
+ * How a send writes, to compare the app's shape against a bundled one:
+ *   message  the Message insert alone (the floor)
+ *   app      what SereusAdapter.send did: Member insert-or-ignore, Member update, Message
+ *            insert — three statements, three separate commits
+ *   bundled  the same three statements in ONE transaction
+ *   check    read the Member row first; write it only if missing or renamed, then the Message
+ */
+const SEND_MODE = process.env.SEND_MODE ?? 'message';
 
 // The chat schema exactly as the app applies it (chat-sapp.ts extractInnerDDL).
 const here = dirname(fileURLToPath(import.meta.url));
@@ -178,9 +187,26 @@ async function oneMessage(from, to, memberId, label) {
     return null;
   })();
   try {
-    await db(from).exec(
+    const d = db(from);
+    const msg = () => d.exec(
       'insert into App.Message (Id, MemberId, Content, Timestamp, ReplyToId) values (?, ?, ?, ?, ?)',
       [id, memberId, label, stamp(), null]);
+    const member = async () => {
+      await d.exec('insert or ignore into App.Member (Id, Name) values (?, ?)', [memberId, 'Same Name']);
+      await d.exec('update App.Member set Name = ? where Id = ?', ['Same Name', memberId]);
+    };
+    if (SEND_MODE === 'app') { await member(); await msg(); }
+    else if (SEND_MODE === 'check') {
+      const it = d.eval('select Name from App.Member where Id = ?', [memberId])[Symbol.asyncIterator]();
+      const r = await it.next(); await it.return?.();
+      if (r.done || r.value.Name !== 'Same Name') await member();
+      await msg();
+    }
+    else if (SEND_MODE === 'bundled') {
+      await d.exec('begin');
+      try { await member(); await msg(); await d.exec('commit'); }
+      catch (e) { try { await d.exec('rollback'); } catch { /* already gone */ } throw e; }
+    } else await msg();
     commitMs = Date.now() - s;
   } catch (e) { error = e?.message ?? String(e); }
   const visibleMs = error ? null : await visibleP;

@@ -12,7 +12,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, FlatList, Pressable, Image, StyleSheet, Alert,
+  View, Text, TextInput, FlatList, Pressable, Image, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KeyboardEvents } from 'react-native-keyboard-controller';
@@ -108,6 +108,8 @@ export default function ChatInterface() {
   const listRef = useRef<FlatList<Row>>(null);
 
   const [messages, setMessages] = useState<Message[]>([]);
+  /** False until the first read answers. Before that, "nothing said yet" would be a guess. */
+  const [loaded, setLoaded] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   /** The user's own outstanding invitations for this strand; only read while nobody else is here. */
   const [invitesOut, setInvitesOut] = useState(0);
@@ -142,6 +144,7 @@ export default function ChatInterface() {
     } catch (e: any) {
       setError(e?.message ?? 'Could not reach this conversation right now');
     }
+    setLoaded(true);
     getStrandState(strandId).then(setState).catch(() => {});
   }, [strandId]);
 
@@ -356,7 +359,11 @@ export default function ChatInterface() {
         />
       ) : null}
 
-      {messages.length === 0 && !error ? (
+      {!loaded ? (
+        <View style={styles.loading} testID="messages-loading">
+          <ActivityIndicator color={theme.textMuted} />
+        </View>
+      ) : messages.length === 0 && !error ? (
         <EmptyState icon="chatbubble-ellipses-outline"
           title={t('screens.chat.emptyTitle', 'Nothing said yet')}
           hint={awaitingJoin
@@ -446,6 +453,7 @@ export default function ChatInterface() {
 }
 
 const styles = StyleSheet.create({
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   container: { flex: 1 },
   statusStrip: { paddingHorizontal: spacing[3], paddingVertical: spacing[1], borderBottomWidth: StyleSheet.hairlineWidth },
   list: { padding: spacing[2] },
