@@ -7,13 +7,13 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Share, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import {
   getStrandState, listMembers, listAttachments, setStrandMuted, setStrandArchived,
-  leaveStrand, resignManager, removeMember,
+  leaveStrand, resignManager, removeMember, listOutstandingInvitations, cancelInvitation,
 } from '../data/adapter';
-import type { StrandState, Member, Attachment } from '../data/types';
+import type { StrandState, Member, Attachment, Invitation } from '../data/types';
 import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { Avatar, ListRow, Banner, SectionHeader, StrandStatus } from '../components';
@@ -31,6 +31,15 @@ export default function StrandDetail() {
   const [state, setState] = useState<StrandState | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [media, setMedia] = useState<Attachment[]>([]);
+  /**
+   * The invitations THIS user has out for this strand. A strand is a box holding
+   * its members and its outstanding invitations (stories 31 1a, 05, 02), but an
+   * invitation is known only to the party that made it — it lives in that
+   * party's control database, and the strand learns of one only when it is
+   * redeemed. So these are the user's own, and the screen says others' are not
+   * shown rather than letting an empty list imply there are none.
+   */
+  const [invites, setInvites] = useState<Invitation[]>([]);
   const [error, setError] = useState<string | null>(null);
   /** Device-local, per story 33 — neither reaches the other members. */
   const [muted, setMuted] = useState<'none' | 'soft' | 'hard'>('none');
@@ -48,6 +57,9 @@ export default function StrandDetail() {
       setError(e?.message ?? 'Could not load members');
     }
     listAttachments(strandId).then(setMedia).catch(() => {});
+    listOutstandingInvitations()
+      .then(all => setInvites(all.filter(i => i.strandId === strandId && i.direction !== 'incoming')))
+      .catch(() => {});
     // Device-local settings, read straight from storage — never a reason to fail
     // the screen, so they are fetched apart from the strand's own data.
     getStrandPrefs(strandId)
@@ -91,6 +103,26 @@ export default function StrandDetail() {
       ],
     );
   };
+
+  const invitationActions = (inv: Invitation) => {
+    Alert.alert(
+      t('screens.strand.invitationTitle', 'Invitation'),
+      // Honest about what removing it does: cadre-core cannot withdraw an
+      // invitation yet (see data/outgoing-invitations.ts).
+      t('screens.invite.forgetNote',
+        'Taking it off this list does not cancel it: whoever holds it can still use it until it runs out.'),
+      [
+        { text: t('common.shareAgain', 'Share again'), onPress: () => { void Share.share({ message: inv.url }); } },
+        { text: t('screens.invite.forget', 'Take it off the list'), style: 'destructive',
+          onPress: () => { cancelInvitation(inv.id).then(load).catch(() => {}); } },
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+      ],
+    );
+  };
+
+  const nobodyElse = members.length > 0 && members.every(m => m.isMe);
+  /** Invitations exist only for a strand that can still grow: private and not settled (story 05). */
+  const canGrow = !!state && state.visibility === 'private' && !state.settled;
 
   const confirmResign = () => {
     const others = (state?.managerCount ?? 1) - 1;
@@ -157,7 +189,10 @@ export default function StrandDetail() {
       {error ? <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: load }} /> : null}
 
       <SectionHeader label={t('screens.strand.whatThisIs', 'What this is')} />
-      {state ? <StrandStatus state={state} variant="full" testID="strand-status" /> : null}
+      {state ? <StrandStatus state={state} variant="full" testID="strand-status" />
+        // Reading a strand's state and members can take tens of seconds on a slow
+        // phone while it syncs; bare headings with nothing under them read as empty.
+        : !error ? <ActivityIndicator style={styles.loading} color={theme.textMuted} /> : null}
 
       <SectionHeader label={t('screens.strand.members', 'Members')} />
       <View style={styles.rows}>
@@ -173,7 +208,46 @@ export default function StrandDetail() {
             onPress={() => memberActions(m)}
           />
         ))}
+        {nobodyElse ? (
+          <Text style={[typography.small, { color: theme.textMuted }]}>
+            {t('screens.strand.nobodyYet', 'Nobody else has joined yet.')}
+          </Text>
+        ) : null}
       </View>
+
+      {canGrow ? (
+        <>
+          <SectionHeader label={t('screens.strand.invitationsOut', 'Invitations you have out ({{n}})')
+            .replace('{{n}}', String(invites.length))} />
+          <View style={styles.rows}>
+            {invites.map(inv => {
+              const made = (inv as { createdAt?: string }).createdAt;
+              return (
+                <ListRow
+                  key={inv.id}
+                  testID={`invitation-${inv.id}`}
+                  title={made
+                    ? t('screens.strand.invitationMade', 'Made {{when}}').replace('{{when}}', new Date(made).toLocaleString())
+                    : t('screens.strand.invitationTitle', 'Invitation')}
+                  subtitle={inv.expiresAt
+                    ? t('screens.invite.expires', 'Runs out {{when}}').replace('{{when}}', new Date(inv.expiresAt).toLocaleDateString())
+                    : undefined}
+                  onPress={() => navigation.navigate('InvitationGenerator', { strandId, token: inv.token })}
+                  onLongPress={() => invitationActions(inv)}
+                />
+              );
+            })}
+            {state?.canIManage ? (
+              <ListRow title={t('screens.strand.makeInvitation', 'Make an invitation')}
+                onPress={() => navigation.navigate('InvitationGenerator', { strandId })} />
+            ) : null}
+            <Text style={[typography.small, { color: theme.textMuted }]}>
+              {t('screens.strand.othersInvitations',
+                'Invitations other members have out are not shown: an invitation is known only to whoever made it.')}
+            </Text>
+          </View>
+        </>
+      ) : null}
 
       <SectionHeader label={t('screens.strand.sharedHere', 'Shared here')} />
       <ListRow
@@ -225,8 +299,6 @@ export default function StrandDetail() {
         <>
           <SectionHeader label={t('screens.strand.managing', 'Because you can add and remove people')} />
           <View style={styles.rows}>
-            <ListRow title={t('screens.strand.addSomeone', 'Add someone')}
-              onPress={() => navigation.navigate('InvitationGenerator', { strandId })} />
             <ListRow title={t('screens.strand.resign', 'Give up adding and removing')} onPress={confirmResign} />
           </View>
         </>
@@ -243,4 +315,5 @@ const styles = StyleSheet.create({
   content: { padding: spacing[3], gap: spacing[1], paddingBottom: spacing[5] },
   rows: { gap: spacing[1] },
   note: { lineHeight: 18, paddingTop: spacing[3] },
+  loading: { paddingVertical: spacing[3] },
 });

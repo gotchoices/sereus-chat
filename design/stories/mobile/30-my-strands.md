@@ -65,9 +65,19 @@ is the screen he opens the app to, so it is the screen that has to be honest at 
      reachable right now, never as an empty conversation and never as one with nothing in it.
      → [42](42-staying-connected.md)
 
+### Alternative Path F: nobody has joined yet
+
+2.3. Bob has started a strand and sent the invitation, and nobody has taken it up.
+2.4. It is listed once, like any strand. It reads as waiting for someone to join, rather than as a
+     conversation with a made-up name, and the invitation is part of it rather than a second row.
+     Once somebody joins, it reads as them. → [02](02-start-a-strand.md)
+
 ## Acceptance Criteria
 
 - [ ] Every strand the user is in appears in one list; nothing is reachable only from elsewhere
+- [ ] Each strand appears exactly once; its outstanding invitations are part of it, not separate rows
+- [ ] A strand nobody else has joined yet reads as waiting for someone to join, not under an invented
+      name
 - [ ] A row identifies the strand, what was last said, and when — enough to choose without opening it
 - [ ] A group strand is shown as a group, not as one of its members
 - [ ] Only what a member has shared of themselves is ever displayed; a private name the user has

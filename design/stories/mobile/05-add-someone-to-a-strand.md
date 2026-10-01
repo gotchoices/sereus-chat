@@ -30,7 +30,9 @@ Bob also has a strand with his brother that he closed for good, and will find ou
 4. He also sees that this is not his decision to make privately — the others are in this strand too,
    and what they said is part of what he is passing on.
 5. He shares the invitation with Tom the way he would reach him anyway, and directly, because
-   whoever holds it can use it.
+   whoever holds it can use it. Until somebody takes it up, Bob can see it inside the strand, among
+   the invitations he has out. The others in the strand cannot: an invitation is known only to
+   whoever made it.
 6. Tom takes it up and joins.
 7. Everyone in the strand sees that Tom is now here — not just Bob.
 8. Nothing about what the strand *is* has changed. It could grow before and it can grow now, and it
@@ -102,6 +104,8 @@ Bob also has a strand with his brother that he closed for good, and will find ou
 - [ ] A member who does not hold it is told so plainly, and told who does
 - [ ] The app does not mediate, queue or chase a request to be invited
 - [ ] An invitation belongs to a strand, not to a named person, and whoever takes it up joins
+- [ ] An inviter sees the invitations they have out within the strand they lead into; other members
+      are not shown them
 - [ ] The inviter decides whether the person joining may invite others
 - [ ] Before an invitation is issued, the inviter is shown that the newcomer will hold everything
       already said, and how much that is

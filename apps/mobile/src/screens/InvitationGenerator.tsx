@@ -66,9 +66,16 @@ export default function InvitationGenerator() {
   const relaySlow = pendingSince !== null && now - pendingSince > RELAY_SLOW_MS;
   const [inviterName, setInviterName] = useState('');
 
+  // Only THIS strand's outstanding invitations: an invitation is part of the
+  // strand it leads into (story 02), and other strands' belong on their own
+  // detail screens. Before a new strand's first invitation there is no strand,
+  // so there is nothing to list.
   const refresh = useCallback(() => {
-    listOutstandingInvitations().then(setOutstanding).catch(() => {});
-  }, []);
+    if (!strandId) { setOutstanding([]); return; }
+    listOutstandingInvitations()
+      .then(all => setOutstanding(all.filter(i => i.strandId === strandId && i.direction !== 'incoming')))
+      .catch(() => {});
+  }, [strandId]);
   useEffect(refresh, [refresh]);
   useEffect(() => { getProfile().then(p => setInviterName(p.name?.trim() ?? '')).catch(() => {}); }, []);
 
@@ -366,11 +373,11 @@ export default function InvitationGenerator() {
         </View>
       ) : null}
 
-      {outstanding.length ? (
+      {outstanding.filter(i => i.id !== invitation?.id).length ? (
         <>
-          <SectionHeader label={t('screens.invite.outstanding', 'Still outstanding')} />
+          <SectionHeader label={t('screens.invite.outstandingHere', 'Also out for this strand')} />
           <View style={styles.rows}>
-            {outstanding.map(inv => (
+            {outstanding.filter(i => i.id !== invitation?.id).map(inv => (
               <ListRow
                 key={inv.id}
                 title={inv.label ?? t('screens.invite.madeAt', 'Made {{when}}')

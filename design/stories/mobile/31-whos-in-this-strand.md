@@ -19,7 +19,10 @@ people; the rest cannot. Tom joined last month. Susan is a member with a request
 ## Sequence
 
 1. Bob looks at who is in the strand. He sees everyone, and can tell at a glance which of them can
-   add and remove people and which cannot.
+   add and remove people and which cannot. He can also see when the strand was started.
+1a. Set apart from the people, he sees the invitations he has out for this strand — not yet anybody,
+    since nothing about an invitation names a person. Invitations other members have out are theirs
+    and he is not shown them; he is told so, rather than left to assume there are none.
 2. He can see what the strand *is*, in terms he does not have to interpret: private, and still able
    to change, because he and Priya can both add and remove.
 3. That is two facts about him rather than one, and the app does not soften either. People he has
@@ -90,6 +93,9 @@ people; the rest cannot. Tom joined last month. Susan is a member with a request
 ## Acceptance Criteria
 
 - [ ] A member can see everybody in the strand, and which of them can add and remove people
+- [ ] A member can see when the strand was started
+- [ ] A member sees their own outstanding invitations for the strand, set apart from its members, and
+      is told that invitations other members have out are not shown
 - [ ] The strand's state is legible without interpretation: public, private and able to change, or
       private and settled
 - [ ] A member is told both consequences of a strand that can change — who may yet read this, and

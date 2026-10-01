@@ -402,6 +402,54 @@ control (exact pins, scratchpad copy) also hands all 5 founder-alone rows to the
 consistent rather than contradictory — a joiner's first sync PULLS those blocks, and 1.8's fix is to
 PUSHES. So Node cannot confirm the fix for our failure; only the two-phone run can.
 
+### A strand is a container: one row per strand; members and invitations inside, 2026-09-30
+
+- **Stories amended** (user's direction):
+  - 02: outstanding invitations are seen within the strand they lead into;
+  - 05: the inviter sees their own invitations inside the strand, and other members do not;
+  - 30 path F: a strand nobody has joined is listed once, reading as waiting for someone to join;
+  - 31 1a: members and your own invitations are set apart, others' invitations are said to be not
+    shown, and the strand's start date is shown.
+- **New spec:** `strand-list.md` "One row per strand".
+- **Regenerated:** consolidations and code for StrandList, StrandDetail, InvitationGenerator and
+  ChatInterface. Dependency hashes are fresh. Every other route is still stale because of an
+  earlier `domain/sereus.md` edit, and was not touched.
+- **Results:**
+  - No Pending section. The invented "New strand" title is now "Waiting for someone to join", with
+    an hourglass glyph and "N invitations out".
+  - Strand details list Members, then "Invitations you have out", then "Make an invitation".
+  - The chat shows a "Nobody has joined yet" banner, and the empty-state copy no longer says "just
+    the two of you" when the user is alone.
+  - Checked on the S7 with two invitations out: the emulator redeemed one, and the row became
+    "Rel2 · No messages yet · 1 invitation out".
+- **Bug found and fixed along the way:** every invitation's id was `token.slice(0,12)` of the
+  encoded invitation, the same base64 prefix every time. A second invitation therefore replaced
+  the first in the local store. The id is now the raw token.
+- **Invitations now retire exactly.** Each is checked against `countFormationUsage(raw token)`, so
+  only the redeemed one retires. The lookup is time-boxed to 3 s, and falls back to member count
+  when the control database cannot be read.
+- **Not done, awaiting the user's decision:** "Started {date}". Sereus records no creation time,
+  so this needs a founder-asserted time added to `chat-sapp.qsql`, which is a human domain spec.
+
+### Which invitation / strand is for whom — asked upstream as sereus#24, 2026-09-30
+
+After a fresh install, one invitation shows as two rows: the pending "Invitation" and the strand it
+founded ("New strand, No messages yet"). There is no default strand any more. Once several
+invitations are out, nothing says which is for whom.
+
+Sereus has no name or label on a strand or an invitation:
+- the control `Strand` row has none (checked on 1.8);
+- `FormationInvite`'s columns are fixed and owner-signed;
+- the shared token carries only token, sAppId, expiration and bootstrap;
+- strand tables are the app's, but every member can read them.
+
+Asked for one optional, free-text, party-private note on the invitation (and on the party's strand
+record). It is deliberately not a "recipient" field, because invitations are bearer tokens. Linked
+to #6 (the planned party-private app store).
+
+**Not yet decided by the user:** a device-local interim label ("Who is this for?", keyed by token),
+and merging the two rows into one "Waiting for someone to join" row.
+
 ### First published APK: stuck at "Connecting to your relay" — release builds refused ws://, 2026-09-30
 
 On the user's phone, the relay was accepted and the app then spun indefinitely.

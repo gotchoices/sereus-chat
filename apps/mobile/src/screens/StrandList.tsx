@@ -12,6 +12,7 @@ import type { StrandSummary, Invitation } from '../data/types';
 import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { ActionSheet, Avatar, ListRow, Badge, EmptyState, Banner, IconButton, SectionHeader } from '../components';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTheme, typography, spacing, radius } from '../theme';
 
 type SortMode = 'recent' | 'alpha' | 'unread';
@@ -154,14 +155,35 @@ export default function StrandList() {
     });
 
     const out: Array<{ title: string | null; data: any[] }> = [];
-    if (invites.length && !query.trim()) out.push({ title: t('screens.strands.pending', 'Pending'), data: invites });
+    // ONE ROW PER STRAND (human spec): there is no Pending section. An outstanding
+    // invitation is part of the strand it leads into — counted on that strand's
+    // row below — never a row of its own.
     out.push({ title: null, data: sorted });
     // "Hidden", matching the act that put them here. The data field is still
     // `archived` (that is `ops.md`'s name for it), but the word the user sees is
     // the one on the button they pressed — story 33 calls this hiding.
     if (archived.length) out.push({ title: t('screens.strands.hidden', 'Hidden'), data: archived });
     return out;
-  }, [strands, invites, sortMode, t, matches, query]);
+  }, [strands, sortMode, matches, t]);
+
+  /**
+   * The user's own outstanding invitations, counted per strand. Only their own:
+   * an invitation is known only to the party that made it (story 31 1a), so the
+   * count claims nothing about anyone else's. One whose strand is not listed yet
+   * is simply not counted until it is — it never becomes a row.
+   */
+  const invitesOut = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const inv of invites) {
+      if (inv.direction === 'incoming' || !inv.strandId) continue;
+      out[inv.strandId] = (out[inv.strandId] ?? 0) + 1;
+    }
+    return out;
+  }, [invites]);
+  const invitesOutText = (n: number) =>
+    n === 0 ? t('screens.strands.noInvitationOut', 'No invitation out')
+    : n === 1 ? t('screens.strands.oneInvitationOut', '1 invitation out')
+    : t('screens.strands.invitationsOut', '{{n}} invitations out').replace('{{n}}', String(n));
 
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
@@ -190,7 +212,7 @@ export default function StrandList() {
     catch (e: any) { setError(e?.message ?? 'That setting could not be saved'); }
   };
 
-  const isEmpty = strands.length === 0 && invites.length === 0;
+  const isEmpty = strands.length === 0;
   const nothingNew = !isEmpty && strands.every(s => !s.unreadCount && !s.mentioned);
 
   const sortIcon = sortMode === 'recent' ? 'time-outline' : sortMode === 'alpha' ? 'text-outline' : 'mail-unread-outline';
@@ -303,25 +325,13 @@ export default function StrandList() {
               </View>
             ) : null
           }
-          renderItem={({ item, section }: any) => {
-            if (section.title === t('screens.strands.pending', 'Pending')) {
-              const inv = item as Invitation;
-              return (
-                <ListRow
-                  testID={`invite-${inv.id}`}
-                  title={inv.label ?? t('screens.strands.invitation', 'Invitation')}
-                  subtitle={inv.direction === 'incoming'
-                    ? t('screens.strands.awaitingYou', 'Waiting for your answer')
-                    : t('screens.strands.awaitingThem', 'Sent — not taken up yet')}
-                  leading={<Avatar name="?" size="sm" />}
-                  onPress={() => navigation.navigate(
-                    inv.direction === 'incoming' ? 'InvitationAcceptance' : 'InvitationGenerator',
-                    { token: inv.token },
-                  )}
-                />
-              );
-            }
+          renderItem={({ item }: any) => {
             const s = item as StrandSummary;
+            // A strand nobody else has joined yet (story 30 F): it reads as waiting,
+            // with its invitations as the second line, not as a conversation under an
+            // invented name. Its title already says so (the adapter's placeholder).
+            const awaiting = s.memberCount <= 1;
+            const out = invitesOut[s.id] ?? 0;
             const preview = s.draftPreview
               ? `${t('screens.strands.draft', 'Draft')}: ${s.draftPreview}`
               : s.lastMessage
@@ -329,12 +339,21 @@ export default function StrandList() {
                   ? `${s.lastMessage.senderName}: ${s.lastMessage.previewText}`
                   : s.lastMessage.previewText
                 : t('screens.strands.noMessages', 'No messages yet');
+            const subtitle = awaiting
+              ? (s.lastMessage || s.draftPreview ? `${preview} · ${invitesOutText(out)}` : invitesOutText(out))
+              : out > 0 ? `${preview} · ${invitesOutText(out)}` : preview;
             return (
               <ListRow
                 testID={`strand-${s.id}`}
                 title={s.title}
-                subtitle={preview}
-                leading={<Avatar name={s.title} uri={s.avatarUri} size="sm" />}
+                subtitle={subtitle}
+                leading={awaiting
+                  // A neutral glyph, not an avatar letter: a letter drawn from a
+                  // sentence would read as a person.
+                  ? <View style={[styles.waiting, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                      <Ionicons name="hourglass-outline" size={18} color={theme.textMuted} />
+                    </View>
+                  : <Avatar name={s.title} uri={s.avatarUri} size="sm" />}
                 trailing={indicatorFor(s)}
                 onPress={() => navigation.navigate('ChatInterface', {
                   strandId: s.id, title: s.title, avatarUri: s.avatarUri,
@@ -406,6 +425,8 @@ const styles = StyleSheet.create({
   flex2: { flex: 2 },
   list: { paddingHorizontal: spacing[3], paddingTop: spacing[1], paddingBottom: spacing[2] },
   nothingNew: { paddingTop: spacing[2] },
+  waiting: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+             borderWidth: StyleSheet.hairlineWidth },
   filter: { marginHorizontal: spacing[3], marginBottom: spacing[1], borderRadius: radius.control,
             paddingHorizontal: spacing[2], paddingVertical: spacing[2] },
   escalate: { marginTop: spacing[2], padding: spacing[2], borderRadius: radius.card,

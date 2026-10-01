@@ -15,6 +15,11 @@ Stories 10, 30, 01.
 - **List**: rows with avatar, title, last message preview, timestamp, unread badge
 - **Footer**: QR scanner, profile avatar
 
+## One row per strand
+
+A strand is one row: a container for its members and its outstanding invitations. Invitations
+never get rows of their own. A strand nobody else has joined is still one row (story 30, path F).
+
 ## Behaviours
 
 - Tap a row → the conversation

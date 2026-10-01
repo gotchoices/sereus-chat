@@ -9,12 +9,13 @@
  * where it keeps them. Story 02 path D: "He can see it is still outstanding, and
  * can share it again or abandon it."
  *
- * WHAT "TAKEN UP" MEANS HERE. Nothing tells the inviter which invitation was
- * redeemed, so each record carries the strand's member count when it was made,
- * and the invitation stops being listed once the strand has more members than
- * that. For a new strand that is exact; for a strand with several invitations
- * out at once, whichever arrival comes first retires all of them from the list —
- * a known approximation, erring towards hiding, never towards inventing activity.
+ * WHAT "TAKEN UP" MEANS HERE. Exactly what the party's control database says:
+ * redeeming an invitation records a `FormationUsage` row against its token, so an
+ * invitation is taken up once that count is non-zero — per invitation, which
+ * matters for a strand with several out at once. Only when the control database
+ * cannot be read does it fall back to the strand's member count at the time the
+ * invitation was made (an arrival then retires every invitation for that strand,
+ * erring towards hiding, never towards inventing activity).
  *
  * WHAT "FORGET" DOES NOT DO. Removing a record here stops listing it; it does
  * not withdraw the invitation. The control schema supports an owner-signed
@@ -61,12 +62,15 @@ export async function forgetOutgoingInvitation(id: string): Promise<void> {
 }
 
 /**
- * Still-outstanding invitations, newest first. Drops expired ones, and ones
- * whose strand has gained a member since, from storage as well as the result.
- * `memberCount` returns null when the strand cannot be read right now; such an
- * invitation is kept, since nothing is known about it.
+ * Still-outstanding invitations, newest first. Drops expired and taken-up ones
+ * from storage as well as the result.
+ *
+ * `taken` answers from the control database: true/false when it knows, null when
+ * it cannot be read. On null, `memberCount` is the fallback, itself null when the
+ * strand cannot be read either — and an invitation nothing is known about is kept.
  */
 export async function listOutgoingInvitations(
+  taken: (inv: OutgoingInvitation) => Promise<boolean | null>,
   memberCount: (strandId: string) => Promise<number | null>,
 ): Promise<OutgoingInvitation[]> {
   const list = await load();
@@ -74,7 +78,9 @@ export async function listOutgoingInvitations(
   const keep: OutgoingInvitation[] = [];
   for (const inv of list) {
     if (inv.expiresAt && Date.parse(inv.expiresAt) <= now) continue;
-    if (inv.strandId) {
+    const used = await taken(inv);
+    if (used === true) continue;
+    if (used === null && inv.strandId) {
       const count = await memberCount(inv.strandId);
       if (count !== null && count > inv.membersAtMint) continue;
     }

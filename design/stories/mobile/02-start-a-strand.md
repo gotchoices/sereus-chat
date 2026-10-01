@@ -34,9 +34,10 @@ cubicle. Bob's brother Mike is not.
 7. He can share the link however he would normally reach that person — message, email, print. The
    app does not send it for him, because it has no way to reach anyone.
 8. Susan is right there, so he holds up his phone and says "scan this".
-9. He can see the invitation is outstanding. The strand already exists — an invitation is a way into
-   a particular strand, so it has to be there first — but nobody else is in it until someone
-   accepts, and it says so rather than looking like a conversation already under way.
+9. He can see the invitation is outstanding, as part of the strand it leads into. The strand already
+   exists — an invitation is a way into a particular strand, so it has to be there first — but
+   nobody else is in it until someone accepts, and it says so rather than looking like a conversation
+   already under way.
    → [03](03-respond-to-an-invitation.md)
 
 ### Alternative Path A: nowhere to be reached yet
@@ -74,8 +75,8 @@ cubicle. Bob's brother Mike is not.
 ### Alternative Path D: nobody responds
 
 9.1. Bob sends an invitation and hears nothing.
-9.2. He can see it is still outstanding, and can share it again or abandon it. It does not sit there
-     looking like a conversation.
+9.2. He can see it is still outstanding, within the strand it leads into, and can share it again or
+     abandon it. It does not sit there looking like a conversation, or like a second strand.
 
 ### Alternative Path E: a strand meant to grow
 
@@ -101,7 +102,8 @@ cubicle. Bob's brother Mike is not.
 - [ ] The user is told that anyone added later holds everything said before they arrived
 - [ ] An invitation is available as both a scannable code and a shareable link
 - [ ] The invitation can be shared through any channel the user already has; the app does not send it
-- [ ] Outstanding invitations are visible, distinguishable from strands, and can be re-shared or abandoned
+- [ ] Outstanding invitations are visible as part of the strand they lead into, distinguishable from
+      its members, and can be re-shared or abandoned
 - [ ] A spent invitation says so when used again, rather than failing obscurely
 - [ ] A new strand exists from the moment its first invitation is made, and reads as having nobody
       else in it until someone accepts

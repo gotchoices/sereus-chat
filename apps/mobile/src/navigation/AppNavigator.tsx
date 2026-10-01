@@ -188,7 +188,17 @@ export default function AppNavigator() {
                   style={{ flexDirection: 'row', alignItems: 'center' }}
                 >
                   <View style={{ marginRight: 8 }}>
-                    <Avatar name={name} uri={params.avatarUri} size="sm" />
+                    {params.memberCount != null && params.memberCount <= 1 ? (
+                      // Nobody else has joined: the same neutral glyph as the list row,
+                      // not a letter drawn from "Waiting…" that would read as a person.
+                      <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center',
+                        justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth,
+                        borderColor: theme.border, backgroundColor: theme.surface }}>
+                        <Ionicons name="hourglass-outline" size={18} color={theme.textMuted} />
+                      </View>
+                    ) : (
+                      <Avatar name={name} uri={params.avatarUri} size="sm" />
+                    )}
                   </View>
                   <View>
                     <Text numberOfLines={1} style={{ maxWidth: 180, ...typography.title, color: theme.textPrimary }}>

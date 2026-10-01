@@ -2,6 +2,8 @@
 provides: ["screen:mobile:InvitationGenerator"]
 needs: ["domain:Op:Invitations.create", "domain:Op:Invitations.listOutstanding", "domain:Op:Invitations.cancel"]
 dependsOn:
+  - design/specs/domain/sereus.md
+  - design/specs/project.md
   - design/specs/mobile/screens/invitation-generator.md
   - design/specs/mobile/navigation.md
   - design/specs/mobile/global/ui.md
@@ -9,6 +11,7 @@ dependsOn:
   - design/specs/domain/interfaces.md
   - design/stories/mobile/02-start-a-strand.md
   - design/stories/mobile/05-add-someone-to-a-strand.md
+  - design/stories/mobile/30-my-strands.md
   - design/stories/mobile/31-whos-in-this-strand.md
 ---
 
@@ -22,7 +25,8 @@ ones.
 ## Route
 
 - `InvitationGenerator` — modal from the home header (new strand) or StrandDetail (add someone)
-- Params: `{ strandId? }` — absence means "new strand"
+- Params: `{ strandId?, token? }`. Absence of both means "new strand". `token` opens an outstanding
+  invitation (from StrandDetail's invitation rows) and continues in its strand.
 - Mock: `sereus://screen/InvitationGenerator?variant={happy|empty|error}`
 
 ## Two modes, one screen
@@ -79,9 +83,19 @@ must not be a dead end.
 - Share row: show QR · copy link · device share sheet · **post into the strand** (only in
   add-to-existing mode). The last carries the standing warning that an invitation works for whoever
   holds it.
-- Outstanding list beneath, with relative expiry, re-share and abandon. Abandon calls `cancel` and
-  is irreversible; confirm it.
-- Nothing on this screen may render a not-yet-accepted invitation as a strand.
+- **The strand comes first** (story 02, as amended): the first invitation for a new strand founds
+  it, and every later one from this screen, including "Make another invitation" (which serves the
+  spec's Regenerate), goes into that same strand. Once founded, the private/public choice is shown
+  as fixed.
+- Outstanding list beneath, **scoped to this strand** (filter `listOutstanding()` by `strandId`).
+  Before the first invitation of a new strand there is no strand yet, so the list is empty. Each row
+  offers "Share again" and "Take it off the list".
+- **"Take it off the list" is not abandon.** The control schema supports an owner-signed delete of
+  the `FormationInvite` row, but cadre-core exposes no call for it, so `cancel` only stops listing
+  it. The invitation works for whoever holds it until it expires, and the confirmation says so.
+  Restore "abandon" when upstream can withdraw.
+- Nothing on this screen may render a not-yet-accepted invitation as a strand of its own. It is part
+  of the strand it leads into, and is seen there (StrandDetail).
 
 ## Libraries
 

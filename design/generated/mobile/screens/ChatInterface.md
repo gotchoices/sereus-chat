@@ -1,7 +1,9 @@
 ---
 provides: ["screen:mobile:ChatInterface"]
-needs: ["domain:Op:Strands.listMessages", "domain:Entity:Message", "domain:Entity:Attachment", "domain:Entity:Member"]
+needs: ["domain:Op:Strands.listMessages", "domain:Entity:Message", "domain:Entity:Attachment", "domain:Entity:Member", "domain:Op:Invitations.listOutstanding"]
 dependsOn:
+  - design/specs/domain/sereus.md
+  - design/specs/project.md
   - design/specs/mobile/screens/chat-interface.md
   - design/specs/mobile/navigation.md
   - design/specs/mobile/global/ui.md
@@ -9,7 +11,9 @@ dependsOn:
   - design/specs/domain/overview.md
   - design/specs/domain/ops.md
   - design/specs/domain/schema.md
+  - design/stories/mobile/02-start-a-strand.md
   - design/stories/mobile/04-our-first-conversation.md
+  - design/stories/mobile/30-my-strands.md
   - design/stories/mobile/10-catching-up.md
   - design/stories/mobile/11-writing-a-message.md
   - design/stories/mobile/12-replying-and-mentioning.md
@@ -37,6 +41,15 @@ One strand's conversation. Reading, composing, replying, reacting, correcting.
 | empty | No messages yet | empty |
 | error | `listMessages` rejects | error |
 | editing / replying / fetchingOlder / unreachablePast | Screen-local | — |
+| awaitingJoin | Nobody but me among the members | — (live data) |
+
+**awaitingJoin** (stories 02 step 9, 30 F): the strand exists and the founder may write in it. A
+banner above the messages says so: "Nobody has joined yet", then "N invitations out" from the
+user's own outstanding invitations for this strand, or "No invitation out". It carries an action,
+"Invitations", which goes to StrandDetail, where they are listed and can be shared again. The
+banner goes away once another Member row arrives. The header shows the same neutral waiting glyph as the
+list row, not a letter avatar drawn from the title (navigation header, `memberCount <= 1`). It is information, not an error: the info
+variant, and no Retry.
 
 ## Data Requirements
 

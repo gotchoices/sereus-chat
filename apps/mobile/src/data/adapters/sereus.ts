@@ -233,9 +233,10 @@ export class SereusAdapter implements DataAdapter {
       const others = members.filter(m => m.Id !== me);
       const nameOf = (m: { Id: string; Name?: string }) => m.Name?.trim() || m.Id.slice(0, 8);
       // Until the other side's Member row arrives, `others` is empty and there is
-      // nothing truthful to call it — say so rather than invent a name.
+      // nothing truthful to call it — say so rather than invent a name. "New strand"
+      // was such an invention; this is what is actually true (story 30, path F).
       const title =
-        others.length === 0 ? 'New strand'
+        others.length === 0 ? 'Waiting for someone to join'
         : others.length === 1 ? nameOf(others[0])
         : others.map(nameOf).join(', ');
 
@@ -411,7 +412,11 @@ export class SereusAdapter implements DataAdapter {
 
     const token = node.encodeInvitation(invitation);
     const minted: Invitation = {
-      id: token.slice(0, 12),
+      // The RAW token, which is unique. This used to be `token.slice(0, 12)` of the
+      // ENCODED invitation, which is the same for every invitation (base64 of
+      // `{"token":`), so every invitation shared one id — remembering a second one
+      // for a strand silently replaced the first.
+      id: invitation.token,
       token,
       // The https App Link, for the QR as well as the text: the person scanning
       // or tapping it may not have the app yet, and a `sereus://` link opens
@@ -661,7 +666,25 @@ export class SereusAdapter implements DataAdapter {
   async resignManager(_id: string): Promise<void> { this.notImplemented('resignManager'); }
   async removeMember(_s: string, _m: string): Promise<void> { this.notImplemented('removeMember'); }
   async listOutstandingInvitations(): Promise<Invitation[]> {
-    return listOutgoingInvitations(async strandId => {
+    const node = cadreService.cadreNode;
+    const control = node?.getControlDatabase();
+    return listOutgoingInvitations(async inv => {
+      // The shared token is the ENCODED invitation; FormationUsage is keyed by the
+      // raw token inside it.
+      if (!node || !control) return null;
+      try {
+        // Time-boxed: a control-database read on a node with no reachable cohort
+        // can hang (sereus.md), and the strand list asks this every 10 s.
+        const used = await withTimeout(
+          control.countFormationUsage(node.decodeInvitation(inv.token).token),
+          3000,
+          'countFormationUsage',
+        );
+        return used > 0;
+      } catch {
+        return null;
+      }
+    }, async strandId => {
       const strand = cadreService.getStrands().get(strandId);
       if (!strand?.database) return null;
       return queryMembers(strand).then(m => m.length).catch(() => null);

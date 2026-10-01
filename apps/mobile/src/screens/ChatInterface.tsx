@@ -20,6 +20,7 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import {
   listMessages, listMembers, getStrandState, send, deleteMessage, react, editMessage,
+  listOutstandingInvitations,
 } from '../data/adapter';
 import type { Message, Member, StrandState, Attachment } from '../data/types';
 import { useT } from '../i18n';
@@ -79,6 +80,10 @@ export default function ChatInterface() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  /** The user's own outstanding invitations for this strand; only read while nobody else is here. */
+  const [invitesOut, setInvitesOut] = useState(0);
+  /** Only the user is a member so far: the strand exists, nobody has taken up an invitation yet. */
+  const awaitingJoin = members.length > 0 && members.every(m => m.isMe);
   const [state, setState] = useState<StrandState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -100,6 +105,11 @@ export default function ChatInterface() {
       setMessages(msgs);
       setMembers(mem);
       setError(null);
+      if (mem.length > 0 && mem.every(m => m.isMe)) {
+        listOutstandingInvitations()
+          .then(all => setInvitesOut(all.filter(i => i.strandId === strandId && i.direction !== 'incoming').length))
+          .catch(() => {});
+      }
     } catch (e: any) {
       setError(e?.message ?? 'Could not reach this conversation right now');
     }
@@ -304,10 +314,28 @@ export default function ChatInterface() {
 
       {error ? <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: load }} /> : null}
 
+      {/* Nobody but me yet (stories 02 step 9, 30 F). The strand is real and the
+          founder may write in it; this says who is not here yet and leads to the
+          invitations. Information, not an error — no Retry. */}
+      {awaitingJoin ? (
+        <Banner
+          variant="info"
+          testID="awaiting-join"
+          message={`${t('screens.chat.nobodyYet', 'Nobody has joined yet')} · ${
+            invitesOut === 0 ? t('screens.strands.noInvitationOut', 'No invitation out')
+            : invitesOut === 1 ? t('screens.strands.oneInvitationOut', '1 invitation out')
+            : t('screens.strands.invitationsOut', '{{n}} invitations out').replace('{{n}}', String(invitesOut))}`}
+          action={{ label: t('screens.chat.invitations', 'Invitations'),
+            onPress: () => navigation.navigate('StrandDetail', { strandId, title }) }}
+        />
+      ) : null}
+
       {messages.length === 0 && !error ? (
         <EmptyState icon="chatbubble-ellipses-outline"
           title={t('screens.chat.emptyTitle', 'Nothing said yet')}
-          hint={t('screens.chat.empty', 'Say something — it is just the two of you until anyone else is invited.')} />
+          hint={awaitingJoin
+            ? t('screens.chat.emptyAlone', 'You can write before anyone joins. Whoever takes up an invitation will be able to read it.')
+            : t('screens.chat.empty', 'Say something — it is just the two of you until anyone else is invited.')} />
       ) : (
         <FlatList
           ref={listRef}
