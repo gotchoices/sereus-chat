@@ -5,7 +5,10 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
+// Scrolls the focused field above the keyboard on every platform, edge-to-edge
+// Android included (global/ui.md). Same component health's forms use.
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { getProfile, saveProfile } from '../data/adapter';
 import type { Profile as ProfileT } from '../data/types';
@@ -92,8 +95,9 @@ export default function Profile() {
   }, [navigation, dirty, firstRun, profile, t, save]);
 
   return (
-    <ScrollView
+    <KeyboardAwareScrollView
       style={{ backgroundColor: theme.background }}
+      bottomOffset={24}
       contentContainerStyle={styles.content}
       // Let a tap on a control work while the keyboard is up, instead of the
       // first tap only dismissing it.
@@ -177,7 +181,7 @@ export default function Profile() {
         </Text>
       )}
 
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

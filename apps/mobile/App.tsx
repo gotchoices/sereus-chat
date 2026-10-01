@@ -1,6 +1,9 @@
 import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+// Keyboard avoidance that works on every Android version, edge-to-edge included
+// (global/ui.md, "The on-screen keyboard"). Same library as health/apps/mobile.
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import AppNavigator from './src/navigation/AppNavigator';
 import { VariantProvider } from './src/mock/VariantContext';
 import { I18nProvider } from './src/i18n';
@@ -58,13 +61,15 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <I18nProvider>
-          <VariantProvider>
-            <ThemedShell />
-          </VariantProvider>
-        </I18nProvider>
-      </ThemeProvider>
+      <KeyboardProvider>
+        <ThemeProvider>
+          <I18nProvider>
+            <VariantProvider>
+              <ThemedShell />
+            </VariantProvider>
+          </I18nProvider>
+        </ThemeProvider>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }

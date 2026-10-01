@@ -13,9 +13,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, FlatList, Pressable, Image, StyleSheet, Alert,
-  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { useHeaderHeight } from '@react-navigation/elements';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import {
@@ -73,6 +74,8 @@ export default function ChatInterface() {
   const navigation: any = useNavigation();
   const route: any = useRoute();
   const { strandId, title } = route.params ?? {};
+  /** The navigation header sits above this view; the avoider measures from the window top. */
+  const headerHeight = useHeaderHeight();
   const t = useT();
   const rev = useDataRevision();
   const theme = useTheme();
@@ -300,10 +303,13 @@ export default function ChatInterface() {
   };
 
   return (
+    // The library's KeyboardAvoidingView, not React Native's: RN's relied on the
+    // window being resized (adjustResize), which an edge-to-edge window never is —
+    // the composer sat under the keyboard on an S20 and on Android 17.
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
+      behavior="padding"
+      keyboardVerticalOffset={headerHeight}
     >
       {state ? (
         <Pressable onPress={() => navigation.navigate('StrandDetail', { strandId, title })}

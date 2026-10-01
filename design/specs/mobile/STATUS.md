@@ -69,6 +69,58 @@ their variants. Calls are parked (story 90).
 - [ ] Consider adding `needs:` frontmatter (domain primitives) to the screen specs — appeus's
       `spec-schema.md` offers it and it would tighten dependency tracking
 
+### Keyboard covered the composer on modern Android — fixed with react-native-keyboard-controller, 2026-09-30
+
+- **Seen on:** the user's S20, Nate's phone, and the API 37 emulator. The S7 (Android 8) was fine,
+  because the system still resizes the window there.
+- **Spec:** `global/ui.md` "The on-screen keyboard". The chat screen used React Native's
+  KeyboardAvoidingView with no behaviour on Android and relied on `adjustResize`, which an
+  edge-to-edge window does not get.
+- **Fix,** the same library and setup as health/apps/mobile:
+  - packages: `react-native-keyboard-controller` with Reanimated 4.3.2 and worklets 0.8.3;
+  - `KeyboardProvider` at the root;
+  - the library's KeyboardAvoidingView in Chat, offset by the real header height
+    (`@react-navigation/elements`, now declared);
+  - `KeyboardAwareScrollView` in Profile.
+- **Found on the way: our babel.config.js was never applied.** Metro's projectRoot is the repo root,
+  and Babel looked for its config there. `metro.transformer.js` now passes the app directory as
+  Babel's projectRoot. Without this, the worklets plugin did not run, and the app (including a
+  release build) crashed at start with "[Worklets] Failed to create a worklet".
+- **Scan QR is deliberately unwrapped.** The library's `behavior="position"` dropped the screen's
+  Text elements, and the paste field already sits above the keyboard.
+- **Not checked:** the two modals in My Network (key import, seed apply).
+- **Verified on the API 37 emulator:** the composer sits directly above the docked keyboard.
+- **Needs a new APK** (native modules).
+
+## Waiting on upstream — revisit when these land
+
+Parked deliberately (user, 2026-09-30). Each item names what to do when its trigger arrives.
+
+- [ ] **sereus#25: pending join on the invitee's side**
+  (`test/stack/offline-inviter-join.mjs` is the acceptance test: it exits 0 once fixed).
+  - Adopt it in place of tapping Join again.
+  - Show the invitee's states: received, trying, waiting for them to be online, joined, failed.
+  - Add a story 03 line: a join keeps trying until the invitation runs out.
+  - Decide where a pending join appears (the Strands list holds strands).
+  - Revisit the cross-platform best effort discussed 2026-09-30: catch up and retry on every return
+    to the foreground; a strand-level "not reachable right now"; one-time "phones-only means both
+    open at once" coaching.
+  - Ask whether an always-on node can answer a join for an offline inviter.
+- [ ] **sereus#24: party-private invitation note** ("for Bob").
+  - Add an optional "Who is this for?" on the invitation.
+  - Show it on pending invitations and on a strand nobody has joined yet, and keep it as "For Bob —
+    joined as Robert" afterwards.
+  - Until then, invitations are told apart only by when they were made.
+- [ ] **optimystic `watch()`, fully implemented.** Rethink the whole notification and refresh plan
+  around it:
+  - today screens poll (the strand list every 3–10 s, the chat every 10 s), and nothing reacts to a
+    change as it happens;
+  - a watched table could drive the lists, the chat and any notification directly once the other
+    side connects;
+  - that also changes how much the app should do on returning to the foreground.
+  - Reachability is a separate problem: phones still sleep, and the answer there is a full-time
+    node (sereus push wake-up, `DeviceToken`, is in the stack but not usable without FCM/APNs).
+
 ## Next steps — UI pass of 2026-09-24
 
 Ordered by what stops a person using the app. Everything here was found by walking the
