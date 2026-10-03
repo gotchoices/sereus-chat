@@ -33,7 +33,7 @@
  * strands or be disturbed by them. It does use the configured relay, because
  * being relay-only is the condition under test.
  */
-import { CadreNode, ControlFormationUsageRecorder, generateStrandMemberKey } from '@serfab/cadre-core';
+import { CadreNode, generateStrandMemberKey } from '@serfab/cadre-core';
 import type { CadreNodeConfig, StrandInstance } from '@serfab/cadre-core';
 import { generateKeyPair } from '@libp2p/crypto/keys';
 import { webSockets } from '@libp2p/websockets';
@@ -140,13 +140,8 @@ export async function runTwoPartyCheck(opts: TwoPartyOptions = {}): Promise<TwoP
   /**
    * Wait for a relay reservation to produce an address.
    *
-   * This is not politeness, it is correctness. `initializeStrandSolicitation`
-   * SNAPSHOTS `getMultiaddrs()`, and a responder that snapshots an empty set
-   * advertises nothing for the life of the node: the joiner dials fine, the host
-   * approves and marks the token spent, and only then does the joiner reject the
-   * result for having no `cadrePeerAddrs`. That reads as a joiner-side failure
-   * with nothing wrong on the host, and it burns the invitation on the way
-   * through — exactly the false lead this check exists to avoid.
+   * An invitation minted before the host has an address names nowhere to dial,
+   * so the joiner would fail looking like the bug under test.
    */
   const awaitAddresses = async (node: CadreNode, tag: string, waitMs = 120_000) => {
     const until = Date.now() + waitMs;
@@ -263,12 +258,9 @@ export async function runTwoPartyCheck(opts: TwoPartyOptions = {}): Promise<TwoP
       return { ok: false, detail: 'Founded closed strand carries no MemberPrivateKey — invitation would be unusable.', log };
     }
 
-    // The recorder is NOT optional for a bound invitation: without one that can
-    // resolve the strand, cadre-core treats the invite as UNBOUND and its
-    // provisioner mints a brand new strand per joiner, so the two never meet.
-    host.initializeStrandSolicitation({
-      formationUsageRecorder: new ControlFormationUsageRecorder(host.getControlDatabase()!),
-    });
+    // No responder to install: since sereus 1.10 `start()` installs one backed
+    // by the control DB's FormationInvite/FormationUsage rows, which is what
+    // binds the invitation to this strand.
     const invitation = await host.createOpenInvitation(CHAT_SAPP_ID, 60 * 60 * 1000);
     await host.publishFormationInvite(invitation.token, CHAT_SAPP_ID, {
       expiresAtMs: invitation.expiration.getTime(),

@@ -21,8 +21,14 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-/** The format this build writes. Bump on any upgrade that strands earlier data. */
-export const DATA_FORMAT = 'sereus-1.9';
+/**
+ * The format this build writes. Bump on any upgrade that strands earlier data.
+ *   sereus-1.9   strand network state replaced the peer book.
+ *   sereus-1.11  optimystic 1.9 and libp2p 3.3; a new PendingJoin control table. Not
+ *                known to break 1.9 data, but bumped so testers start clean rather
+ *                than chase faults carried over from it (internal testing, no users).
+ */
+export const DATA_FORMAT = 'sereus-1.11';
 
 const MARKER_KEY = '@sereus.chat/dataFormat';
 const APP_PREFIX = '@sereus.chat/';

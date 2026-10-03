@@ -52,6 +52,13 @@ const STORE_ROOT = process.env.STORE_ROOT ?? join(tmpdir(), 'offline-inviter-joi
 const WAIT_MS = Number(process.env.WAIT_MS ?? 120_000);
 const REACHABLE_MS = Number(process.env.REACHABLE_MS ?? 60_000);
 const JOINER_RESTART = process.env.JOINER_RESTART === '1';
+/**
+ * JOIN_MODE=form (default) — the one-shot `formStrand`, which the original report was about.
+ * JOIN_MODE=request — sereus 1.10's `requestJoin`, which records a party-wide pending join and
+ * keeps trying (gotchoices/sereus#25). The PASS condition is the same: the joiner ends up
+ * joined with nobody calling anything after the host comes back.
+ */
+const JOIN_MODE = process.env.JOIN_MODE ?? 'form';
 
 const SAPP = {
   id: 'org.sereus.repro.offlinejoin',
@@ -191,12 +198,19 @@ try {
   // 2. Joiner tries while the host is down.
   const disclosure = { partyId: partyJoiner, purpose: 'offline-inviter repro', metadata: { name: 'Joiner' } };
   const a0 = Date.now();
-  try {
-    await joiner.formStrand(invitation, disclosure);
-    log('JOINER: !! formStrand SUCCEEDED with the host down — the rig is wrong (is the host really stopped?)');
-    process.exit(2);
-  } catch (e) {
-    log(`JOINER: formStrand failed after ${((Date.now() - a0) / 1000).toFixed(1)}s, as expected — ${e?.name}: ${e?.message}`);
+  if (JOIN_MODE === 'request') {
+    joiner.on?.('pendingJoin:changed', (st) => log(`JOINER: pendingJoin:changed → ${st?.state ?? JSON.stringify(st)}`));
+    const st = await joiner.requestJoin(invitation, disclosure);
+    log(`JOINER: requestJoin returned after ${((Date.now() - a0) / 1000).toFixed(1)}s — ${JSON.stringify(st)}`);
+    if (st?.state === 'joined') { log('JOINER: !! joined with the host down — the rig is wrong'); process.exit(2); }
+  } else {
+    try {
+      await joiner.formStrand(invitation, disclosure);
+      log('JOINER: !! formStrand SUCCEEDED with the host down — the rig is wrong (is the host really stopped?)');
+      process.exit(2);
+    } catch (e) {
+      log(`JOINER: formStrand failed after ${((Date.now() - a0) / 1000).toFixed(1)}s, as expected — ${e?.name}: ${e?.message}`);
+    }
   }
   log('JOINER: what its own party records about that attempt:', JSON.stringify(await joinerKnowledge(joiner, strandId)));
 

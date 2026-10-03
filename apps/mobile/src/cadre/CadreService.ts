@@ -20,7 +20,6 @@
 
 import {
   CadreNode,
-  ControlFormationUsageRecorder,
   pinnedKeyTrustPolicy,
   type CadreNodeConfig,
   type CadreNodeEvents,
@@ -127,18 +126,7 @@ class CadreServiceImpl {
 
   /** Callbacks run after a rebuild-driven restart — see `onRebuilt`. */
   private rebuildHooks: Array<() => void | Promise<void>> = [];
-  /**
-   * The address set the formation responder was last installed with, and the
-   * timer that notices when reality diverges from it. See `watchReachability`.
-   */
-  private _responderAddrs: string[] = [];
-  /**
-   * The address set most recently OBSERVED, which is not the same thing as the
-   * set the responder advertises: the responder is only reinstalled when it has
-   * nothing, so after one reinstall its set goes stale by design. Comparing
-   * against the responder's copy made the log undercount — a 4 → 0 → 4 → 0 cycle
-   * printed as two identical "4 → 0" lines with the recoveries invisible.
-   */
+  /** The address set most recently observed. See `watchReachability`. */
   private _lastSeenAddrs: string[] = [];
   private _reachabilityListener: (() => void) | null = null;
 
@@ -569,17 +557,18 @@ class CadreServiceImpl {
         );
       }
 
-      // Formation responder — a SECURITY GATE: createOpenInvitation/formStrand
-      // lazily spin up a solicitation service with NO usage recorder otherwise,
-      // which accepts every token.  Synchronous (no control-DB read).
+      // No formation responder to install: since sereus 1.10, `start()` installs
+      // one on every node, checking tokens against the control DB's
+      // `FormationInvite`/`FormationUsage` rows and reading this node's addresses
+      // live. (Chat used to install its own and reinstall it once a relay
+      // reservation landed, because the old one snapshotted the addresses.)
       try {
-        this.initializeFormationResponder();
         this.watchReachability();
         // Re-arm everything the PREVIOUS node carried. Must happen on every
         // start, not only the first — see `on()`.
         this.reapplySubscriptions();
       } catch (err) {
-        console.warn('[CadreService] formation responder init failed:', err);
+        console.warn('[CadreService] post-start wiring failed:', err);
       }
     } catch (err) {
       this._startError = err instanceof Error ? err.message : String(err);
@@ -588,12 +577,6 @@ class CadreServiceImpl {
     }
   }
 
-  /**
-   * Install the strand-formation responder, backed by the control DB's
-   * `FormationInvite` / `FormationUsage` tables.  Without this, an invitation
-   * token is never actually checked.  Synchronous — `initializeStrandSolicitation`
-   * only constructs + registers a responder; it performs no control-DB read.
-   */
   /**
    * Choose how much of Noise's crypto runs natively, and rebuild the node if it
    * is already up.
@@ -687,91 +670,17 @@ class CadreServiceImpl {
     return this.cadreNode?.getRelayReservationState() ?? null;
   }
 
-  /**
-   * Install the strand-formation responder, backed by the control DB's
-   * `FormationInvite` / `FormationUsage` tables. Without this, an invitation
-   * token is never actually checked.
-   *
-   * Installed once, at startup, and that is now correct: `initializeStrandSolicitation`
-   * snapshots the node's addresses (`cadrePeerAddrs: getMultiaddrs()`), and with
-   * relays named in `network.relayAddrs` the circuit listener exists before this
-   * runs. On the old `reserveRelays()` path it did not, so the responder advertised
-   * an empty address list for the life of the process and every joiner rejected the
-   * result — which is why this briefly grew a reinstall-on-reservation hook. The
-   * config change removed the reason for it.
-   */
-  private initializeFormationResponder(): void {
-    if (!this.node) throw new Error('CadreNode not running');
-    const controlDb = this.node.getControlDatabase();
-    if (!controlDb) throw new Error('Control database not available');
-
-    // Drop the previous responder first. A fresh `StrandSolicitationService`
-    // carries a fresh registration set, so it would call `node.handle()` for a
-    // protocol the old one still holds — and libp2p throws on a duplicate.
-    const previous = this.node.getStrandSolicitationService();
-    const controlNode = this.node.getControlNode();
-    if (previous && controlNode) {
-      previous.unregisterResponder(controlNode);
-    }
-
-    this.node.initializeStrandSolicitation({
-      formationUsageRecorder: new ControlFormationUsageRecorder(controlDb),
-    });
-
-    this._responderAddrs = this.node.getMultiaddrs();
-    console.info(
-      `[CadreService] ✓ formation responder installed — advertising ${this._responderAddrs.length} address(es)`,
-    );
-    if (this._responderAddrs.length === 0) {
-      // Not fatal, and not permanent any more — `watchReachability` reinstalls
-      // once an address appears. Said out loud because an invitation minted in
-      // this state cannot be completed, and the joiner is the only side that
-      // finds out.
-      console.warn('[CadreService] responder has no addresses yet — joins will be rejected until a relay reservation lands');
-    }
-  }
-
   /** Stable comparison key for an address set; order from libp2p is not stable. */
   private static addrsKey(addrs: string[]): string {
     return [...addrs].sort().join('|');
   }
 
   /**
-   * Keep the formation responder's advertised addresses honest.
-   *
-   * `initializeStrandSolicitation` takes `cadrePeerAddrs` as a SNAPSHOT —
-   * `getMultiaddrs()`, evaluated once — while `resolveStrandAddrs` beside it is a
-   * live hook. On a phone that asymmetry decides whether anyone can join us, and
-   * naming relays in `network.relayAddrs` is not by itself enough to fix it:
-   * `requireRelay: false` (which we want, so a dead relay leaves the app usable)
-   * lets `start()` return before the first reservation has landed. A device slow
-   * enough to lose that race — our 2016 test phone does, repeatedly — installs a
-   * responder advertising NOTHING and, without this, keeps advertising nothing
-   * for the life of the process even after the reservation succeeds seconds later.
-   *
-   * The failure that causes is thoroughly misleading: the joiner dials fine, the
-   * responder approves, creates the strand and records the token as spent, and
-   * only then does the joiner reject the result, because
-   * `isValidResponderCreatesResult` requires a non-empty `cadrePeerAddrs`. It
-   * reads as "Responder result failed validation" on the JOINER, with nothing
-   * visibly wrong on the host, and it burns the invitation on the way through.
-   *
-   * EVENT-DRIVEN, not polled. libp2p dispatches `self:peer:update` whenever this
-   * node's own peer record changes — "a transport started listening on a new
-   * address" covers a circuit-relay reservation being granted, lost, or moved —
-   * and cadre-core exposes the control node through `getControlNode()`, so the
-   * signal is already there to subscribe to.
-   *
-   * The event also fires for changes we do not care about (registering a protocol
-   * handler, for one — which reinstalling the responder itself does). Comparing
-   * address SETS is what makes that safe: a handler registration leaves the set
-   * identical, the comparison returns early, and the reinstall cannot re-trigger
-   * itself.
-   *
-   * Reacting to any CHANGE, not merely empty → non-empty: a reservation that
-   * lapses and is re-granted comes back on a different relay address, and a
-   * responder still advertising the old one sends joiners somewhere that no
-   * longer routes.
+   * Log every change in this node's own addresses. A relay reservation being
+   * granted, lost or moved shows up here (libp2p's `self:peer:update`), and it is
+   * the single most useful signal we have about how the stack is doing on a
+   * phone. Address SETS are compared, because the event also fires for changes
+   * that leave them unchanged.
    */
   private watchReachability(): void {
     const node = this.node;
@@ -788,43 +697,9 @@ class CadreServiceImpl {
       const previousSeen = this._lastSeenAddrs;
       this._lastSeenAddrs = current;
 
-      // Always SAY what changed, even when we decline to act on it. The
-      // reservation dropping and recovering underneath a live connection is the
-      // single most useful signal we have about this stack's behaviour, and the
-      // narrow guard below would otherwise hide it.
       console.info(
         `[CadreService] reachability ${previousSeen.length} → ${current.length} address(es)`,
       );
-
-      // ONLY when the responder currently has NOTHING to offer.
-      //
-      // Reinstalling means `unhandle()` then `handle()` on the formation
-      // protocol, and that tears down streams in flight — a joiner mid-handshake
-      // gets "Formation stream closed before length prefix" and its invitation is
-      // spent. Relay reservations turn out to drop and recover routinely during a
-      // formation (measured: a 4 → 0 → 4 cycle on whichever side is working), so
-      // reacting to EVERY change meant we were reliably cutting the very
-      // handshakes this was meant to enable.
-      //
-      // Empty → non-empty is the case that actually needed fixing: a responder
-      // stuck advertising nothing rejects every joiner, forever, and has no
-      // stream to lose. A responder that already has addresses stays as it is
-      // even if they change; a stale address costs one failed dial, while a
-      // mid-formation teardown costs the invitation.
-      if (this._responderAddrs.length > 0) {
-        return;
-      }
-
-      console.info('[CadreService] responder had no addresses — reinstalling now that it does');
-      try {
-        this.initializeFormationResponder();
-      } catch (err) {
-        // Best-effort: a failed reinstall leaves the PREVIOUS responder
-        // unregistered, so record the failure loudly and clear the remembered set
-        // so the next address change retries rather than comparing equal.
-        console.warn('[CadreService] responder reinstall failed; will retry on the next address change:', err);
-        this._responderAddrs = [];
-      }
     };
 
     controlNode.addEventListener('self:peer:update', onSelfUpdate);
@@ -835,7 +710,6 @@ class CadreServiceImpl {
   async stop(): Promise<void> {
     this._reachabilityListener?.();
     this._reachabilityListener = null;
-    this._responderAddrs = [];
     this._lastSeenAddrs = [];
     if (this.node) {
       await this.node.stop();

@@ -205,6 +205,47 @@ their variants. Calls are parked (story 90).
   - [ ] Draft for the user's review: `apps/mobile/tmp/cadre-rn-native-digest-issue.md` (the kit's
         digest polyfill is pure JS).
 
+### Upgraded to sereus 1.11.0 / optimystic 1.9.0 / libp2p 3.3.11, 2026-10-02
+
+- **Packages:**
+  - cadre-core/cadre-rn ^1.11.0, `@optimystic/*` ^1.9.0;
+  - single-copy pins: libp2p 3.3.11, `@libp2p/interface` 3.3.0, peer-id 6.0.15, multiaddr ^13.0.3;
+  - `use-stack.sh` table brought up to date (it still held 0.x ranges and would have downgraded);
+  - `test/stack` moved to the same versions.
+- **Code:** chat no longer installs or reinstalls the formation responder; `start()` does since
+  1.10 and reads addresses live. Data-format marker is now `sereus-1.11`, so old installs see the
+  blocking screen.
+- **Node harness:**
+  - #25 repro with `JOIN_MODE=request`: PASS, joined on its own 55 s after the host returned
+    (15 s with the joiner also restarted);
+  - messages: commit about 0.5–0.6 s, also after a restart of both;
+  - lone writes reached the returning peer, in 28 s (run alongside three other runs);
+  - concurrent runs on one machine and relay distort latency; measure alone.
+- **Devices (S7 + API 37 emulator, wiped, relay only):**
+  - join via a `#` link: **73 s** (1.9: 150 s);
+  - messages 21 s / 16 s, and after a cold restart of both 14 s / 17 s (each includes the 10 s
+    chat poll; 1.9 before the digest fix: minutes);
+  - after a cold start, the strand list showed "No strands yet" for about 2.2 min until the
+    strand attached.
+- **Not yet adopted:** `requestJoin` for the invitee (it replaces the "waiting on #25" item; needs
+  stories/spec first) and the typed formation errors.
+
+### optimystic 1.9.0 trial in the Node harness, 2026-10-01 (not adopted)
+
+Run in a scratchpad copy of `test/stack`: optimystic 1.9.0 with cadre-core 1.9.0, forcing a single
+libp2p 3.3.11 and `@multiformats/multiaddr` 13.0.3 (cadre-core 1.9.0 asks for 12).
+
+- **sereus#13 passes unpatched.** At 1500 ms per frame: formation 19 s (1.8: failed at 6.0 s),
+  first sync 71 s, the host's row read, writes both ways. Confirmed on #13 (2026-10-01).
+- **Messages are faster:** commit and delivery median about 0.5 s, also after a restart of both
+  (1.8.1: 0.7–0.8 s).
+- **Reads with a stalled peer are unchanged:** the same 7.0 s cap (Optimystic#25 still applies).
+  Healthy-peer slow reads are faster (p90 141 ms, against about 300 ms).
+- **Writes with the peer offline:** the first fails after 4.4 s (1.8.1: about 2.8 s), then lone
+  commits in 8 ms. The returning peer held them after 15.5 s (1.8.1: 8.4 s; one run each).
+- **Decision:** wait for the next sereus release. It adopts optimystic 1.9.0 and libp2p 3.3 and
+  adds pending joins (#25). Taking optimystic alone means overriding cadre-core's multiaddr range.
+
 ## Waiting on upstream — revisit when these land
 
 Parked deliberately (user, 2026-09-30). Each item names what to do when its trigger arrives.

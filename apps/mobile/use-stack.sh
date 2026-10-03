@@ -82,15 +82,15 @@ pj_path = os.path.join(APP_DIR, 'package.json')
 # `in_deps` packages appear in `dependencies`; `in_res` packages appear in
 # `resolutions` in BOTH modes so a single version wins tree-wide.
 PACKAGES = collections.OrderedDict([
-    ('@optimystic/db-core',                  ('../../../optimystic/packages/db-core',                  '^0.22.0', True,  True)),
-    ('@optimystic/db-p2p',                   ('../../../optimystic/packages/db-p2p',                   '^0.22.0', True,  True)),
-    ('@optimystic/db-p2p-storage-rn',        ('../../../optimystic/packages/db-p2p-storage-rn',        '^0.22.0', True,  True)),
-    ('@optimystic/quereus-plugin-crypto',    ('../../../optimystic/packages/quereus-plugin-crypto',    '^0.22.0', True,  True)),
-    ('@optimystic/quereus-plugin-optimystic',('../../../optimystic/packages/quereus-plugin-optimystic','^0.14.1', True,  True)),
-    ('@quereus/quereus',                     ('../../../quereus/packages/quereus',                     '^4.11.0', True,  True)),
-    ('@serfab/cadre-core',                   ('../../../sereus/packages/cadre-core',                   '^0.10.0', True,  True)),
-    ('@serfab/strand-proto',                 ('../../../sereus/packages/strand-proto',                 '^0.10.0', False, True)),
-    ('p2p-fret',                             ('../../../fret/packages/fret',                           '^0.6.0',  True,  True)),
+    ('@optimystic/db-core',                  ('../../../optimystic/packages/db-core',                  '^1.9.0',  True,  True)),
+    ('@optimystic/db-p2p',                   ('../../../optimystic/packages/db-p2p',                   '^1.9.0',  True,  True)),
+    ('@optimystic/db-p2p-storage-rn',        ('../../../optimystic/packages/db-p2p-storage-rn',        '^1.9.0',  True,  True)),
+    ('@optimystic/quereus-plugin-crypto',    ('../../../optimystic/packages/quereus-plugin-crypto',    '^1.9.0',  True,  True)),
+    ('@optimystic/quereus-plugin-optimystic',('../../../optimystic/packages/quereus-plugin-optimystic','^1.9.0',  True,  True)),
+    ('@quereus/quereus',                     ('../../../quereus/packages/quereus',                     '^4.20.0', True,  True)),
+    ('@serfab/cadre-core',                   ('../../../sereus/packages/cadre-core',                   '^1.11.0', True,  True)),
+    ('@serfab/cadre-rn',                     ('../../../sereus/packages/cadre-rn',                     '^1.11.0', True,  False)),
+    ('p2p-fret',                             ('../../../fret/packages/fret',                           '^1.0.0',  True,  True)),
 ])
 NAMES = set(PACKAGES)
 SENTINEL = '@serfab/cadre-core'  # its spec tells us the current mode
@@ -100,22 +100,16 @@ SENTINEL = '@serfab/cadre-core'  # its spec tells us the current mode
 # A `None` npm_value means the pin is DROPPED in npm mode.
 #
 # Why these differ per mode:
-#   @multiformats/multiaddr — @optimystic/db-p2p declares ^13 while
-#     @serfab/strand-proto + @serfab/cadre-core declare ^12.5.1.  In `local`
-#     mode yarn's portal protocol ignores declared ranges and refuses to nest
-#     duplicates, so we force v13 tree-wide and metro.config.js redirects the
-#     one v12-only subpath (@multiformats/multiaddr/convert, needed by
-#     gossipsub) at the v12 copy in sereus/node_modules.  In `npm` mode yarn
-#     nests both majors where each consumer needs them, so no pin and no
-#     redirect — drop it.
+#   @multiformats/multiaddr — since sereus 1.10 every ser package declares ^13, so it is
+#     pinned to one copy in both modes, like the libp2p family below.
 #   libp2p / @libp2p/interface / @libp2p/peer-id / @noble/hashes — single-copy
-#     pins for type identity.  The `npm` values track what the published
-#     0.8.x/4.x stack resolves to (same set health/apps/mobile uses).
+#     pins for type identity.  The values track what the published stack
+#     (sereus 1.11 / optimystic 1.9) declares.
 COMPAT_PINS = collections.OrderedDict([
-    ('@libp2p/interface',        ('npm:3.1.0',  'npm:3.2.5')),
-    ('@libp2p/peer-id',          ('npm:6.0.4',  'npm:6.0.14')),
-    ('@multiformats/multiaddr',  ('npm:13.0.1', None)),
-    ('libp2p',                   ('npm:3.1.3',  'npm:3.3.8')),
+    ('@libp2p/interface',        ('npm:3.3.0',  'npm:3.3.0')),
+    ('@libp2p/peer-id',          ('npm:6.0.15', 'npm:6.0.15')),
+    ('@multiformats/multiaddr',  ('^13.0.3',    '^13.0.3')),
+    ('libp2p',                   ('npm:3.3.11', 'npm:3.3.11')),
     ('@noble/hashes',            ('npm:2.0.1',  'npm:2.2.0')),
 ])
 PIN_NAMES = set(COMPAT_PINS)
