@@ -62,15 +62,17 @@ export async function forgetOutgoingInvitation(id: string): Promise<void> {
 }
 
 /**
- * Still-outstanding invitations, newest first. Drops expired and taken-up ones
- * from storage as well as the result.
+ * Still-outstanding invitations, newest first. Drops expired and spent ones from
+ * storage as well as the result.
  *
- * `taken` answers from the control database: true/false when it knows, null when
- * it cannot be read. On null, `memberCount` is the fallback, itself null when the
- * strand cannot be read either — and an invitation nothing is known about is kept.
+ * `usage` answers from the control database: how many have joined through it, or
+ * null when it cannot be read. An invitation for one person is spent at its first
+ * use. One for anyone stays until it expires, carrying its count. On null,
+ * `memberCount` is the fallback for a one-person invitation, itself null when the
+ * strand cannot be read either, and an invitation nothing is known about is kept.
  */
 export async function listOutgoingInvitations(
-  taken: (inv: OutgoingInvitation) => Promise<boolean | null>,
+  usage: (inv: OutgoingInvitation) => Promise<number | null>,
   memberCount: (strandId: string) => Promise<number | null>,
 ): Promise<OutgoingInvitation[]> {
   const list = await load();
@@ -78,14 +80,21 @@ export async function listOutgoingInvitations(
   const keep: OutgoingInvitation[] = [];
   for (const inv of list) {
     if (inv.expiresAt && Date.parse(inv.expiresAt) <= now) continue;
-    const used = await taken(inv);
-    if (used === true) continue;
-    if (used === null && inv.strandId) {
-      const count = await memberCount(inv.strandId);
-      if (count !== null && count > inv.membersAtMint) continue;
+    // Remembered by an older build: those were treated as one-person invitations.
+    const singleUse = inv.singleUse ?? true;
+    const used = await usage(inv);
+    if (singleUse) {
+      if (used !== null && used > 0) continue;
+      if (used === null && inv.strandId) {
+        const count = await memberCount(inv.strandId);
+        if (count !== null && count > inv.membersAtMint) continue;
+      }
+      keep.push(inv);
+    } else {
+      keep.push(used === null ? inv : { ...inv, uses: used });
     }
-    keep.push(inv);
   }
-  if (keep.length !== list.length) await save(keep);
+  const stored = keep.map(({ uses: _uses, ...rest }) => rest);
+  if (stored.length !== list.length) await save(stored as OutgoingInvitation[]);
   return keep.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

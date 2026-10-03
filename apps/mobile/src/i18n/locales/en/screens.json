@@ -66,7 +66,21 @@
     "wayBorrow": "Use an open relay",
     "wayBorrowBody": "The quick way: free, nothing to set up. Whoever runs it can see that you talk to someone, when, and roughly how much — never what you say. Opens the list on sereus.org; you confirm your pick here.",
     "wayOwn": "Run your own relay",
-    "wayOwnBody": "The private way: nobody else sees who you talk to. Needs a machine that stays on. Opens the instructions on sereus.org."
+    "wayOwnBody": "The private way: nobody else sees who you talk to. Needs a machine that stays on. Opens the instructions on sereus.org.",
+    "validDay": "1 day",
+    "validWeek": "1 week",
+    "validMonth": "1 month",
+    "forOne": "For one person",
+    "forAnyone": "Anyone with the link",
+    "goodFor": "good for {{period}}",
+    "change": "Change",
+    "whoCanUse": "Who can use it",
+    "forOneBody": "Spent once used, so a lost copy is useless to anyone else.",
+    "forAnyoneBody": "Works for everyone who has it, until it runs out. It cannot be recalled.",
+    "goodForLabel": "Good for",
+    "anyoneAndRights": "Anyone who finds this link can join and then add or remove anyone, including you. It cannot be recalled.",
+    "usedOnce": "Used once",
+    "usedTimes": "Used {{n}} times"
   },
   "media": {
     "empty": "Photos, files and voice messages will collect here.",

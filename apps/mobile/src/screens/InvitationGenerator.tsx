@@ -14,8 +14,9 @@ import { View, Text, ScrollView, Pressable, Switch, StyleSheet, Share, Alert, Li
 import Clipboard from '@react-native-clipboard/clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import { createInvitation, listOutstandingInvitations, cancelInvitation, reachability, getProfile } from '../data/adapter';
-import type { Invitation } from '../data/types';
+import { createInvitation, listOutstandingInvitations, cancelInvitation, reachability, getProfile, getStrandState } from '../data/adapter';
+import type { Invitation, InvitationValidity } from '../data/types';
+import { INVITATION_VALIDITY, defaultInvitationTerms } from '../data/types';
 import { useT } from '../i18n';
 import { UnreachableError } from '../data/errors';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -39,6 +40,13 @@ export default function InvitationGenerator() {
 
   const [visibility, setVisibility] = useState<'private' | 'public'>('private');
   const [grantsInviteRight, setGrants] = useState(false);
+  // THE TERMS (story 02 step 3, paths C and F). Defaults follow the strand kind and
+  // show as one line; "Change" opens the choices. Once the user has changed any of
+  // them, a later change of strand kind no longer resets them.
+  const [singleUse, setSingleUse] = useState(true);
+  const [validity, setValidity] = useState<InvitationValidity>('week');
+  const [termsTouched, setTermsTouched] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [outstanding, setOutstanding] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -109,6 +117,34 @@ export default function InvitationGenerator() {
     return () => clearInterval(id);
   }, []));
 
+  // Defaults by strand kind: the choice on a new strand, or the existing strand's own.
+  useEffect(() => {
+    if (termsTouched || addingToExisting) return;
+    const d = defaultInvitationTerms(visibility);
+    setSingleUse(d.singleUse); setValidity(d.validity);
+  }, [visibility, termsTouched, addingToExisting]);
+  useEffect(() => {
+    if (!addingToExisting || !routeStrandId) return;
+    getStrandState(routeStrandId).then(st => {
+      if (termsTouched) return;
+      const d = defaultInvitationTerms(st.visibility);
+      setSingleUse(d.singleUse); setValidity(d.validity);
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addingToExisting, routeStrandId]);
+
+  const validityLabel = (v: InvitationValidity) =>
+    v === 'day' ? t('screens.invite.validDay', '1 day')
+    : v === 'week' ? t('screens.invite.validWeek', '1 week')
+    : t('screens.invite.validMonth', '1 month');
+  const termsLine = [
+    singleUse ? t('screens.invite.forOne', 'For one person') : t('screens.invite.forAnyone', 'Anyone with the link'),
+    t('screens.invite.goodFor', 'good for {{period}}').replace('{{period}}', validityLabel(validity)),
+    grantsInviteRight
+      ? t('screens.invite.canInviteOnShort', 'they can add and remove people')
+      : t('screens.invite.canInviteOffShort', 'they cannot add or remove anyone'),
+  ].join(' · ');
+
   const generate = useCallback(async () => {
     if (loading) return;
     setLoading(true); setError(null); setUnreachable(false);
@@ -117,6 +153,8 @@ export default function InvitationGenerator() {
         strandId,
         visibility: addingToExisting ? undefined : visibility,
         grantsInviteRight,
+        singleUse,
+        validForMs: INVITATION_VALIDITY[validity],
       });
       // Dev-only: an invitation is a QR or a share sheet for a real user, but in
       // development it has to cross from one device to another with no camera in
@@ -138,7 +176,7 @@ export default function InvitationGenerator() {
     } finally {
       setLoading(false);
     }
-  }, [loading, strandId, addingToExisting, visibility, grantsInviteRight, refresh]);
+  }, [loading, strandId, addingToExisting, visibility, grantsInviteRight, singleUse, validity, refresh]);
 
   // What goes in the message. A bare 600-character link says nothing about what
   // it is to somebody who has never heard of the app.
@@ -268,9 +306,7 @@ export default function InvitationGenerator() {
             .replace('{{kind}}', addingToExisting
               ? t('screens.invite.existingStrand', 'this strand')
               : visibility === 'private' ? t('screens.invite.private', 'Private') : t('screens.invite.public', 'Open to anyone'))
-            .replace('{{rights}}', grantsInviteRight
-              ? t('screens.invite.canInviteOnShort', 'they can add and remove people')
-              : t('screens.invite.canInviteOffShort', 'they cannot add or remove anyone'))}
+            .replace('{{rights}}', termsLine.charAt(0).toLowerCase() + termsLine.slice(1))}
         </Text>
       ) : null}
 
@@ -301,18 +337,72 @@ export default function InvitationGenerator() {
 
       {unreachable ? null : (<>
       <SectionHeader label={t('screens.invite.rights', 'On this invitation')} />
-      <Pressable onPress={() => setGrants(g => !g)}
-        style={[styles.card, { borderColor: grantsInviteRight ? theme.accent : theme.border, backgroundColor: theme.surfaceAlt }]}>
-        <Text style={[typography.body, styles.cardTitle, { color: theme.textPrimary }]}>
-          {grantsInviteRight
-            ? t('screens.invite.canInviteOn', 'They can add and remove people')
-            : t('screens.invite.canInviteOff', 'They cannot add or remove anyone')}
-        </Text>
-        <Text style={[typography.small, { color: theme.textMuted }]}>
-          {t('screens.invite.rightsBody',
-            'Passing this on gives them the same reach you have — including over you.')}
-        </Text>
-      </Pressable>
+      {/* One line a newcomer can leave alone; the choices are one tap away. */}
+      <View style={[styles.card, styles.termsRow, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
+        <Text testID="invite-terms" style={[typography.small, styles.flex1, { color: theme.textPrimary }]}>{termsLine}</Text>
+        <Pressable accessibilityRole="button" onPress={() => setShowTerms(v => !v)} hitSlop={8}>
+          <Text style={[typography.small, styles.cardTitle, { color: theme.accent }]}>
+            {showTerms ? t('common.done', 'Done') : t('screens.invite.change', 'Change')}
+          </Text>
+        </Pressable>
+      </View>
+
+      {showTerms ? (
+        <View style={styles.terms}>
+          <Text style={[typography.small, { color: theme.textSecondary }]}>
+            {t('screens.invite.whoCanUse', 'Who can use it')}
+          </Text>
+          <View style={styles.choiceRow}>
+            {([true, false] as const).map(one => (
+              <Pressable key={String(one)} onPress={() => { setSingleUse(one); setTermsTouched(true); }}
+                style={[styles.choice, { borderColor: singleUse === one ? theme.accent : theme.border, backgroundColor: theme.surfaceAlt }]}>
+                <Text style={[typography.small, styles.cardTitle, { color: theme.textPrimary }]}>
+                  {one ? t('screens.invite.forOne', 'For one person') : t('screens.invite.forAnyone', 'Anyone with the link')}
+                </Text>
+                <Text style={[typography.small, { color: theme.textMuted }]}>
+                  {one
+                    ? t('screens.invite.forOneBody', 'Spent once used, so a lost copy is useless to anyone else.')
+                    : t('screens.invite.forAnyoneBody', 'Works for everyone who has it, until it runs out. It cannot be recalled.')}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={[typography.small, { color: theme.textSecondary }]}>
+            {t('screens.invite.goodForLabel', 'Good for')}
+          </Text>
+          <View style={styles.choiceRow}>
+            {(['day', 'week', 'month'] as const).map(v => (
+              <Pressable key={v} onPress={() => { setValidity(v); setTermsTouched(true); }}
+                style={[styles.choice, styles.choiceShort, { borderColor: validity === v ? theme.accent : theme.border, backgroundColor: theme.surfaceAlt }]}>
+                <Text style={[typography.small, styles.cardTitle, { color: theme.textPrimary }]}>{validityLabel(v)}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Pressable onPress={() => setGrants(g => !g)}
+            style={[styles.card, { borderColor: grantsInviteRight ? theme.accent : theme.border, backgroundColor: theme.surfaceAlt }]}>
+            <Text style={[typography.body, styles.cardTitle, { color: theme.textPrimary }]}>
+              {grantsInviteRight
+                ? t('screens.invite.canInviteOn', 'They can add and remove people')
+                : t('screens.invite.canInviteOff', 'They cannot add or remove anyone')}
+            </Text>
+            <Text style={[typography.small, { color: theme.textMuted }]}>
+              {t('screens.invite.rightsBody',
+                'Passing this on gives them the same reach you have — including over you.')}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {!singleUse && grantsInviteRight ? (
+        // Allowed (story 02 path F, 3.4), but said plainly.
+        <Banner
+          variant="info"
+          message={t('screens.invite.anyoneAndRights',
+            'Anyone who finds this link can join and then add or remove anyone, including you. It cannot be recalled.')}
+        />
+      ) : null}
 
       <View style={styles.actions}>
         <Pressable
@@ -384,9 +474,18 @@ export default function InvitationGenerator() {
                   .replace('{{when}}', (inv as { createdAt?: string }).createdAt
                     ? new Date((inv as { createdAt?: string }).createdAt!).toLocaleString()
                     : '')}
-                subtitle={inv.expiresAt
-                  ? t('screens.invite.expires', 'Runs out {{when}}').replace('{{when}}', new Date(inv.expiresAt).toLocaleDateString())
-                  : undefined}
+                subtitle={[
+                  inv.singleUse === false
+                    ? (inv.uses === undefined
+                        ? t('screens.invite.forAnyone', 'Anyone with the link')
+                        : inv.uses === 1
+                          ? t('screens.invite.usedOnce', 'Used once')
+                          : t('screens.invite.usedTimes', 'Used {{n}} times').replace('{{n}}', String(inv.uses)))
+                    : t('screens.invite.forOne', 'For one person'),
+                  inv.expiresAt
+                    ? t('screens.invite.expires', 'Runs out {{when}}').replace('{{when}}', new Date(inv.expiresAt).toLocaleDateString())
+                    : null,
+                ].filter(Boolean).join(' · ')}
                 onPress={() => Alert.alert(inv.label ?? t('screens.strands.invitation', 'Invitation'),
                   // Honest about what removing it does: cadre-core cannot withdraw
                   // an invitation yet — see data/outgoing-invitations.ts.
@@ -437,5 +536,10 @@ const styles = StyleSheet.create({
   qrToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing[1] },
   qr: { alignItems: 'center', paddingVertical: spacing[2] },
   rows: { gap: spacing[1] },
+  termsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  terms: { gap: spacing[1], paddingVertical: spacing[1] },
+  choiceRow: { flexDirection: 'row', gap: spacing[1] },
+  choice: { flex: 1, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.card, padding: spacing[2], gap: 2 },
+  choiceShort: { alignItems: 'center' },
   dim: { opacity: 0.5 },
 });

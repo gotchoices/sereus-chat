@@ -4,6 +4,47 @@ Checklist for specs, screens and app code. Stories are tracked in
 [`stories/mobile/STATUS.md`](../../stories/mobile/STATUS.md). Platform facts, hazards and upstream
 questions live in [`domain/sereus.md`](../domain/sereus.md).
 
+## Next up (as of 2026-10-02)
+
+Pick up here. Details are in the dated sections below.
+
+1. [x] **Invitation terms (2026-10-02).** Story 02 amended (step 3, path C, new path F, acceptance
+       criteria) and `screens/invitation-generator.md` given a "Terms" section, with consent.
+       - Defaults by strand kind: private = one person, good for a week; open = anyone with the
+         link, good for a month.
+       - Shown as one line; "Change" opens who can use it, how long it's good for (1 day / week /
+         month), and the existing add-and-remove choice. Anyone-with-the-link plus add-and-remove is
+         allowed, with a warning.
+       - Sent as `publishFormationInvite({ totalUses: 1 | omitted, expiresAtMs })`. Before, it
+         always omitted `totalUses`, so every invitation was unlimited for 24 h.
+       - Outstanding multi-use invitations stay listed with "Used N times" until they expire.
+       - No withdrawal, by the user's decision: dropping and recreating a strand is cheap.
+       - [x] Confirmed on the phones: the S7 joined with a private invitation (70 s); opening the
+             same link again was refused in 16 s with "This invitation has already been used or has
+             expired. Ask for a new one." (`token-spent` → `explainJoinFailure`).
+2. [ ] **Invitee joins with `requestJoin` (sereus 1.10).** The join survives the inviter being
+       offline and shows `pending`/`trying`/`waiting`/`joined`/`failed`. Needs story 03 and the
+       invitation-acceptance spec amended first (user consent), then the screen. It retires the
+       "waiting on #25" items under *Waiting on upstream*.
+3. [ ] **Draw the strand list from the cache before starting the node.** On the S7 the cached
+       row appears about 30 s after the screen, because node start keeps the JS thread busy.
+4. [ ] **`screens/chat-interface.md`: add "Sending…"** (built) and "Not yet delivered" (waiting
+       on Optimystic#26). Needs the user's consent to edit the spec.
+5. [x] **Withdrawing an invitation: not wanted** (user, 2026-10-02). Dropping and recreating a
+       strand is cheap, and withdrawal is fraught. "Forget" only stops listing it, and says so.
+6. [ ] **Housekeeping:**
+       - delete `apps/mobile/tmp/cadre-rn-native-digest-issue.md` (now covered in
+         sereus `tickets/backlog/feat-rn-kit-phone-node.md`, "The Chat Context");
+       - commit today's work (the user commits).
+7. [ ] **Adopt the cadre-rn kit's `/phone-node` and `/lifecycle`** (sereus PR stacked on #29)
+       when it lands, replacing most of `CadreService`.
+8. [ ] **Watching upstream:**
+       - Optimystic#25 (reads wait on a slow peer) and #26 (commit durability → "not yet
+         delivered");
+       - Optimystic#24 (clock skew);
+       - sereus#24 (invitation labels);
+       - sereus#8 (likely obsolete; left open).
+
 ## Phases
 
 - [x] `design/specs/project.md` complete

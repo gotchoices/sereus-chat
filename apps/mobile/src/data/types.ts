@@ -122,6 +122,13 @@ export type Invitation = {
   strandId: string | null;
   expiresAt: string | null;
   grantsInviteRight: boolean;
+  /**
+   * For one person (spent on first use) or for anyone holding the link until it
+   * expires. Absent on invitations remembered by older builds; read as true.
+   */
+  singleUse?: boolean;
+  /** How many have joined through it, when known (outstanding invitations only). */
+  uses?: number;
   spent: boolean;
   direction?: 'outgoing' | 'incoming';
   label?: string;
@@ -159,3 +166,22 @@ export type SendInput = {
   attachments?: Attachment[];
   replyToId?: string | null;
 };
+
+/** How long an invitation stays good: the choices the generator offers (story 02). */
+export const INVITATION_VALIDITY = {
+  day: 24 * 60 * 60 * 1000,
+  week: 7 * 24 * 60 * 60 * 1000,
+  month: 30 * 24 * 60 * 60 * 1000,
+} as const;
+export type InvitationValidity = keyof typeof INVITATION_VALIDITY;
+
+/**
+ * Story 02's defaults by strand kind: a private strand's invitation is for one
+ * person and good for a week; an open strand's is for anyone with the link and
+ * good for a month.
+ */
+export function defaultInvitationTerms(visibility: Visibility): { singleUse: boolean; validity: InvitationValidity } {
+  return visibility === 'public'
+    ? { singleUse: false, validity: 'month' }
+    : { singleUse: true, validity: 'week' };
+}

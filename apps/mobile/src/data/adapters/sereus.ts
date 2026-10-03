@@ -9,6 +9,7 @@ import type {
   SearchBatch, SearchOptions, Invitation, InvitationPreview, Visibility,
   Prefs, StorageUsage, SendInput,
 } from '../types';
+import { INVITATION_VALIDITY } from '../types';
 import {
   getAllStrandPrefs,
   setStrandMuted as setStrandMutedLocal,
@@ -44,8 +45,8 @@ const LIST_READ_MS = 3000;
 /** Strands whose list reads are still running (see `listStrands`). */
 const listReadsInFlight = new Set<string>();
 
-/** Open invitations are valid for 24h — matches the cadre-core default. */
-const INVITE_EXPIRY_MS = 24 * 60 * 60 * 1000;
+/** How long an invitation stays good when the caller does not say: story 02's private-strand default. */
+const INVITE_EXPIRY_MS = INVITATION_VALIDITY.week;
 
 /**
  * Dev-only step timings for the message path, tagged `[perf]`. Messages took
@@ -497,6 +498,8 @@ export class SereusAdapter implements DataAdapter {
     strandId?: string;
     visibility?: Visibility;
     grantsInviteRight: boolean;
+    singleUse?: boolean;
+    validForMs?: number;
   }): Promise<Invitation> {
     const node = cadreService.cadreNode;
     if (!node) throw new Error('Cadre is not running.');
@@ -539,12 +542,19 @@ export class SereusAdapter implements DataAdapter {
     // harmlessly.
     await registerSelfAsMember(strand);
 
-    const invitation = await node.createOpenInvitation(CHAT_SAPP_ID, INVITE_EXPIRY_MS);
+    // THE TERMS (story 02). Sereus enforces both: `totalUses` is counted against the
+    // invite's FormationUsage rows and refused as `token-spent` once reached; a null
+    // `totalUses` means unlimited until it expires. Omitting it, as this used to,
+    // made every invitation usable by anyone holding it for its whole life.
+    const singleUse = input.singleUse ?? true;
+    const validForMs = input.validForMs ?? INVITE_EXPIRY_MS;
+    const invitation = await node.createOpenInvitation(CHAT_SAPP_ID, validForMs);
 
     await withTimeout(
       node.publishFormationInvite(invitation.token, CHAT_SAPP_ID, {
         expiresAtMs: invitation.expiration.getTime(),
         strandId: strand.strandId,
+        ...(singleUse ? { totalUses: 1 } : {}),
       }),
       CONTROL_OP_TIMEOUT_MS,
       'publishFormationInvite',
@@ -568,6 +578,7 @@ export class SereusAdapter implements DataAdapter {
       // The platform seats a member from a bearer invitation; invite rights
       // are conferred by a separate signed act (see STATUS.md §G).
       grantsInviteRight: input.grantsInviteRight,
+      singleUse,
       spent: false,
       direction: 'outgoing',
     };
@@ -820,12 +831,11 @@ export class SereusAdapter implements DataAdapter {
       try {
         // Time-boxed: a control-database read on a node with no reachable cohort
         // can hang (sereus.md), and the strand list asks this every 10 s.
-        const used = await withTimeout(
+        return await withTimeout(
           control.countFormationUsage(node.decodeInvitation(inv.token).token),
           3000,
           'countFormationUsage',
         );
-        return used > 0;
       } catch {
         return null;
       }

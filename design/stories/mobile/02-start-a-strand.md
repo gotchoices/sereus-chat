@@ -23,9 +23,12 @@ cubicle. Bob's brother Mike is not.
 2. He chooses **private**: only people he invites can be in it, and somebody — him, to begin with —
    decides who those are. The alternative is public, which anyone holding the link can join and from
    which nobody can be removed, because nobody is in charge of it.
-3. He creates an invitation for the person he has in mind, and decides one thing about it: whether
-   the person who takes it up can invite others, as he can.
-4. This is his brother, so he does not pass that on.
+3. He creates an invitation for the person he has in mind. He is shown, in one line, what it is: for
+   one person, good for a week, and the person who takes it up cannot invite others. Those are the
+   defaults for a private strand, and he can leave them alone.
+4. This is his brother, so the defaults are right. Had he wanted otherwise, a "Change" link beside
+   that line lets him say who can use it (one person, or anyone with the link), how long it stays
+   good, and whether the person taking it up can invite others, as he can.
 5. He can see what the strand is, plainly and without asking: private, and open to growing, because
    Bob himself can still add people. The app does not treat this as a problem — it is simply what is
    true right now, and he can see it at a glance.
@@ -69,8 +72,9 @@ cubicle. Bob's brother Mike is not.
 7.1. Bob wants to invite his brother Mike, who is across town. He sends the link by text.
 7.2. He gets impatient and sends the same link by email as well.
 7.3. Mike responds to the text one. Later he opens the emailed copy and is told it is no longer
-     good — an invitation is spent once it is used. He learns this from the app rather than being
-     left to guess.
+     good: an invitation for one person is spent once it is used. He learns this from the app rather
+     than being left to guess. Had someone else found the lost copy first, it would have been spent
+     for them too; that is why a private strand's invitations are for one person by default.
 
 ### Alternative Path D: nobody responds
 
@@ -86,6 +90,19 @@ cubicle. Bob's brother Mike is not.
 3.3. Everybody in it can see the same thing Bob can: this is a strand that can still grow, and
      whoever joins later will be able to read everything said before they arrived.
 3.4. Each person who accepts joins the same strand. → [05](05-add-someone-to-a-strand.md)
+
+### Alternative Path F: a link anyone can use
+
+3.1. Bob runs an open strand for anyone interested in local rides, and wants a link he can post on
+     the club's website.
+3.2. For an open strand the defaults are already that: anyone with the link can use it, as many
+     times as people take it up, good for a month. He can make it last longer or shorter under
+     "Change".
+3.3. The outstanding invitation shows how many people have used it and when it runs out. It stays
+     listed until then; there is no recalling it, so if it goes somewhere he did not mean it to, he
+     can start a fresh strand.
+3.4. If he also lets the people taking it up invite others, he is told plainly what that means for a
+     link anyone can use: everyone who finds it can bring in anyone they like. He may still do it.
 
 ## Acceptance Criteria
 
@@ -105,6 +122,15 @@ cubicle. Bob's brother Mike is not.
 - [ ] Outstanding invitations are visible as part of the strand they lead into, distinguishable from
       its members, and can be re-shared or abandoned
 - [ ] A spent invitation says so when used again, rather than failing obscurely
+- [ ] Each invitation decides who can use it (one person, or anyone with the link) and how long it
+      stays good
+- [ ] Defaults follow the kind of strand: a private strand's invitations are for one person and
+      good for a week; an open strand's are for anyone with the link and good for a month
+- [ ] The defaults are shown as one line, and changing them is one step away, so a newcomer never
+      has to decide anything to share an invitation
+- [ ] A link anyone can use that also lets them invite others is allowed, with a plain warning of
+      what it means
+- [ ] An invitation anyone can use shows how many have used it, and stays listed until it runs out
 - [ ] A new strand exists from the moment its first invitation is made, and reads as having nobody
       else in it until someone accepts
 - [ ] Further invitations made for it lead into that same strand, never into a new one
@@ -118,7 +144,7 @@ cubicle. Bob's brother Mike is not.
 
 - happy: invitation shared in person, accepted, then closed for good
 - empty: the user's first-ever strand — nothing else in the list
-- error: an invitation that is never answered, or one used twice
+- error: an invitation that is never answered, or one meant for one person used twice
 
 ## Open
 

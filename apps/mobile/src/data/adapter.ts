@@ -73,6 +73,10 @@ export interface DataAdapter {
     strandId?: string;
     visibility?: 'public' | 'private';
     grantsInviteRight: boolean;
+    /** One person (default) or anyone with the link. */
+    singleUse?: boolean;
+    /** How long it stays good, ms. Default one week. */
+    validForMs?: number;
   }): Promise<Invitation>;
   listOutstandingInvitations(): Promise<Invitation[]>;
   cancelInvitation(id: string): Promise<void>;
