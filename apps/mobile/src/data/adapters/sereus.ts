@@ -14,9 +14,11 @@ import {
   setStrandMuted as setStrandMutedLocal,
   setStrandArchived as setStrandArchivedLocal,
 } from '../strand-prefs';
+import { readStrandSummaries, saveStrandSummaries } from '../strand-summary-cache';
 import { attachAndAwaitWritable, attachJoinedStrands, ensureCadreUp, generateUuid, getBootFailure, hasSweptForStrands, watchDiscoveredStrands, leaveStrandLocally, registerSelfAsMember, rememberJoinedStrand, syncProfileNameToStrands } from '../chat-strand';
 import { createChatStrand, joinChatStrand } from '../chat-sapp';
 import type { StrandInstance } from '@serfab/cadre-core';
+import { FormationPostApprovalError, FormationRejectedError, FormationUnreachableError } from '@serfab/cadre-core';
 import {
   queryMessages, insertMessage, updateMessage, removeMessage,
   addReaction, removeReaction, queryReactions, queryAttachments, queryMembers,
@@ -36,6 +38,11 @@ const DEFAULT_PREFS: Prefs = {
   theme: 'system', language: 'en', notifyDefault: 'all',
   storageCeilingBytes: null, perStrandOverrides: 0, relayAddrs: [],
 };
+
+/** How long the strand list waits on one strand's preview or member read before using its cached row. */
+const LIST_READ_MS = 3000;
+/** Strands whose list reads are still running (see `listStrands`). */
+const listReadsInFlight = new Set<string>();
 
 /** Open invitations are valid for 24h — matches the cadre-core default. */
 const INVITE_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -70,6 +77,51 @@ async function retryAfterRestart<T>(write: () => Promise<T>): Promise<T> {
       await new Promise(r => setTimeout(r, 3000));
     }
   }
+}
+
+/**
+ * A join failure in words the person can act on. Since sereus 1.10 `formStrand` throws
+ * typed errors: `FormationRejectedError` with a fixed `code` and a `retryable` flag
+ * when the inviter answered no, and `FormationUnreachableError` when nothing answered.
+ * The original stays as `cause` for the logs.
+ */
+function explainJoinFailure(err: unknown): Error {
+  let message: string;
+  if (err instanceof FormationUnreachableError) {
+    message = 'Could not reach the person who invited you. Their app may be closed or offline — try again when they are back.';
+  } else if (err instanceof FormationRejectedError) {
+    switch (err.code) {
+      case 'token-spent':
+        message = 'This invitation has already been used or has expired. Ask for a new one.';
+        break;
+      case 'token-unknown':
+        message = 'The invitation is not ready on their side yet. Try again in a moment.';
+        break;
+      case 'approval-refused':
+        message = 'The person who invited you did not let this join go through.';
+        break;
+      case 'busy':
+      case 'provisioning-timeout':
+      case 'host-strand-unavailable':
+      case 'approval-unavailable':
+        message = 'Their side could not finish this join just now. Try again in a moment.';
+        break;
+      case 'host-strand-must-be-recreated':
+        message = 'This conversation was made with an older version and cannot take new members. Ask for a new invitation.';
+        break;
+      default:
+        message = err.retryable
+          ? 'The join did not go through this time. Try again in a moment.'
+          : 'This invitation cannot be used. Ask for a new one.';
+    }
+  } else if (err instanceof FormationPostApprovalError) {
+    message = 'You were let in, but this phone could not finish setting up the conversation. Ask for a new invitation.';
+  } else {
+    return err instanceof Error ? err : new Error(String(err));
+  }
+  const out = new Error(message);
+  (out as Error & { cause?: unknown }).cause = err;
+  return out;
 }
 
 export class SereusAdapter implements DataAdapter {
@@ -251,50 +303,70 @@ export class SereusAdapter implements DataAdapter {
     const strands = cadreService.getStrands();
     // One read for the whole list, not one per strand.
     const prefs = await getAllStrandPrefs();
-    const summaries: StrandSummary[] = [];
+    const cached = await readStrandSummaries();
 
-    for (const [id, strand] of strands) {
-      if (!strand.database) continue;
-      let preview: StrandSummary['lastMessage'] = null;
+    // EACH STRAND READ IN PARALLEL, AND BOUNDED. A read can wait on a slow member
+    // (Optimystic#25); on the S7 one took 61 s, and the list showed "Looking for your
+    // strands…" until every strand had answered. Past LIST_READ_MS a strand's row falls
+    // back to what this device last showed for it.
+    const rows = await Promise.all([...strands].map(async ([id, strand]): Promise<StrandSummary | null> => {
+      if (!strand.database) return null;
+      const last = cached[id];
+      // A timed-out read keeps running; while it does, do not start another for this
+      // strand (the list refreshes every few seconds and they would pile up).
+      if (listReadsInFlight.has(id) && last) {
+        return { ...last, avatarUri: null, unreadCount: 0, mentioned: false,
+          muted: prefs[id]?.muted ?? 'none', draftPreview: null,
+          archived: prefs[id]?.archived ?? false, pending: false };
+      }
+      // Started together; the strand stays "in flight" until both have really
+      // settled, not merely until the list stopped waiting for them.
+      const messagesRead = queryMessages(strand, 1);
+      const membersRead = queryMembers(strand);
+      listReadsInFlight.add(id);
+      void Promise.allSettled([messagesRead, membersRead]).then(() => listReadsInFlight.delete(id));
+      let preview: StrandSummary['lastMessage'] = last?.lastMessage ?? null;
       try {
-        const msgs = await queryMessages(strand, 1);
-        const last = msgs[msgs.length - 1];
-        if (last) {
-          preview = { previewText: last.Content, senderName: null, timestamp: last.Timestamp };
-        }
+        const msgs = await withTimeout(messagesRead, LIST_READ_MS, 'last-message preview');
+        const newest = msgs[msgs.length - 1];
+        preview = newest ? { previewText: newest.Content, senderName: null, timestamp: newest.Timestamp } : null;
       } catch (err) {
-        console.warn('[SereusAdapter] last-message preview failed for', id, err);
+        console.warn('[SereusAdapter] last-message preview unavailable for', id, err instanceof Error ? err.message : err);
       }
       // WHO ELSE IS IN IT is the title. `domain/ops.md`: "`title` is the app's,
       // not sereus's — no strand-title slot exists upstream. Two-party strands
       // fall back to the other member's name; unnamed groups compose from member
       // names." There is no screen for naming a strand and there is not meant to
-      // be one. This used to render `Strand ${id.slice(0, 8)}`, which is a
-      // placeholder the spec never asked for — a list of hex is unreadable, and
-      // it made the app look like it had lost a feature it never had.
-      let members: Awaited<ReturnType<typeof queryMembers>> = [];
+      // be one.
+      let members: Awaited<ReturnType<typeof queryMembers>> | null = null;
       try {
-        members = await queryMembers(strand);
+        members = await withTimeout(membersRead, LIST_READ_MS, 'member names');
       } catch (err) {
-        console.warn('[SereusAdapter] member names unavailable for', id, err);
+        console.warn('[SereusAdapter] member names unavailable for', id, err instanceof Error ? err.message : err);
       }
-      const me = cadreService.peerId ?? '';
-      const others = members.filter(m => m.Id !== me);
-      const nameOf = (m: { Id: string; Name?: string }) => m.Name?.trim() || m.Id.slice(0, 8);
-      // Until the other side's Member row arrives, `others` is empty and there is
-      // nothing truthful to call it — say so rather than invent a name. "New strand"
-      // was such an invention; this is what is actually true (story 30, path F).
-      const title =
-        others.length === 0 ? 'Waiting for someone to join'
-        : others.length === 1 ? nameOf(others[0])
-        : others.map(nameOf).join(', ');
-
-      summaries.push({
+      let title: string, isGroup: boolean, memberCount: number;
+      if (members) {
+        const me = cadreService.peerId ?? '';
+        const others = members.filter(m => m.Id !== me);
+        const nameOf = (m: { Id: string; Name?: string }) => m.Name?.trim() || m.Id.slice(0, 8);
+        // Until the other side's Member row arrives there is nothing truthful to call
+        // it — say so rather than invent a name (story 30, path F).
+        title = others.length === 0 ? 'Waiting for someone to join'
+          : others.length === 1 ? nameOf(others[0])
+          : others.map(nameOf).join(', ');
+        isGroup = others.length > 1;
+        memberCount = Math.max(members.length, 1);
+      } else {
+        title = last?.title ?? 'Waiting for someone to join';
+        isGroup = last?.isGroup ?? false;
+        memberCount = last?.memberCount ?? 1;
+      }
+      return {
         id,
         title,
         avatarUri: null,
-        isGroup: others.length > 1,
-        memberCount: Math.max(members.length, 1),
+        isGroup,
+        memberCount,
         lastMessage: preview,
         unreadCount: 0,
         mentioned: false,
@@ -302,6 +374,25 @@ export class SereusAdapter implements DataAdapter {
         draftPreview: null,
         archived: prefs[id]?.archived ?? false,
         pending: false,
+      };
+    }));
+    const summaries = rows.filter((r): r is StrandSummary => r !== null);
+
+    // Strands this device knows but has not opened yet, from the last list it showed,
+    // so a cold start does not read as "No strands yet" (strand-summary-cache.ts).
+    await saveStrandSummaries(summaries);
+    const open = new Set(summaries.map(s => s.id));
+    for (const known of Object.values(cached)) {
+      if (open.has(known.id)) continue;
+      summaries.push({
+        ...known,
+        unreadCount: 0,
+        mentioned: false,
+        muted: prefs[known.id]?.muted ?? 'none',
+        draftPreview: null,
+        archived: prefs[known.id]?.archived ?? false,
+        pending: false,
+        opening: true,
       });
     }
     return summaries;
@@ -552,9 +643,14 @@ export class SereusAdapter implements DataAdapter {
     // It goes in `metadata`, which is the sanctioned app-specific slot.  We used to
     // pass `{ name }` at the top level behind an `as any` — `StrandFormationDisclosure`
     // has no such field, so it was being dropped silently, and the cast is what hid it.
-    const result = await node.formStrand(invitation, {
-      ...(profile.name ? { metadata: { name: profile.name } } : {}),
-    });
+    let result: Awaited<ReturnType<typeof node.formStrand>>;
+    try {
+      result = await node.formStrand(invitation, {
+        ...(profile.name ? { metadata: { name: profile.name } } : {}),
+      });
+    } catch (err) {
+      throw explainJoinFailure(err);
+    }
 
     const { strandId, memberPrivateKey } = result;
 

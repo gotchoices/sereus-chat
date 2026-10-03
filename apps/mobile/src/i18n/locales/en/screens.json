@@ -36,7 +36,8 @@
     "placeholder": "Message",
     "replyingTo": "Replying to {{name}}",
     "unread": "New",
-    "sending": "Sending…"
+    "sending": "Sending…",
+    "connecting": "Connecting to this conversation…"
   },
   "invite": {
     "abandon": "Abandon",
@@ -189,7 +190,8 @@
     "sortAlpha": "Alphabetical",
     "sortRecent": "Recent",
     "sortTitle": "Order by",
-    "sortUnread": "Unread first"
+    "sortUnread": "Unread first",
+    "connecting": "Connecting…"
   },
   "viewer": {
     "fetching": "Still coming…",

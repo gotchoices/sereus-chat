@@ -141,19 +141,35 @@ export default function ChatInterface() {
     [members],
   );
 
+  /** One refresh at a time: a read can wait seconds on a slow peer (Optimystic#25), and stacked reads were what made the S7 crawl. */
+  const loading = useRef(false);
+  /** The strand is known but not open on this device yet (cold start, re-attaching). */
+  const [opening, setOpening] = useState(false);
+
   const load = useCallback(async () => {
+    if (loading.current) return;
+    loading.current = true;
     try {
       const [msgs, mem] = await Promise.all([listMessages(strandId), listMembers(strandId)]);
       setMessages(msgs);
       setMembers(mem);
       setError(null);
+      setOpening(false);
       if (mem.length > 0 && mem.every(m => m.isMe)) {
         listOutstandingInvitations()
           .then(all => setInvitesOut(all.filter(i => i.strandId === strandId && i.direction !== 'incoming').length))
           .catch(() => {});
       }
     } catch (e: any) {
-      setError(e?.message ?? 'Could not reach this conversation right now');
+      const message: string = e?.message ?? 'Could not reach this conversation right now';
+      if (/not attached on this device/.test(message)) {
+        // Still opening, not failed: keep the spinner and try again on the next pass.
+        setOpening(true);
+        return;
+      }
+      setError(message);
+    } finally {
+      loading.current = false;
     }
     setLoaded(true);
     getStrandState(strandId).then(setState).catch(() => {});
@@ -176,12 +192,11 @@ export default function ChatInterface() {
    * was supplied at construction, which cadre-core does not do. Replace this the
    * day either of those changes.
    *
-   * WHILE FOCUSED ONLY, and not fast. Each pass is three Quereus queries
-   * (messages, reactions, attachments) plus members, and CPU is the scarce
-   * resource on a phone here — the stack's own sync work is what competes with
-   * it, and starving that is how joins and writes start failing. Ten seconds is
-   * slow for a conversation and is deliberately the conservative end; it is a
-   * stopgap for a missing notification, not a design.
+   * WHILE FOCUSED ONLY, every 10 s, one pass at a time (`load` skips while the last
+   * pass is still running). Tried at 3 s on 2026-10-02 and reverted: on the S7 a pass
+   * takes 2.5–4.4 s (a read can consult the other member, Optimystic#25), so a 3 s
+   * poll kept it reading almost continuously, and S7 → emulator delivery went from
+   * 14–21 s to 79–109 s. A stopgap for a missing notification, not a design.
    */
   useFocusEffect(
     useCallback(() => {
@@ -389,6 +404,11 @@ export default function ChatInterface() {
       {!loaded ? (
         <View style={styles.loading} testID="messages-loading">
           <ActivityIndicator color={theme.textMuted} />
+          {opening ? (
+            <Text style={[typography.small, { color: theme.textMuted, marginTop: spacing[1] }]}>
+              {t('screens.chat.connecting', 'Connecting to this conversation…')}
+            </Text>
+          ) : null}
         </View>
       ) : shown.length === 0 && !error ? (
         <EmptyState icon="chatbubble-ellipses-outline"

@@ -205,6 +205,32 @@ their variants. Calls are parked (story 90).
   - [ ] Draft for the user's review: `apps/mobile/tmp/cadre-rn-native-digest-issue.md` (the kit's
         digest polyfill is pure JS).
 
+### Refinements after the 1.11 upgrade, 2026-10-02
+
+- **Strand list on a cold start no longer says "No strands yet".**
+  - Each listed strand's row is cached on the device (`data/strand-summary-cache.ts`). A known
+    strand that isn't open yet is listed from the cache as "Connecting… · <last message>".
+  - Leaving a strand drops it from the cache.
+  - The list reads strands in parallel, with a 3 s limit per read and the cached row as fallback.
+    A strand whose previous read is still running isn't read again.
+  - The spinner shows only while there are no rows.
+  - S7 measurements: screen at 23 s (dev bundle load), row at 42–53 s, open at 124 s. Before: an
+    empty list for about 2 min, and "Looking for your strands…" for 5 min while reads were slow.
+  - [ ] The 30 s between screen and row is the node's start keeping the JS thread busy. Try
+        drawing the list from the cache before starting the node.
+- **The chat screen while its strand is still opening** shows "Connecting to this conversation…"
+  and keeps retrying, instead of a "not attached" error.
+- **Chat refresh:** one pass at a time. A 3 s interval was tried and reverted: on the S7 a pass
+  takes 2.5–4.4 s, and S7 → emulator delivery went from 14–21 s to 79–109 s. Back to 10 s.
+- **`registerSelfAsMember`** checks once per strand per session (it saved about 3.4 s per send on
+  the S7, where the Member read is slow).
+- **Typed join errors:** `FormationRejectedError` codes, `FormationUnreachableError` and
+  `FormationPostApprovalError` now produce plain messages (`explainJoinFailure`).
+  - Not seen on a device yet: chat's invitations are multi-use, so re-opening a used one re-joined
+    the same strand instead of failing.
+  - [ ] Decide whether invitations should be single-use (story question).
+- **Issues closed** (resolved by 1.10/1.11): sereus #25, #13, #17, #4; Optimystic#23.
+
 ### Upgraded to sereus 1.11.0 / optimystic 1.9.0 / libp2p 3.3.11, 2026-10-02
 
 - **Packages:**

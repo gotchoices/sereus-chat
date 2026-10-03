@@ -34,6 +34,12 @@ export type StrandSummary = {
   draftPreview: string | null;
   archived: boolean;
   pending: boolean;
+  /**
+   * Known to this device but not open yet (a cold start, a joined strand still
+   * re-attaching). The row comes from the last list this device showed
+   * (`strand-summary-cache.ts`) and is marked as connecting.
+   */
+  opening?: boolean;
 };
 
 /**

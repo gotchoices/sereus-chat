@@ -269,9 +269,10 @@ export default function StrandList() {
             },
           }}
         />
-      ) : (!loaded || settling) ? (
+      ) : (!loaded || (settling && isEmpty)) ? (
         // Waiting, not empty. A spinner says "still looking"; the empty state
-        // would say "there is nothing", which we do not yet know.
+        // would say "there is nothing", which we do not yet know. Once there are
+        // rows (even "Connecting…" ones from the cache) they show, settled or not.
         <View style={styles.loading}>
           <ActivityIndicator />
           <Text style={[typography.small, { color: theme.textMuted }]}>
@@ -339,7 +340,11 @@ export default function StrandList() {
                   ? `${s.lastMessage.senderName}: ${s.lastMessage.previewText}`
                   : s.lastMessage.previewText
                 : t('screens.strands.noMessages', 'No messages yet');
-            const subtitle = awaiting
+            const connecting = t('screens.strands.connecting', 'Connecting…');
+            const subtitle = s.opening
+              // Known from the last list, not open yet: say so instead of guessing.
+              ? (s.lastMessage ? `${connecting} · ${preview}` : connecting)
+              : awaiting
               ? (s.lastMessage || s.draftPreview ? `${preview} · ${invitesOutText(out)}` : invitesOutText(out))
               : out > 0 ? `${preview} · ${invitesOutText(out)}` : preview;
             return (

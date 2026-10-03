@@ -9,6 +9,7 @@
   },
   "chat": {
     "empty": "Di algo: sois solo vosotros dos hasta que se invite a alguien más.",
-    "sending": "Enviando…"
+    "sending": "Enviando…",
+    "connecting": "Conectando con esta conversación…"
   }
 }

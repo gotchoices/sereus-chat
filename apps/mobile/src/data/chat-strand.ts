@@ -17,6 +17,7 @@ import { cadreService } from '../cadre';
 import { createChatStrand, joinChatStrand } from './chat-sapp';
 import { upsertMember } from './chat-operations';
 import { getPrefs } from './adapter';
+import { forgetStrandSummary } from './strand-summary-cache';
 
 const PROFILE_KEY = '@sereus.chat/profile';
 
@@ -165,13 +166,24 @@ export async function ensureCadreUp(): Promise<void> {
  * Failure is logged, not thrown: not being listed yet is a smaller harm than a
  * join that reports itself as failed after it actually succeeded.
  */
+/**
+ * Strands whose Member row for this device is known to be in place this session,
+ * with the name it carries. `send` registers before every message; checking costs a
+ * read, and on the S7 a read takes about 3.4 s, so once per strand per session is
+ * enough. A rename goes through `syncProfileNameToStrands`, and a different name
+ * here simply checks again.
+ */
+const registeredAs = new Map<string, string>();
+
 export async function registerSelfAsMember(strand: StrandInstance): Promise<void> {
   const peerId = cadreService.peerId;
   if (!peerId) return;
   try {
     // The local profile name, or a truncated peer id until they enter one.
     const name = await readProfileDisplayName(peerId);
+    if (registeredAs.get(strand.strandId) === name) return;
     await upsertMember(strand, peerId, name);
+    registeredAs.set(strand.strandId, name);
   } catch (err) {
     console.warn('[chat-strand] self-registration failed for', strand.strandId, err);
   }
@@ -189,6 +201,7 @@ export async function syncProfileNameToStrands(): Promise<void> {
     if (!strand.database) continue;
     try {
       await upsertMember(strand, peerId, name);
+      registeredAs.set(strand.strandId, name);
     } catch (err) {
       console.warn('[chat-strand] sync to strand', strand.strandId, 'failed:', err);
     }
@@ -506,6 +519,8 @@ export async function leaveStrandLocally(
   }
 
   await node.unpublishStrand(strandId);
+  // Left on purpose: it must not come back as a "connecting" row.
+  await forgetStrandSummary(strandId);
 
   // `keepIdentity` decides whether the membership key survives. Keeping it is what
   // lets a later invitation return this user AS THEMSELVES rather than as a
