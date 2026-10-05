@@ -2,6 +2,7 @@
 // (src/diagnostics/dev-bridge.ts), over Metro's inspector. No UI involved.
 //
 //   node devtime.mjs <deviceA-substr> <deviceB-substr> [rounds] [prefix]
+//   PAIR=1 node devtime.mjs …     A invites B into a new private strand first, and times the join
 //
 // For each round: A sends (bridge `send`, the composer's path), host polls B's `seen`
 // every 250 ms; then B sends to A. Times are on the host clock.
@@ -40,10 +41,22 @@ async function connect(want) {
 }
 
 const a = await connect(A), b = await connect(B);
-const strandsA = await a.call('strands');
-const strandsB = await b.call('strands');
-const shared = strandsA.find(s => strandsB.some(t => t.id === s.id));
-if (!shared) { console.log('no strand in common', strandsA, strandsB); process.exit(2); }
+let shared;
+if (process.env.PAIR === '1') {
+  // A invites into a new private strand; B joins it. Timed, since joining is worth knowing too.
+  const t0 = Date.now();
+  const inv = await a.call('invite');
+  console.log(`A invited in ${Date.now() - t0} ms`);
+  const t1 = Date.now();
+  const joined = await b.call('accept', inv.url);
+  console.log(`B joined in ${Date.now() - t1} ms`);
+  shared = { id: joined.strandId ?? inv.strandId, title: '(new)' };
+} else {
+  const strandsA = await a.call('strands');
+  const strandsB = await b.call('strands');
+  shared = strandsA.find(s => strandsB.some(t => t.id === s.id));
+  if (!shared) { console.log('no strand in common', strandsA, strandsB); process.exit(2); }
+}
 console.log(`strand ${shared.id.slice(0, 8)} ("${shared.title}" on ${a.name})`);
 console.log('armed:', await a.call('arm', shared.id), await b.call('arm', shared.id));
 

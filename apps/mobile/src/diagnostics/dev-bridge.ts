@@ -11,6 +11,8 @@
  *   __chatDev.send(strandId, text)  → { ms }      the same `send` the composer calls
  *   __chatDev.arm(strandId)         → true        watch it, as the chat screen does
  *   __chatDev.seen(text)            → epoch ms when first seen here, or null
+ *   __chatDev.invite()              → { url, strandId }   a new private strand's invitation
+ *   __chatDev.accept(url)           → { strandId }        join through it
  *
  * Hermes's inspector ignores `awaitPromise`, so an async call is started with
  * `__chatDev.start(id, method, ...args)` and its outcome collected later with
@@ -20,14 +22,17 @@
  * appears after a wake, so "seen" measures the watch path the chat screen relies on,
  * not a poll. Installed only when `__DEV__`.
  */
-import { listStrands, listMessages, send, watchStrand } from '../data/adapter';
+import { listStrands, listMessages, send, watchStrand, createInvitation, acceptInvitation } from '../data/adapter';
+import { parseInviteToken } from '../data/inviteLink';
 
 type Bridge = {
   strands(): Promise<Array<{ id: string; title: string }>>;
   send(strandId: string, text: string): Promise<{ ms: number }>;
   arm(strandId: string): Promise<boolean>;
   seen(text: string): number | null;
-  start(id: string, method: 'strands' | 'send' | 'arm', ...args: unknown[]): true;
+  invite(): Promise<{ url: string; strandId: string | null }>;
+  accept(url: string): Promise<{ strandId: string }>;
+  start(id: string, method: 'strands' | 'send' | 'arm' | 'invite' | 'accept', ...args: unknown[]): true;
   take(id: string): { ok: true; value: unknown } | { ok: false; error: string } | undefined;
 };
 
@@ -63,6 +68,15 @@ export function installDevBridge(): void {
     },
     seen(text) {
       return firstSeen.get(text) ?? null;
+    },
+    async invite() {
+      const inv = await createInvitation({ visibility: 'private', grantsInviteRight: false });
+      return { url: inv.url, strandId: inv.strandId };
+    },
+    async accept(url) {
+      const token = parseInviteToken(url);
+      if (!token) throw new Error('not an invitation link');
+      return acceptInvitation(token);
     },
     start(id, method, ...args) {
       const call = (bridge[method] as (...a: unknown[]) => Promise<unknown>)(...args);

@@ -70,11 +70,27 @@ function watchMessages(inst, tag) {
 
 // The chat schema exactly as the app applies it (chat-sapp.ts extractInnerDDL).
 const here = dirname(fileURLToPath(import.meta.url));
-const SCHEMA = readFileSync(join(here, '../../design/specs/domain/chat-sapp.qsql'), 'utf8')
-  .replace(/^\s*--[^\n]*\n/gm, '')
-  .replace(/^declare\s+schema\s+\w+\s*\{/m, '')
-  .replace(/\}\s*$/, '')
-  .trim();
+// The chat schema when run from the chat repo; the two tables this script touches otherwise.
+const CHAT_SCHEMA_FILE = join(here, '../../design/specs/domain/chat-sapp.qsql');
+const SCHEMA = existsSync(CHAT_SCHEMA_FILE)
+  ? readFileSync(CHAT_SCHEMA_FILE, 'utf8')
+    .replace(/^\s*--[^\n]*\n/gm, '')
+    .replace(/^declare\s+schema\s+\w+\s*\{/m, '')
+    .replace(/\}\s*$/, '')
+    .trim()
+  : `table Member (
+    Id text primary key,
+    Name text not null,
+    AvatarUri text null
+);
+table Message (
+    Id text primary key,
+    MemberId text not null,
+    Content text not null,
+    Timestamp datetime not null,
+    ReplyToId text null,
+    foreign key (MemberId) references Member(Id)
+);`;
 const SAPP = { id: 'org.sereus.chat', version: '0.1.0', schema: SCHEMA, signature: '', latencyHint: 'interactive' };
 
 const t0 = Date.now();

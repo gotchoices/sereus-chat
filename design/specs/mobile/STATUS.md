@@ -54,10 +54,15 @@ Pick up here. Details are in the dated sections below.
          before adopting.
        - If the cost is real, a watch only while a chat is on screen may still pay.
        - The chat poll's comment ("nothing to subscribe to") is out of date.
-9. [ ] **Watching upstream:**
+9. [ ] **Message latency is now upstream-bound (2026-10-05).** In Node and on phones alike, a
+       two-member write is 4 sequential `cluster` requests, each on a fresh stream: 8 relay round
+       trips. Posted as gotchoices/Optimystic#29 (2026-10-05).
+       App-side causes are fixed (native digest, read-first Member write, watch instead of poll).
+       Open: why a round trip costs about 3× more on fast phones than in Node.
+10. [ ] **Watching upstream:**
        - Optimystic#25 (reads wait on a slow peer) and #26 (commit durability → "not yet
          delivered");
-       - Optimystic#24 (clock skew);
+       - Optimystic#24 (clock skew), #29 (8 round trips per write);
        - sereus#24 (invitation labels);
        - sereus#8 (likely obsolete; left open).
 
@@ -261,6 +266,44 @@ their variants. Calls are parked (story 90).
         - Posted as gotchoices/Optimystic#25 (2026-10-01). Revisit when answered.
   - [ ] Draft for the user's review: `apps/mobile/tmp/cadre-rn-native-digest-issue.md` (the kit's
         digest polyfill is pure JS).
+
+### Where a message's time goes, profiled 2026-10-05 (sereus 1.12, public relay)
+
+Tools: `test/devices/devtime.mjs` (timing via the dev bridge, no UI); `test/devices/profsend.mjs`
+(sender CPU profile, plus the bridge, plus console capture); narrow debug channels
+`optimystic:db-p2p:protocol-client,optimystic:db-core:network-transactor` (in `debug-bootstrap.js`,
+off again).
+
+| Pair | Sender's write | Seen by receiver |
+|---|---|---|
+| Node, same relay | 0.6–0.8 s | 0.8–1.0 s |
+| S21 ↔ emulator | 1.6–3.0 s (median about 2.1) | 2.5–5.1 s (median about 3.0) |
+| S7 ↔ emulator, S7 ↔ S21 | 3.4–6.1 s (12–31 s right after pairing) | 7–9 s (28–79 s right after pairing) |
+
+- **A write is four sequential requests to the other member** (pend: 2, commit: 2), and **each
+  opens a new stream**: about 270–475 ms to open, then 365–540 ms for the reply (S21 → S7).
+  Local work is milliseconds.
+- **Reads go to the peer block by block** (`sync`, "latest revision"), about 0.6 s each and
+  sequential: a chat refresh of 8 rows took 3.3 s on the S21. Same behaviour as Optimystic#25, with
+  a healthy peer.
+- **Relay round trip** is 39–46 ms from both phones and the Mac, so the network alone would be
+  about 90 ms per phone-to-phone round trip. Node does a request in about 170 ms; fast phones about
+  450 ms; with the S7, 650–965 ms.
+- **The sender's CPU is not the limit:** the S21 profile was 57% idle during sends.
+- **Timers are not the cause:** RN `setTimeout(0)` costs 17–21 ms per hop on the fast devices and
+  155 ms on the S7, against 1.25 ms in Node. But Node with every `setTimeout` floored at 17 or
+  155 ms (`test/stack/rn-timers.mjs`) still writes in about 0.9–1.0 s. libp2p's job queues fire
+  274 1 ms debounce timers per send (`@libp2p/utils` debounce of emitEmpty/emitIdle): churn, not
+  latency.
+- **RN WebSocket round trip** (in-app, local echo): emulator 3 ms, S21 26 ms (wireless adb
+  included). On the **S7, 1,058 ms**: its JS event delivery is pathological, which is why
+  anything involving the S7 is slow. Don't use it as a latency benchmark.
+- [ ] Still unexplained: fast phones at about 450 ms per request against Node's 170. Next, count
+      round trips per stream open (multistream negotiation, yamux) on RN versus Node.
+- [ ] Upstream candidates (optimystic), to be measured before raising:
+  - reuse streams for cluster requests (a fresh one per request costs 1–2 round trips);
+  - fewer round trips per pend and commit;
+  - reads that don't consult the peer per block (#25).
 
 ### Upgraded to sereus 1.12.0 / optimystic 1.10.1; chat watches instead of polling, 2026-10-05
 
