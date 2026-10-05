@@ -17,6 +17,7 @@
  *   RELAY_ADDR=/dns4/relay.sereus.org/tcp/4011/ws/p2p/12D3Koo… node message-latency.mjs
  *   ROUNDS=10 RESTART=1 RELAY_ADDR=… node message-latency.mjs
  *   ROUNDS=8 GAP_MS=150000 RELAY_ADDR=… node message-latency.mjs   # idle between messages
+ *   WATCH=1 [REACTIVITY=1] RELAY_ADDR=… node message-latency.mjs     # does the receiver's Database.watch fire, and when
  *
  * RESTART=1 then stops both parties, restarts them over the same storage and
  * identity (as two phones whose apps were closed), and measures ROUNDS more.
@@ -55,6 +56,17 @@ const GAP_MS = Number(process.env.GAP_MS ?? 0);
  *   check    read the Member row first; write it only if missing or renamed, then the Message
  */
 const SEND_MODE = process.env.SEND_MODE ?? 'message';
+/** WATCH=1: subscribe Database.watch on App.Message on both sides and report when the receiver's watch fires. */
+const WATCH = process.env.WATCH === '1';
+/** REACTIVITY=1: build both nodes with sereus 1.12's `strandReactivity` (optimystic change notifications). */
+const REACTIVITY = process.env.REACTIVITY === '1';
+const wakes = { host: [], joiner: [] };
+const watchTags = { host: null, joiner: null };
+function watchMessages(inst, tag) {
+  const d = db(inst);
+  const scope = d.prepare('select Id from App.Message').getChangeScope();
+  return d.watch(scope, () => { wakes[tag].push(Date.now()); });
+}
 
 // The chat schema exactly as the app applies it (chat-sapp.ts extractInnerDDL).
 const here = dirname(fileURLToPath(import.meta.url));
@@ -133,6 +145,7 @@ async function startParty(tag, partyId) {
       connectionGater: { denyDialMultiaddr: () => false },
     },
     requireSignedSchemas: false,
+    ...(REACTIVITY ? { strandReactivity: { enabled: true } } : {}),
   });
   autoAttach(node, tag);
   await node.start();
@@ -178,6 +191,8 @@ const stamp = () => new Date().toISOString().replace('T', ' ').replace(/\.\d{3}Z
 async function oneMessage(from, to, memberId, label) {
   const id = randomUUID();
   const s = Date.now();
+  const toTag = to === watchTags.host ? 'host' : 'joiner';
+  const wakeMark = wakes[toTag].length;
   let commitMs = null, error = null;
   const visibleP = (async () => {
     while (Date.now() - s < VISIBLE_MS) {
@@ -210,7 +225,9 @@ async function oneMessage(from, to, memberId, label) {
     commitMs = Date.now() - s;
   } catch (e) { error = e?.message ?? String(e); }
   const visibleMs = error ? null : await visibleP;
+  const woke = WATCH ? wakes[toTag].slice(wakeMark).map(t => t - s) : [];
   log(`${label}: commit ${commitMs ?? '—'} ms, visible on the other side ${visibleMs ?? 'NEVER'} ms` +
+      (WATCH ? `, receiver's watch fired ${woke.length ? woke.map(x => x + ' ms').join(', ') : 'NEVER'}` : '') +
       (error ? ` — insert FAILED: ${error}` : ''));
   return { commitMs, visibleMs, error };
 }
@@ -267,6 +284,8 @@ try {
   log(`JOINER: wrote its Member in ${Date.now() - m0} ms`);
 
   mem('after setup');
+  watchTags.host = founded.instance; watchTags.joiner = joinerInst;
+  if (WATCH) { watchMessages(founded.instance, 'host'); watchMessages(joinerInst, 'joiner'); log('watching App.Message on both sides'); }
   const warm = await exchange('fresh', founded.instance, joinerInst, hostMember, joinerMember);
   if (warm.some(r => r.visibleMs == null)) code = 1;
   mem('after exchange');

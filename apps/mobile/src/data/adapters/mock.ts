@@ -156,6 +156,9 @@ export class MockAdapter implements DataAdapter {
     };
   }
 
+  watchStrand(_strandId: string, _onChange: () => void): (() => void) | null {
+    return () => {};
+  }
   async listOutstandingInvitations(): Promise<Invitation[]> {
     if (isError()) fail('Could not load invitations');
     return (isEmpty() ? invitesEmpty : invitesHappy) as unknown as Invitation[];

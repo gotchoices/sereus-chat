@@ -27,8 +27,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  *   sereus-1.11  optimystic 1.9 and libp2p 3.3; a new PendingJoin control table. Not
  *                known to break 1.9 data, but bumped so testers start clean rather
  *                than chase faults carried over from it (internal testing, no users).
+ *   sereus-1.12  optimystic 1.10.1; chat tables tagged for change notification.
  */
-export const DATA_FORMAT = 'sereus-1.11';
+export const DATA_FORMAT = 'sereus-1.12';
 
 const MARKER_KEY = '@sereus.chat/dataFormat';
 const APP_PREFIX = '@sereus.chat/';

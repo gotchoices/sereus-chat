@@ -11,10 +11,12 @@ import { ThemeProvider, useThemeContext } from './src/theme';
 import { USE_SEREUS } from './src/data/config';
 import { checkDataFormat, type DataFormatCheck } from './src/data/data-format';
 import { startLoopLagMonitor } from './src/diagnostics/loop-lag';
+import { installDevBridge } from './src/diagnostics/dev-bridge';
 import { useT } from './src/i18n';
 import { typography, spacing } from './src/theme';
 
 startLoopLagMonitor();
+installDevBridge();
 
 /**
  * Shown instead of the app when the saved data was written in a form this build

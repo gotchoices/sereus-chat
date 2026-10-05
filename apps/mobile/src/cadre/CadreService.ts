@@ -61,6 +61,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // candidate for `@sereus/cadre-rn-ui` extraction.
 import { CHAT_SAPP_ID } from '../data/chat-sapp';
 import { withTimeout, OWNER_GENESIS_TIMEOUT_MS } from './async';
+import { STRAND_REACTIVITY } from '../data/config';
 
 type OptimysticDb = ReturnType<typeof openOptimysticRNDb>;
 type EventHandler<T> = (payload: T) => void;
@@ -518,6 +519,9 @@ class CadreServiceImpl {
         // unlike the reference's Persistent*Store — chat uses the `privateKey`
         // identity path, so there is no expo-secure-store slot to hang them off).
         requireSignedSchemas: false,
+
+        // Change notifications for strand tables (sereus 1.12). See STRAND_REACTIVITY.
+        ...(STRAND_REACTIVITY ? { strandReactivity: { enabled: true } } : {}),
 
         // NO `strandFirstSync` OVERRIDE, and no `cohortQueryTimeoutMs`: as of
         // cadre-core 1.5.0 the platform defaults ARE the values we had been setting

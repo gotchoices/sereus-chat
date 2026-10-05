@@ -19,11 +19,17 @@
 -- `ReplyToId` and omits `EditedAt`, so sending a message failed with
 -- `NOT NULL constraint failed` — on a column this file declares optional.
 
+-- CHANGE NOTIFICATION. Every table is tagged `"optimystic.network_watch" = true`
+-- (sereus 1.12, docs/strands.md "Change notifications (reactivity)"). On a node
+-- built with `strandReactivity` a `Database.watch` on it wakes when another
+-- machine commits; on a node without it the tag only logs a warning and local
+-- wakes continue, so it is safe to ship unconditionally.
+
 table Member (
     Id text primary key,                -- libp2p Peer ID of the participating member
     Name text not null check (length(Name) between 1 and 100),
     AvatarUri text null                 -- optional; Quereus defaults to NOT NULL
-);
+) with tags ("optimystic.network_watch" = true);
 
 table Message (
     Id text primary key,                -- client-generated UUID
@@ -33,7 +39,7 @@ table Message (
     ReplyToId text null,                -- quote-reply target, null when not a reply
     EditedAt datetime null,             -- set when edited in place; no version chain
     foreign key (MemberId) references Member(Id)
-);
+) with tags ("optimystic.network_watch" = true);
 
 table Attachment (
     Id text primary key,
@@ -45,7 +51,7 @@ table Attachment (
     ByteSize integer null,
     DurationMs integer null,            -- video and voice
     foreign key (MessageId) references Message(Id)
-);
+) with tags ("optimystic.network_watch" = true);
 
 table Reaction (
     MessageId text not null,
@@ -54,4 +60,4 @@ table Reaction (
     primary key (MessageId, MemberId, Symbol),
     foreign key (MessageId) references Message(Id),
     foreign key (MemberId) references Member(Id)
-);
+) with tags ("optimystic.network_watch" = true);

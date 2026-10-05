@@ -79,6 +79,12 @@ export interface DataAdapter {
     validForMs?: number;
   }): Promise<Invitation>;
   listOutstandingInvitations(): Promise<Invitation[]>;
+  /**
+   * Call `onChange` whenever this strand's chat tables change, by this device or,
+   * once applied here, by another. Coarse: re-query on a wake. Returns null when the
+   * strand is not open yet (try again later), else an unsubscribe.
+   */
+  watchStrand(strandId: string, onChange: () => void): (() => void) | null;
   cancelInvitation(id: string): Promise<void>;
   /**
    * Can anybody answer an invitation from this device right now — and if not,
@@ -173,3 +179,4 @@ export const setPrefs = async (p: Partial<Prefs>) => (await getAdapter()).setPre
 export const storageUsage = async () => (await getAdapter()).storageUsage();
 export const trimStorage = async (id: string, c: Parameters<DataAdapter['trimStorage']>[1]) =>
   (await getAdapter()).trimStorage(id, c);
+export const watchStrand = async (id: string, onChange: () => void) => (await getAdapter()).watchStrand(id, onChange);

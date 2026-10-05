@@ -845,6 +845,32 @@ export class SereusAdapter implements DataAdapter {
       return queryMembers(strand).then(m => m.length).catch(() => null);
     });
   }
+  /**
+   * Quereus's `Database.watch` over the four chat tables. A wake comes from a commit
+   * this device's storage applies: its own writes, and in a two-person strand the
+   * other phone's too, since both store every block. With `STRAND_REACTIVITY` on
+   * (sereus 1.12) it also wakes on commits applied only elsewhere.
+   */
+  watchStrand(strandId: string, onChange: () => void): (() => void) | null {
+    const strand = cadreService.getStrands().get(strandId);
+    if (!strand?.database) return null;
+    const db = strand.database.getDatabase();
+    const subs: Array<{ unsubscribe(): void }> = [];
+    try {
+      for (const table of ['Message', 'Reaction', 'Attachment', 'Member']) {
+        // The statement is only needed for its scope.
+        const stmt = db.prepare(`select * from App.${table}`);
+        const scope = stmt.getChangeScope();
+        void stmt.finalize().catch(() => {});
+        subs.push(db.watch(scope, () => { onChange(); }));
+      }
+    } catch (err) {
+      subs.forEach(sub => sub.unsubscribe());
+      console.warn('[SereusAdapter] watch unavailable for', strandId, err instanceof Error ? err.message : err);
+      return null;
+    }
+    return () => subs.forEach(sub => sub.unsubscribe());
+  }
   /** Stops LISTING it; does not withdraw it — see outgoing-invitations.ts. */
   async cancelInvitation(id: string): Promise<void> {
     await forgetOutgoingInvitation(id);

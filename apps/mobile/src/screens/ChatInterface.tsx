@@ -22,7 +22,7 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import {
   listMessages, listMembers, getStrandState, send, deleteMessage, react, editMessage,
-  listOutstandingInvitations,
+  listOutstandingInvitations, watchStrand,
 } from '../data/adapter';
 import type { Message, Member, StrandState, Attachment } from '../data/types';
 import { useT } from '../i18n';
@@ -146,8 +146,11 @@ export default function ChatInterface() {
   /** The strand is known but not open on this device yet (cold start, re-attaching). */
   const [opening, setOpening] = useState(false);
 
+  /** A wake arrived during a load: run one more when it finishes, so no change is missed. */
+  const reloadAfter = useRef(false);
+
   const load = useCallback(async () => {
-    if (loading.current) return;
+    if (loading.current) { reloadAfter.current = true; return; }
     loading.current = true;
     try {
       const [msgs, mem] = await Promise.all([listMessages(strandId), listMembers(strandId)]);
@@ -170,9 +173,11 @@ export default function ChatInterface() {
       setError(message);
     } finally {
       loading.current = false;
+      if (reloadAfter.current) { reloadAfter.current = false; void Promise.resolve().then(() => load()); }
     }
     setLoaded(true);
     getStrandState(strandId).then(setState).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [strandId]);
 
   useEffect(() => { void load(); }, [load, rev]);
@@ -180,30 +185,39 @@ export default function ChatInterface() {
   /**
    * Incoming messages, which otherwise never arrive.
    *
-   * This screen used to read once on mount and never again, so a message the
-   * other party sent while you were looking at the conversation simply did not
-   * appear — you had to leave the screen and come back. For a chat app that is
-   * the difference between working and not.
+   * A WATCH, with a slow poll behind it. Quereus's `Database.watch` on the strand's
+   * tables (`watchStrand`) wakes on any commit this device's storage applies: its
+   * own, and in a two-person strand the other phone's too, because both store every
+   * block. With sereus 1.12's `strandReactivity` it also wakes on commits applied
+   * only elsewhere (larger strands). A wake reloads; a wake during a load queues
+   * exactly one more.
    *
-   * A POLL, not a subscription, because there is nothing to subscribe to yet:
-   * cadre-core emits strand LIFECYCLE events only (`strand:started`,
-   * `strand:writable`, …) and nothing per row, and optimystic's
-   * `onCollectionChange` is explicitly a no-op unless a `localChangeNotifier`
-   * was supplied at construction, which cadre-core does not do. Replace this the
-   * day either of those changes.
-   *
-   * WHILE FOCUSED ONLY, every 10 s, one pass at a time (`load` skips while the last
-   * pass is still running). Tried at 3 s on 2026-10-02 and reverted: on the S7 a pass
-   * takes 2.5–4.4 s (a read can consult the other member, Optimystic#25), so a 3 s
-   * poll kept it reading almost continuously, and S7 → emulator delivery went from
-   * 14–21 s to 79–109 s. A stopgap for a missing notification, not a design.
+   * The poll stays as the safety net: every 10 s until the watch is in place (the
+   * strand may still be opening), then every 30 s. One pass at a time. 3 s was
+   * tried on 2026-10-02 and reverted: on the S7 a pass takes 2.5–4.4 s, and a 3 s
+   * poll kept it reading almost continuously.
    */
   useFocusEffect(
     useCallback(() => {
       void load();
-      const t = setInterval(() => { void load(); }, 10_000);
-      return () => clearInterval(t);
-    }, [load]),
+      let unwatch: (() => void) | null = null;
+      let closed = false;
+      let timer: ReturnType<typeof setInterval> | null = null;
+      const arm = async () => {
+        if (unwatch || closed) return;
+        try { unwatch = await watchStrand(strandId, () => { void load(); }); } catch { unwatch = null; }
+        if (closed && unwatch) { unwatch(); unwatch = null; }
+      };
+      const schedule = (ms: number) => {
+        if (timer) clearInterval(timer);
+        timer = setInterval(() => {
+          void load();
+          if (!unwatch) void arm().then(() => { if (unwatch && !closed) schedule(30_000); });
+        }, ms);
+      };
+      void arm().then(() => { if (!closed) schedule(unwatch ? 30_000 : 10_000); });
+      return () => { closed = true; if (timer) clearInterval(timer); unwatch?.(); unwatch = null; };
+    }, [load, strandId]),
   );
 
   // Draft and read cursor are device-local.  Nothing unsent leaves the phone.

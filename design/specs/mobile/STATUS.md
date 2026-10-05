@@ -38,7 +38,23 @@ Pick up here. Details are in the dated sections below.
        - commit today's work (the user commits).
 7. [ ] **Adopt the cadre-rn kit's `/phone-node` and `/lifecycle`** (sereus PR stacked on #29)
        when it lands, replacing most of `CadreService`.
-8. [ ] **Watching upstream:**
+8. [x] **Change notification instead of polling.** Done in the chat screen on 1.12. Measured on
+       the S7 + emulator: delivery 7–9 s median, of which the sender's write is about 4.7 s (see
+       2026-10-05). Earlier notes (2026-10-03):
+       - Optimystic 1.10's *network* watch (`reactivityWatch`, tables tagged
+         `"optimystic.network_watch"`) needs the node built with cohort-topic/reactivity enabled.
+         cadre-core 1.11 and sereus master do not enable it ("sereus does not use optimystic's
+         opt-in reactivity"). Nothing to gain from optimystic 1.10 alone; wait for sereus.
+       - Quereus's local `Database.watch` already fires on the receiving side, on 1.9 and on
+         1.10. In a two-person strand both phones store every block, so the replicated insert wakes
+         it, at or before when polling first saw the row (Node, `message-latency.mjs WATCH=1` in a
+         scratch copy).
+       - But with a watch open, commits measured slower: median 2.2–3.1 s against about 1.0 s
+         without. A sereus test process was running concurrently, so re-measure on a quiet machine
+         before adopting.
+       - If the cost is real, a watch only while a chat is on screen may still pay.
+       - The chat poll's comment ("nothing to subscribe to") is out of date.
+9. [ ] **Watching upstream:**
        - Optimystic#25 (reads wait on a slow peer) and #26 (commit durability → "not yet
          delivered");
        - Optimystic#24 (clock skew);
@@ -245,6 +261,67 @@ their variants. Calls are parked (story 90).
         - Posted as gotchoices/Optimystic#25 (2026-10-01). Revisit when answered.
   - [ ] Draft for the user's review: `apps/mobile/tmp/cadre-rn-native-digest-issue.md` (the kit's
         digest polyfill is pure JS).
+
+### Upgraded to sereus 1.12.0 / optimystic 1.10.1; chat watches instead of polling, 2026-10-05
+
+- **Packages:** cadre-core/cadre-rn ^1.12.0, `@optimystic/*` ^1.10.1, one copy each
+  (`use-stack.sh` updated); `test/stack` on the same versions. tsc clean. Data marker
+  `sereus-1.12`.
+- **Schema:** Member, Message, Attachment and Reaction are tagged
+  `with tags ("optimystic.network_watch" = true)`. Checked that Quereus parses it.
+- **`STRAND_REACTIVITY` switch** (`data/config.ts`, off) adds `strandReactivity: { enabled: true }`
+  to the node config.
+  - Off because two-person strands don't need it: the local `Database.watch` already wakes on the
+    other phone's applied commit.
+  - Its cost (a proof-of-work registration per watched table on every build or wake, "slower on a
+    phone's JS thread") is the reason sereus leaves it off.
+  - Turn it on for strands larger than their replication breadth, and on every machine serving
+    them.
+- **Chat screen** subscribes with `watchStrand` (`Database.watch` over the four tables) and reloads
+  on a wake; a wake during a load queues one more. Safety poll: every 10 s until the watch is in
+  place, then every 30 s.
+- **Node measurements, quiet machine** (`message-latency.mjs WATCH=1 [REACTIVITY=1]`):
+  - baseline: commit median 0.84 s;
+  - local watch: commit 1.05 s, and the receiver's watch fires 0.86–1.13 s after the send, about
+    when the sender's commit returns;
+  - with reactivity: commit 0.84 s, watch fires at 0.63–1.27 s.
+  - The 2–3 s commits seen on 2026-10-03 were contention from another process.
+- **Devices:** the S21 now carries the debug build (the release install was removed, with the
+  user's OK). It joined the emulator's private strand in about 15 s (the S7 took 70 s).
+  - **Delivery with the watch, S7 + emulator 5564** (fresh 1.12 strand, the S7 just rebooted
+    after its battery died):
+    - S7 → emulator: 94 s for the first message after the join, then 12 s;
+    - emulator → S7: 7 s.
+    - Before the watch, with a 10 s poll: 14–21 s; before the digest fix: minutes.
+    - The run stopped when emulator 5564 was switched to taleus; the S7's third send committed.
+  - **Second session, four confirmed rounds each way:** S7 → emulator 127–197 s, emulator → S7
+    10–112 s. Not comparable: the emulator was starved again (load 5.4 on 4 cores; the chat app
+    838 MB PSS with 218 MB swapped), the Oct-1 situation. In a two-person strand each of the S7's
+    writes waits on it.
+  - **Test-harness finding:** in the dev build, the LogBox "Open debugger to view warnings" toast
+    blocks taps on the whole bottom row (composer, Send, Attach) while it shows. That is what left
+    messages unsent in the composer. `send.sh` (scratchpad) now closes it with its X and confirms
+    the composer emptied. Release builds have no toast.
+  - **Measured without the UI (2026-10-05), S7 + emulator, emulator not swapping:**
+    - S7 → emulator: sender commit median 4.7 s (3.4–6.1); seen by the receiver median 8.8 s
+      (6.8–9.9).
+    - emulator → S7: commit median 4.7 s (2.8–5.2); seen median 6.8 s (5.1–6.9).
+    - 0 lost in 8.
+    - The receiver's watch sees a message 2–4 s after the sender's commit returns. The rest is the
+      sender's write (about 0.6–0.8 s in Node; a phone's CPU and the relay make it 3–6 s).
+    - Tool: dev bridge `src/diagnostics/dev-bridge.ts` (`globalThis.__chatDev`: `strands`, `send`,
+      `arm`, `seen`, and `start`/`take`, because Hermes ignores `awaitPromise`), installed only in
+      `__DEV__`, driven over Metro's inspector by `test/devices/devtime.mjs <devA> <devB> [rounds]`.
+      It uses the composer's `send` and the chat screen's `watchStrand` path, with no UI taps.
+  - [ ] Repeat on two real phones (S7 + S21) when the S21 is free.
+  - [ ] The chat app's footprint on the emulator grew to about 840 MB (it was about 550 MB on
+        Oct 1). Check whether it grows over a session (watch subscriptions?) or is the dev build.
+  - [ ] More rounds, and why the first message after a join is slow (94 s). The S7 was freshly
+        booted, and its first send also writes its Member row.
+  - Devices used for chat testing: the S7 (USB), the S21 (wireless adb, debug build now
+    installed), emulator 5564. Emulator 5566 is the user's taleus emulator; a chat debug build was
+    installed there by mistake and can be removed. Ask before using either emulator while the
+    user is working on taleus.
 
 ### Refinements after the 1.11 upgrade, 2026-10-02
 
