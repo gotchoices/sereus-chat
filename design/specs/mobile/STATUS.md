@@ -36,7 +36,10 @@ Pick up here. Details are in the dated sections below.
        - delete `apps/mobile/tmp/cadre-rn-native-digest-issue.md` (now covered in
          sereus `tickets/backlog/feat-rn-kit-phone-node.md`, "The Chat Context");
        - commit today's work (the user commits).
-7. [ ] **Adopt the cadre-rn kit's `/phone-node` and `/lifecycle`** (sereus PR stacked on #29)
+7. [ ] **Kit native digest: gotchoices/sereus#32** (2026-10-05). `/native-digest`, called by
+       `/noise-crypto` at load, replaces the kit polyfill's JS digest with quick-crypto's. Once it
+       ships, chat can drop its own copy in `polyfills/hermes.js` and use the kit polyfills.
+   [ ] **Adopt the cadre-rn kit's `/phone-node` and `/lifecycle`** (sereus PR stacked on #29)
        when it lands, replacing most of `CadreService`.
 8. [x] **Change notification instead of polling.** Done in the chat screen on 1.12. Measured on
        the S7 + emulator: delivery 7–9 s median, of which the sender's write is about 4.7 s (see

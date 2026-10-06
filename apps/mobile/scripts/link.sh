@@ -17,7 +17,7 @@
 #   link.sh devices                     list attached devices
 #
 # Default target is $DEVICE_SERIAL (see env-defaults.sh / .env.ports.local);
-# `--all` targets every attached device, which is the two-instance pair.
+# `--all` targets the attached members of $DEVICES — the two-instance pair.
 # For a one-off elsewhere, `TARGET_DEVICE=<serial> sh ./scripts/link.sh …` — and a
 # plain exported DEVICE_SERIAL deliberately does NOT win (env-defaults.sh says why).
 set -eu
@@ -35,23 +35,18 @@ CHAT_ROOT=$(cd "$APP_DIR/../.." && pwd)
 usage() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
 # ── target selection ───────────────────────────────────────────────────────
-# `--all` means EVERY DEVICE THIS PROJECT OWNS — not every device `adb` can see.
+# `--all` means THIS PROJECT'S DEVICE SET — $DEVICES (env-defaults.sh), not every
+# device `adb` can see.
 #
 # ser/health, ser/chat and ser/taleus each pin their own emulator in
-# .env.ports.local (health 5562, chat 5564) precisely so all three can run at once.
-# A bare `adb devices` walks straight through that: it returns a sibling project's
-# emulator, and `--all` would then deep-link into it, or `adb reverse` this
+# .env.ports.local precisely so all three can run at once, and phones on the cable
+# may belong to a sibling's set too. A bare `adb devices` walks straight through
+# that: `--all` would deep-link into a sibling's emulator, or `adb reverse` this
 # project's Metro and relay ports INSIDE it. Neither is ours to touch.
 #
-# Ownership rule:
-#   - an emulator is ours only if its serial is $DEVICE_SERIAL
-#   - a PHYSICAL device is ours: it is plugged into this machine deliberately and
-#     there is no per-project way to claim one (nor should there be — the whole
-#     point of attaching a phone is to test on it from wherever you are working)
-#
-# Foreign emulators are skipped out loud, so "it did nothing" is never silent. To
-# reach one anyway — a deliberate cross-project act — name it: `-d emulator-5562`,
-# which bypasses this filter entirely.
+# Members of the set that are not attached are skipped out loud, so "it did
+# nothing" is never silent. To reach a device outside the set — a deliberate act —
+# name it: `-d <serial>`.
 targets_from_args() {
   _all=no; _serial=''
   while [ $# -gt 0 ]; do
@@ -62,15 +57,16 @@ targets_from_args() {
     shift
   done
   if [ "$_all" = yes ]; then
+    _online=$(adb devices | awk '/\tdevice$/ { print $1 }')
     _skipped=''
-    for _dev in $(adb devices | awk '/\tdevice$/ { print $1 }'); do
-      if is_emulator "$_dev" && [ "$_dev" != "$DEVICE_SERIAL" ]; then
+    for _dev in $DEVICES; do
+      if echo "$_online" | grep -qx "$_dev"; then
+        echo "$_dev"
+      else
         _skipped="$_skipped $_dev"
-        continue
       fi
-      echo "$_dev"
     done
-    [ -n "$_skipped" ] && echo "    skipped (another project's emulator):$_skipped" >&2
+    [ -n "$_skipped" ] && echo "    skipped (in DEVICES, not attached):$_skipped" >&2
   elif [ -n "$_serial" ]; then
     echo "$_serial"
   else
@@ -106,14 +102,15 @@ host_for() {
 }
 
 # Metro and the relay both live on the Mac; every target needs both forwarded.
-# 8081 as well as $METRO_PORT: `pm clear` wipes the app's saved dev-server
-# setting, and a freshly-cleared app looks for the RN default port.
+# Only $METRO_PORT, not 8081: `yarn android` bakes METRO_PORT into the build
+# (react_native_dev_server_port), so even a `pm clear`ed app looks there. And a
+# phone may be in several projects' sets — a 8081 forward from each would steal
+# the port from whichever sibling set it last.
 setup_reverse() {
   _s="$1"
   adb -s "$_s" reverse "tcp:$METRO_PORT" "tcp:$METRO_PORT" >/dev/null
-  adb -s "$_s" reverse tcp:8081 "tcp:$METRO_PORT" >/dev/null
   adb -s "$_s" reverse "tcp:$RELAY_WS_PORT" "tcp:$RELAY_WS_PORT" >/dev/null
-  echo "    $_s reversed: metro $METRO_PORT (and 8081), relay $RELAY_WS_PORT"
+  echo "    $_s reversed: metro $METRO_PORT, relay $RELAY_WS_PORT"
 }
 
 send_link() {
@@ -160,15 +157,22 @@ cmd_relay() {
 # and the only thing distinguishing them is a port number in a git-ignored file.
 cmd_devices() {
   echo "this project: METRO_PORT=$METRO_PORT  DEVICE_SERIAL=$DEVICE_SERIAL  AVD_NAME=${AVD_NAME:-?}"
+  echo "              DEVICES=$DEVICES"
   echo
   for _dev in $(adb devices | awk '/\tdevice$/ { print $1 }'); do
-    if [ "$_dev" = "$DEVICE_SERIAL" ]; then
-      echo "  $_dev  — this project's emulator"
-    elif is_emulator "$_dev"; then
-      echo "  $_dev  — ANOTHER project's emulator (skipped by --all; -d to force)"
+    case " $DEVICES " in *" $_dev "*) _mine=yes ;; *) _mine=no ;; esac
+    if is_emulator "$_dev"; then
+      _what=emulator
     else
       _model=$(adb -s "$_dev" shell getprop ro.product.model 2>/dev/null | tr -d '\r')
-      echo "  $_dev  — physical device${_model:+ ($_model)}"
+      _what="physical device${_model:+ ($_model)}"
+    fi
+    if [ "$_dev" = "$DEVICE_SERIAL" ]; then
+      echo "  $_dev  — $_what, this project's primary"
+    elif [ "$_mine" = yes ]; then
+      echo "  $_dev  — $_what, in this project's set"
+    else
+      echo "  $_dev  — $_what, NOT in this project's set (skipped by --all; -d to force)"
     fi
   done
 }

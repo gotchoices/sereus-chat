@@ -4,7 +4,8 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "android": "sh -c '. ./env-defaults.sh && react-native run-android --port \"$METRO_PORT\" --deviceId \"$DEVICE_SERIAL\"'",
+    "android": "sh ./scripts/android.sh",
+    "android:emu": "sh ./scripts/android.sh --active-arch-only",
     "emulator": "sh -c '. ./env-defaults.sh && \"${ANDROID_HOME:-$HOME/Library/Android/sdk}/emulator/emulator\" -avd \"$AVD_NAME\" -port \"$EMULATOR_PORT\"'",
     "ios": "react-native run-ios",
     "start": "sh -c '. ./env-defaults.sh && react-native start --port \"$METRO_PORT\"'",

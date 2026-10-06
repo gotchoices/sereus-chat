@@ -1,5 +1,52 @@
 This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
 
+## Devices and ports
+
+[`env-defaults.sh`](env-defaults.sh) — sourced by every `yarn` script — carries the
+stock React Native settings (Metro 8081, `emulator-5554`), so a fresh clone just
+works. Anything specific to your bench goes in a git-ignored `.env.ports.local`
+beside it. Running several sereus apps at once needs each to have its own slot:
+
+```sh
+METRO_PORT=8084
+EMULATOR_PORT=5564
+DEVICE_SERIAL="emulator-5564"          # primary device: launch, logs, deep links
+AVD_NAME="C_Phone_API_37.1"
+DEVICES="emulator-5564 6a61c968"       # optional: every device `yarn android` targets
+```
+
+- Console ports must be even and in 5554..5682 — the odd port above is the paired
+  adb port. Each project needs its own `METRO_PORT` and `EMULATOR_PORT`.
+- `DEVICES` lists raw adb serials (see `adb devices -l`), space-separated. Unset,
+  it is just `DEVICE_SERIAL`. A physical phone may appear in several projects'
+  sets — each app installs separately and reaches its own Metro port.
+
+Precedence, lowest to highest: the defaults, `.env.ports.local`, then one-off
+`TARGET_*` overrides on the command line (announced on stderr):
+
+```sh
+TARGET_DEVICE=6a61c968 yarn android             # just this phone, this once
+TARGET_DEVICES="478db6f0 6a61c968" yarn android # both phones, this once
+TARGET_METRO_PORT=8090 yarn start               # Metro elsewhere, this once
+```
+
+A plain exported `DEVICE_SERIAL` or `METRO_PORT` does *not* win — a stale export
+left in a terminal is indistinguishable from an intended one.
+
+Typical session:
+
+```sh
+yarn start             # Metro on METRO_PORT
+yarn android           # build, install to every device in DEVICES, launch on each
+yarn android:emu       # same, building only the ABIs those devices need (faster)
+yarn emulator          # boot AVD_NAME on EMULATOR_PORT by hand (optional)
+```
+
+`yarn android` ([`scripts/android.sh`](scripts/android.sh)) boots this project's own
+emulator (`emulator-$EMULATOR_PORT`) if it is in the set and not running, skips any
+other listed device that is not attached (out loud), installs to the rest in one
+Gradle run, then sets up `adb reverse` for Metro and launches the app on each.
+
 # Getting Started
 
 > **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
