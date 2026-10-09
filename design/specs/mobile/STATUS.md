@@ -270,6 +270,35 @@ their variants. Calls are parked (story 90).
   - [ ] Draft for the user's review: `apps/mobile/tmp/cadre-rn-native-digest-issue.md` (the kit's
         digest polyfill is pure JS).
 
+### Upgrade to sereus 1.14.0 / optimystic 1.12.1 / Quereus 4.20.2 / fret 1.0.2, 2026-10-08 (in progress)
+
+- **Packages bumped, one copy each.** tsc is clean with no app changes. Data marker
+  `sereus-1.14`: control approvals now sign the party id. `test/stack` is on the same versions.
+- **Node harness** (sequential, quiet):
+  - messages: commit median 0.6–1.2 s, also after a restart of both;
+  - `requestJoin` repro passes (65 s);
+  - a lone write now commits at once (no super-majority failure first);
+  - a returning peer held the lone-written rows after 40 s (8–28 s before; the strand-launch wait
+    for seed peers, new in 1.13, is the likely reason).
+- **#29 re-measured on 1.12.1:** a single-message write is still 4 `cluster` requests on fresh
+  streams (pend about 290 ms, commit about 300 ms). Nate's 6 → 4 applies to multi-block writes.
+  Reply pending, with device numbers.
+- **Devices (S7 `6a61c968` + emulator 5564, the pair in `apps/mobile/.env.ports.local`):** not
+  usable yet.
+  - A first invitation failed ("No multiaddrs available": the emulator had no relay reservation
+    yet).
+  - The retry: invite 49 s, join 159 s, writes up to 290 s, 3 of 8 never seen within 5 min.
+  - The Mac was at load 11 (two emulators plus Spotlight); emulator chat used 61% CPU with 79 MB
+    swapped.
+  - A 30 s profile of the emulator's JS: mostly network traffic (Noise encrypt/decrypt, yamux,
+    `pbToPeer`/`multiaddr` parsing), JS itself busy only part of the time.
+  - [ ] Re-run on a quiet machine. Compare idle traffic on 1.12 and 1.14 before concluding
+        anything about 1.14.
+- **Tools now in the repo** (the scratchpad gets cleared): `test/devices/cpuprofile.mjs`,
+  `test/devices/profsum.py`, alongside `devtime.mjs` and `profsend.mjs`.
+- **First-run oddity:** the S7's fresh profile screen showed "Save" where the emulator showed
+  "Continue". Look into it later.
+
 ### Where a message's time goes, profiled 2026-10-05 (sereus 1.12, public relay)
 
 Tools: `test/devices/devtime.mjs` (timing via the dev bridge, no UI); `test/devices/profsend.mjs`

@@ -82,15 +82,15 @@ pj_path = os.path.join(APP_DIR, 'package.json')
 # `in_deps` packages appear in `dependencies`; `in_res` packages appear in
 # `resolutions` in BOTH modes so a single version wins tree-wide.
 PACKAGES = collections.OrderedDict([
-    ('@optimystic/db-core',                  ('../../../optimystic/packages/db-core',                  '^1.10.1', True,  True)),
-    ('@optimystic/db-p2p',                   ('../../../optimystic/packages/db-p2p',                   '^1.10.1', True,  True)),
-    ('@optimystic/db-p2p-storage-rn',        ('../../../optimystic/packages/db-p2p-storage-rn',        '^1.10.1', True,  True)),
-    ('@optimystic/quereus-plugin-crypto',    ('../../../optimystic/packages/quereus-plugin-crypto',    '^1.10.1', True,  True)),
-    ('@optimystic/quereus-plugin-optimystic',('../../../optimystic/packages/quereus-plugin-optimystic','^1.10.1', True,  True)),
-    ('@quereus/quereus',                     ('../../../quereus/packages/quereus',                     '^4.20.0', True,  True)),
-    ('@serfab/cadre-core',                   ('../../../sereus/packages/cadre-core',                   '^1.12.0', True,  True)),
-    ('@serfab/cadre-rn',                     ('../../../sereus/packages/cadre-rn',                     '^1.12.0', True,  False)),
-    ('p2p-fret',                             ('../../../fret/packages/fret',                           '^1.0.0',  True,  True)),
+    ('@optimystic/db-core',                  ('../../../optimystic/packages/db-core',                  '^1.12.1', True,  True)),
+    ('@optimystic/db-p2p',                   ('../../../optimystic/packages/db-p2p',                   '^1.12.1', True,  True)),
+    ('@optimystic/db-p2p-storage-rn',        ('../../../optimystic/packages/db-p2p-storage-rn',        '^1.12.1', True,  True)),
+    ('@optimystic/quereus-plugin-crypto',    ('../../../optimystic/packages/quereus-plugin-crypto',    '^1.12.1', True,  True)),
+    ('@optimystic/quereus-plugin-optimystic',('../../../optimystic/packages/quereus-plugin-optimystic','^1.12.1', True,  True)),
+    ('@quereus/quereus',                     ('../../../quereus/packages/quereus',                     '^4.20.2', True,  True)),
+    ('@serfab/cadre-core',                   ('../../../sereus/packages/cadre-core',                   '^1.14.0', True,  True)),
+    ('@serfab/cadre-rn',                     ('../../../sereus/packages/cadre-rn',                     '^1.14.0', True,  False)),
+    ('p2p-fret',                             ('../../../fret/packages/fret',                           '^1.0.2',  True,  True)),
 ])
 NAMES = set(PACKAGES)
 SENTINEL = '@serfab/cadre-core'  # its spec tells us the current mode

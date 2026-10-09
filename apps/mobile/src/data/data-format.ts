@@ -28,8 +28,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  *                known to break 1.9 data, but bumped so testers start clean rather
  *                than chase faults carried over from it (internal testing, no users).
  *   sereus-1.12  optimystic 1.10.1; chat tables tagged for change notification.
+ *   sereus-1.14  optimystic 1.12.1; control approvals now sign the party id, so
+ *                earlier control data does not verify.
  */
-export const DATA_FORMAT = 'sereus-1.12';
+export const DATA_FORMAT = 'sereus-1.14';
 
 const MARKER_KEY = '@sereus.chat/dataFormat';
 const APP_PREFIX = '@sereus.chat/';
