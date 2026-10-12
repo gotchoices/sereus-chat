@@ -9215,6 +9215,7 @@ __metadata:
     react-native-get-random-values: "npm:^1.11.0"
     react-native-image-picker: "npm:^8.2.1"
     react-native-keyboard-controller: "npm:^1.21.14"
+    react-native-keychain: "npm:^10.0.0"
     react-native-nitro-modules: "npm:^0.37.1"
     react-native-permissions: "npm:^5.4.4"
     react-native-qrcode-svg: "npm:^6.3.20"
@@ -10262,6 +10263,13 @@ __metadata:
     react-native: "*"
     react-native-reanimated: ">=3.0.0"
   checksum: 10c0/4293d6c6d6fbcb8cebff302cb33024708be8d325d8a0735fae130e14f42a2d7e17c26a95ffd9f2c71cea445610cf21ad4bb56d57e0b9295bd5db4c0b45e4c5cc
+  languageName: node
+  linkType: hard
+
+"react-native-keychain@npm:^10.0.0":
+  version: 10.0.0
+  resolution: "react-native-keychain@npm:10.0.0"
+  checksum: 10c0/a632ad27e58264506d2b373d329a867f042fb014e8a78db3a63031e953d61b5c98066eed1be238ee6c186d3f213d0efaa2a26526fb3a1d36a624c4460e982230
   languageName: node
   linkType: hard
 

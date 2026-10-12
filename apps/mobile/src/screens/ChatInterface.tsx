@@ -16,6 +16,7 @@ import {
   View, Text, TextInput, FlatList, Pressable, Image, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '../data/persisted-names';
 import { KeyboardEvents } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Clipboard from '@react-native-clipboard/clipboard';
@@ -32,10 +33,10 @@ import { ActionSheet,
 } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
-const DRAFT_KEY = (id: string) => `@sereus.chat/draft/${id}`;
+const DRAFT_KEY = STORAGE_KEYS.draft;
 /** Id prefix of a message whose write is still in flight. Never a stored id (those are UUIDs). */
 const SENDING_PREFIX = 'sending-';
-const READ_KEY = (id: string) => `@sereus.chat/read/${id}`;
+const READ_KEY = STORAGE_KEYS.readCursor;
 const GROUP_GAP_MS = 5 * 60 * 1000;
 
 const dayOf = (iso: string) => new Date(iso).toDateString();

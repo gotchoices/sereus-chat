@@ -1,1 +1,1 @@
-export { cadreService, OPTIMYSTIC_DB_PREFIX } from './CadreService';
+export { cadreService } from './CadreService';

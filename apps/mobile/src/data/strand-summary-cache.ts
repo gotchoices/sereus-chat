@@ -12,9 +12,10 @@
  * on purpose is dropped from it (`forgetStrandSummary`), so it cannot come back.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from './persisted-names';
 import type { StrandSummary } from './types';
 
-const KEY = '@sereus.chat/strandSummaries';
+const KEY = STORAGE_KEYS.strandSummaries;
 
 /** What is worth showing before the strand opens; the rest is recomputed when it does. */
 export type CachedSummary = Pick<StrandSummary, 'id' | 'title' | 'avatarUri' | 'isGroup' | 'memberCount' | 'lastMessage'>;

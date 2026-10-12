@@ -20,6 +20,7 @@
  *   - a different marker        → incompatible.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS, STORAGE_KEY_PREFIX } from './persisted-names';
 
 /**
  * The format this build writes. Bump on any upgrade that strands earlier data.
@@ -30,13 +31,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  *   sereus-1.12  optimystic 1.10.1; chat tables tagged for change notification.
  *   sereus-1.14  optimystic 1.12.1; control approvals now sign the party id, so
  *                earlier control data does not verify.
+ *   sereus-1.14-kit  the node is built by the cadre kit (`createPhoneNode`): the
+ *                identity, trusted owners and joined strands move to the keychain, the
+ *                party id and relays to the kit's saved start, and the databases are
+ *                renamed (`persisted-names.ts`). Nothing is carried over.
  */
-export const DATA_FORMAT = 'sereus-1.14';
+export const DATA_FORMAT = 'sereus-1.14-kit';
 
-const MARKER_KEY = '@sereus.chat/dataFormat';
-const APP_PREFIX = '@sereus.chat/';
+const MARKER_KEY = STORAGE_KEYS.dataFormat;
+const APP_PREFIX = STORAGE_KEY_PREFIX;
 /** Keys that say nothing about network data and may exist before first use. */
-const HARMLESS = new Set([MARKER_KEY, '@sereus.chat/themeMode']);
+const HARMLESS = new Set<string>([MARKER_KEY, STORAGE_KEYS.themeMode]);
 
 export type DataFormatCheck =
   | { ok: true }

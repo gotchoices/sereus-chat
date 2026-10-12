@@ -14,16 +14,16 @@
 import type { CadreNode, StrandInstance, StrandRow } from '@serfab/cadre-core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cadreService } from '../cadre';
+import { STORAGE_KEYS } from './persisted-names';
 import { createChatStrand, joinChatStrand } from './chat-sapp';
 import { upsertMember } from './chat-operations';
-import { getPrefs } from './adapter';
 import { forgetStrandSummary } from './strand-summary-cache';
 
-const PROFILE_KEY = '@sereus.chat/profile';
+const PROFILE_KEY = STORAGE_KEYS.profile;
 
 
 /** Strands joined through someone else's invitation — see `rememberJoinedStrand`. */
-const JOINED_STRANDS_KEY = '@sereus.chat/joinedStrands';
+const JOINED_STRANDS_KEY = STORAGE_KEYS.joinedStrands;
 
 /**
  * Exactly what `addStrand` needs to re-attach a joined strand, and nothing else.
@@ -106,25 +106,6 @@ export function getBootFailure(): string | null {
  * calls on the same strandId.
  */
 /**
- * Configure the node with every relay the user has accepted.
- *
- * MUST run BEFORE the node starts, not after: relays are named at construction
- * (`network.relayAddrs`), which is the only path that reaches this machine's
- * strand nodes as well as its control node. Applying them afterwards would make
- * `applyRelays` rebuild a node we had just built.
- *
- * Stored in prefs rather than on the node, because a reservation lives with the
- * running node and does not survive a restart — without this the app would come
- * back from a cold start silently unreachable while still listing the relay
- * under "how you are reachable".
- */
-export async function applySavedRelays(): Promise<void> {
-  const { relayAddrs } = await getPrefs();
-  if (!relayAddrs?.length) return;
-  await cadreService.applyRelays(relayAddrs);
-}
-
-/**
  * Bring the node up and start watching for strands. Nothing is created.
  *
  * THIS USED TO FOUND A STRAND. The app auto-created one on first run "so the user
@@ -145,9 +126,8 @@ export async function applySavedRelays(): Promise<void> {
 export async function ensureCadreUp(): Promise<void> {
   if (bringUp) return bringUp;
   bringUp = (async () => {
-    // BEFORE the node starts, every time. Relays are named at construction, so
-    // applying them afterwards forces a rebuild of the node just built.
-    await applySavedRelays();
+    // Relays come with the node's saved start (the cadre kit keeps the options
+    // each start used), so there is nothing to apply first.
     await cadreService.ensureStarted();
   })().finally(() => { bringUp = null; });
   return bringUp;

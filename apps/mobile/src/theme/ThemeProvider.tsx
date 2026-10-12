@@ -10,6 +10,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '../data/persisted-names';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -88,7 +89,7 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-const THEME_STORAGE_KEY = '@sereus.chat/themeMode';
+const THEME_STORAGE_KEY = STORAGE_KEYS.themeMode;
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useColorScheme();

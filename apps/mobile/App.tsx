@@ -87,12 +87,11 @@ export default function App() {
     // Errors are logged; the rest of the app keeps running.
     (async () => {
       try {
-        const { attachJoinedStrands, ensureCadreUp, applySavedRelays, watchDiscoveredStrands } =
+        const { attachJoinedStrands, ensureCadreUp, watchDiscoveredStrands } =
           await import('./src/data/chat-strand');
-        // Relays FIRST, and specifically before anything starts the node: they are
-        // named at construction, and that is the only path that gives a circuit
-        // address to the strand nodes a conversation actually lives on.
-        await applySavedRelays();
+        // Relays need no step here: they are the node's saved start options, named at
+        // construction — the only path that gives a circuit address to the strand
+        // nodes a conversation actually lives on.
         // Before anything else touches the node, because the strand watcher offers
         // stored strands about 100 ms after it starts and never re-offers them.
         // Anything invited into existence by our own formation responder — which

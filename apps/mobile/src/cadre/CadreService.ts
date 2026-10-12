@@ -1,154 +1,129 @@
 /**
- * CadreService — singleton wrapper around @serfab/cadre-core CadreNode.
+ * CadreService — the app's one cadre node, built by the Sereus kit.
  *
- * Step 1 (smoke test): just brings up the control network and identity.
- *   - Open control LevelDB
- *   - Load/create persistent Ed25519 peer key
- *   - Load/create party ID (AsyncStorage)
- *   - Start CadreNode in transaction profile, solo (no bootstrap nodes)
+ * The node is `@serfab/cadre-rn`'s phone node (`createPhoneNode`): identity in the
+ * keychain, the node-local stores durable and party-scoped, LevelDB storage per scope,
+ * owner genesis, and the last start (party id, relays, Noise mode) remembered. This file
+ * keeps the interface the rest of the app has always called, over that node, so the
+ * kit could be adopted without touching the data layer (docs/STATUS.md, Phase 2a). In
+ * the app-family structure it becomes the app's host (`apps/mobile/src/host/`).
  *
- * Strand creation is added in Step 2.
- *
- * Boundary: this file must not import anything chat-specific.  It is a
- * candidate for upstream extraction into `@sereus/cadre-rn-ui` (engine).
+ * What chat adds over the kit's defaults, all in `configure` below: its strand filter,
+ * unsigned schemas, and the strand-reactivity switch.
  *
  * References:
- *   sereus/packages/cadre-core/README.md
- *   sereus/packages/reference-app-rn/src/cadre-phone.ts
- *   ser/health/apps/mobile/src/services/CadreService.ts
+ *   sereus/packages/cadre-rn/src/phone-node (the kit)
+ *   sereus/packages/reference-app-rn/src/cadre-phone.ts (its worked example)
  */
 
 import {
-  CadreNode,
   pinnedKeyTrustPolicy,
-  type CadreNodeConfig,
+  type CadreNode,
   type CadreNodeEvents,
   type ControlDatabase,
   type RelayReservationState,
   type StrandInstance,
 } from '@serfab/cadre-core';
-// NATIVE NOISE CRYPTO — now the SEREUS KIT's, not our own copy.
-//
-// `@serfab/cadre-rn/noise-crypto` exports the same three modes, the same
-// `symmetric` default and the same `buildNoiseCrypto(mode)` signature over the
-// same `react-native-quick-crypto`, and it types the result from
-// `@optimystic/db-p2p` directly. We wrote an equivalent module before the kit
-// existed; keeping ours would mean maintaining a parallel implementation of a
-// published, upstream-maintained one — the same divergence cost `index.js`
-// already warns about for the polyfills.
 import {
-  PersistentStrandNetworkStateStore,
-  KeyStoreJoinedStrandStore,
-} from '@serfab/cadre-core';
-import { strandNetworkStateSlot, RNKeyStore, LEGACY_STRAND_PEER_BOOK_PREFIX } from './rn-durable-slot';
+  createPhoneNode,
+  runOwnerGenesis,
+  type PhoneNodeOptions,
+  type PhoneNodeStatus,
+} from '@serfab/cadre-rn/phone-node';
+// NATIVE NOISE CRYPTO — the kit's: `react-native-quick-crypto` for Noise's per-frame
+// primitives. Metro resolves libp2p-noise's browser build, whose crypto is pure JS; on
+// Hermes that saturates the loop long enough for libp2p's connection monitor to tear
+// down its own connections (gotchoices/sereus#13). The kit hands it to the control node
+// and every strand node.
 import {
   buildNoiseCrypto,
   DEFAULT_NOISE_CRYPTO_MODE,
   type NoiseCryptoMode,
 } from '@serfab/cadre-rn/noise-crypto';
-import { webSockets } from '@libp2p/websockets';
-import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
-import {
-  LevelDBRawStorage,
-  openOptimysticRNDb,
-  loadOrCreateRNPeerKey,
-} from '@optimystic/db-p2p-storage-rn';
 import { LevelDB, LevelDBWriteBatch } from 'rn-leveldb';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// TODO(extraction): replace this one chat-aware import with a configure({
-// sAppId }) call before ensureStarted, so the cadre layer is a clean
-// candidate for `@sereus/cadre-rn-ui` extraction.
+import { keychainSecureStore } from './keychain';
+// TODO(extraction): the one chat-aware import; becomes host configuration in Phase 5.
 import { CHAT_SAPP_ID } from '../data/chat-sapp';
-import { withTimeout, OWNER_GENESIS_TIMEOUT_MS } from './async';
+import { DATA_FORMAT } from '../data/data-format';
+import { NODE_STORAGE_NAMES } from '../data/persisted-names';
+import { OWNER_GENESIS_TIMEOUT_MS } from './async';
 import { STRAND_REACTIVITY } from '../data/config';
 
-type OptimysticDb = ReturnType<typeof openOptimysticRNDb>;
 type EventHandler<T> = (payload: T) => void;
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const PARTY_ID_KEY = '@sereus.chat/partyId';
-
 /**
- * LevelDB directory naming for optimystic stores.
- * Each strand (plus the control network, strandId='control') gets its own
- * native LevelDB directory.
+ * The app's phone node. One per app: the kit refuses a second over the same storage.
  */
-export const OPTIMYSTIC_DB_PREFIX = 'optimystic-chat-';
-
-function optimysticDbName(strandId: string): string {
-  return `${OPTIMYSTIC_DB_PREFIX}${strandId}`;
-}
-
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
-
-/**
- * One retained `on()` registration. The handler is stored under the widened
- * event union because the list is heterogeneous; `on()` is the type-safe door in
- * and the cast is confined to that one push.
- */
-type ServiceSubscription = {
-  [K in keyof CadreNodeEvents]: {
-    event: K;
-    handler: EventHandler<CadreNodeEvents[K]>;
-  };
-}[keyof CadreNodeEvents];
+const phone = createPhoneNode({
+  secureStore: keychainSecureStore,
+  leveldb: {
+    openFn: (name, createIfMissing, errorIfExists) => new LevelDB(name, createIfMissing, errorIfExists),
+    WriteBatch: LevelDBWriteBatch,
+  },
+  names: NODE_STORAGE_NAMES,
+  dataVersion: DATA_FORMAT,
+  noiseCrypto: { build: buildNoiseCrypto, defaultMode: DEFAULT_NOISE_CRYPTO_MODE },
+  // Chat's bound, as before the kit (the kit's default is 60 s).
+  ownerGenesisTimeoutMs: OWNER_GENESIS_TIMEOUT_MS,
+  // Transports and the connection gater are the kit's defaults, which are what chat
+  // built by hand: WebSockets plus circuit relay, no listening, and dialing allowed to
+  // private and plain-`ws` addresses (an emulator's 10.0.2.2, a relay on the house
+  // Wi-Fi). The pinned `/p2p/<peerId>` decides which machine answers, not the gater.
+  configure: config => ({
+    ...config,
+    // Only strands tagged with our sApp. The kit admits every strand the control
+    // network lists.
+    strandFilter: { mode: 'sAppId', sAppId: CHAT_SAPP_ID },
+    // Our sApp config carries `signature: ''` and its `id` is a name, not an author
+    // key, so it cannot be verified and fail-closed checking would refuse every
+    // strand. Turn back on once the schema is signed.
+    requireSignedSchemas: false,
+    // Change notification for strand tables (sereus 1.12). See STRAND_REACTIVITY.
+    ...(STRAND_REACTIVITY ? { strandReactivity: { enabled: true } } : {}),
+  }),
+});
 
 class CadreServiceImpl {
-  private node: CadreNode | null = null;
-  private _partyId: string | null = null;
-  private _authorityPublicKey: string | null = null;
+  /**
+   * The options the node last started with, or will start with: loaded from the kit's
+   * saved start on first use, then whatever the last start used. Kept here as well as
+   * on the kit, which reports options only while running, so relays and the party id
+   * stay known while the node is stopped (a diagnostic stops it; a rebuild passes
+   * through stopped).
+   */
+  private options: PhoneNodeOptions | null = null;
+  /** Relays chosen while the node is not running; the next start uses them. */
+  private pendingRelays: string[] | null = null;
+  /** Noise mode chosen while the node is not running; the next start uses it. */
+  private pendingNoiseMode: NoiseCryptoMode | null = null;
   private _startError: string | null = null;
   private _startPromise: Promise<void> | null = null;
-  /**
-   * Relays this node is configured with, named at CONSTRUCTION.
-   *
-   * Set by `applyRelays` before start (App boot reads them from prefs). They go
-   * into `network.relayAddrs`, which is the only way a relay reaches this
-   * machine's STRAND nodes as well as its control node — see `applyRelays`.
-   */
-  private _relayAddrs: string[] = [];
-  /**
-   * Which Noise primitives to run natively. Read at node CONSTRUCTION, like
-   * `relayAddrs` — see `setNoiseCryptoMode`.
-   */
-  private _noiseCryptoMode: NoiseCryptoMode = DEFAULT_NOISE_CRYPTO_MODE;
+  /** Owner genesis that succeeded through `createAuthorityKey` after a start that did not enroll. */
+  private enrolledLate = false;
 
-  /**
-   * Service-level event subscriptions, replayed onto every node this service
-   * builds. See `on()` for why they cannot live on the node alone.
-   */
-  private subscriptions: ServiceSubscription[] = [];
-
+  /** `on()` registrations, so `off()` can find the kit's unsubscribe for a handler. */
+  private readonly subscriptions: Array<{ event: string; handler: unknown; unsubscribe: () => void }> = [];
   /** Callbacks run after a rebuild-driven restart — see `onRebuilt`. */
-  private rebuildHooks: Array<() => void | Promise<void>> = [];
+  private readonly rebuildHooks: Array<() => void | Promise<void>> = [];
   /** The address set most recently observed. See `watchReachability`. */
-  private _lastSeenAddrs: string[] = [];
-  private _reachabilityListener: (() => void) | null = null;
+  private lastSeenAddrs: string[] = [];
+  private reachabilityListener: (() => void) | null = null;
 
-  /**
-   * LevelDB handles open for the lifetime of this service.
-   * `rn-leveldb` allows exactly one open handle per database name, so this
-   * cache is mandatory.  Keyed by strandId (with 'control' for the control
-   * network).  Closed in stop().
-   */
-  private readonly openDbs = new Map<string, OptimysticDb>();
+  constructor() {
+    phone.onStatus(status => this.onStatus(status));
+  }
 
   get isRunning(): boolean {
-    return this.node?.isRunning ?? false;
+    return phone.node?.isRunning ?? false;
   }
 
   get partyId(): string | null {
-    return this._partyId;
+    return phone.options?.partyId ?? this.options?.partyId ?? null;
   }
 
   get peerId(): string | undefined {
-    return this.node?.peerId?.toString();
+    return phone.node?.peerId?.toString();
   }
 
   get startError(): string | null {
@@ -156,103 +131,68 @@ class CadreServiceImpl {
   }
 
   get cadreNode(): CadreNode | null {
-    return this.node;
+    return phone.node;
   }
 
   get controlDatabase(): ControlDatabase | null {
-    return this.node?.getControlDatabase() ?? null;
+    return phone.node?.getControlDatabase() ?? null;
   }
 
   /** Live snapshot of strand instances managed by this node. */
   getStrands(): Map<string, StrandInstance> {
-    return this.node?.getStrands() ?? new Map();
+    return phone.node?.getStrands() ?? new Map();
   }
 
   /** Look up a single strand by id (null if not attached). */
   getStrand(strandId: string): StrandInstance | null {
-    return this.node?.getStrands().get(strandId) ?? null;
+    return phone.node?.getStrands().get(strandId) ?? null;
   }
 
   // -----------------------------------------------------------------------
   // Authority key + seed flows
   // -----------------------------------------------------------------------
 
-  /** True iff authority genesis has run and seed flows are armed. */
+  /** True iff owner genesis has run and seed flows are armed. */
   get hasAuthorityKey(): boolean {
-    return this._authorityPublicKey !== null;
+    const status = phone.status;
+    return status.state === 'running' && (status.owner === 'enrolled' || this.enrolledLate);
   }
 
-  /** The authority public key (base64url) — populated by authority genesis. */
+  /** The authority public key (base64url) — the node identity's owner key, once enrolled. */
   get authorityPublicKey(): string | null {
-    return this._authorityPublicKey;
+    return this.hasAuthorityKey ? phone.ownerPublicKey() : null;
   }
 
   /**
-   * Run owner genesis (cadre-core 0.10).  Idempotent, safe on every start.
-   *
-   * SINGLE-KEY model: the cadre's owner key IS the node identity
-   * (`getIdentityOwnerKey`), not an independent keypair.  `publishStrand`,
-   * `publishFormationInvite` and `registerSelf` all sign with the self key,
-   * which refuses to sign unless the derived public key matches the control
-   * node's PeerId — so there is nothing separate to "create".
-   *
-   * `ensureOwnerKey` inserts the founding `CadreControl.OwnerKey` row only when
-   * the table is empty (bootstrap insert — no existing owners required), then
-   * `initializeSeedBootstrap` arms the seed/enrolment flows with the private
-   * half.  Mirrors `runOwnerGenesis` in reference-app-rn/src/cadre-phone.ts.
-   *
-   * Logs elapsed time: the reference documents the solo (cadre-of-one) control
-   * path completing in milliseconds (`control-database-solo.spec.ts`).  This is
-   * chat's independent check of that on a real device.
-   */
-  private async runOwnerGenesis(): Promise<string> {
-    if (!this.node) throw new Error('CadreNode not running');
-    const t0 = Date.now();
-
-    // Throws on an ephemeral libp2p identity; we always pass an explicit
-    // Ed25519 `privateKey`, so the identity is resolved and Ed25519.
-    const { privateKeyB64, publicKeyB64 } = this.node.getIdentityOwnerKey();
-
-    const controlDb = this.node.getControlDatabase();
-    if (!controlDb) throw new Error('Control database not available');
-
-    const inserted = await controlDb.ensureOwnerKey(publicKeyB64);
-    this.node.initializeSeedBootstrap(privateKeyB64);
-    this._authorityPublicKey = publicKeyB64;
-
-    console.info(
-      `[CadreService] ✓ owner genesis in ${Date.now() - t0}ms — ` +
-        (inserted ? 'inserted founding OwnerKey' : 'OwnerKey already present') +
-        ', seed flows enabled',
-    );
-    return publicKeyB64;
-  }
-
-  /**
-   * Public entry point for the "create authority key" UI affordance.  Under
-   * the 0.8 single-key model there is nothing to *create* — the key already
-   * exists as the node identity — so this just runs (idempotent) genesis and
-   * surfaces failures to the caller.
+   * The "create authority key" UI affordance. There is nothing to create — the
+   * cadre's owner key IS the node identity — so this runs owner genesis again if the
+   * start's own genesis did not enroll (it is idempotent), and reports the outcome.
    */
   async createAuthorityKey(): Promise<{ publicKey: string }> {
     await this.ensureStarted();
-    const publicKey = await this.runOwnerGenesis();
+    const node = phone.node;
+    if (!node) throw new Error('CadreNode not running');
+    if (!this.hasAuthorityKey) {
+      const result = await runOwnerGenesis(node, OWNER_GENESIS_TIMEOUT_MS);
+      if (result !== 'enrolled') throw new Error(`Owner genesis ${result === 'timed-out' ? 'timed out' : 'failed'}`);
+      this.enrolledLate = true;
+    }
+    const publicKey = phone.ownerPublicKey();
+    if (!publicKey) throw new Error('Owner key unavailable');
     return { publicKey };
   }
 
   /**
-   * Reveal the authority private key for offline backup.  Use only from
-   * explicit user-confirmed UI ("Export key for recovery") — never log it.
-   *
-   * Because authority == node identity, this IS the device's identity secret.
-   * It is derived on demand from the identity key held in the control
-   * LevelDB; it is never copied into AsyncStorage.
+   * Reveal the authority private key for offline backup. Use only from explicit
+   * user-confirmed UI ("Export key for recovery") — never log it. Because authority ==
+   * node identity, this IS the device's identity secret, held in the keychain.
    */
   async exportAuthorityPrivateKey(): Promise<string | null> {
     await this.ensureStarted();
-    if (!this.node) return null;
+    const node = phone.node;
+    if (!node) return null;
     try {
-      return this.node.getIdentityOwnerKey().privateKeyB64;
+      return node.getIdentityOwnerKey().privateKeyB64;
     } catch (err) {
       console.warn('[CadreService] exportAuthorityPrivateKey failed:', err);
       return null;
@@ -260,75 +200,57 @@ class CadreServiceImpl {
   }
 
   /**
-   * Not supported under cadre-core 0.8's single-key model.
-   *
-   * The authority key is derived from the node identity, and
-   * `getSelfSigningKey()` refuses to sign with any key whose public half
-   * doesn't match the control node's PeerId.  Installing a foreign authority
-   * private key would therefore produce a node that believes it is an
-   * authority but cannot sign anything.
-   *
-   * Recovering a cadre means restoring the *node identity* key (the value
-   * `exportAuthorityPrivateKey()` returns) into the control store before the
-   * node starts, or enrolling this device as a new peer of the existing
-   * cadre via a seed.  See tmp/cadre-key-recovery-upstream.md.
+   * Not supported: the authority key is derived from the node identity, and the node
+   * refuses to sign with any key whose public half does not match its PeerId.
+   * Recovering a cadre means restoring the node identity, or enrolling this device as
+   * a new peer of the existing cadre with a seed. See tmp/cadre-key-recovery-upstream.md.
    */
   async importAuthorityKey(_privateKeyB64u: string): Promise<{ publicKey: string }> {
     throw new Error(
-      'Importing a standalone authority key is not supported: since cadre-core 0.8 the ' +
-        'authority key is derived from this device\'s node identity. To recover a cadre, ' +
-        'restore the node identity key, or enrol this device with a seed from an existing node.',
+      'Importing a standalone authority key is not supported: the authority key is derived from this ' +
+        "device's node identity. To recover a cadre, restore the node identity key, or enrol this " +
+        'device with a seed from an existing node.',
     );
   }
 
   /**
-   * Generate a base64url-encoded seed for transporting cadre membership to a
-   * new node (typically a drone via cadre-cli).  Requires authority genesis.
+   * A base64url seed for bringing a new node (typically a drone, via cadre-cli) into
+   * this cadre. Requires owner genesis.
    */
   async createDroneSeed(): Promise<string> {
     await this.ensureStarted();
-    if (!this.node) throw new Error('CadreNode not running');
-    if (!this._authorityPublicKey) {
+    const node = phone.node;
+    if (!node) throw new Error('CadreNode not running');
+    if (!this.hasAuthorityKey) {
       throw new Error('No authority key — call createAuthorityKey() first');
     }
-    const seed = await this.node.createSeed();
-    return this.node.encodeSeed(seed);
+    const seed = await node.createSeed();
+    return node.encodeSeed(seed);
   }
 
   /**
-   * Join an existing cadre from a base64url seed produced by another node
-   * (typically a drone/server via cadre-cli).  This is the INBOUND enrolment
-   * path: decode the seed, dial the peers it advertises, and add them to the
-   * control network.  Once at least one peer is connected the control network
-   * has a cohort, so control-DB reads (authority genesis, strand attach) stop
-   * blocking and normal operation resumes.
-   *
-   * Trust: a cold-start node's default policy (`dbAnchoredTrustPolicy`) rejects
-   * every seed because its `AuthorityKey` table is empty.  We pin the seed's
-   * OWN `signerKey`, so the node trusts the authority whose seed the user is
-   * explicitly pasting.  This is deliberate trust-on-paste — the security
-   * boundary is the user choosing to enter this specific seed.
-   *
-   * Mirrors `applySeed` in sereus reference-app-rn/src/use-cadre.ts.
+   * Join an existing cadre from a base64url seed produced by another node. Trust is
+   * pinned to the seed's own `signerKey`: deliberate trust-on-paste, the boundary being
+   * the user choosing to enter this specific seed. Mirrors `applySeed` in
+   * reference-app-rn/src/use-cadre.ts.
    */
   async applySeedFromCode(encoded: string): Promise<{ peersAdded: number }> {
     await this.ensureStarted();
-    if (!this.node) throw new Error('CadreNode not running');
+    const node = phone.node;
+    if (!node) throw new Error('CadreNode not running');
 
     let seed;
     try {
-      seed = this.node.decodeSeed(encoded.trim());
+      seed = node.decodeSeed(encoded.trim());
     } catch {
       throw new Error('Invalid seed: not a base64url-encoded cadre seed.');
     }
-
-    const result = await this.node.applySeed(seed, {
+    const result = await node.applySeed(seed, {
       trustPolicy: pinnedKeyTrustPolicy([seed.signerKey]),
     });
     if (!result.success) {
       throw new Error(result.error ?? 'Seed could not be applied.');
     }
-
     console.info(
       `[CadreService] ✓ applied seed for party ${seed.partyId} — ${result.peersAdded} peer(s) added`,
     );
@@ -340,338 +262,170 @@ class CadreServiceImpl {
   // -----------------------------------------------------------------------
 
   /**
-   * Ensure the CadreNode is started.  Idempotent — concurrent callers share
-   * the same in-flight promise.
+   * Ensure the node is started. Idempotent — concurrent callers share the same
+   * in-flight promise.
    */
   async ensureStarted(): Promise<void> {
-    if (this.node?.isRunning) return;
+    if (phone.node?.isRunning) return;
     if (this._startPromise) return this._startPromise;
 
     this._startPromise = this.doStart();
     try {
       await this._startPromise;
     } catch {
-      this._startPromise = null;
       throw new Error(this._startError ?? 'CadreService failed to start');
+    } finally {
+      this._startPromise = null;
     }
   }
 
+  /**
+   * Start with the options the node last ran with — the kit's saved start, so the
+   * party id, relays and Noise mode survive a cold start — or, on first run, as a
+   * fresh party. Relays or a Noise mode chosen while stopped override the saved ones.
+   */
   private async doStart(): Promise<void> {
     this._startError = null;
-
     try {
-      this._partyId = await this.getOrCreateValue(PARTY_ID_KEY);
-      console.info('[CadreService] party ID:', this._partyId);
-
-      // Open the control LevelDB up-front so we can both load the persistent
-      // peer identity and reuse the same handle when CadreNode asks for
-      // strandId='control' through the storage provider.
-      const controlDb = this.getOrOpenDb('control');
-      const privateKey = await loadOrCreateRNPeerKey(controlDb);
-      console.info('[CadreService] loaded peer identity from control store');
-
-      /**
-       * THE TWO STORES sereus 1.7.0's restart fix depends on (gotchoices/sereus#18).
-       *
-       * Its release notes put it plainly: "either store left in memory reproduces
-       * the old behaviour" — two relay-only parties that both restart never find
-       * each other again, which on a phone means every conversation dies the
-       * first night both handsets sleep. There is no error when that happens:
-       * the strand still reports `active` and still accepts local writes.
-       *
-       *   strandNetworkState  each strand node's routing table, with every
-       *                  peer's signed address record (sereus 1.9; it replaced
-       *                  1.7's strand peer book). Saved and reloaded across a
-       *                  restart, so a restarted phone reaches the other members
-       *                  without a fresh invitation. In memory, it dies with the
-       *                  process and so does every conversation's way back.
-       *   joinedStrands  the strands this party joined from ANOTHER party.
-       *                  cadre-core re-offers them as `strand:discovered` every
-       *                  start. A node given `privateKey` — as this one is —
-       *                  carries no keyStore of its own, so the store is passed
-       *                  explicitly; the notes name the web reference app, which
-       *                  has this same shape, as still losing such strands.
-       */
-      const strandNetworkStore = await PersistentStrandNetworkStateStore.open(
-        strandNetworkStateSlot(this._partyId),
-        this._partyId,
-      );
-      // The 1.7–1.8 peer book is no longer read (1.9 notes: "can be deleted").
-      void AsyncStorage.getAllKeys()
-        .then(keys => keys.filter(k => k.startsWith(LEGACY_STRAND_PEER_BOOK_PREFIX)))
-        .then(old => (old.length ? AsyncStorage.multiRemove(old) : undefined))
-        .catch(() => { /* best effort; nothing reads it */ });
-      const joinedStrandStore = new KeyStoreJoinedStrandStore(
-        new RNKeyStore(),
-        this._partyId,
-      );
-
-      const config: CadreNodeConfig = {
-        privateKey,
-        controlNetwork: {
-          partyId: this._partyId,
-          bootstrapNodes: [],
-        },
-        strandNetworkState: { store: strandNetworkStore },
-        joinedStrands: { store: joinedStrandStore },
-        profile: 'transaction',
-        // Only join strands tagged with our chat sAppId.
-        strandFilter: { mode: 'sAppId', sAppId: CHAT_SAPP_ID },
-        storage: {
-          provider: (strandId: string) => new LevelDBRawStorage(this.getOrOpenDb(strandId)),
-        },
-        network: {
-          // webSockets — dial a drone/relay over `wss`.
-          // circuitRelayTransport — request a `/p2p-circuit` reservation on that
-          //   relay so this non-listening phone gets a DIALABLE address
-          //   (`getMultiaddrs()` becomes non-empty), which is what unblocks
-          //   self-registration and invitations.  Passive until we dial a relay.
-          // webRTC (relayed→direct hole-punch) is added in a follow-up — it needs
-          //   the native `react-native-webrtc` module and is only used
-          //   phone↔phone, not for reaching a drone.
-          // `circuitRelayTransport()` is cast to bridge a nominal brand skew:
-          // chat's `@libp2p/circuit-relay-v2` resolves a slightly different
-          // `Components`/`@libp2p/interface` identity than db-p2p's transport-
-          // factory element type.  Runtime-safe — libp2p matches transports by
-          // the global `transportSymbol`, not by structural type.  Same bridge
-          // the reference app uses for `webRTC()`.
-          transports: [
-            webSockets(),
-            circuitRelayTransport() as unknown as ReturnType<typeof webSockets>,
-          ],
-          // RN cannot listen for inbound connections, so no TCP entry — and no
-          // hand-written `/p2p-circuit` either. Naming a relay in `relayAddrs`
-          // ADDS the bare `/p2p-circuit` search listener for us, one per relay,
-          // to both the control node and every strand node. An explicitly empty
-          // list stays empty when no relay is configured, which is right: a
-          // phone with no relay has no address and should not pretend to listen.
-          listenAddrs: [],
-          // THE RELAYS, NAMED AT CONSTRUCTION — not `reserveRelays()` afterwards.
-          //
-          // This used to be the other way round, to avoid `relayAddrs`' fail-fast
-          // contract (a relay that is down aborting `start()`). That reasoning was
-          // sound but the conclusion was wrong: `requireRelay: false` below softens
-          // exactly that, and strand nodes are fail-soft over `relayAddrs`
-          // regardless of it.
-          //
-          // The difference is not cosmetic. `reserveRelays()` supervises the
-          // CONTROL node alone, while every strand runs as its own libp2p node with
-          // its own transport peer id — so on the runtime path our strand nodes had
-          // no circuit address at all. Formation still completed (the invitee dials
-          // the control node first), the invitation was consumed, and then the
-          // joiner sat in `StrandAwaitingFirstSyncError` because nothing holding
-          // the strand's data was reachable. Success on one side, silence on the
-          // other. `reference-app-rn/src/phone-node-config.ts` warns about this in
-          // as many words.
-          relayAddrs: this._relayAddrs,
-          // NATIVE CRYPTO FOR CONNECTION ENCRYPTION (cadre-core 1.3+).
-          //
-          // Metro resolves libp2p-noise's browser build, whose crypto is pure
-          // JavaScript; on Hermes that runs 11x-198x slower than Node's native
-          // path, measured on a desktop-class emulator, and it saturates the JS
-          // loop for long enough that libp2p's connection monitor tears down its
-          // own connections (gotchoices/sereus#13). cadre-core hands this to the
-          // control node AND every strand node.
-          //
-          // `undefined` when the mode is 'off', which is exactly stock behaviour —
-          // the switch exists so the timeout work can still be reproduced.
-          noiseCrypto: buildNoiseCrypto(this._noiseCryptoMode),
-          // Fail-soft: a relay that is down leaves the app usable and merely
-          // unreachable, which is the honest failure and the posture the old
-          // `reserveRelays()` call was really after.
-          requireRelay: false,
-          // NO `linkRoundTripMs` OVERRIDE — measured, not assumed.
-          //
-          // Declaring 8000 (a 32 s relayed-dial budget, against the 3500 ms
-          // default's 14 s) was tested on two devices on 1.7.0: the budget in the
-          // log changed and nothing else did. Two restarted phones still failed
-          // to open a relayed dial to each other's strand nodes and no message
-          // crossed. So this is not the constraint, and carrying a non-default we
-          // cannot justify would only make the next measurement harder to read —
-          // the release notes warn that a MISMATCH between a party's machines is
-          // itself a failure mode.
-          // Since sereus 1.8.0 the same declaration (default 3500) also sizes
-          // Optimystic's request, push and libp2p connection limits, which used to
-          // be LAN-sized. That is where the 1.8 join-time improvement comes from,
-          // at the default — still no reason to override it.
-          // libp2p's default gater refuses to dial private/loopback addresses
-          // and insecure WebSockets — which covers an emulator's `10.0.2.2`, a
-          // phone reaching a relay on the house wifi, and any relay not behind
-          // TLS.  All three are cases chat means to support: "run your own on a
-          // spare machine" is the outcome we steer people to.
-          //
-          // Dialing is not the security boundary here.  The user is dialing a
-          // relay they chose, at an address they were shown, and the pinned
-          // `/p2p/<peerId>` is what guarantees the machine that answers is the
-          // one offered — the promise RelayOffer makes in as many words.  A
-          // relay also never joins a strand or reads a message.
-          connectionGater: { denyDialMultiaddr: () => false },
-        },
-        // cadre-core verifies the sApp schema signature fail-closed.  Our sApp
-        // config carries `signature: ''` and its `id` is a name
-        // (`org.sereus.chat`) rather than an ed25519 author public key, so it
-        // cannot be verified — every addStrand() would throw
-        // SchemaVerificationError.  The reference app relaxes the policy for
-        // exactly this reason.  Flip this back on once the schema is signed.
-        //
-        // trustedOwners / bootstrapPeers are omitted → cadre-core defaults them
-        // to in-memory stores (fine for a session; not persisted across restart,
-        // unlike the reference's Persistent*Store — chat uses the `privateKey`
-        // identity path, so there is no expo-secure-store slot to hang them off).
-        requireSignedSchemas: false,
-
-        // Change notifications for strand tables (sereus 1.12). See STRAND_REACTIVITY.
-        ...(STRAND_REACTIVITY ? { strandReactivity: { enabled: true } } : {}),
-
-        // NO `strandFirstSync` OVERRIDE, and no `cohortQueryTimeoutMs`: as of
-        // cadre-core 1.5.0 the platform defaults ARE the values we had been setting
-        // by hand — 120 s for the first-sync wait (was 30 s) and a 5 s cohort read
-        // deadline (was 1 s, the LAN-shaped budget behind optimystic#22). Inheriting
-        // them means a future adjustment upstream reaches us instead of being masked
-        // by a stale local number. `network.cohortQueryTimeoutMs` and
-        // `network.linkRoundTripMs` are the knobs if a deployment ever needs them.
+      const base = await this.knownOptions();
+      const options: PhoneNodeOptions = {
+        ...base,
+        relayAddrs: this.pendingRelays ?? base.relayAddrs,
+        ...(this.pendingNoiseMode ? { noiseCryptoMode: this.pendingNoiseMode } : {}),
       };
-
-      console.info('[CadreService] creating CadreNode...');
-      this.node = new CadreNode(config);
-      console.info('[CadreService] starting CadreNode...');
-      await this.node.start();
-      console.info(
-        '[CadreService] ✓ CadreNode running. Peer ID:',
-        this.node.peerId?.toString(),
-      );
-
-      // Owner genesis + formation responder, INLINE (reference-app-rn pattern).
-      //
-      // At cadre-core 0.10 / optimystic 0.22 the solo (cadre-of-one) control
-      // path completes in milliseconds (`control-database-solo.spec.ts`), so —
-      // unlike the 0.8 stack chat previously ran, where a solo control-DB read
-      // blocked forever and forced these off the boot path — we await genesis
-      // here, fail-soft.  A generous diagnostic timeout keeps a regression from
-      // silently wedging boot: if genesis ever fails to settle we log it and the
-      // node still comes up (seed/invite flows just stay un-armed).  This inline
-      // await is exactly chat's independent test of whether phone genesis works
-      // on-device at 0.10.
-      try {
-        await withTimeout(this.runOwnerGenesis(), OWNER_GENESIS_TIMEOUT_MS, 'owner genesis');
-      } catch (err) {
-        console.warn(
-          '[CadreService] owner genesis did not complete:',
-          err instanceof Error ? err.message : err,
-        );
-      }
-
-      // No formation responder to install: since sereus 1.10, `start()` installs
-      // one on every node, checking tokens against the control DB's
-      // `FormationInvite`/`FormationUsage` rows and reading this node's addresses
-      // live. (Chat used to install its own and reinstall it once a relay
-      // reservation landed, because the old one snapshotted the addresses.)
-      try {
-        this.watchReachability();
-        // Re-arm everything the PREVIOUS node carried. Must happen on every
-        // start, not only the first — see `on()`.
-        this.reapplySubscriptions();
-      } catch (err) {
-        console.warn('[CadreService] post-start wiring failed:', err);
-      }
+      console.info('[CadreService] starting node for party', options.partyId);
+      await phone.start(options);
+      this.options = phone.options ?? options;
+      this.pendingRelays = null;
+      this.pendingNoiseMode = null;
     } catch (err) {
       this._startError = err instanceof Error ? err.message : String(err);
-      console.error('[CadreService] doStart failed:', this._startError);
+      console.error('[CadreService] start failed:', this._startError);
       throw err;
     }
   }
 
-  /**
-   * Choose how much of Noise's crypto runs natively, and rebuild the node if it
-   * is already up.
-   *
-   * A SWITCH rather than a constant, because it is also a measuring instrument:
-   *
-   *   off        stock — pure JS, the state every RN app is in today. Keep the
-   *              connection-monitor / timeout work reproducible.
-   *   symmetric  native sha256 + chacha20-poly1305. These are the PER-FRAME costs
-   *              (561x and 146x slower than native on our measurements) and a
-   *              bring-up pushes thousands of frames, so this is most of the win
-   *              for the least native surface.
-   *   full       adds x25519. ~22x, but paid per handshake rather than per frame.
-   *
-   * Like `relayAddrs`, this is read when the node is BUILT, so changing it on a
-   * running node means rebuilding — the same few seconds of reconnect, and the
-   * same reasoning (no identity change; the peer key is reloaded from the control
-   * store). Idempotent when unchanged.
-   */
-  async setNoiseCryptoMode(mode: NoiseCryptoMode): Promise<void> {
-    if (mode === this._noiseCryptoMode) return;
-    this._noiseCryptoMode = mode;
-    if (!this.node?.isRunning) return;
+  /** The last known options, loading the kit's saved start the first time. */
+  private async knownOptions(): Promise<PhoneNodeOptions> {
+    if (this.options) return this.options;
+    const saved = await phone.loadSavedStart();
+    if (saved) {
+      this.options = saved.options;
+    } else {
+      this.options = { partyId: generateUuid(), bootstrapAddrs: [], relayAddrs: [] };
+      console.info('[CadreService] first run: new party', this.options.partyId);
+    }
+    return this.options;
+  }
 
-    console.info(`[CadreService] noise crypto mode -> ${mode}; restarting node`);
-    await this.stop();
-    this._startPromise = null;
-    await this.ensureStarted();
+  /** Rebuild the running node with changed options, then let the data layer catch up. */
+  private async restartWith(change: Partial<PhoneNodeOptions>, why: string): Promise<void> {
+    const current = phone.options ?? (await this.knownOptions());
+    console.info(`[CadreService] ${why} — restarting node`);
+    await phone.restart({ ...current, ...change });
+    this.options = phone.options;
     await this.runRebuildHooks();
   }
 
-  /** What the node is currently built with. */
+  /**
+   * Choose how much of Noise's crypto runs natively (`off`, `symmetric`, `full`).
+   * Read when the node is BUILT, so changing it on a running node rebuilds it — no
+   * identity change; the identity is reloaded from the keychain. Saved with the start.
+   */
+  async setNoiseCryptoMode(mode: NoiseCryptoMode): Promise<void> {
+    if (mode === this.noiseCryptoMode) return;
+    if (!phone.node?.isRunning) {
+      this.pendingNoiseMode = mode;
+      return;
+    }
+    await this.restartWith({ noiseCryptoMode: mode }, `noise crypto mode -> ${mode}`);
+  }
+
+  /** What the node is built with, or will be at the next start. */
   get noiseCryptoMode(): NoiseCryptoMode {
-    return this._noiseCryptoMode;
+    return this.pendingNoiseMode
+      ?? phone.options?.noiseCryptoMode
+      ?? this.options?.noiseCryptoMode
+      ?? DEFAULT_NOISE_CRYPTO_MODE;
   }
 
   /**
-   * Point this machine at `addrs` as its relays, and make that true of the
-   * running node.
+   * The relays this machine is configured with: those of the running node, or the
+   * ones the next start will use. They live in the kit's saved start, not in prefs —
+   * one copy of the setting.
+   */
+  async getRelayAddrs(): Promise<string[]> {
+    if (this.pendingRelays) return [...this.pendingRelays];
+    if (phone.options) return [...phone.options.relayAddrs];
+    return [...(await this.knownOptions()).relayAddrs];
+  }
+
+  /**
+   * Point this machine at `addrs` as its relays, and make that true of the running node.
    *
-   * Relays are named when the node is BUILT (`network.relayAddrs`), because that
-   * is what gives a circuit listener to the control node AND to every strand
-   * node — and a strand node is what actually holds a conversation's data. There
-   * is no runtime call that reaches strand nodes: `CadreNode.reserveRelays()`
-   * supervises the control node only, by design (it exists for a browser tab
-   * that learns its relay late).
+   * Relays are named when the node is BUILT (`network.relayAddrs`): that is what gives
+   * a circuit listener to the control node AND to every strand node, and a strand node
+   * is what holds a conversation's data. `CadreNode.reserveRelays()` reaches the
+   * control node only. So changing relays on a RUNNING node rebuilds it: a few seconds
+   * of reconnecting, the same identity, nothing on disk touched. Rare, and the
+   * alternative presents as a successful join whose conversation never arrives.
    *
-   * So changing the relay set on a RUNNING node means rebuilding the node. That
-   * is a few seconds of reconnecting, and it is deliberate:
-   *
-   *   - It is not a new identity. The peer key lives in the control store and is
-   *     reloaded on start, so this machine keeps the same peer id across the
-   *     rebuild and remains the same party to everyone else. Nothing on disk is
-   *     touched.
-   *   - It is rare. Relays are chosen at setup and changed seldom; every launch
-   *     afterwards reads them from prefs and names them at construction, with no
-   *     restart involved.
-   *   - The alternative is worse. Reserving at runtime makes the control node
-   *     reachable and leaves the strand nodes unreachable, which presents as a
-   *     successful join whose conversation never arrives.
-   *
-   * Idempotent and fail-soft: an unchanged set does nothing, and a relay that is
-   * down leaves the node running and merely unreachable (`requireRelay: false`).
+   * Idempotent and fail-soft: an unchanged set does nothing, and a relay that is down
+   * leaves the node running and merely unreachable.
    */
   async applyRelays(addrs: string[]): Promise<void> {
     const next = [...addrs];
-    const unchanged =
-      next.length === this._relayAddrs.length &&
-      next.every((a, i) => a === this._relayAddrs[i]);
+    const current = await this.getRelayAddrs();
+    const unchanged = next.length === current.length && next.every((a, i) => a === current[i]);
     if (unchanged) return;
 
-    this._relayAddrs = next;
-
-    // Not running yet: `doStart` will read the new list. This is the common
-    // case — App boot applies saved relays before the first start.
-    if (!this.node?.isRunning) return;
-
-    console.info(`[CadreService] relays changed (${next.length}) — restarting node so strand nodes get them`);
-    await this.stop();
-    this._startPromise = null;
-    await this.ensureStarted();
-    await this.runRebuildHooks();
+    // Pending until a node has started with them, so `getRelayAddrs` reports the new
+    // set at once, including while a rebuild is under way.
+    this.pendingRelays = next;
+    if (!phone.node?.isRunning) return;
+    try {
+      await this.restartWith(
+        { relayAddrs: next },
+        `relays changed (${next.length}) so strand nodes get them`,
+      );
+    } finally {
+      if (this.pendingRelays === next) this.pendingRelays = null;
+    }
   }
 
   /**
-   * The node's live reachability, recomputed on every call from its current
-   * multiaddrs — a reservation can be lost after it was granted (the relay
-   * restarts, the connection drops), so this is read, never cached.
+   * The node's live reachability, recomputed on every call — a reservation can be
+   * lost after it was granted, so this is read, never cached.
    */
   getRelayReservationState(): RelayReservationState | null {
-    return this.cadreNode?.getRelayReservationState() ?? null;
+    return phone.node?.getRelayReservationState() ?? null;
+  }
+
+  /** Stop the node gracefully. Idempotent. */
+  async stop(): Promise<void> {
+    await phone.stop();
+    this._startPromise = null;
+  }
+
+  // -----------------------------------------------------------------------
+  // Status and reachability
+  // -----------------------------------------------------------------------
+
+  private onStatus(status: PhoneNodeStatus): void {
+    switch (status.state) {
+      case 'running':
+        console.info(
+          `[CadreService] ✓ node running. Peer ID: ${status.node.peerId?.toString()} — owner genesis: ${status.owner}`,
+        );
+        this.watchReachability(status.node);
+        break;
+      case 'failed':
+        this._startError = status.error.message;
+        this.unwatchReachability();
+        break;
+      default:
+        this.unwatchReachability();
+    }
   }
 
   /** Stable comparison key for an address set; order from libp2p is not stable. */
@@ -680,74 +434,32 @@ class CadreServiceImpl {
   }
 
   /**
-   * Log every change in this node's own addresses. A relay reservation being
-   * granted, lost or moved shows up here (libp2p's `self:peer:update`), and it is
-   * the single most useful signal we have about how the stack is doing on a
-   * phone. Address SETS are compared, because the event also fires for changes
-   * that leave them unchanged.
+   * Log every change in this node's own addresses. A relay reservation being granted,
+   * lost or moved shows up here (libp2p's `self:peer:update`), and it is the single
+   * most useful signal we have about how the stack is doing on a phone. Address SETS
+   * are compared, because the event also fires for changes that leave them unchanged.
    */
-  private watchReachability(): void {
-    const node = this.node;
-    const controlNode = node?.getControlNode();
-    if (!node || !controlNode || this._reachabilityListener) return;
+  private watchReachability(node: CadreNode): void {
+    this.unwatchReachability();
+    const controlNode = node.getControlNode();
+    if (!controlNode) return;
 
     const onSelfUpdate = () => {
-      if (!this.node?.isRunning) return;
-
-      const current = this.node.getMultiaddrs();
-      if (CadreServiceImpl.addrsKey(current) === CadreServiceImpl.addrsKey(this._lastSeenAddrs)) {
-        return;
-      }
-      const previousSeen = this._lastSeenAddrs;
-      this._lastSeenAddrs = current;
-
-      console.info(
-        `[CadreService] reachability ${previousSeen.length} → ${current.length} address(es)`,
-      );
+      if (!node.isRunning) return;
+      const current = node.getMultiaddrs();
+      if (CadreServiceImpl.addrsKey(current) === CadreServiceImpl.addrsKey(this.lastSeenAddrs)) return;
+      const previous = this.lastSeenAddrs;
+      this.lastSeenAddrs = current;
+      console.info(`[CadreService] reachability ${previous.length} → ${current.length} address(es)`);
     };
-
     controlNode.addEventListener('self:peer:update', onSelfUpdate);
-    this._reachabilityListener = () => controlNode.removeEventListener('self:peer:update', onSelfUpdate);
+    this.reachabilityListener = () => controlNode.removeEventListener('self:peer:update', onSelfUpdate);
   }
 
-  /** Stop the CadreNode gracefully.  Idempotent. */
-  async stop(): Promise<void> {
-    this._reachabilityListener?.();
-    this._reachabilityListener = null;
-    this._lastSeenAddrs = [];
-    if (this.node) {
-      await this.node.stop();
-      this.node = null;
-    }
-    // Release rn-leveldb per-name locks; without this a subsequent
-    // open() on the same name throws "DB is open".
-    for (const [strandId, db] of this.openDbs) {
-      try {
-        await db.close();
-      } catch (e) {
-        console.warn(`[CadreService] close LevelDB ${strandId} failed:`, e);
-      }
-    }
-    this.openDbs.clear();
-    this._startPromise = null;
-  }
-
-  // -----------------------------------------------------------------------
-  // LevelDB handle cache
-  // -----------------------------------------------------------------------
-
-  private getOrOpenDb(strandId: string): OptimysticDb {
-    let db = this.openDbs.get(strandId);
-    if (!db) {
-      db = openOptimysticRNDb({
-        openFn: (name, createIfMissing, errorIfExists) =>
-          new LevelDB(name, createIfMissing, errorIfExists),
-        WriteBatch: LevelDBWriteBatch,
-        name: optimysticDbName(strandId),
-      });
-      this.openDbs.set(strandId, db);
-    }
-    return db;
+  private unwatchReachability(): void {
+    this.reachabilityListener?.();
+    this.reachabilityListener = null;
+    this.lastSeenAddrs = [];
   }
 
   // -----------------------------------------------------------------------
@@ -755,56 +467,27 @@ class CadreServiceImpl {
   // -----------------------------------------------------------------------
 
   /**
-   * Subscribe for the life of the SERVICE, not the life of the node.
-   *
-   * These used to forward straight to `this.node.on(...)`, which quietly made
-   * every subscription die at the next rebuild: `applyRelays` and
-   * `setNoiseCryptoMode` both `stop()` (which nulls the node) and then build a
-   * NEW `CadreNode`, and nothing re-registered what the old one carried.
-   *
-   * The consequence was not theoretical. `watchDiscoveredStrands` subscribes to
-   * `strand:discovered` exactly once, at boot, and a strand row is written by the
-   * formation responder WITHOUT being launched — so after a rebuild that row's
-   * event fired into nothing and the strand was never attached. The host then
-   * holds a strand it never runs while the joiner waits out its first-sync
-   * budget. That is indistinguishable from the upstream restart bug
-   * (gotchoices/sereus#18), arriving by a purely app-side route — precisely the
-   * kind of confound that has cost this project several wrong diagnoses.
-   *
-   * A relay change is the worst possible moment for it, because that is exactly
-   * when a phone first becomes reachable AND exactly what rebuilds the node.
-   *
-   * `watchReachability` always got this right by re-installing itself inside
-   * `doStart`; this makes every other subscriber right by construction instead
-   * of asking each one to remember.
+   * Subscribe for the life of the app, not the life of one node. The kit re-attaches
+   * every subscription to each node it builds, so a rebuild (relays, Noise mode) does
+   * not silently drop `strand:discovered` — which once left a formed strand unattached
+   * on the host while the joiner waited out its first-sync budget.
    */
-  on<K extends keyof CadreNodeEvents>(
-    event: K,
-    handler: EventHandler<CadreNodeEvents[K]>,
-  ): void {
-    this.subscriptions.push({ event, handler } as ServiceSubscription);
-    this.node?.on(event, handler);
+  on<K extends keyof CadreNodeEvents>(event: K, handler: EventHandler<CadreNodeEvents[K]>): void {
+    const unsubscribe = phone.on(event, handler);
+    this.subscriptions.push({ event, handler, unsubscribe });
   }
 
-  off<K extends keyof CadreNodeEvents>(
-    event: K,
-    handler: EventHandler<CadreNodeEvents[K]>,
-  ): void {
-    const i = this.subscriptions.findIndex(
-      s => s.event === event && s.handler === (handler as ServiceSubscription['handler']),
-    );
-    if (i >= 0) this.subscriptions.splice(i, 1);
-    this.node?.off(event, handler);
+  off<K extends keyof CadreNodeEvents>(event: K, handler: EventHandler<CadreNodeEvents[K]>): void {
+    const i = this.subscriptions.findIndex(s => s.event === event && s.handler === handler);
+    if (i < 0) return;
+    this.subscriptions[i].unsubscribe();
+    this.subscriptions.splice(i, 1);
   }
 
   /**
-   * Run after a REBUILD-driven restart (not the first start), so the data layer
-   * can re-read anything the old node was told while it was going away.
-   *
-   * The subscription replay above covers future events; this covers the window
-   * during the rebuild, when an offer was delivered to a node that no longer
-   * exists. Kept as a hook rather than an import so `CadreService` stays free of
-   * a dependency on the strand layer.
+   * Run after a REBUILD-driven restart (not the first start), so the data layer can
+   * re-read anything the old node was told while it was going away. The subscriptions
+   * cover future events; this covers the window during the rebuild.
    */
   onRebuilt(cb: () => void | Promise<void>): void {
     this.rebuildHooks.push(cb);
@@ -819,64 +502,24 @@ class CadreServiceImpl {
       }
     }
   }
-
-  /**
-   * Re-apply every service-level subscription to a freshly built node. Called
-   * from `doStart` before anything can emit. Registering on the node directly
-   * (not through `on`) so the list is not appended to while it is being replayed.
-   */
-  private reapplySubscriptions(): void {
-    if (!this.node) return;
-    for (const sub of this.subscriptions) {
-      // The pair was type-checked at the `on()` call that created it; TypeScript
-      // cannot re-correlate event to handler while iterating the union, so the
-      // cast is confined to this one replay line rather than widening the store.
-      (this.node.on as (e: string, h: unknown) => void)(sub.event, sub.handler);
-    }
-    if (this.subscriptions.length > 0) {
-      console.info(
-        `[CadreService] re-applied ${this.subscriptions.length} subscription(s) to the new node`,
-      );
-    }
-  }
-
-  // -----------------------------------------------------------------------
-  // Persistence helpers
-  // -----------------------------------------------------------------------
-
-  private async getOrCreateValue(key: string): Promise<string> {
-    const stored = await AsyncStorage.getItem(key);
-    if (stored) return stored;
-    const id = generateUuid();
-    await AsyncStorage.setItem(key, id);
-    return id;
-  }
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Lightweight UUID v4 using crypto.getRandomValues (polyfilled in index.js). */
+/** UUID v4 from crypto.getRandomValues (polyfilled in index.js). */
 function generateUuid(): string {
   const bytes = new Uint8Array(16);
-  const g = globalThis as Record<string, unknown>;
-  const c = (g.crypto ?? {}) as { getRandomValues?: (buf: Uint8Array) => void };
-  if (typeof c.getRandomValues === 'function') {
-    c.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  const c = (globalThis as { crypto?: { getRandomValues?: (buf: Uint8Array) => void } }).crypto;
+  if (typeof c?.getRandomValues !== 'function') {
+    throw new Error('crypto.getRandomValues is unavailable; cannot mint a party id');
   }
+  c.getRandomValues(bytes);
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    hex.slice(12, 16),
-    hex.slice(16, 20),
-    hex.slice(20),
-  ].join('-');
+  return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-');
 }
 
 // ---------------------------------------------------------------------------

@@ -19,8 +19,9 @@
  * they are offered above `Leave` in the same menu.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from './persisted-names';
 
-const KEY = '@sereus.chat/strandPrefs';
+const KEY = STORAGE_KEYS.strandPrefs;
 
 export type MuteMode = 'none' | 'soft' | 'hard';
 

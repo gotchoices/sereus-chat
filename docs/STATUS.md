@@ -86,25 +86,49 @@ into the core and then replaced. One change per step, each ending with the
 `devtime.mjs` timings against the previous step). A failure then names its
 cause, and the open RN convergence work gains no confounds.
 
-**2a. Adopt the kit's node.**
-- [ ] Build the node with `createPhoneNode` from `@serfab/cadre-rn/phone-node`:
-      keychain secure store and `rn-leveldb`.
-- [ ] Pass `noiseCrypto` with `buildNoiseCrypto` and chat's current mode. Chat
-      already runs native Noise; without this the kit falls back to pure-JS
-      Noise and every timing changes.
-- [ ] Keep everything else as it is: the same relays, `strandReactivity` off,
-      chat's own polyfills.
-- [ ] Persistence names: pass `names` to the kit (`storagePrefix`,
-      `nodeLocalDb`, `nodeLocalKvPrefix`, `savedStartKey`) as pinned constants.
-      Add a test that fails if any persisted name changes: the kit names, and
-      the AsyncStorage keys in app-family.md.
-- [ ] Data wipe: the kit files the party id, peer key and key store differently
-      from `CadreService`. Bump `DATA_FORMAT`; testers wipe and re-pair, with no
-      migration.
-- [ ] Relays move into the kit's saved start options. `applyRelays` becomes a
-      `restart` with the current options and new relays, and the `relayAddrs`
-      field leaves `@sereus.chat/prefs`.
-- [ ] Two-phone check.
+**2a. Adopt the kit's node.** (done 2026-10-12)
+- [x] `CadreService` builds its node with `createPhoneNode`. Its public interface is
+      unchanged, so no call site changed except relay handling (below).
+      - The identity, trusted-owner anchor and joined strands are in the keychain,
+        through `src/cadre/keychain.ts` over the new `react-native-keychain`
+        dependency (a native module: the APK was rebuilt).
+      - Trusted owners, bootstrap peers and enrolled machines are now persisted;
+        before, they were in memory.
+      - `configure` adds chat's strand filter, unsigned schemas and the reactivity
+        switch. Hibernation stays off, as it was (cadre-core's default).
+- [x] `noiseCrypto` passed with `buildNoiseCrypto` and the kit's default mode
+      (`symmetric`), as before.
+- [x] Everything else kept: the same relay, `strandReactivity` off, chat's own
+      polyfills.
+- [x] Persistence names: every name is in `src/data/persisted-names.ts`
+      (AsyncStorage keys and the kit's `NODE_STORAGE_NAMES`: `chat-`,
+      `chat-node-local`, `chat:node-local:`, `start-options`). The modules that
+      used the keys import them from there. Pinned by
+      `__tests__/persisted-names.test.ts` (passes).
+- [x] Data wipe: `DATA_FORMAT` is `sereus-1.14-kit`. Both phones were wiped and
+      re-paired.
+- [x] Relays live in the kit's saved start.
+      - `applyRelays` restarts with the current options and the new relays.
+      - `getPrefs().relayAddrs` reads them from the node, and `setPrefs` no longer
+        stores them.
+      - The boot-time `applySavedRelays` step is gone.
+      - The dev bridge gained `relays([addrs])`, which goes through the same
+        `setPrefs` as the relay-offer screen.
+- [x] Two-phone check (S7 ↔ emulator 5564, public relay):
+      - Fresh install on both: the node started, owner genesis `enrolled`.
+      - After a restart: the same party id and peer id, so the saved start and
+        the keychain identity both hold.
+      - Pairing: invite 4.0 s, join 32.4 s.
+      - 3 rounds each way, no message missed: commit median 3.1 s / 3.6 s,
+        delivery median 5.8 s / 6.7 s.
+      - After restarting both: the strand reattached, relays kept, 2 rounds each
+        way with none missed (commit 3.4 s / 5.7 s, delivery 4.9 s / 7.3 s).
+      - These timings are not comparable with the 2026-10-09 runs, which had
+        debug logging on and an extra strand on the emulator. 2b–2d compare
+        against these.
+- Install note: the emulator has too little free storage for the all-ABI
+  debug APK (240 MB). Install an x86_64-only build there:
+  `./gradlew app:assembleDebug -PreactNativeArchitectures=x86_64`.
 
 **2b. The kit's polyfills.**
 - [ ] Replace chat's polyfill set and its digest copy with the kit's

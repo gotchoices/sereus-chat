@@ -14,6 +14,7 @@
  *   __chatDev.invite()              → { url, strandId }   a new private strand's invitation
  *   __chatDev.accept(url)           → { strandId }        join through it
  *   __chatDev.traffic(seconds)      → new streams per node, protocol and direction
+ *   __chatDev.relays([addrs])       → the relays; with addrs, set them first (as RelayOffer does)
  *
  * Hermes's inspector ignores `awaitPromise`, so an async call is started with
  * `__chatDev.start(id, method, ...args)` and its outcome collected later with
@@ -23,7 +24,7 @@
  * appears after a wake, so "seen" measures the watch path the chat screen relies on,
  * not a poll. Installed only when `__DEV__`.
  */
-import { listStrands, listMessages, send, watchStrand, createInvitation, acceptInvitation } from '../data/adapter';
+import { listStrands, listMessages, send, watchStrand, createInvitation, acceptInvitation, getPrefs, setPrefs } from '../data/adapter';
 import { parseInviteToken } from '../data/inviteLink';
 import { cadreService } from '../cadre/CadreService';
 
@@ -35,7 +36,8 @@ type Bridge = {
   invite(): Promise<{ url: string; strandId: string | null }>;
   accept(url: string): Promise<{ strandId: string }>;
   traffic(seconds: number): Promise<Record<string, Record<string, number>>>;
-  start(id: string, method: 'strands' | 'send' | 'arm' | 'invite' | 'accept' | 'traffic', ...args: unknown[]): true;
+  relays(addrs?: string[]): Promise<string[]>;
+  start(id: string, method: 'strands' | 'send' | 'arm' | 'invite' | 'accept' | 'traffic' | 'relays', ...args: unknown[]): true;
   take(id: string): { ok: true; value: unknown } | { ok: false; error: string } | undefined;
 };
 
@@ -127,6 +129,10 @@ export function installDevBridge(): void {
     },
     traffic(seconds) {
       return sampleTraffic(seconds);
+    },
+    async relays(addrs) {
+      if (addrs) await setPrefs({ relayAddrs: addrs });
+      return (await getPrefs()).relayAddrs;
     },
     async accept(url) {
       const token = parseInviteToken(url);

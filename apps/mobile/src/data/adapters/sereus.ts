@@ -30,10 +30,9 @@ import { buildInviteUrl } from '../inviteLink';
 import { rememberOutgoingInvitation, forgetOutgoingInvitation, listOutgoingInvitations } from '../outgoing-invitations';
 import { CHAT_SAPP_ID } from '../chat-sapp';
 import { cadreService } from '../../cadre';
+import { STORAGE_KEYS } from '../persisted-names';
 import { withTimeout, CONTROL_OP_TIMEOUT_MS } from '../../cadre/async';
 
-const PROFILE_KEY = '@sereus.chat/profile';
-const PREFS_KEY = '@sereus.chat/prefs';
 
 const DEFAULT_PREFS: Prefs = {
   theme: 'system', language: 'en', notifyDefault: 'all',
@@ -451,7 +450,7 @@ export class SereusAdapter implements DataAdapter {
   }
 
   async getProfile(): Promise<Profile> {
-    const raw = await AsyncStorage.getItem(PROFILE_KEY);
+    const raw = await AsyncStorage.getItem(STORAGE_KEYS.profile);
     if (!raw) return { name: '' };
     try {
       return JSON.parse(raw) as Profile;
@@ -461,7 +460,7 @@ export class SereusAdapter implements DataAdapter {
   }
 
   async saveProfile(profile: Profile): Promise<void> {
-    await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    await AsyncStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(profile));
     // Best-effort propagation; UI persists regardless of sync result.
     try {
       await syncProfileNameToStrands();
@@ -954,24 +953,30 @@ export class SereusAdapter implements DataAdapter {
   //    per-device by design and sidestep the missing party-private store
   //    (gotchoices/sereus#6).
 
+  // Relays are the exception: they are the node's start options, saved by the cadre
+  // kit with every start, so they are read from and written to the node — one copy of
+  // the setting, never also kept here.
   async getPrefs(): Promise<Prefs> {
-    const raw = await AsyncStorage.getItem(PREFS_KEY);
-    return { ...DEFAULT_PREFS, ...(raw ? JSON.parse(raw) : {}) };
+    const raw = await AsyncStorage.getItem(STORAGE_KEYS.prefs);
+    const { relayAddrs: _stale, ...stored } = raw ? JSON.parse(raw) : {};
+    return { ...DEFAULT_PREFS, ...stored, relayAddrs: await cadreService.getRelayAddrs() };
   }
 
   async setPrefs(patch: Partial<Prefs>): Promise<Prefs> {
-    const next = { ...(await this.getPrefs()), ...patch };
-    await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(next));
+    const { relayAddrs, ...rest } = patch;
+    const { relayAddrs: _current, ...stored } = { ...(await this.getPrefs()), ...rest };
+    await AsyncStorage.setItem(STORAGE_KEYS.prefs, JSON.stringify(stored));
     // Applying relays can REBUILD the node (they are named at construction — see
     // `CadreService.applyRelays`), so it is deliberately not awaited: accepting a
-    // relay should return to the UI immediately and reconnect behind it. Fail-soft
-    // — a relay that is down leaves the app working, just unreachable.
-    if (patch.relayAddrs) {
-      void cadreService.applyRelays(next.relayAddrs).catch(err =>
+    // relay should return to the UI immediately and reconnect behind it. The new set
+    // is visible to `getPrefs` at once. Fail-soft — a relay that is down leaves the
+    // app working, just unreachable.
+    if (relayAddrs) {
+      void cadreService.applyRelays(relayAddrs).catch(err =>
         console.warn('[prefs] applying relays failed:', err),
       );
     }
-    return next;
+    return this.getPrefs();
   }
 
   async storageUsage(): Promise<StorageUsage> {

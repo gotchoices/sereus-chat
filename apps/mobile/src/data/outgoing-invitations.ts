@@ -25,9 +25,10 @@
  * "abandoned".
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from './persisted-names';
 import type { Invitation } from './types';
 
-const KEY = '@sereus.chat/outgoingInvitations';
+const KEY = STORAGE_KEYS.outgoingInvitations;
 
 export type OutgoingInvitation = Invitation & {
   /** Members in the strand when this invitation was made. */
