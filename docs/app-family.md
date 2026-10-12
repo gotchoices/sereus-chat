@@ -21,7 +21,9 @@ shape; the steps to reach it from today's single app are in
    platform work: native storage, transports, crypto, background execution.
    Sereus ships that work for each platform (the `@serfab/cadre-rn` kit on
    React Native, the reference apps elsewhere), and the app uses it. The core is
-   handed a running node and never constructs one.
+   handed a running node and never constructs one. The one exception is
+   diagnostics that need a second party in the same process: they ask the host
+   for an extra node (`createExtraNode`) rather than building it.
 6. **One model, two implementations.** Screens see one interface. Behind it are
    a mock (fixtures, in-memory writes) and the Sereus implementation, and a
    single contract test suite holds both to the same behavior.
@@ -101,12 +103,61 @@ What it costs:
 
 - **A build step.** `yarn build` in `packages/core` (or `tsc -b --watch` while
   developing). Each app has a script that builds its packages first.
-- **Bundler wiring.** Metro needs the package folders in `watchFolders` and the
-  app's `node_modules` in `resolver.nodeModulesPaths`, or linked code looks for
-  dependencies and Babel helpers beside its own real path. Jest needs the same
-  in `modulePaths`. Vite and webpack resolve `link:` packages without help, but
-  must not pre-bundle them away from the app's copy of the stack (see *Stack
-  versions*).
+- **Bundler wiring.** Metro needs the package folders in `watchFolders`. Jest
+  needs the equivalent in its roots. That much makes linked code visible; it
+  does not make it resolve correctly (next section).
+
+### Linked code must resolve the app's copy of the stack
+
+Bundlers resolve a linked package by its real path. An import of
+`@serfab/cadre-core` from `packages/core/dist/…` walks up from there and finds
+`packages/core/node_modules` or the root `node_modules` (both hold the stack,
+for the core's own tests and for `test/stack`) **before** the app's copy.
+Metro's `resolver.nodeModulesPaths` and Jest's `modulePaths` are searched only
+after that walk, so adding them does not help. The result is two copies of
+cadre-core, libp2p and `@libp2p/interface` in one bundle: transports that
+silently fail to register, `instanceof` checks that fail.
+
+The rule:
+
+- **Pin the core's peer dependencies, for imports made from linked packages.**
+  When a file under `packages/*` imports one of `@chat/core`'s
+  `peerDependencies`, the app's bundler resolves it from the app's own
+  `node_modules`. Everything those packages import then resolves from the
+  app's copy by the normal walk.
+- **Pin nothing else.** Not `@noble/*`, `@multiformats/*` or other transitive
+  packages: different stack packages legitimately use different major versions
+  of them, and a blanket pin would hand one of them the wrong one.
+- **Per bundler:**
+  - **Metro:** a `resolveRequest` that checks the importing file's path and the
+    module name against the peer list, generated from `packages/core/package.json`.
+    It extends the existing `@babel/runtime` pin in
+    `apps/mobile/metro.config.js`.
+  - **Jest:** the same, as a custom resolver.
+  - **Vite:** `resolve.dedupe` with the peer list only.
+  - **webpack:** `resolve.alias` for the peer list.
+- **A build check:** each app's build fails if more than one copy of
+  `@serfab/cadre-core` or `@libp2p/interface` is bundled. For Metro, inspect the
+  module map; for Vite, a small plugin.
+
+### Where an app touches the stack
+
+An app **installs** the stack: native modules autolink only from its own
+`node_modules`, and its copy is the one every bundle resolves to. An app
+**imports** the stack in exactly two places:
+
+- **The polyfill entry** (`index.js` on React Native), which must run before
+  any other module.
+- **`src/host/`**: building the node (for example `createPhoneNode`, with the
+  native LevelDB constructors and native Noise crypto), the slot storage, and
+  the extra-node factory for diagnostics.
+
+Everything else imports `@chat/core`, which re-exports the stack types screens
+need. A lint rule (`no-restricted-imports` on the stack's package scopes,
+allowed only in those two places) enforces it.
+
+A shared host package per platform (`packages/host-rn`) is not needed while each
+platform has one app. Revisit if two apps ever share a platform.
 
 ### Packages are private
 
@@ -142,8 +193,8 @@ our own apps. Until then:
   through module-level imports.
 - Apps depend on `packages/*`. Apps never import from each other. Packages never
   import from apps.
-- Screens never call the Sereus stack. The app touches the stack only to build
-  its host: the node, storage slots, polyfills.
+- Screens never call the Sereus stack. The app imports the stack only to build
+  its host and load its polyfills (*Where an app touches the stack*).
 
 ## `packages/core`
 
@@ -169,8 +220,8 @@ One object with a namespace per area of the product:
 | `media` | Attachments: list, add to a send |
 | `search` | Streaming search |
 | `profile` | The local profile and its sync to strands |
-| `prefs` | App preferences: relays, behavior settings |
-| `reachability` | Relay reservation state and whether this device can be invited |
+| `prefs` | App preferences: behavior settings, storage ceiling |
+| `reachability` | Relays: read the configured relays and the reservation state, change the relays, and say whether this device can be invited |
 | `cadre` | The cadre manager's operations (keys, seeds, devices) |
 
 Rules, all inherited from experience with the current adapter:
@@ -201,6 +252,7 @@ What an app must supply to create the Sereus model:
 interface ChatHost {
   node: NodeHost;                       // the app's running node
   slots: (name: SlotName) => DurableSlot; // device-local state, one text slot per record
+  createExtraNode?: (options: ExtraNodeOptions) => Promise<CadreNode>; // diagnostics only
   log?: Logger;
   now?: () => number;                   // tests drive time
 }
@@ -208,6 +260,7 @@ interface ChatHost {
 /** The shape of cadre-rn's PhoneNode, which every platform's host matches. */
 interface NodeHost {
   readonly node: CadreNode | null;      // null while stopped or starting
+  readonly options: NodeOptions | null; // what it last started with: party id, relays, crypto mode
   readonly status: NodeStatus;          // stopped | starting | running | failed
   onStatus(listener: (s: NodeStatus) => void): () => void;
   on<K extends keyof CadreNodeEvents>(event: K, h: (d: CadreNodeEvents[K]) => void): () => void;
@@ -232,10 +285,22 @@ interface NodeHost {
   throw, not return `undefined`. The model owns what goes in each slot (JSON,
   versioned). The app decides where slots live: AsyncStorage on React Native,
   IndexedDB on the web, a file or memory in Node.
+- **Relays have one home: the node's start options.**
+  - **Storage:** the kit saves `relayAddrs` with every start (`loadSavedStart`),
+    so they are not also kept in a `prefs` slot. Two copies of one setting
+    would drift.
+  - **Changing them:** `reachability` reads them from `NodeHost.options` and
+    changes them with `restart({ ...host.options, relayAddrs })`. That keeps the
+    party id and Noise crypto mode as they are.
+  - **Status:** the reservation state comes from the node's events.
+  - **First start:** the app chooses the party id and default relays.
+- **`createExtraNode`** builds a second, throwaway party in the same process,
+  with storage the host chooses. Only diagnostics use it (two-party checks on a
+  phone). A host may omit it; those checks then report themselves unavailable.
 - **Not in the host:** storage, transports, crypto and lifecycle are all inside
-  the node the app built. The Noise crypto mode, relay addresses, background
-  runner and storage names are the app's business, and the core never sees
-  them.
+  the node the app built. The core reads and changes only the start options it
+  needs (relays); the background runner and storage names are the app's
+  business, and the core never sees them.
 
 ### Device-local state and persistence names
 
@@ -246,7 +311,7 @@ keys and pins that map in a test.
 | Slot (core) | Holds | mobile key today |
 |-------------|-------|------------------|
 | `profile` | Display name and profile fields | `@sereus.chat/profile` |
-| `prefs` | App preferences, relays | `@sereus.chat/prefs` |
+| `prefs` | App preferences (relays move to the node's saved start) | `@sereus.chat/prefs` |
 | `strandPrefs` | Per-strand mute and archive | `@sereus.chat/strandPrefs` |
 | `strandSummaries` | Cached list rows for a fast cold start | `@sereus.chat/strandSummaries` |
 | `joinedStrands` | Remembered joins, re-attached after restart | `@sereus.chat/joinedStrands` |
@@ -309,7 +374,8 @@ only through static `require`s. Tests read the same files from disk.
 
 `core/diagnostics` holds the checks and the dev-bridge command set: `strands`,
 `send`, `arm`, `seen`, `invite`, `accept`, `traffic`. Commands run over
-`ChatModel` and the `NodeHost`. Each app installs the bridge in development
+`ChatModel` and the `NodeHost`. Checks that need a second party (two-party,
+found strand) get it from `ChatHost.createExtraNode`. Each app installs the bridge in development
 builds as `globalThis.__chatDev`, so `test/devices/devtime.mjs`, `devlog.mjs`
 and `devcall.mjs` drive phones, browsers and Node the same way.
 
@@ -328,8 +394,10 @@ Platform-neutral data the UIs share:
 ## What each app owns
 
 - Building its node and host: the node kit or its own `CadreNode` construction,
-  relay and Noise crypto options, background or lifecycle runner, the
-  slot-to-storage mapping and its persistence names.
+  first-start options (party id, default relays, Noise crypto mode), background
+  or lifecycle runner, the slot-to-storage mapping and its persistence names,
+  and the extra-node factory for diagnostics.
+- Installing the stack, and pinning linked code to that copy.
 - Runtime polyfills and their audit (the set differs per engine).
 - Bundler configuration (Metro, Vite, webpack) and the wiring to linked
   packages.
@@ -371,7 +439,7 @@ Platform-neutral data the UIs share:
 
 | Level | Runs on | Drives |
 |-------|---------|--------|
-| Contract suite | Node | One suite run against both `ChatModel` implementations: mock and Sereus (two cadre-core nodes on loopback). Fixtures that show something the Sereus model can never produce fail it. |
+| Contract suite | Node | One suite run against both `ChatModel` implementations: mock and Sereus. The Sereus run has two topologies: loopback (fast, the default) and relay-only (both nodes with `listenAddrs: []`, meeting through a local relay, as phones do — the topology behind past convergence failures). Fixtures that show something the Sereus model can never produce fail it. |
 | Core unit tests | Node | `protocol`, pure derivations, stores against the mock |
 | Integration / repro | Node (`test/`) | The Sereus model with real storage and real relays — the same code the apps run |
 | Cross-runtime diagnostics | Each app, and Node | The shared `diagnostics` module; results compared side by side |
@@ -389,8 +457,13 @@ that reproduces only in one app is that app's defect.
   broken this app before.
 - Each app depends on the same release line, and keeps the `resolutions` that
   force one copy of each stack package in its own tree. The Node harness does
-  the same. A root script (today's `apps/mobile/use-stack.sh`, moved to the
-  root) updates every consumer's versions together.
+  the same. Linked code is pinned to the app's copy (*Linked code must resolve
+  the app's copy of the stack*).
+- Separate lockfiles (root, each app) could resolve one range to different
+  patch versions, testing the core against one stack and shipping another. A
+  root script (today's `apps/mobile/use-stack.sh`, moved to the root) writes
+  **exact** stack versions into every consumer's dependencies and
+  `resolutions` together.
 - A stack upgrade is validated by the core's tests and the Node harness before
   any app is touched.
 - Apps add only the platform-specific stack pieces (storage adapters, native
