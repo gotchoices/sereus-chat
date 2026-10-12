@@ -130,10 +130,42 @@ cause, and the open RN convergence work gains no confounds.
   debug APK (240 MB). Install an x86_64-only build there:
   `./gradlew app:assembleDebug -PreactNativeArchitectures=x86_64`.
 
-**2b. The kit's polyfills.**
-- [ ] Replace chat's polyfill set and its digest copy with the kit's
-      (`/polyfills`, `/native-digest`, sereus 1.13+).
-- [ ] Two-phone check.
+**2b. The kit's polyfills.** (2026-10-12; restart timing to recheck)
+- [x] `index.js` imports `@serfab/cadre-rn/polyfills` and `@serfab/cadre-rn/boot-check`.
+      Chat's copies (`hermes`, `event`, `intl-pluralrules`, `audit`, `registry`) are
+      deleted; apart from comments they matched the kit's.
+- [x] One local file remains, `polyfills/native-crypto.js`, imported right after the
+      kit's polyfills. It provides:
+      - native Ed25519 behind `crypto.subtle`, which the kit lacks: 169 ms per verify
+        in pure JS on the S7, against 0.72 ms native;
+      - the kit's own `installNativeDigest`, called at boot.
+
+      This is what gotchoices/sereus#33 (ours, open since 2026-10-06, unreviewed)
+      adds to the kit as `/polyfills/native-crypto`. #33 is still based on the #32
+      branch, although #32 has merged. When a release carries it, the import
+      becomes the kit's and the file goes.
+- [x] Boot audit on both phones:
+      - no MISSING globals;
+      - `crypto.subtle.importKey` native, so Ed25519 is filled;
+      - no native-crypto warnings.
+- [x] Two-phone check before restart: 3 rounds each way, none missed. Commit
+      median 2.8 s / 3.4 s, delivery median 4.8 s / 4.9 s.
+- [ ] Restart check: run again on a quiet machine.
+      - **What happened:** after restarting both, the emulator's strand was still
+        starting at 90 s. The harness then failed one send and could not arm its
+        watch.
+      - **No message was lost:** both of the S7's messages reached the emulator.
+      - **Timeline on the emulator:**
+        - launch to boot audit: 59 s (Metro serving the dev bundle);
+        - audit to node start: 65 s;
+        - node start to running: 25 s (4 s in 2a);
+        - strand start: 32 s.
+      - **Why it can't be compared:** the Mac's load average was 341 (a parallel
+        NDK build, not ours), so these times do not separate 2b from the
+        machine.
+      - **Harness fix:** `devtime.mjs` now waits for both strands to be
+        writable (`ARM_WAIT_MS`, default 5 min) and reports how long that took,
+        instead of relying on a fixed sleep.
 
 **2c. The background runner.**
 - [ ] Start the runner from `@serfab/cadre-rn/lifecycle` over `AppState`.

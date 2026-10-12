@@ -211,7 +211,7 @@ async function readProfileDisplayName(peerIdFallback: string): Promise<string> {
 // ───────────────────────────────────────────────────────────────────────────
 
 
-/** Lightweight UUID v4 using crypto.getRandomValues (polyfilled in polyfills/hermes.js). */
+/** Lightweight UUID v4 using crypto.getRandomValues (the kit polyfills it: @serfab/cadre-rn/polyfills). */
 export function generateUuid(): string {
   const bytes = new Uint8Array(16);
   const g = globalThis as Record<string, unknown>;

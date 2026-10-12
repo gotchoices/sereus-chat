@@ -4,6 +4,7 @@ import { createWriteStream } from 'node:fs';
 //
 //   node devtime.mjs <deviceA-substr> <deviceB-substr> [rounds] [prefix]
 //   PAIR=1 node devtime.mjs …     A invites B into a new private strand first, and times the join
+//   ARM_WAIT_MS=…                 how long to wait for both strands to be writable (default 5 min)
 //   LOG=out node devtime.mjs …    also write each device's console to out-A.log / out-B.log
 //                                 (host seconds; `#` lines mark each send), as devlog.mjs does
 //
@@ -74,7 +75,20 @@ if (process.env.PAIR === '1') {
   if (!shared) { console.log('no strand in common', strandsA, strandsB); process.exit(2); }
 }
 console.log(`strand ${shared.id.slice(0, 8)} ("${shared.title}" on ${a.name})`);
-console.log('armed:', await a.call('arm', shared.id), await b.call('arm', shared.id));
+// A strand is armable once it is writable. Right after a restart that can take minutes on
+// a loaded machine, so wait for it (ARM_WAIT_MS, default 5 min) rather than sending into a
+// strand that is still starting.
+{
+  const t0 = Date.now(), limit = Number(process.env.ARM_WAIT_MS ?? 300_000);
+  let armedA = false, armedB = false;
+  while (!(armedA && armedB) && Date.now() - t0 < limit) {
+    armedA ||= await a.call('arm', shared.id).catch(() => false);
+    armedB ||= await b.call('arm', shared.id).catch(() => false);
+    if (!(armedA && armedB)) await sleep(5000);
+  }
+  console.log(`armed: ${armedA} ${armedB} after ${Date.now() - t0} ms`);
+  if (!(armedA && armedB)) { console.log('a strand never became writable'); process.exit(3); }
+}
 
 async function one(from, to, text) {
   const t0 = Date.now();
