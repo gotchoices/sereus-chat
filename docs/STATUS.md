@@ -36,25 +36,47 @@ the first web work.
 | `data/config.ts` | Stays in the app | `USE_SEREUS` is backend selection; `STRAND_REACTIVITY` is node config |
 | `data/attachmentDraft.ts`, `mock/VariantContext.tsx`, `ui/*`, `components/*`, `screens/*`, `navigation/*` | Stay in the app | Presentation and screen hand-offs |
 
-## Phase 1 — Workspace root
+## Phase 1 — Workspace root (done 2026-10-12)
 
-- [ ] Root `package.json`: Yarn workspaces `packages/*` and `test/*` (not
-      `apps/*`)
-- [ ] `test/stack` joins the workspace (one Yarn version at the root)
-- [ ] Move `apps/mobile/use-stack.sh` to the root as a script that writes
-      **exact** stack versions into every consumer's dependencies and
-      `resolutions` together (the core's `peerDependencies`, `apps/mobile`,
-      `test/stack`)
-- [ ] Move the local relay script (`apps/mobile/scripts/relay.sh`, `yarn relay`)
-      to the root, so the core's tests and `test/` can start a relay without the
-      app
-- [ ] Rename the landing site `web/` → `site/` so it is not confused with
-      `apps/web`; update `publish.sh`, `server.sh` and the docs that point at
-      `web/`; confirm the deployed paths, including `invite/` and `.well-known`,
-      do not change
-- [ ] Record in `design/specs/project.md` and the root `AGENTS.md` that the
-      domain contract is implemented in `packages/core`, and that targets bind
-      to core stores rather than generating data code
+- [x] Root `package.json`: Yarn workspaces `packages/*` and `test/stack` (not
+      `apps/*`). `test/stack` is listed by name: `test/devices` has no
+      `package.json`, and a `test/*` glob would make Yarn reject it. The root
+      has its own `yarn.lock` and `.yarnrc.yml` (`nodeLinker: node-modules`),
+      so Yarn does not treat it as part of the `ser/` project above it
+- [x] `test/stack` joins the workspace: its lockfile, `packageManager` and
+      `resolutions` moved to the root. Checked with a two-round
+      `message-latency.mjs` run through the public relay
+- [x] `scripts/use-stack.sh` (`yarn stack`) replaces `apps/mobile/use-stack.sh`.
+      It writes **exact** stack versions into every consumer at once: the
+      root's `resolutions`, each `apps/*` (dependencies and resolutions),
+      `test/stack`, and `packages/*` peer ranges once they exist. `npm` and
+      `local` (portal) modes as before. `apps/mobile` re-locked with no
+      resolved version changing
+- [x] Metro `blockList` for the root `node_modules` and `test/`. The root is a
+      Metro watch folder (for `design/` and `mock/`) and now holds a second copy
+      of the stack. A one-off dev bundle confirmed that no module comes from
+      either, with one copy each of `@serfab/cadre-core` and
+      `@libp2p/interface`, from the app. Phase 3 adds the pin for linked
+      packages
+- [x] `scripts/relay.sh` (`yarn relay` at the root, and still in
+      `apps/mobile`) replaces `apps/mobile/scripts/relay.sh`. It no longer reads
+      the app's `env-defaults.sh`, which held nothing relay-related
+- [x] Landing site renamed `web/` → `site/`. `publish.sh` and `server.sh` locate
+      themselves, and the remote destinations (`/var/www/sereus.org/chat`, apex
+      `.well-known`) are fixed in the script, so deployed paths do not change.
+      Path references updated:
+      - `design/specs/mobile/navigation.md`;
+      - story 42;
+      - `site/README.md`;
+      - the iOS entitlements and Android manifest comments;
+      - `inviteLink.ts`.
+
+      Dated history in `design/specs/mobile/STATUS.md` still says `web/`, as it
+      was then
+- [x] Recorded in `design/specs/project.md` (*Shared Resources*) and the root
+      `README.md` (layout) that `packages/core` implements the domain contract
+      and that targets bind to core stores. Not in the root `AGENTS.md`: it is
+      Appeus's rules file, symlinked and gitignored
 
 ## Phase 2 — Adopt the cadre-rn kit in `apps/mobile`
 

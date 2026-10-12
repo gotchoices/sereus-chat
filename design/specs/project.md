@@ -79,6 +79,12 @@ Sereus manages trust and authentication.  Strands are initiated by invitations s
 
 - [x] Domain contract (schema, api, rules, interfaces as needed) — `design/specs/domain/`
 - [x] Mock data
+- [x] Shared code — `packages/core` (`@chat/core`) implements the domain contract: protocol,
+      the `ChatModel` with its mock and Sereus implementations, and the stores screens bind to.
+      `packages/resources` holds strings, design tokens and brand art. Targets under
+      `apps/<target>/` build their own node and UI and bind to core stores; they do not
+      generate data-layer code of their own. Structure and rules: `docs/app-family.md`;
+      migration progress: `docs/STATUS.md`.
 
 ## Notes
 

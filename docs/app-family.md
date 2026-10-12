@@ -68,7 +68,7 @@ chat/
   mock/                    shared fixture data (domain-shaped JSON)
   site/                    static landing site + .well-known association files
   docs/                    project documentation (this file)
-  package.json             Yarn workspace root for packages/* and test/*
+  package.json             Yarn workspace root for packages/* and test/stack
 ```
 
 ### Why `packages/`, not `apps/lib`
@@ -84,7 +84,7 @@ chat/
 
 ### How apps consume the packages
 
-The root `package.json` is a Yarn workspace over `packages/*` and `test/*`
+The root `package.json` is a Yarn workspace over `packages/*` and `test/stack`
 only. **Apps are not workspace members.** Each app keeps its own lockfile and
 `node_modules`, depends on a package as `"@chat/core": "link:../../packages/core"`,
 and consumes the package's **built** `dist/`.

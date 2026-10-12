@@ -10,7 +10,7 @@
  *
  * Path-based on the existing `sereus.org` host (rather than a `chat.sereus.org`
  * subdomain) so it reuses the site's TLS cert / vhost — see the design decision
- * in ../../../web/README.md.  The two verification files therefore live at the
+ * in ../../../../site/README.md.  The two verification files therefore live at the
  * APEX (`sereus.org/.well-known/`), shared with other Sereus apps.
  *
  * Older forms are still accepted on the parse side (see `parseInviteToken`),
@@ -47,7 +47,7 @@ const SCHEME_PREFIXES = INVITE_APP_SCHEMES.map(s => `${s}://invite/`);
  *   - a query (`?t=<token>`) is sent to the server and written to its access
  *     log, and an invitation is a bearer credential;
  *   - a fragment is never sent to the server at all. `/chat/invite/` is a plain
- *     static page (`web/invite/index.html`) that reads the token in the browser.
+ *     static page (`site/invite/index.html`) that reads the token in the browser.
  * Android matches App Links on scheme/host/path and ignores the fragment, so the
  * existing `/chat/invite/` pathPrefix still claims these links.
  */

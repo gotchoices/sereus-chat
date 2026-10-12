@@ -38,7 +38,7 @@ The app registers `https://sereus.org/chat/invite/` (invitation after `#`) (see 
 association files at the **host root** — `https://sereus.org/.well-known/…`, never
 `https://sereus.org/chat/.well-known/…`. That root is **shared** with other Sereus
 apps (e.g. health at `sereus.org/health`), so this repo keeps only *chat's own*
-association entries in `web/.well-known/`, and `publish.sh` **merges** them into the
+association entries in `site/.well-known/`, and `publish.sh` **merges** them into the
 apex files by key (`package_name` for Android, `appID` for iOS) — it never
 overwrites or `--delete`s the shared files.
 

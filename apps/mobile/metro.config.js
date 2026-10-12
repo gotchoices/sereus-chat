@@ -8,7 +8,9 @@ const projectRoot = path.resolve(__dirname, '../..');
 // Workspace root that contains the cloned sereus / optimystic / quereus / fret repos
 const workspaceRoot = path.resolve(__dirname, '../../..');
 
-// Stack mode is derived from package.json — the same file `use-stack.sh` edits.
+const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Stack mode is derived from package.json — the same file `scripts/use-stack.sh` (repo root) edits.
 // In `local` mode the ser packages are portal:'d to local clones and we alias
 // them to source below; in `npm` mode they come from node_modules like any
 // other dependency and these aliases / watch folders must NOT be applied.
@@ -136,6 +138,16 @@ const config = {
       ios: ['react-native', 'import', 'require', 'default'],
       android: ['react-native', 'import', 'require', 'default'],
     },
+    // The chat root is a watch folder (for `design/` and `mock/`), and it is also the
+    // Yarn workspace root for packages/* and test/stack — so it has a node_modules of
+    // its own holding a second copy of the stack. Nothing in the app may come from
+    // there or from test/: every dependency resolves from this app's node_modules.
+    // (docs/app-family.md, "Linked code must resolve the app's copy of the stack".)
+    blockList: [
+      defaultConfig.resolver.blockList,
+      new RegExp(`^${escapeRegExp(path.join(projectRoot, 'node_modules'))}/`),
+      new RegExp(`^${escapeRegExp(path.join(projectRoot, 'test'))}/`),
+    ].flat().filter(Boolean),
     assetExts: defaultConfig.resolver.assetExts.filter(ext => ext !== 'qsql'),
     sourceExts: [...defaultConfig.resolver.sourceExts, 'qsql'],
     nodeModulesPaths: [

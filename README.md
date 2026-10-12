@@ -1,5 +1,13 @@
 # Sereus Chat (Built with Appeus)
 
+Repository layout (see `docs/app-family.md`)
+- `apps/<target>/` — deployable apps (`apps/mobile` today). Not workspace members; each has its own lockfile.
+- `packages/` — shared libraries (`@chat/core`, `@chat/resources`), consumed by apps through `link:`.
+- `test/stack` — Node harness. `test/devices` — device timing and capture tools.
+- `site/` — the static sereus.org/chat pages and deep-link association files (`site/publish.sh`).
+- `scripts/use-stack.sh` — sets the Sereus stack versions for every consumer at once (`yarn stack`).
+- `scripts/relay.sh` — local libp2p relay for two-instance testing (`yarn relay`).
+
 Quick commands
 - Start Metro: `npm start -- --reset-cache`
 - Run Android: `yarn android`

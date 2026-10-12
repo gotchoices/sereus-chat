@@ -2,7 +2,7 @@
 #
 # chat/apps/mobile/stack-check — chat-specific stack sanity check.
 #
-# Only meaningful in `local` stack mode (see use-stack.sh).  Verifies that
+# Only meaningful in `local` stack mode (see ../../scripts/use-stack.sh).  Verifies that
 # every ser dependency this app consumes is wired up correctly:
 #   1. Every @optimystic/*, @quereus/*, @serfab/*, @sereus/*, p2p-fret dep in
 #      this app's package.json resolves via a local portal / link / file /
@@ -36,7 +36,7 @@ print('local' if spec.startswith('portal:') else 'npm')
 
 if [ "$MODE" = "npm" ]; then
   echo "Stack mode: NPM — ser packages resolve from npmjs.org; nothing to audit."
-  echo "Run 'bash use-stack.sh local' first if you meant to check portal wiring."
+  echo "Run 'bash ../../scripts/use-stack.sh local' (from apps/mobile) first if you meant to check portal wiring."
   exit 0
 fi
 

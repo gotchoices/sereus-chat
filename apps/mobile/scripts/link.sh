@@ -11,7 +11,7 @@
 # `?addr=X` — the link works, with a parameter missing, which is worse than
 # failing.  Every URL below is single-quoted for that second shell.
 #
-#   link.sh relay [--all | -d SERIAL]   configure the local relay (scripts/relay.sh)
+#   link.sh relay [--all | -d SERIAL]   configure the local relay (../../scripts/relay.sh at the repo root)
 #   link.sh reverse [--all | -d SERIAL] adb-reverse Metro + relay for a USB device
 #   link.sh '<url>' [--all | -d SERIAL] send any deep link
 #   link.sh devices                     list attached devices
@@ -122,7 +122,7 @@ send_link() {
 }
 
 # ── relay peer id ──────────────────────────────────────────────────────────
-# Written by scripts/relay.sh as the relay starts.  The peer id is derived from
+# Written by the root scripts/relay.sh as the relay starts.  The peer id is derived from
 # the identity key in DATA_DIR, so it is stable across restarts — but read it
 # fresh rather than hard-coding, since a wiped DATA_DIR mints a new one.
 relay_peer_id() {

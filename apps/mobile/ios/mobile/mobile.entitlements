@@ -5,9 +5,9 @@
 	<!--
 	  iOS Universal Links for https://sereus.org/chat/invite/<token>.
 	  The domain is the apex sereus.org (path-based), so this requires
-	  web/.well-known/apple-app-site-association (chat's entry) to be MERGED into
+	  site/.well-known/apple-app-site-association (chat's entry) to be MERGED into
 	  https://sereus.org/.well-known/apple-app-site-association — Universal Links
-	  only read the host root, never /chat/.well-known.  web/publish.sh does the
+	  only read the host root, never /chat/.well-known.  site/publish.sh does the
 	  merge without clobbering other apps' entries.
 
 	  This file must be wired into the Xcode target once:

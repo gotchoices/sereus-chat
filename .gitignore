@@ -40,3 +40,11 @@ tmp/
 # which resolves independently of yarn.lock and silently drifts the two apart —
 # apps/mobile carried both for a while and they disagreed.
 package-lock.json
+
+# Yarn's local install state for the root workspace — machine-specific.
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions

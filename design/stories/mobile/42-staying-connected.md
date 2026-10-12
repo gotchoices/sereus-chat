@@ -98,7 +98,7 @@ notices and why they would act.
 
 **Where offers are listed.** The app deliberately ships with no operators in it: a bundled list ages
 badly, cannot be retracted, and makes the app carry infrastructure policy it should not have. The
-list lives on the web (`chat/web/`, published to sereus.org/chat) where it can be changed and
+list lives on the web (`chat/site/`, published to sereus.org/chat) where it can be changed and
 withdrawn, and a link carries a chosen operator back into the app. Two consequences worth holding
 on to: listing somebody reads as vouching for them, whatever a disclaimer says; and a link that
 configures reachability must **propose**, never apply silently — any page can offer one, and the

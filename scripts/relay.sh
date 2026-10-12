@@ -14,12 +14,10 @@
 #   script does not change.
 set -eu
 
+# At the repo root so the app, the core's tests and test/ all start the same relay
+# (`yarn relay` at the root, or in apps/mobile).
 HERE=$(cd "$(dirname "$0")" && pwd)
-APP_DIR=$(cd "$HERE/.." && pwd)
-CHAT_ROOT=$(cd "$APP_DIR/../.." && pwd)
-
-# Ports and device serials live with the rest of the local config.
-. "$APP_DIR/env-defaults.sh"
+CHAT_ROOT=$(cd "$HERE/.." && pwd)
 
 : "${RELAY_FROM:=source}"                       # source | npx
 : "${SEREUS_DIR:=$(cd "$CHAT_ROOT/../sereus" 2>/dev/null && pwd || echo '')}"
@@ -66,7 +64,7 @@ case "$RELAY_FROM" in
     fi
 
     echo "==> relay: role=$SEREUS_ROLE limit=$RELAY_APPLY_DEFAULT_LIMIT"
-    echo "    configure devices with: sh ./scripts/link.sh relay --all"
+    echo "    configure devices with: sh apps/mobile/scripts/link.sh relay --all"
     echo
 
     # Tee into DATA_DIR so `link.sh relay` can read the peer id back rather than

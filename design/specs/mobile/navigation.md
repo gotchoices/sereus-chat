@@ -88,7 +88,7 @@ platform for the whole host, shared by every sereus app:
 - `assetlinks.json` — a JSON array, one entry per app, keyed by `target.package_name`
 - `apple-app-site-association` — `applinks.details`, one entry per app, keyed by `appID`
 
-Chat's copies live in `web/.well-known/` and are **merged** into the apex by `web/publish.sh`;
+Chat's copies live in `site/.well-known/` and are **merged** into the apex by `site/publish.sh`;
 copying them wholesale would wipe the other apps' entries. Adding a path here means adding it to
 both files and to the Android manifest, then reinstalling the app.
 
