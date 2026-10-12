@@ -10,7 +10,13 @@ import type {
   SearchBatch, SearchOptions, Invitation, InvitationPreview,
   Prefs, StorageUsage, SendInput,
 } from './types';
-import type { MockControls } from '@chat/core';
+// Static, not `await import()`: Metro's lazy bundles cannot reach a linked package
+// outside the app folder ("Could not load bundle"), and the stack is loaded at start
+// anyway (the host's node service is imported by the navigator).
+import { createMockModel, type MockControls } from '@chat/core';
+import { createSereusModel, type SereusModel } from '@chat/core/sereus';
+import { chatHost } from '../host/chat-host';
+import { adapterFromModel } from './legacy-adapter';
 import { USE_SEREUS } from './config';
 
 export interface DataAdapter {
@@ -42,6 +48,7 @@ export interface DataAdapter {
    * device's alone — `ops.md` is explicit that they "never touch strand data" —
    * so neither reaches the other members.
    */
+  getStrandSettings(strandId: string): Promise<{ muted: 'none' | 'soft' | 'hard'; archived: boolean }>;
   setStrandMuted(strandId: string, muted: 'none' | 'soft' | 'hard'): Promise<void>;
   setStrandArchived(strandId: string, archived: boolean): Promise<void>;
   getStrandState(strandId: string): Promise<StrandState>;
@@ -55,6 +62,11 @@ export interface DataAdapter {
   deleteMessage(strandId: string, messageId: string): Promise<void>;
   react(strandId: string, messageId: string, symbol: string): Promise<void>;
   unreact(strandId: string, messageId: string, symbol: string): Promise<void>;
+  /** Device-local: an unsent draft and the last message read, per strand. */
+  getDraft(strandId: string): Promise<string>;
+  saveDraft(strandId: string, text: string): Promise<void>;
+  getReadCursor(strandId: string): Promise<string | null>;
+  saveReadCursor(strandId: string, messageId: string): Promise<void>;
 
   /** keepIdentity:false is permanent — a later return is as a new member. */
   leaveStrand(strandId: string, opts: { keepIdentity: boolean }): Promise<void>;
@@ -108,16 +120,26 @@ export interface DataAdapter {
 
 let currentAdapter: DataAdapter | null = null;
 let mockControls: MockControls | null = null;
+let sereus: SereusModel | null = null;
+
+/**
+ * Start-up for the Sereus model: watch for offered strands, start the node, re-attach
+ * remembered joins. App.tsx runs it once the data format is known to be usable.
+ */
+export async function bootSereus(): Promise<void> {
+  await getAdapter();
+  await sereus?.boot();
+}
 
 async function createAdapter(): Promise<DataAdapter> {
   if (USE_SEREUS) {
-    const { SereusAdapter } = await import('./adapters/sereus');
-    return new SereusAdapter();
+    // The core's Sereus model over this app's host, behind the throwing adapter screens
+    // still call (Phase 5; the adapter goes in Phase 6).
+    sereus = createSereusModel(chatHost);
+    return adapterFromModel(sereus.model);
   }
   // The core's mock model, behind the throwing adapter screens still call (Phase 4).
-  const { createMockModel } = await import('@chat/core');
   const { appFixtures } = await import('./mock-fixtures');
-  const { adapterFromModel } = await import('./legacy-adapter');
   const mock = createMockModel(appFixtures);
   mockControls = mock.controls;
   mockControls.setVariant(pendingVariant);
@@ -147,6 +169,7 @@ export const listStrands = async () => (await getAdapter()).listStrands();
 export const strandsSettling = async () => (await getAdapter()).strandsSettling();
 export const strandsBootError = async () => (await getAdapter()).strandsBootError();
 export const retryBoot = async () => (await getAdapter()).retryBoot();
+export const getStrandSettings = async (id: string) => (await getAdapter()).getStrandSettings(id);
 export const setStrandMuted = async (id: string, m: 'none' | 'soft' | 'hard') =>
   (await getAdapter()).setStrandMuted(id, m);
 export const setStrandArchived = async (id: string, a: boolean) =>
@@ -167,6 +190,10 @@ export const react = async (strandId: string, id: string, s: string) =>
   (await getAdapter()).react(strandId, id, s);
 export const unreact = async (strandId: string, id: string, s: string) =>
   (await getAdapter()).unreact(strandId, id, s);
+export const getDraft = async (id: string) => (await getAdapter()).getDraft(id);
+export const saveDraft = async (id: string, text: string) => (await getAdapter()).saveDraft(id, text);
+export const getReadCursor = async (id: string) => (await getAdapter()).getReadCursor(id);
+export const saveReadCursor = async (id: string, messageId: string) => (await getAdapter()).saveReadCursor(id, messageId);
 export const leaveStrand = async (id: string, o: { keepIdentity: boolean }) =>
   (await getAdapter()).leaveStrand(id, o);
 export const resignManager = async (id: string) => (await getAdapter()).resignManager(id);

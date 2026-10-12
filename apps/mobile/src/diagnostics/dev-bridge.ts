@@ -26,7 +26,7 @@
  */
 import { listStrands, listMessages, send, watchStrand, createInvitation, acceptInvitation, getPrefs, setPrefs } from '../data/adapter';
 import { parseInviteToken } from '@chat/core';
-import { cadreService } from '../cadre/CadreService';
+import { cadreService } from '../host/CadreService';
 
 type Bridge = {
   strands(): Promise<Array<{ id: string; title: string }>>;
@@ -114,7 +114,9 @@ export function installDevBridge(): void {
     },
     async arm(strandId) {
       if (armed.has(strandId)) return true;
-      await record(strandId).catch(() => {});
+      // Armed only once the strand can be read: the watch itself subscribes even
+      // before a strand opens, so it says nothing about whether the strand is up.
+      try { await record(strandId); } catch { return false; }
       const unwatch = await watchStrand(strandId, () => { void record(strandId).catch(() => {}); });
       if (!unwatch) return false;
       armed.set(strandId, unwatch);

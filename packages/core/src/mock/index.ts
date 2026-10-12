@@ -55,6 +55,8 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
   const unavailable = <T>(message: string): Result<T> => fail<T>('unavailable', message);
 
   let sent: Record<string, Message[]> = {};
+  let drafts: Record<string, string> = {};
+  let readCursors: Record<string, string> = {};
   let prefs: Prefs = { ...data<Prefs>('Prefs', 'happy') };
   let profile: Profile = { ...data<Profile>('Profile', 'happy') };
 
@@ -74,6 +76,8 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
     },
     reset() {
       sent = {};
+      drafts = {};
+      readCursors = {};
       prefs = { ...data<Prefs>('Prefs', 'happy') };
       profile = { ...data<Profile>('Profile', 'happy') };
       notifyAll();
@@ -90,6 +94,10 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       async settling() { return false; },
       async bootError() { return null; },
       async retryBoot() { return ok(); },
+      async settings(strandId) {
+        const listed = data<StrandSummary[]>('Strands').find(s => s.id === strandId);
+        return ok({ muted: listed?.muted ?? 'none', archived: listed?.archived ?? false });
+      },
       async setMuted() { return ok(); },
       async setArchived() { return ok(); },
       async state() {
@@ -124,6 +132,10 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       async delete() { return ok(); },
       async react() { return ok(); },
       async unreact() { return ok(); },
+      async draft(strandId) { return ok(drafts[strandId] ?? ''); },
+      async saveDraft(strandId, text) { drafts[strandId] = text; return ok(); },
+      async readCursor(strandId) { return ok(readCursors[strandId] ?? null); },
+      async saveReadCursor(strandId, messageId) { readCursors[strandId] = messageId; return ok(); },
     },
 
     members: {

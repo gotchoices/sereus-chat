@@ -6,6 +6,8 @@
  */
 declare function setTimeout(handler: () => void, ms?: number): unknown;
 declare function clearTimeout(handle: unknown): void;
+declare function setInterval(handler: () => void, ms?: number): unknown;
+declare function clearInterval(handle: unknown): void;
 
 interface AbortSignal {
   readonly aborted: boolean;
@@ -13,6 +15,12 @@ interface AbortSignal {
   addEventListener(type: 'abort', listener: () => void, options?: { once?: boolean }): void;
   removeEventListener(type: 'abort', listener: () => void): void;
 }
+
+interface Crypto {
+  getRandomValues<T extends ArrayBufferView>(array: T): T;
+  randomUUID?(): string;
+}
+declare const crypto: Crypto;
 
 declare const console: {
   info(...args: unknown[]): void;

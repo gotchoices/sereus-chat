@@ -20,7 +20,7 @@ import {
   View,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { cadreService } from '../cadre';
+import { cadreService } from '../host';
 import {
   useCadreManager,
   type CadreKeyRow,

@@ -1,9 +1,7 @@
 /**
- * chat-sapp.ts — create and join chat strands on this device's node.
+ * sapp-strands.ts — create and join chat strands on this device's node.
  *
- * The sApp itself (id, version, schema, config) is protocol and lives in `@chat/core`;
- * these two calls need a running node and move to the core's Sereus model in Phase 5
- * (docs/STATUS.md).
+ * The sApp itself (id, version, schema, config) is protocol (`../protocol`).
  *
  * Mirrors the pattern in sereus/packages/reference-app-rn/src/chat-strand.ts.
  */
@@ -14,8 +12,8 @@ import type {
   StrandRow,
 } from '@serfab/cadre-core';
 import { generateStrandMemberKey } from '@serfab/cadre-core';
-import { getChatSAppConfig } from '@chat/core';
-import type { Visibility } from './types';
+import { getChatSAppConfig } from '../protocol/index.js';
+import type { Visibility } from '../model/index.js';
 
 /**
  * A freshly founded strand plus the membership key an invitation into it must

@@ -41,6 +41,9 @@ export type StrandState = {
   canIManage: boolean;
 };
 
+/** This device's own settings for a strand (story 33). Never strand data. */
+export type StrandSettings = { muted: Muted; archived: boolean };
+
 /** The one rule `StrandState.settled` follows (ops.md). */
 export function isSettled(state: Pick<StrandState, 'visibility' | 'managerCount'>): boolean {
   return state.visibility === 'private' && state.managerCount === 0;
@@ -59,6 +62,8 @@ export interface StrandsModel {
   bootError(): Promise<string | null>;
   /** Re-attempt start-up after a failure. */
   retryBoot(): Promise<Result<void>>;
+  /** Device-local (story 33). */
+  settings(strandId: string): Promise<Result<StrandSettings>>;
   /** Device-local (story 33): never reaches the other members. */
   setMuted(strandId: string, muted: Muted): Promise<Result<void>>;
   /** Device-local (story 33): never reaches the other members. */

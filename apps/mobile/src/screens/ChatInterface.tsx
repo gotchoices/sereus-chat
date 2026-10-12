@@ -15,15 +15,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, TextInput, FlatList, Pressable, Image, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { STORAGE_KEYS } from '../data/persisted-names';
 import { KeyboardEvents } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import {
   listMessages, listMembers, getStrandState, send, deleteMessage, react, editMessage,
-  listOutstandingInvitations, watchStrand,
+  listOutstandingInvitations, watchStrand, getDraft, saveDraft, getReadCursor, saveReadCursor,
 } from '../data/adapter';
 import type { Message, Member, StrandState, Attachment } from '../data/types';
 import { useT } from '../i18n';
@@ -33,10 +31,8 @@ import { ActionSheet,
 } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
-const DRAFT_KEY = STORAGE_KEYS.draft;
 /** Id prefix of a message whose write is still in flight. Never a stored id (those are UUIDs). */
 const SENDING_PREFIX = 'sending-';
-const READ_KEY = STORAGE_KEYS.readCursor;
 const GROUP_GAP_MS = 5 * 60 * 1000;
 
 const dayOf = (iso: string) => new Date(iso).toDateString();
@@ -223,10 +219,10 @@ export default function ChatInterface() {
 
   // Draft and read cursor are device-local.  Nothing unsent leaves the phone.
   useEffect(() => {
-    AsyncStorage.getItem(DRAFT_KEY(strandId)).then(v => v && setDraft(v));
-    AsyncStorage.getItem(READ_KEY(strandId)).then(setReadCursor);
+    getDraft(strandId).then(v => v && setDraft(v)).catch(() => {});
+    getReadCursor(strandId).then(setReadCursor).catch(() => {});
   }, [strandId]);
-  useEffect(() => { AsyncStorage.setItem(DRAFT_KEY(strandId), draft).catch(() => {}); }, [draft, strandId]);
+  useEffect(() => { saveDraft(strandId, draft).catch(() => {}); }, [draft, strandId]);
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -294,7 +290,7 @@ export default function ChatInterface() {
     try {
       const msg = await send(strandId, { content: text, replyToId: pendingReply });
       setMessages(prev => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]));
-      await AsyncStorage.setItem(READ_KEY(strandId), msg.id);
+      await saveReadCursor(strandId, msg.id);
     } catch (e: any) {
       // A genuine write failure — keep what they wrote.
       setDraft(text);

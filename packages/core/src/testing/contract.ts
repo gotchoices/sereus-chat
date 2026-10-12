@@ -46,6 +46,12 @@ export function describeChatModelContract(name: string, setup: () => Promise<Con
       }
     });
 
+    it('keeps device-local strand settings', async () => {
+      const settings = value(await model.strands.settings(strandId));
+      expect(['none', 'soft', 'hard']).toContain(settings.muted);
+      expect(typeof settings.archived).toBe('boolean');
+    });
+
     it("derives a strand's settled state from recorded state only", async () => {
       const state = value(await model.strands.state(strandId));
       expect(state.settled).toBe(isSettled(state));
@@ -67,6 +73,15 @@ export function describeChatModelContract(name: string, setup: () => Promise<Con
       expect(messages[messages.length - 1].id).toBe(sent.id);
       expect(signalled).toBeGreaterThan(0);
       unsubscribe();
+    });
+
+    it('keeps a draft and a read cursor per strand', async () => {
+      value(await model.messages.saveDraft(strandId, 'half a thought'));
+      expect(value(await model.messages.draft(strandId))).toBe('half a thought');
+      value(await model.messages.saveDraft(strandId, ''));
+      expect(value(await model.messages.draft(strandId))).toBe('');
+      value(await model.messages.saveReadCursor(strandId, 'm-1'));
+      expect(value(await model.messages.readCursor(strandId))).toBe('m-1');
     });
 
     it('makes an invitation whose link carries its token', async () => {

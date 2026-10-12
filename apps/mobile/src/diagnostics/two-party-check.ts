@@ -42,7 +42,7 @@ import { LevelDBRawStorage, openOptimysticRNDb } from '@optimystic/db-p2p-storag
 import { LevelDB, LevelDBWriteBatch } from 'rn-leveldb';
 import { getChatSAppConfig, CHAT_SAPP_ID } from '@chat/core';
 import { getPrefs } from '../data/adapter';
-import { cadreService } from '../cadre/CadreService';
+import { cadreService } from '../host/CadreService';
 import { buildNoiseCrypto, DEFAULT_NOISE_CRYPTO_MODE } from '@serfab/cadre-rn/noise-crypto';
 
 export type TwoPartyResult = {

@@ -10,7 +10,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert, Share, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import {
-  getStrandState, listMembers, listAttachments, setStrandMuted, setStrandArchived,
+  getStrandState, listMembers, listAttachments, getStrandSettings, setStrandMuted, setStrandArchived,
   leaveStrand, resignManager, removeMember, listOutstandingInvitations, cancelInvitation,
 } from '../data/adapter';
 import type { StrandState, Member, Attachment, Invitation } from '../data/types';
@@ -18,7 +18,6 @@ import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { Avatar, ListRow, Banner, SectionHeader, StrandStatus } from '../components';
 import { useTheme, typography, spacing } from '../theme';
-import { getStrandPrefs } from '../data/strand-prefs';
 
 export default function StrandDetail() {
   const navigation: any = useNavigation();
@@ -62,7 +61,7 @@ export default function StrandDetail() {
       .catch(() => {});
     // Device-local settings, read straight from storage — never a reason to fail
     // the screen, so they are fetched apart from the strand's own data.
-    getStrandPrefs(strandId)
+    getStrandSettings(strandId)
       .then(p => { setMuted(p.muted); setArchived(p.archived); })
       .catch(() => {});
   }, [strandId]);

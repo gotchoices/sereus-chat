@@ -8,8 +8,6 @@
  * In the app-family structure (docs/app-family.md) the AsyncStorage keys become the
  * core's named slots, and this map is what the app's host uses to place them.
  */
-import type { PhoneNodeNames } from '@serfab/cadre-rn/phone-node';
-
 /** AsyncStorage keys. */
 export const STORAGE_KEYS = {
   profile: '@sereus.chat/profile',
@@ -32,9 +30,10 @@ export const STORAGE_KEY_PREFIX = '@sereus.chat/';
  * key prefix inside the node-local one. The node's identity, trusted-owner anchor and
  * joined strands are in the keychain, under keys the kit derives from the party id.
  */
-export const NODE_STORAGE_NAMES: PhoneNodeNames = {
+// Checked against the kit's `PhoneNodeNames` where `CadreService` passes it in.
+export const NODE_STORAGE_NAMES = {
   storagePrefix: 'chat-',
   nodeLocalDb: 'chat-node-local',
   nodeLocalKvPrefix: 'chat:node-local:',
   savedStartKey: 'start-options',
-};
+} as const;

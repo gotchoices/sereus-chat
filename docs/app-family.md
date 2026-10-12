@@ -106,6 +106,9 @@ What it costs:
 - **Bundler wiring.** Metro needs the package folders in `watchFolders`. Jest
   needs the equivalent in its roots. That much makes linked code visible; it
   does not make it resolve correctly (next section).
+- **No dynamic `import()` of a linked package in a dev build.** Metro's lazy
+  bundles cannot reach a module outside the app folder, and the app dies with
+  "Could not load bundle". Import `@chat/core` statically.
 
 ### Linked code must resolve the app's copy of the stack
 
@@ -202,7 +205,7 @@ our own apps. Until then:
 |--------|-------|
 | `protocol/` | The chat sApp schema, generated from `design/specs/domain/chat-sapp.qsql` (the single source) into a TypeScript module; the sApp id and config; the invite link and QR payload formats, encode and parse; link host and scheme constants. Imports nothing else from the core. |
 | `model/` | The `ChatModel` interface, one file per namespace (below). Each holds that namespace's shapes, policy constants, pure derivations and its slice of the interface. Plus `Result`, the error kinds, and the change signals. |
-| `sereus/` | The Sereus implementation of `ChatModel` over a `ChatHost`: strand attach and re-attach, remembered joins, discovery, queries and writes, invitations, device-local state over slots, the data-format check. |
+| `sereus/` | The Sereus implementation of `ChatModel` over a `ChatHost`, and the host interface: strand attach and re-attach, remembered joins, discovery, queries and writes, invitations, device-local state over slots. Its own entry point, `@chat/core/sereus`, so the main entry (protocol, model, mock) never loads the stack at runtime. |
 | `mock/` | The mock implementation over an injected `FixtureSource`, with in-memory writes and variants. |
 | `stores/` | The store primitive, the loader store, and the screen-level stores (strand list, chat, invitation status, reachability, cadre manager). |
 | `diagnostics/` | Stack checks runnable on every runtime (two-party, found strand, handshake cost, loop lag), and the dev-bridge command set. |
@@ -247,61 +250,64 @@ Rules, all inherited from experience with the current adapter:
 
 ### The host
 
-What an app must supply to create the Sereus model:
+What an app must supply to create the Sereus model (`@chat/core/sereus`,
+`packages/core/src/sereus/host.ts`):
 
 ```ts
 interface ChatHost {
-  node: NodeHost;                       // the app's running node
-  slots: (name: SlotName) => DurableSlot; // device-local state, one text slot per record
-  createExtraNode?: (options: ExtraNodeOptions) => Promise<CadreNode>; // diagnostics only
-  log?: Logger;
-  now?: () => number;                   // tests drive time
+  node: NodeHost;                                   // the app's node
+  slot(name: SlotName, key?: string): DurableSlot;  // device-local state; `key` names the strand for per-strand records
+  dev?: boolean;                                    // development build: step timings, narrated joins
+  // planned (Phase 8): createExtraNode?(options): Promise<CadreNode> — diagnostics only
 }
 
-/** The shape of cadre-rn's PhoneNode, which every platform's host matches. */
 interface NodeHost {
-  readonly node: CadreNode | null;      // null while stopped or starting
-  readonly options: NodeOptions | null; // what it last started with: party id, relays, crypto mode
-  readonly status: NodeStatus;          // stopped | starting | running | failed
-  onStatus(listener: (s: NodeStatus) => void): () => void;
+  readonly node: CadreNode | null;                  // null while stopped or starting
+  ensureStarted(): Promise<void>;                   // saved options, or a fresh party on first run; idempotent
   on<K extends keyof CadreNodeEvents>(event: K, h: (d: CadreNodeEvents[K]) => void): () => void;
-  start(options: NodeOptions): Promise<CadreNode>;
-  restart(options: NodeOptions): Promise<CadreNode>;
-  stop(): Promise<void>;
-  loadSavedStart(): Promise<SavedStart | undefined>;
+  onRebuilt(callback: () => void | Promise<void>): () => void;  // after a restart, to re-read offers
+  getRelayAddrs(): Promise<string[]>;
+  applyRelays(addrs: string[]): Promise<void>;      // restarts the node if it runs
 }
 ```
 
-- **`NodeHost`** matches `@serfab/cadre-rn`'s `PhoneNode`, so on React Native
-  the host *is* `createPhoneNode(...)`. On the web and in Node it is a thin
-  wrapper over a `CadreNode` the app builds:
-  - **web:** modelled on `sereus/packages/reference-app-web/src/lib/cadre-web.ts`;
-  - **NativeScript:** modelled on `reference-app-ns/src/cadre-phone.ts`;
-  - **Node harness:** cadre-core with `classic-level`.
+- **`NodeHost` is what the core needs from a node, no more.**
+  - **React Native:** `CadreService` (`apps/mobile/src/host/`) implements it
+    over the cadre kit's `createPhoneNode`. It adds the first-start party id,
+    the background runner and the foreground wake sweep, which the core never
+    sees. `apps/mobile/src/host/chat-host.ts` is the adapter.
+  - **Web and NativeScript:** a thin wrapper over a `CadreNode` the app builds,
+    modelled on `sereus/packages/reference-app-web/src/lib/cadre-web.ts` (web)
+    or `reference-app-ns/src/cadre-phone.ts` (NativeScript).
+  - **Node tests:** `packages/core/src/testing/node-host.ts`, cadre-core with
+    in-memory storage and an in-process relay.
 
   `on(...)` must keep its subscriptions across restarts, so the model never
   re-subscribes after a node rebuild.
 - **`DurableSlot`** is cadre-core's shape: `load(): Promise<string | undefined>`
   and `save(text): Promise<void>`. A slot that exists but cannot be read must
   throw, not return `undefined`. The model owns what goes in each slot (JSON,
-  versioned). The app decides where slots live: AsyncStorage on React Native,
-  IndexedDB on the web, a file or memory in Node.
+  normalised on read). The app decides where slots live: AsyncStorage on React
+  Native, IndexedDB on the web, memory in tests.
 - **Relays have one home: the node's start options.**
-  - **Storage:** the kit saves `relayAddrs` with every start (`loadSavedStart`),
-    so they are not also kept in a `prefs` slot. Two copies of one setting
-    would drift.
-  - **Changing them:** `reachability` reads them from `NodeHost.options` and
-    changes them with `restart({ ...host.options, relayAddrs })`. That keeps the
-    party id and Noise crypto mode as they are.
-  - **Status:** the reservation state comes from the node's events.
+  - **Storage:** the kit saves `relayAddrs` with every start, so they are not
+    also kept in a `prefs` slot. Two copies of one setting would drift.
+  - **Reading and changing:** `prefs` and `reachability` read them through
+    `getRelayAddrs`. `applyRelays` changes them; the host restarts its node
+    with its current options and the new relays, which keeps the party id and
+    Noise crypto mode as they are.
   - **First start:** the app chooses the party id and default relays.
-- **`createExtraNode`** builds a second, throwaway party in the same process,
-  with storage the host chooses. Only diagnostics use it (two-party checks on a
-  phone). A host may omit it; those checks then report themselves unavailable.
+- **Waking:** a strand hibernated in the background is woken by the core
+  before a read or write uses it, joining any wake already under way.
+  cadre-core coalesces wakes, so the host's own return sweep and the core never
+  double-build a strand.
+- **`createExtraNode`** (Phase 8) will build a second, throwaway party in the
+  same process, with storage the host chooses. Only diagnostics will use it
+  (two-party checks on a phone). A host may omit it; those checks then report
+  themselves unavailable.
 - **Not in the host:** storage, transports, crypto and lifecycle are all inside
-  the node the app built. The core reads and changes only the start options it
-  needs (relays); the background runner and storage names are the app's
-  business, and the core never sees them.
+  the node the app built. The background runner, the data-format check and
+  storage names are the app's business, and the core never sees them.
 
 ### Device-local state and persistence names
 
@@ -317,13 +323,14 @@ keys and pins that map in a test.
 | `strandSummaries` | Cached list rows for a fast cold start | `@sereus.chat/strandSummaries` |
 | `joinedStrands` | Remembered joins, re-attached after restart | `@sereus.chat/joinedStrands` |
 | `outgoingInvitations` | Invitations this device made, with use counts | `@sereus.chat/outgoingInvitations` |
-| `dataFormat` | The data-format marker (`sereus-1.14`) | `@sereus.chat/dataFormat` |
-| `drafts` | Unsent text per strand | `@sereus.chat/draft/<strandId>` (one key per strand) |
-| `readCursors` | Last read message per strand (drives unread counts) | `@sereus.chat/read/<strandId>` (one key per strand) |
+| `draft` | Unsent text per strand | `@sereus.chat/draft/<strandId>` (one key per strand) |
+| `readCursor` | Last read message per strand (drives unread counts) | `@sereus.chat/read/<strandId>` (one key per strand) |
 
-These stay with the app (node bring-up or presentation, not chat logic): the
-party id, peer key, key store and strand network state used by `CadreService`
-today, which become the node kit's records, and the theme mode.
+These stay with the app (node bring-up, storage layout or presentation, not chat
+logic): the node kit's records (party id and relays in its saved start;
+identity, trusted owners and joined strands in the keychain), the data-format
+marker `@sereus.chat/dataFormat` and its check (which scans the app's own
+storage before any model exists), and the theme mode.
 
 ### Stores
 

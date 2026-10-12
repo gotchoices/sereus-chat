@@ -10,8 +10,8 @@
  */
 
 import { useEffect, useState } from 'react';
-import { cadreService } from '../cadre';
-import { withTimeout, CONTROL_READ_UI_TIMEOUT_MS } from '../cadre/async';
+import { cadreService } from '../host';
+import { withTimeout, CONTROL_READ_UI_TIMEOUT_MS } from '../host/async';
 
 export type CadreKeyType = 'vault' | 'external' | 'dongle';
 export type CadreKeyProtection = 'login' | 'biometric' | 'password';

@@ -11,6 +11,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./sereus": {
+      "types": "./dist/sereus/index.d.ts",
+      "default": "./dist/sereus/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -24,11 +28,21 @@
     "test": "node scripts/gen-schema.mjs && vitest run"
   },
   "peerDependencies": {
+    "@quereus/quereus": "^4.20.2",
     "@serfab/cadre-core": "^1.14.0"
   },
   "devDependencies": {
+    "@chainsafe/libp2p-noise": "17.0.0",
+    "@chainsafe/libp2p-yamux": "8.0.1",
+    "@libp2p/circuit-relay-v2": "4.2.14",
+    "@libp2p/crypto": "5.1.24",
+    "@libp2p/identify": "4.1.15",
+    "@libp2p/websockets": "10.1.22",
+    "@optimystic/db-p2p": "1.12.1",
+    "@quereus/quereus": "4.20.2",
     "@serfab/cadre-core": "1.14.0",
     "@types/node": "^24.0.0",
+    "libp2p": "3.3.11",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17"
   }

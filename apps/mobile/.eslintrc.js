@@ -1,7 +1,7 @@
 /**
  * The stack boundary (docs/app-family.md, "Where an app touches the stack"): app code
  * imports the Sereus stack only where it builds its host — the polyfill entry, polyfills/
- * and src/cadre/ (src/host/ from Phase 5). Everything else goes through @chat/core.
+ * and src/host/. Everything else goes through @chat/core.
  * Until the migration's Phase 6 the data layer and screens still break this rule; the
  * count is tracked in docs/STATUS.md and goes to zero.
  */
@@ -23,12 +23,12 @@ module.exports = {
   overrides: [
     {
       files: ['src/**/*.{ts,tsx,js}', 'App.tsx'],
-      excludedFiles: ['src/cadre/**'],
+      excludedFiles: ['src/host/**'],
       rules: {
         'no-restricted-imports': ['error', {
           patterns: [{
             group: STACK,
-            message: 'Stack imports belong in the host (src/cadre/, later src/host/) or the polyfill entry; elsewhere use @chat/core.',
+            message: 'Stack imports belong in the host (src/host/) or the polyfill entry; elsewhere use @chat/core.',
           }],
         }],
       },

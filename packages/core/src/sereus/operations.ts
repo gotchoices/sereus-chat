@@ -28,8 +28,8 @@ export interface ChatMessageRow {
   MemberName?: string;
 }
 
-/** Random id for a new row.  `react-native-get-random-values` polyfills
- *  `crypto.getRandomValues`, which is imported at app entry. */
+/** A random UUID v4, for rows and strands. Every runtime the core targets provides
+ *  `crypto.getRandomValues` (React Native through the kit's polyfills). */
 export function newId(): string {
   const g: any = globalThis as any;
   if (g.crypto?.randomUUID) return g.crypto.randomUUID();

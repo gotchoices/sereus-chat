@@ -118,7 +118,8 @@ async function wakeHibernatedStrands(): Promise<void> {
   }
 }
 
-/** Wakes in flight, so a send waiting on a strand joins the sweep's wake of it. */
+/** Wakes in flight, so the sweep never asks for the same strand twice. (A read or send
+ *  in the core wakes a hibernated strand itself; cadre-core coalesces the two.) */
 const wakes = new Map<string, Promise<void>>();
 
 function wakeStrand(strandId: string): Promise<void> {
@@ -195,19 +196,6 @@ class CadreServiceImpl {
   /** Live snapshot of strand instances managed by this node. */
   getStrands(): Map<string, StrandInstance> {
     return phone.node?.getStrands() ?? new Map();
-  }
-
-  /**
-   * Make sure a strand is awake before it is used. A strand hibernated while the app
-   * was in the background has no database until it is rebuilt, which takes 15–20 s on
-   * a phone; a send made in that window would fail with "status: hibernating". This
-   * waits for the wake instead, joining the foreground sweep's wake if one is running.
-   * Resolves at once for a strand that is not hibernating or waking.
-   */
-  async ensureAwake(strandId: string): Promise<void> {
-    const instance = phone.node?.getStrands().get(strandId);
-    if (!instance) return;
-    if (wakes.has(strandId) || instance.status === 'hibernating') await wakeStrand(strandId);
   }
 
   /** Look up a single strand by id (null if not attached). */
@@ -557,8 +545,12 @@ class CadreServiceImpl {
    * re-read anything the old node was told while it was going away. The subscriptions
    * cover future events; this covers the window during the rebuild.
    */
-  onRebuilt(cb: () => void | Promise<void>): void {
+  onRebuilt(cb: () => void | Promise<void>): () => void {
     this.rebuildHooks.push(cb);
+    return () => {
+      const i = this.rebuildHooks.indexOf(cb);
+      if (i >= 0) this.rebuildHooks.splice(i, 1);
+    };
   }
 
   private async runRebuildHooks(): Promise<void> {

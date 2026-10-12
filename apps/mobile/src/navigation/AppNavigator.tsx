@@ -21,7 +21,7 @@ import Diagnostics from '../screens/Diagnostics';
 import ChatInterface from '../screens/ChatInterface';
 import MediaPicker from '../screens/MediaPicker';
 import { CadreManager } from '../cadre-ui';
-import { cadreService } from '../cadre';
+import { cadreService } from '../host';
 import { Avatar, IconButton } from '../components';
 import { getPrefs, setPrefs } from '../data/adapter';
 import { useTheme, useThemeContext, typography, radius } from '../theme';

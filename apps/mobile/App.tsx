@@ -87,22 +87,13 @@ export default function App() {
     // Errors are logged; the rest of the app keeps running.
     (async () => {
       try {
-        const { attachJoinedStrands, ensureCadreUp, watchDiscoveredStrands } =
-          await import('./src/data/chat-strand');
-        // Relays need no step here: they are the node's saved start options, named at
-        // construction — the only path that gives a circuit address to the strand
-        // nodes a conversation actually lives on.
-        // Before anything else touches the node, because the strand watcher offers
-        // stored strands about 100 ms after it starts and never re-offers them.
-        // Anything invited into existence by our own formation responder — which
-        // writes the strand row but does not launch it — arrives this way, and a
-        // listener attached later misses it for the life of the process.
-        await watchDiscoveredStrands();
-        await ensureCadreUp();
-        // Strands joined through someone else's invitation. Last, because it is
-        // the only step that dials other PARTIES — the two above are local — and a
-        // host that is currently unreachable should not delay our own strands.
-        await attachJoinedStrands();
+        // The core's start-up sequence (StrandRuntime.boot): watch for strands the
+        // control network offers BEFORE anything else touches the node — it offers
+        // stored strands about 100 ms after start and never re-offers them — then
+        // start the node, then re-attach strands joined through someone else's
+        // invitation, last because it is the only step that dials other parties.
+        const { bootSereus } = await import('./src/data/adapter');
+        await bootSereus();
       } catch (err) {
         // Expected on a solo node: attaching the default strand reads the
         // control DB, which times out without a cohort.  It attaches once the

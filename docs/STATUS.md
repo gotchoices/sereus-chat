@@ -18,15 +18,17 @@ the first web work.
 | `data/types.ts` | `core/model/*` | Split by namespace (done, Phase 4; the app file re-exports) |
 | `data/errors.ts` | `core/model` | Becomes `ChatError` kinds |
 | `data/adapter.ts` | `core/model` | `DataAdapter` becomes `ChatModel`; backend selection stays in the app |
-| `data/adapters/sereus.ts` | `core/sereus/*` | Split by namespace; AsyncStorage use becomes slots; `perf()` timing kept behind the host's logger |
+| `data/adapters/sereus.ts` | `core/sereus/model.ts` | Done (Phase 5); AsyncStorage use became slots; `perf()` timing behind `ChatHost.dev` |
 | `data/adapters/mock.ts` | `core/mock` | Fixtures through `FixtureSource` from root `mock/data` (done, Phase 4) |
-| `data/chat-operations.ts` | `core/sereus` | SQL over a strand database |
-| `data/chat-strand.ts` | `core/sereus/strands` | Attach, re-attach, joins, discovery, self-registration |
-| `data/strand-prefs.ts`, `strand-summary-cache.ts`, `outgoing-invitations.ts`, `data-format.ts` | `core/sereus` | Over slots (app-family.md, *Device-local state*) |
-| `screens/ChatInterface.tsx` drafts and read cursors | `core/sereus` (`messages`) | Slots `drafts`, `readCursors` |
-| `cadre/async.ts` | `core` (util) | Timeouts and helpers |
+| `data/chat-operations.ts` | `core/sereus/operations.ts` | Done (Phase 5) |
+| `data/chat-strand.ts` | `core/sereus/strands.ts` | Done (Phase 5) |
+| `data/strand-prefs.ts`, `strand-summary-cache.ts`, `outgoing-invitations.ts` | `core/sereus/local-state.ts` | Done (Phase 5), over slots |
+| `data/data-format.ts` | Stays in the app | It scans the app's own storage before any model exists |
+| `data/chat-sapp.ts` (create and join) | `core/sereus/sapp-strands.ts` | Done (Phase 5) |
+| `screens/ChatInterface.tsx` drafts and read cursors | `core/model` `messages` | Done (Phase 5), slots `draft`, `readCursor` |
+| `cadre/async.ts` | `apps/mobile/src/host/` | Host timeouts; the core has its own `withTimeout` |
 | `theme/colorHash.ts` | `packages/resources/tokens` | A color palette: design tokens, not model (Phase 7) |
-| `cadre/CadreService.ts` | `apps/mobile/src/host/` | Replaced by `createPhoneNode` (Phase 2); reachability reading and `applyRelays` move to `core/sereus/reachability`, over `NodeHost.options` and `restart` |
+| `cadre/CadreService.ts` | `apps/mobile/src/host/` | Done (Phase 5): the kit's phone node behind `NodeHost`, adapted by `host/chat-host.ts` |
 | `cadre/rn-durable-slot.ts` | `apps/mobile/src/host/` | The AsyncStorage `DurableSlot` behind the core's slots |
 | `cadre-ui/useCadreManager.ts` | `core/stores` | Cadre-manager store; the RN components stay in the app |
 | Screen polling (`StrandList`, `ChatInterface`, `InvitationGenerator`, `AppNavigator` reachability) | `core/stores` | Loader store and screen stores |
@@ -351,29 +353,75 @@ Ed25519 file until sereus#33) and lifecycle runner.
       - Two phones, under the restarted Metro with the pin: 2 rounds each way,
         none missed, no resolution errors.
 
-## Phase 5 — The Sereus model over a host
+## Phase 5 — The Sereus model over a host (done 2026-10-12)
 
-- [ ] Define `ChatHost` (with optional `createExtraNode`), `NodeHost` (with
-      `options`) and the slot names in `core/model`
-- [ ] Move `adapters/sereus.ts`, `chat-strand.ts`, `chat-operations.ts`,
-      `strand-prefs.ts`, `strand-summary-cache.ts`, `outgoing-invitations.ts`
-      and `data-format.ts` into `core/sereus`, over the host. No module-level
-      `AsyncStorage`, `rn-leveldb` or `cadreService` imports remain
-- [ ] Drafts and read cursors move out of `ChatInterface` into `messages`, over
-      slots
-- [ ] Strand discovery and re-attach subscribe through `NodeHost.on`, so they
-      survive node restarts without re-subscribing
-- [ ] `apps/mobile/src/host/`: `NodeHost` is the Phase 2 phone node; slots map
-      to the existing AsyncStorage keys through `rn-durable-slot.ts`
-- [ ] Node host for tests: cadre-core with `classic-level`, and in-memory slots
-- [ ] `reachability` reads relays from `NodeHost.options` and changes them by
-      `restart`. No relays are kept in a slot
-- [ ] Contract suite passes against the Sereus model in both topologies: found,
-      invite, join, send both ways, restart one, converge
-      - loopback (the fast default);
-      - relay-only: both nodes with `listenAddrs: []`, through the local relay
-        script from Phase 1
-- [ ] `apps/mobile` runs on the core model; two-phone check as in Phase 2
+- [x] `ChatHost`, `NodeHost` and `SlotName` in `core/sereus/host.ts`, exported from
+      `@chat/core/sereus`.
+      - The host interface is what the core actually needs: `node`,
+        `ensureStarted`, `on`, `onRebuilt`, `getRelayAddrs`, `applyRelays`, plus
+        the slots. app-family.md, *The host*, is updated to match.
+      - `createExtraNode` waits for Phase 8.
+- [x] Into `core/sereus`, with no module-level AsyncStorage, `rn-leveldb` or
+      `cadreService`:
+      - `model.ts`, from `adapters/sereus.ts`: `createSereusModel(host)` returns
+        `{ model, boot }`, and every operation goes through `attempt` into a
+        `Result`;
+      - `strands.ts` (`StrandRuntime`), from `chat-strand.ts`;
+      - `operations.ts`, from `chat-operations.ts`;
+      - `sapp-strands.ts`, from `chat-sapp.ts`;
+      - `local-state.ts`, from `strand-prefs`, `strand-summary-cache`,
+        `outgoing-invitations` and the profile, prefs, drafts and read cursors;
+      - `errors.ts`: `ChatFailure` and `toChatError`. `explainJoinFailure` moved
+        here; the stack's timeouts and quorum failures classify as
+        `unavailable`.
+
+      The seven app modules are deleted. `data-format.ts` stays in the app: it
+      scans the app's own storage before any model exists.
+- [x] New in the model:
+      - `strands.settings(id)` (for `StrandDetail`);
+      - `messages.draft` / `saveDraft` / `readCursor` / `saveReadCursor`.
+        `ChatInterface` no longer touches AsyncStorage.
+- [x] Discovery and re-attach subscribe through `NodeHost.on`, which `CadreService`
+      keeps across restarts. `changes.strand` follows its strand: it attaches
+      whenever the database appears (started, writable, waking) and detaches when
+      it goes (hibernating, stopped).
+- [x] Waking moved into the core. A read or write wakes a hibernated strand,
+      including one the app's return sweep is already waking (`starting`, no
+      database). Without that, a send 3 s after returning failed, as before 2c.
+      `CadreService.ensureAwake` is gone; the host keeps its sweep.
+- [x] `apps/mobile/src/host/` (was `src/cadre/`):
+      - `CadreService` (the kit's phone node);
+      - `chat-host.ts`, the `ChatHost` over it, with each slot an AsyncStorage
+        key from `persisted-names.ts`.
+
+      The adapter's Sereus path is
+      `adapterFromModel(createSereusModel(chatHost).model)`, and `App.tsx` boots
+      through `bootSereus()`. The core is imported **statically**: a dynamic
+      `import()` of the linked package failed on the phones with "Could not load
+      bundle", because Metro's lazy bundles cannot reach outside the app folder.
+- [x] Node test host (`core/src/testing/node-host.ts`): cadre-core nodes with
+      `MemoryRawStorage`, memory slots, and an in-process circuit relay with
+      unlimited reservations.
+- [x] `prefs` and `reachability` read relays through `NodeHost.getRelayAddrs`; no
+      relays in a slot.
+- [x] Contract suite on the Sereus model, both topologies, plus a two-sided test
+      (a message each way; each side lists both members):
+      - **loopback:** both listen on 127.0.0.1;
+      - **relay-only:** neither listens, and the test asserts every address is a
+        `/p2p-circuit` through the in-process relay.
+
+      Core: 37 tests pass in about 10 s.
+- [x] App: `tsc` clean; Jest 7 pass. Lint: **14** stack-import violations (from
+      22), all in `diagnostics/` (Phase 8). The data layer has none.
+- [x] Two phones on the core model:
+      - The strand reattached on both through the core's boot.
+      - 3 rounds each way, none missed: commit median 4.8 s / 4.7 s, delivery
+        8.7 s / 10.1 s (Phase 4: 4.8–6.2 s and 10–12 s).
+      - Emulator in the background for 30 s, back, send 3 s later: waited for
+        the wake (12.7 s) and delivered. All messages arrived.
+- Harness fix: the bridge's `arm` now succeeds only once the strand can be read. A
+  watch subscribes even before a strand opens, so arming said nothing about
+  readiness, and the first send went out mid-start.
 
 ## Phase 6 — Stores
 
