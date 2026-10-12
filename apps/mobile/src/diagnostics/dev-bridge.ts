@@ -13,6 +13,7 @@
  *   __chatDev.seen(text)            → epoch ms when first seen here, or null
  *   __chatDev.invite()              → { url, strandId }   a new private strand's invitation
  *   __chatDev.accept(url)           → { strandId }        join through it
+ *   __chatDev.traffic(seconds)      → new streams per node, protocol and direction
  *
  * Hermes's inspector ignores `awaitPromise`, so an async call is started with
  * `__chatDev.start(id, method, ...args)` and its outcome collected later with
@@ -24,6 +25,7 @@
  */
 import { listStrands, listMessages, send, watchStrand, createInvitation, acceptInvitation } from '../data/adapter';
 import { parseInviteToken } from '../data/inviteLink';
+import { cadreService } from '../cadre/CadreService';
 
 type Bridge = {
   strands(): Promise<Array<{ id: string; title: string }>>;
@@ -32,9 +34,59 @@ type Bridge = {
   seen(text: string): number | null;
   invite(): Promise<{ url: string; strandId: string | null }>;
   accept(url: string): Promise<{ strandId: string }>;
-  start(id: string, method: 'strands' | 'send' | 'arm' | 'invite' | 'accept', ...args: unknown[]): true;
+  traffic(seconds: number): Promise<Record<string, Record<string, number>>>;
+  start(id: string, method: 'strands' | 'send' | 'arm' | 'invite' | 'accept' | 'traffic', ...args: unknown[]): true;
   take(id: string): { ok: true; value: unknown } | { ok: false; error: string } | undefined;
 };
+
+type StreamLike = { id: string; protocol?: string; direction: string };
+type ConnLike = { id: string; remotePeer: { toString(): string }; limits?: unknown; streams: StreamLike[] };
+type NodeLike = { getConnections(): ConnLike[] };
+
+/** Every libp2p node this party runs, labelled: the control node and one per live strand. */
+function libp2pNodes(): Array<[string, NodeLike]> {
+  // Dev-only reach past the service's boundary: the cadre node is private there.
+  const cadre = (cadreService as unknown as { node?: { getControlNode(): NodeLike | null } }).node;
+  const out: Array<[string, NodeLike]> = [];
+  const control = cadre?.getControlNode();
+  if (control) out.push(['control', control]);
+  for (const [id, inst] of cadreService.getStrands()) {
+    const node = (inst as { libp2pNode?: NodeLike }).libp2pNode;
+    if (node) out.push([`strand-${id.slice(0, 8)}`, node]);
+  }
+  return out;
+}
+
+/**
+ * Count the streams opened on every node over `seconds`, by sampling open streams every
+ * 100 ms: what the idle traffic consists of. A stream that opens and closes between two
+ * samples is missed, so counts are a floor. Keys are `<protocol> <in|out> <peer>`, the
+ * peer shortened and marked `(relayed)` for a limited connection.
+ */
+async function sampleTraffic(seconds: number): Promise<Record<string, Record<string, number>>> {
+  const seen = new Set<string>();
+  const counts: Record<string, Record<string, number>> = {};
+  const sample = () => {
+    for (const [label, node] of libp2pNodes()) {
+      for (const conn of node.getConnections()) {
+        for (const st of conn.streams) {
+          const key = `${label}/${conn.id}/${st.id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const proto = (st.protocol ?? '(negotiating)').replace(/strand-[0-9a-f-]{36}/, 'strand-*').replace(/control-[0-9a-f-]{36}/, 'control-*');
+          const peer = conn.remotePeer.toString().slice(-4) + (conn.limits ? ' (relayed)' : '');
+          const k = `${proto} ${st.direction === 'inbound' ? 'in' : 'out'} ${peer}`;
+          (counts[label] ??= {})[k] = ((counts[label] ??= {})[k] ?? 0) + 1;
+        }
+      }
+    }
+  };
+  const timer = setInterval(sample, 100);
+  sample();
+  await new Promise(r => setTimeout(r, seconds * 1000));
+  clearInterval(timer);
+  return counts;
+}
 
 const results = new Map<string, { ok: true; value: unknown } | { ok: false; error: string }>();
 
@@ -72,6 +124,9 @@ export function installDevBridge(): void {
     async invite() {
       const inv = await createInvitation({ visibility: 'private', grantsInviteRight: false });
       return { url: inv.url, strandId: inv.strandId };
+    },
+    traffic(seconds) {
+      return sampleTraffic(seconds);
     },
     async accept(url) {
       const token = parseInviteToken(url);

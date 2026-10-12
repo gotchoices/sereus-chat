@@ -165,6 +165,9 @@ export async function ensureCadreUp(): Promise<void> {
  *
  * Failure is logged, not thrown: not being listed yet is a smaller harm than a
  * join that reports itself as failed after it actually succeeded.
+ *
+ * Resolves true when the row is known to be in place (registered this session, or
+ * written now), false when that could not be confirmed.
  */
 /**
  * Strands whose Member row for this device is known to be in place this session,
@@ -175,17 +178,19 @@ export async function ensureCadreUp(): Promise<void> {
  */
 const registeredAs = new Map<string, string>();
 
-export async function registerSelfAsMember(strand: StrandInstance): Promise<void> {
+export async function registerSelfAsMember(strand: StrandInstance): Promise<boolean> {
   const peerId = cadreService.peerId;
-  if (!peerId) return;
+  if (!peerId) return false;
   try {
     // The local profile name, or a truncated peer id until they enter one.
     const name = await readProfileDisplayName(peerId);
-    if (registeredAs.get(strand.strandId) === name) return;
+    if (registeredAs.get(strand.strandId) === name) return true;
     await upsertMember(strand, peerId, name);
     registeredAs.set(strand.strandId, name);
+    return true;
   } catch (err) {
     console.warn('[chat-strand] self-registration failed for', strand.strandId, err);
+    return false;
   }
 }
 

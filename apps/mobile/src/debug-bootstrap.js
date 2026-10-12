@@ -38,6 +38,9 @@ if (!globalThis.process.env) globalThis.process.env = {};
 // Profiling a send (2026-10-05): every request to another machine (dial, first byte,
 // response) and the transactor's get/pend/commit. Low volume. Comment out when done.
 // globalThis.process.env.DEBUG = 'optimystic:db-p2p:protocol-client,optimystic:db-core:network-transactor';
+// Device idle/latency analysis (2026-10-09): every sereus channel, optimystic's network layer and
+// write coordinator. High volume; comment out when done.
+// globalThis.process.env.DEBUG = 'sereus:*,optimystic:db-p2p:*,optimystic:db-core:network-transactor';
 // globalThis.process.env.DEBUG = 'sereus:cadre:relay-reservation';
 // globalThis.process.env.DEBUG = 'sereus:cadre:*,optimystic:*';
 // Tracing why a device's own writes stop crossing once the strand is attached:

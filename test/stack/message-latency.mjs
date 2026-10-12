@@ -47,6 +47,8 @@ const VISIBLE_MS = Number(process.env.VISIBLE_MS ?? 300_000);
 const REACHABLE_MS = Number(process.env.REACHABLE_MS ?? 60_000);
 /** Idle time between messages. People don't chat in a tight loop; links idle out. */
 const GAP_MS = Number(process.env.GAP_MS ?? 0);
+/** IDLE_MS: after the exchange, sit idle this long and report the process's CPU time meanwhile. */
+const IDLE_MS = Number(process.env.IDLE_MS ?? 0);
 /**
  * How a send writes, to compare the app's shape against a bundled one:
  *   message  the Message insert alone (the floor)
@@ -305,6 +307,15 @@ try {
   const warm = await exchange('fresh', founded.instance, joinerInst, hostMember, joinerMember);
   if (warm.some(r => r.visibleMs == null)) code = 1;
   mem('after exchange');
+  if (IDLE_MS) {
+    // Nothing is written from here on: whatever CPU this costs is background work.
+    await sleep(5000);
+    const c0 = process.cpuUsage(), t0i = Date.now();
+    log(`IDLE: start (${IDLE_MS / 1000} s, nothing written)`);
+    await sleep(IDLE_MS);
+    const c = process.cpuUsage(c0), wall = Date.now() - t0i;
+    log(`IDLE: CPU ${((c.user + c.system) / 1000).toFixed(0)} ms over ${wall} ms wall = ${(100 * (c.user + c.system) / 1000 / wall).toFixed(1)}% (both parties, one process)`);
+  }
 
   if (RESTART) {
     log('Stopping both parties (two apps closed), then restarting over the same storage');

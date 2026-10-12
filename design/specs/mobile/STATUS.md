@@ -270,6 +270,92 @@ their variants. Calls are parked (story 90).
   - [ ] Draft for the user's review: `apps/mobile/tmp/cadre-rn-native-digest-issue.md` (the kit's
         digest polyfill is pure JS).
 
+### Where the time goes on 1.14, from debug logs, 2026-10-09 (S7 ↔ emulator 5564, public relay)
+
+Captured with `DEBUG='sereus:*,optimystic:db-p2p:*,optimystic:db-core:network-transactor'`
+(line kept, commented out, in `debug-bootstrap.js`), and with these new tools:
+- `test/devices/devlog.mjs`, for console capture;
+- `devtime.mjs` with `LOG=<prefix>`, which captures both consoles during sends;
+- `devcall.mjs <dev> traffic 60`, which calls the bridge's `traffic` and counts streams opened
+  per protocol.
+
+**No timeouts or retries fired during a send.** The time is a chain of about 12 sequential round
+trips, each costing 0.3–0.8 s when the S7 is at one end.
+
+**A send, S7 → emulator (9.0 s):**
+
+| Step | Time | What it is |
+|---|---|---|
+| `queryMembers` guard read | 0.7 s | 2 `sync` "latest revision" checks (Optimystic#25) |
+| Local reads and preparation | 1.5 s | On a JS loop that is 39% blocked during the send |
+| `pend` | 3.6 s | 2 `/cluster` requests |
+| `commit` | 3.0 s | 2 `/cluster` requests |
+
+- **Every `/cluster` request opens a new stream.** `dial:ok` is 150–770 ms, about half of each
+  request.
+- **Why opening a stream costs a round trip.** `@libp2p/multistream-select` 7.0.28 has no lazy
+  path: it waits for the protocol echo before the request is written. db-p2p passes
+  `negotiateFully: false`, which is ignored; its own docstring and a pinned test already say so.
+  That is the 8 round trips in Optimystic#29.
+
+**Delivery adds 5–9 s after the commit.**
+- The receiver stores the block when the commit reaches it. In `dbg-a1` that was 0.5 s before
+  the sender's commit returned.
+- Its watch then re-reads the messages, and every read again asks the sender for the latest
+  revision: 1.2–1.6 s per read (#25).
+- The message showed 6.5 s after it was stored locally.
+
+**What runs while idle.** Neither phone is doing anything; per minute:
+
+| What | Rate, per device | Cost |
+|---|---|---|
+| cadre StrandWatcher, control DB poll every 5 s | ~72 local block reads | CPU only |
+| Chat StrandList reload every 10 s (ours) | ~45 strand reads | 20–29 `sync` streams to the other phone |
+| fret stabilization, every 1.5 s passive | ping + neighbours snapshot per neighbour | ~45 streams to the other phone; also decodes the whole peer store (`peerStore.all()`) each pass |
+
+- In total, each phone opens about 75 streams a minute to the other through the relay.
+- **S7 idle CPU profile:**
+  - 22% receiving (noise decrypt, yamux);
+  - 15% sending;
+  - 19% young-generation GC;
+  - JS loop 15–19% blocked (2–4% on the emulator).
+- That background load inflates every round trip of a send.
+
+**The emulator distrusts itself.**
+- Two of its three nodes show `self-coord-blocked: suspicious-shrinkage current=1 hwm=14` (and
+  `hwm=4`), about 250 times a minute.
+- The high-water mark is persisted and never decreases, and it is fed by fret's size estimate,
+  which overshot on a 2–3 node ring.
+- Reads degrade to self, which is harmless. For a write this is a hard denial.
+- Not yet linked to a failure.
+
+**Changed in chat.**
+- `registerSelfAsMember` now returns whether the Member row is known to be in place.
+- `send` runs the `queryMembers` guard read only when it isn't.
+- Re-timed: the emulator's median commit went from 6.7 s to 5.5 s. The S7 did not improve
+  (8.0–12.4 s): its first read inside the insert now pays the remote check instead.
+
+**Posted 2026-10-09:**
+- gotchoices/Fret#2 (idle stabilization);
+- device comments on Optimystic#29 (stream open per request) and #25 (receiver re-checks
+  a just-committed block).
+
+Still candidates:
+- **Optimystic (new, needs a Node repro):** the high-water mark comes from an overshooting size
+  estimate and is persistent, so a small network reads as shrinkage.
+- **sereus (new, low):** StrandWatcher polls the control DB every 5 s; `Database.watch` could
+  drive it.
+- **Ours:**
+  - [x] StrandList now reloads on `watchStrand` changes, debounced and single-flight.
+    - The poll stays for strands that open or are discovered later: 3 s while settling, 10 s
+      while any listed strand can't be watched yet, 60 s once all are.
+    - Idle inbound `sync` streams dropped from 29 to 14 a minute (emulator) and from 20 to 12
+      (S7).
+    - The rest is probably cadre's periodic strand reads (revocation refresh every 30 s, FRET
+      address re-merge every 15 s). Not verified.
+  - On the S7, `registerSelfAsMember` still takes 0.2–0.9 s on a memo hit, from the profile-name
+    read in the control DB.
+
 ### Upgrade to sereus 1.14.0 / optimystic 1.12.1 / Quereus 4.20.2 / fret 1.0.2, 2026-10-08 (in progress)
 
 - **Packages bumped, one copy each.** tsc is clean with no app changes. Data marker
@@ -292,8 +378,21 @@ their variants. Calls are parked (story 90).
     swapped.
   - A 30 s profile of the emulator's JS: mostly network traffic (Noise encrypt/decrypt, yamux,
     `pbToPeer`/`multiaddr` parsing), JS itself busy only part of the time.
-  - [ ] Re-run on a quiet machine. Compare idle traffic on 1.12 and 1.14 before concluding
-        anything about 1.14.
+  - **Re-run on a quiet machine (2026-10-09), in the strand from the day before:** 8 of 8
+    delivered.
+    - Commit median 7.1–9.3 s, delivery median 12.7–14.8 s: about 2× the 1.12 figures for the same
+      pair (4.7 s; 6.8–8.8 s).
+    - The emulator's chat process was still at about 71% CPU while idle afterwards (about 13% on
+      1.12 at idle).
+  - **Node idle comparison** (`message-latency.mjs IDLE_MS=60000`, 1.12 stack in a scratch copy):
+    - idle CPU is the same: 3.7% on 1.12, 3.6–3.9% on 1.14;
+    - idle requests are the same (18 strand `sync`) once the last writes have settled. One 1.14 run
+      showed 14 `cluster` and 7 `block-transfer` requests in its idle minute; a rerun showed none,
+      so that was the tail of the exchange.
+    - Node does not reproduce the device slowdown or the idle CPU.
+  - [ ] Next: run 1.12 against 1.14 on the same two devices on the same day (a downgrade and wipe,
+        about 20 min); profile the emulator at idle on 1.14 with the protocol-client debug channel
+        to see what it is exchanging.
 - **Tools now in the repo** (the scratchpad gets cleared): `test/devices/cpuprofile.mjs`,
   `test/devices/profsum.py`, alongside `devtime.mjs` and `profsend.mjs`.
 - **First-run oddity:** the S7's fresh profile screen showed "Save" where the emulator showed

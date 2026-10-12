@@ -210,7 +210,7 @@ export class SereusAdapter implements DataAdapter {
     // no-op on the normal path and repairs the broken one at the only moment
     // that matters — when the user is actually trying to speak, which is also
     // when a cohort is most likely to be available.
-    await registerSelfAsMember(strand);
+    const registered = await registerSelfAsMember(strand);
     step('registerSelfAsMember');
 
     // …and SAY SO if it still did not take. `registerSelfAsMember` swallows its
@@ -218,13 +218,19 @@ export class SereusAdapter implements DataAdapter {
     // a boot sweep), so without this check a repair that did not work produces
     // the same silent constraint failure as before — the draft reappears and the
     // user is told nothing. Better a sentence they can act on.
-    const members = await queryMembers(strand);
-    step('queryMembers');
-    if (!members.some(m => m.Id === peerId)) {
-      throw new Error(
-        'Could not register you in this conversation yet — no other member was reachable. ' +
-        'Try again in a moment.',
-      );
+    //
+    // Only when it could not confirm the row: the read costs 0.7–1.6 s on a phone
+    // (it checks the other member for a newer revision), and on every send after
+    // the first it would only re-confirm what registration already knows.
+    if (!registered) {
+      const members = await queryMembers(strand);
+      step('queryMembers');
+      if (!members.some(m => m.Id === peerId)) {
+        throw new Error(
+          'Could not register you in this conversation yet — no other member was reachable. ' +
+          'Try again in a moment.',
+        );
+      }
     }
 
     // A local write.  There is no pending state to surface — the phone holds

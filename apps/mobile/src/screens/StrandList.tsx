@@ -4,10 +4,10 @@
  * Consolidation: design/generated/mobile/screens/StrandList.md
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, SectionList, StyleSheet, RefreshControl, Alert, Pressable, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { listStrands, strandsSettling, strandsBootError, retryBoot, listOutstandingInvitations, listMembers, setStrandMuted, setStrandArchived } from '../data/adapter';
+import { listStrands, watchStrand, strandsSettling, strandsBootError, retryBoot, listOutstandingInvitations, listMembers, setStrandMuted, setStrandArchived } from '../data/adapter';
 import type { StrandSummary, Invitation } from '../data/types';
 import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
@@ -102,25 +102,67 @@ export default function StrandList() {
   }, []);
 
   /**
-   * Re-read while the list is on screen. There is no event to wait on —
-   * cadre-core emits strand lifecycle events, but the adapter boundary
-   * deliberately does not expose them — so the list polls: every 3 s while the
-   * node is still bringing strands up, then every 10 s.
+   * Re-read when a listed strand changes. Each open strand is watched (the same
+   * local `watchStrand` the chat screen uses), and a burst of changes — a send
+   * touches Message and Member — becomes one reload.
    *
-   * The slow poll is not optional. "Settled" means the boot sweep is done, not
-   * that every strand is open: a strand joined from another party can be
-   * offered by discovery AFTER the sweep (seen on sereus 1.8, where joined
-   * strands are recorded party-wide), and with polling stopped it never
-   * appeared — a phone that had just rejoined its conversation showed "No
-   * strands yet", which reads as data loss. New messages' previews and a
-   * partner's first Member row arriving are the same kind of change.
+   * A poll stays, for what no watch can see: a strand that is still opening
+   * (`watchStrand` returns null until it is), and a strand joined from another
+   * party that discovery offers AFTER the boot sweep (seen on sereus 1.8, where
+   * joined strands are recorded party-wide) — with polling stopped it never
+   * appeared, and a phone that had just rejoined its conversation showed "No
+   * strands yet", which reads as data loss. Every 3 s while the node is still
+   * bringing strands up, 10 s while any listed strand is unwatched, then 60 s.
+   *
+   * The 10 s poll was the whole mechanism until 2026-10-09; each pass read every
+   * strand, and each read asks the other member for its latest revision — about
+   * a third of a phone's idle traffic (STATUS, "Where the time goes on 1.14").
    */
+  const [allWatched, setAllWatched] = useState(false);
+  const loading = useRef<Promise<void> | null>(null);
+  const reloadAfter = useRef(false);
+  /** One read at a time; a request during a read runs once more after it. */
+  const reload = useCallback(() => {
+    if (loading.current) { reloadAfter.current = true; return; }
+    loading.current = load().finally(() => {
+      loading.current = null;
+      if (reloadAfter.current) { reloadAfter.current = false; reload(); }
+    });
+  }, [load]);
+
+  const openIds = useMemo(
+    () => strands.filter(s => !s.opening && !s.pending).map(s => s.id).sort().join(','),
+    [strands],
+  );
   useFocusEffect(useCallback(() => {
-    void load();
-    const timer = setInterval(() => { void load(); }, settling ? 3000 : 10_000);
+    const ids = openIds ? openIds.split(',') : [];
+    let alive = true;
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    const onChange = () => {
+      if (debounce) return;
+      debounce = setTimeout(() => { debounce = null; if (alive) reload(); }, 500);
+    };
+    const unwatch: Array<() => void> = [];
+    void Promise.all(ids.map(id => watchStrand(id, onChange).catch(() => null))).then(subs => {
+      for (const u of subs) if (u) unwatch.push(u);
+      if (!alive) { unwatch.forEach(u => u()); return; }
+      setAllWatched(subs.every(Boolean));
+    });
+    return () => {
+      alive = false;
+      if (debounce) clearTimeout(debounce);
+      unwatch.forEach(u => u());
+      setAllWatched(false);
+    };
+  }, [openIds, reload]));
+
+  useFocusEffect(useCallback(() => {
+    reload();
+    const every = settling ? 3000 : allWatched ? 60_000 : 10_000;
+    const timer = setInterval(reload, every);
     return () => clearInterval(timer);
-  }, [load, settling]));
-  useEffect(() => { void load(); }, [load, rev]);
+  }, [reload, settling, allWatched]));
+  useEffect(() => { reload(); }, [reload, rev]);
 
   // Narrowing is free: a string match over names already held.  No adapter
   // call, no network, works with nothing reachable (story 32).
