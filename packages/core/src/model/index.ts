@@ -9,4 +9,5 @@ export * from './profile.js';
 export * from './prefs.js';
 export * from './reachability.js';
 export * from './changes.js';
+export * from './cadre.js';
 export * from './model.js';

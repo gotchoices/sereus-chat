@@ -478,10 +478,33 @@ Done in steps, each type-checked and run on a phone.
       - Fixed on the way: the bridge's `traffic` had lost the control node since
         2a (it read a removed field), and leave/forget failures now show instead
         of being dropped.
-- [ ] **6f. Cadre manager.** `cadre-ui/` still calls `CadreService` directly: authority
-      key, seeds, the device list. That is not a stack import, so lint allows it,
-      but web needs the same screen. It needs a `cadre` namespace in the model, the
-      host methods behind it, and a store.
+- [ ] **6f. Cadre manager**, on sereus 1.14's claiming model (the one health
+      uses). Code done; the device check is still to do.
+      - Core: a `cadre` area on the model (`status`, `inspectNodeCode`,
+        `claimNode`, `removeMachine`, `exportOwnerKey`), `changes.cadre`, and
+        `cadreManagerStore`. It is implemented in the Sereus model, the mock and
+        the Node test host.
+      - `sereus/node-code.ts` is health's node-code reader and claim-failure
+        sorter, ported. It is marked interim: two copies until sereus has a home
+        for it (#45). Not yet raised on #45.
+      - Node test: a real claim of a node started with `claim: {secret, record}`,
+        and a damaged code refused.
+      - App: `cadre-ui/CadreManager` takes the model as a prop.
+        - It shows the status strip, network id, owner key (fingerprint, guarded
+          backup) and the machines list (remove).
+        - To add a machine: scan or paste its code, read it, approve (peer id,
+          owner fingerprint, reach), then claim, with retry when it can help.
+        - The scanner sends a node code to it (`popTo`).
+        - On mocks it renders the sample cadre instead of a placeholder.
+      - Removed: the pre-1.14 seed flows (`createDroneSeed`, `applySeedFromCode`),
+        the key import, the late-genesis path, `useCadreManager` (which read the
+        stale `AuthorityKey` table), `KeyImportModal`. `SeedApplyModal` became
+        `NodeCodeModal`.
+      - Specs: story 42 and `cadre-manager.md` amended to claiming at low detail
+        (consented); `cadre-ui/SPEC.md` rewritten.
+      - Not done: opening a `sereus-join:` link from outside the app. Every
+        sereus app on the phone would claim that scheme; that is a question for
+        sereus.
 - Checks:
   - Core: 47 tests, including the stores against the mock (pending and
     failed sends, strand-list contents, mute ranking).

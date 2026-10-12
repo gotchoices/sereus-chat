@@ -22,12 +22,18 @@ import {
   queryReactions, removeMessage, removeReaction, updateMessage,
 } from './operations.js';
 import { createChatStrand } from './sapp-strands.js';
+import { classifyClaimFailure, nodeReach, readNodeCode } from './node-code.js';
+import { ownerFingerprint, type CadreMachine, type CadreStatus } from '../model/index.js';
 import { StrandRuntime } from './strands.js';
 
 /** How long the strand list waits on one strand's preview or member read before using its cached row. */
 const LIST_READ_MS = 3000;
 /** How long to wait on a one-off control-network write before failing fast. */
 const CONTROL_OP_TIMEOUT_MS = 15_000;
+/** Bound on a claim: `claimNode` dials each address in turn (~115 s worst case when none answers). */
+const CLAIM_TIMEOUT_MS = 150_000;
+/** Bound on the control reads behind the machine list; with no cohort they can hang. */
+const CONTROL_READ_MS = 6000;
 /** How long an invitation stays good when the caller does not say: story 02's private-strand default. */
 const INVITE_EXPIRY_MS = INVITATION_VALIDITY.week;
 
@@ -406,6 +412,9 @@ export function createSereusModel(host: ChatHost): SereusModel {
     return { strandId };
   }
 
+  /** One claim at a time. */
+  let claiming = false;
+
   const model: ChatModel = {
     strands: {
       list: () => attempt(listStrands),
@@ -609,7 +618,90 @@ export function createSereusModel(host: ChatHost): SereusModel {
       },
     },
 
+    cadre: {
+      status: () => attempt(async (): Promise<CadreStatus> => {
+        const node = host.node.node;
+        const peerId = node?.peerId?.toString() ?? null;
+        let fingerprint: string | null = null;
+        try { fingerprint = node ? ownerFingerprint(node.getIdentityOwnerKey().publicKeyB64) : null; } catch { /* no key yet */ }
+        const machines: CadreMachine[] = peerId ? [{ peerId, thisDevice: true, addresses: [] }] : [];
+        if (node) {
+          // Best effort and bounded: the list fills in when the control network answers.
+          const members = await withTimeout(node.listMembers(), CONTROL_READ_MS, 'listMembers').catch(() => []);
+          for (const m of members) {
+            if (m.peerId === peerId) continue;
+            machines.push({ peerId: m.peerId, thisDevice: false, addresses: m.multiaddr ? [m.multiaddr] : [] });
+          }
+        }
+        return {
+          running: !!node,
+          partyId: host.node.partyId(),
+          peerId,
+          ownerEnrolled: host.node.ownerEnrolled(),
+          ownerFingerprint: fingerprint,
+          machines,
+        };
+      }),
+      async inspectNodeCode(text) {
+        const reading = readNodeCode(text);
+        if (!reading.ok) {
+          return fail('invalid-node-code', reading.problem === 'newer-version'
+            ? 'This code comes from a newer version of the node software; update the app to use it.'
+            : reading.problem === 'damaged' ? 'This code is incomplete or damaged.' : 'This is not a node code.',
+          { reason: reading.problem });
+        }
+        const { peerId, multiaddrs } = reading.payload;
+        return ok({ peerId, addresses: multiaddrs, reach: nodeReach(multiaddrs) });
+      },
+      async claimNode(text) {
+        const reading = readNodeCode(text);
+        if (!reading.ok) return fail('invalid-node-code', 'This is not a usable node code.', { reason: reading.problem });
+        if (claiming) return fail('claim-failed', 'A machine is already being added.', { retryable: true });
+        claiming = true;
+        try {
+          const node = requireNode();
+          if (!host.node.ownerEnrolled()) {
+            return fail('unavailable', 'This device is not yet an owner of its cadre; try again in a moment.');
+          }
+          // The code carries the claim secret: log the peer id only.
+          console.info('[sereus-model] claiming node', reading.payload.peerId);
+          try {
+            await withTimeout(node.claimNode(reading.payload), CLAIM_TIMEOUT_MS, 'claimNode');
+          } catch (err) {
+            const failure = classifyClaimFailure(err, reading.payload);
+            const message = failure.kind === 'node-unreachable'
+              ? (failure.reach === 'home-network'
+                ? 'Could not reach that machine. It is only reachable on its own network: join that Wi-Fi and try again.'
+                : 'Could not reach that machine. Check that it is running and try again.')
+              : failure.kind === 'claim-refused'
+                ? `The machine refused: ${failure.detail}`
+                : `Adding the machine did not finish: ${failure.detail}`;
+            return fail(failure.kind, message, {
+              retryable: failure.retryable,
+              reason: failure.kind === 'node-unreachable' ? failure.reach : failure.kind === 'claim-refused' ? failure.refusal : undefined,
+              cause: err,
+            });
+          }
+          console.info('[sereus-model] ✓ node accepted the claim:', reading.payload.peerId);
+          return ok();
+        } finally {
+          claiming = false;
+        }
+      },
+      removeMachine: peerId => attempt(async () => {
+        await withTimeout(requireNode().removePeer(peerId), CONTROL_OP_TIMEOUT_MS, 'removePeer');
+      }),
+      exportOwnerKey: () => attempt(async () => requireNode().getIdentityOwnerKey().privateKeyB64),
+    },
+
     changes: {
+      cadre(onChange) {
+        const unsubscribe = [
+          host.node.on('control:connected', () => onChange()),
+          host.node.on('control:disconnected', () => onChange()),
+        ];
+        return () => unsubscribe.forEach(u => u());
+      },
       reachability: onChange => host.node.onReachabilityChange(onChange),
       strands(onChange) {
         const events = [...STRAND_UP_EVENTS, ...STRAND_DOWN_EVENTS, 'strand:discovered'] as const;

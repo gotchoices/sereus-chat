@@ -34,6 +34,8 @@ const nodeHost: NodeHost = {
   onRebuilt(callback) {
     return cadreService.onRebuilt(callback);
   },
+  partyId: () => cadreService.partyId,
+  ownerEnrolled: () => cadreService.ownerEnrolled,
   getRelayAddrs: () => cadreService.getRelayAddrs(),
   applyRelays: addrs => cadreService.applyRelays(addrs),
   relayStatus: () => cadreService.getRelayReservationState()?.status ?? null,

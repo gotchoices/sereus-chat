@@ -1,34 +1,39 @@
 /**
- * CadreManager — drop-in screen for managing a Sereus cadre.
+ * CadreManager — drop-in screen for managing a Sereus cadre: the machines that act for
+ * this person, and the owner key that binds them.
  *
- * App-agnostic.  Reaches data only through `cadreService` (the cadre engine).
- * No host-app imports.  See ./SPEC.md for the contract this implements.
+ * App-agnostic: it reaches data only through the `ChatModel` it is given (its `cadre`
+ * area and `cadreManagerStore`), so it has no host-app imports. See ./SPEC.md.
  *
- * Theming: pass `theme={...}` to override any subset of color tokens; missing
- * tokens fall back to `DEFAULT_THEME` in `./theme.ts`.
+ * Adding a machine is sereus's claiming model (1.14): the machine shows a node code
+ * (`sereus-join:…`) while it waits; this device reads it, asks, and claims it. The code
+ * carries a one-time claim secret, so it is never logged or shown back.
+ *
+ * Theming: pass `theme={...}` to override any subset of color tokens; missing tokens
+ * fall back to `DEFAULT_THEME` in `./theme.ts`.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Clipboard,
-  RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { cadreService } from '../host';
 import {
-  useCadreManager,
-  type CadreKeyRow,
-  type CadreNodeRow,
-} from './useCadreManager';
+  cadreManagerStore,
+  shortPeerId,
+  type CadreMachine,
+  type CadreStatus,
+  type ChatModel,
+  type NodeCodePreview,
+} from '@chat/core';
 import SecretDisplayModal from './SecretDisplayModal';
-import KeyImportModal from './KeyImportModal';
-import SeedApplyModal from './SeedApplyModal';
+import NodeCodeModal from './NodeCodeModal';
 import {
   CadreThemeContext,
   resolveTheme,
@@ -38,291 +43,252 @@ import {
 
 // ── i18n-friendly strings (centralised for future override) ────────────────
 const STRINGS = {
-  title: 'My Devices',
   networkId: 'NETWORK ID',
-  myKeys: 'MY KEYS',
-  myNodes: 'MY NODES',
+  ownerKey: 'OWNER KEY',
+  machines: 'MY MACHINES',
   copied: 'Copied',
   loading: 'Loading…',
-  statusRunning: 'Cadre running',
-  statusStopped: 'Cadre stopped',
-  statusKeyOk: 'authority key on file',
-  statusKeyNone: 'no authority key',
-  statusNodes: (n: number) => (n === 0 ? 'no remote nodes' : `${n} remote node${n === 1 ? '' : 's'}`),
-  noKeys: 'No keys yet',
-  noKeysHint: 'One is created automatically when you add your first node.',
-  noNodes: 'No remote nodes yet. Tap + to add one.',
-  statusOnline: 'online',
-  statusUnknown: 'unknown',
-  statusUnreachable: 'unreachable',
-  addKey: 'Add a key',
-  addKeyVault: 'Generate in device vault',
-  addKeyExternal: 'Import key file or QR',
-  addKeyDongle: 'Hardware dongle (future)',
-  addNode: 'Add a node',
-  addNodeDrone: 'Drone (server)',
-  addNodeJoinSeed: 'Join with a seed',
-  addNodeServerQr: 'Server (scan QR)',
-  addNodeBrowser: 'Browser node (future)',
-  addNodePhone: 'Another phone (future)',
-  removeNodeTitle: 'Remove node?',
-  removeNodeBody: 'This device will be removed from your cadre. It will need to be re-invited to rejoin.',
+  retry: 'Try again',
+  statusRunning: 'Running',
+  statusStopped: 'Not running',
+  statusOwner: 'owner key on file',
+  statusNoOwner: 'owner key not ready',
+  statusMachines: (n: number) => (n === 0 ? 'no other machines' : `${n} other machine${n === 1 ? '' : 's'}`),
+  ownerHint: 'Machines you add are bound to this key. Back it up to keep control of them if you lose this device.',
+  ownerNotReady: 'Not ready yet — this device is still setting up its network.',
+  backUp: 'Back up',
+  backUpConfirmTitle: 'Show your owner key?',
+  backUpConfirmBody: 'Anyone who sees this key can take control of your machines. Show it only somewhere private.',
+  show: 'Show',
+  exportTitle: 'Owner key',
+  exportHint: 'This is your owner private key. Anyone with it controls your machines. Write it down or store it somewhere secure and offline.',
+  thisDevice: 'This device',
+  machine: 'Machine',
+  noMachines: 'Only this device so far. Add a machine that stays on, so your messages keep moving while your phone sleeps.',
+  addMachine: 'Add a machine',
+  addScan: 'Scan its code',
+  addPaste: 'Paste its code',
+  confirmTitle: 'Add this machine?',
+  confirmBody: (p: NodeCodePreview, fingerprint: string | null) =>
+    `Machine ${shortPeerId(p.peerId)} will join your network`
+    + (fingerprint ? `, owned by your key ${fingerprint}` : '')
+    + '.\n\n'
+    + (p.reach === 'home-network'
+      ? 'It can only be reached on its own network: be on the same Wi-Fi as it.'
+      : 'It can be reached from anywhere.'),
+  add: 'Add',
+  adding: (peerId: string) => `Adding ${shortPeerId(peerId)}… this can take a minute.`,
+  added: 'Machine added',
+  addedBody: (peerId: string) => `${shortPeerId(peerId)} is now one of your machines.`,
+  addFailed: 'Could not add the machine',
+  removeTitle: 'Remove this machine?',
+  removeBody: 'It will no longer act for you. To bring it back, it will need a new code.',
+  removeFailed: 'Could not remove the machine',
   cancel: 'Cancel',
   remove: 'Remove',
-  notImplementedTitle: 'Not yet implemented',
-  notImplementedRemove: 'Remove flow requires the cadre control mutation API.',
-  notImplementedQr: 'QR scan flow needs the camera screen wired up; until then use the Drone (server) option which produces a seed for cadre-cli.',
-  notImplementedBrowser: 'Browser node (quoomb) wiring is upcoming.',
-  notImplementedPhone: 'Phone-to-phone (relay-routed) is upcoming; currently requires a drone or server intermediary.',
-  keyCreated: 'Authority key created and stored on this device.',
-  keyCreatedFailed: 'Failed to create authority key',
-  exportTitle: 'Recovery key',
-  exportHint: 'This is your authority private key.  Anyone with it controls your cadre.  Write it down or transfer it to a secure location and keep it offline.  If you lose this device and no other authority key exists, this is the only way to restore access.',
-  exportEmpty: 'No authority key on file yet.  Generate one first via "Add a key".',
-  importMenuLabel: 'Import recovery key',
-  seedTitle: 'Drone seed',
-  seedHint: 'Paste this into your cadre-cli drone to authorize it for your cadre.  Generated seeds expire and should be transported privately.',
+  badCode: 'That code cannot be used',
 };
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
-interface CadreManagerProps {
+export interface CadreManagerProps {
+  model: ChatModel;
   theme?: Partial<CadreManagerTheme>;
+  /** A node code that arrived from outside (the host's scanner, a link): reviewed when it changes. */
+  nodeCode?: string;
+  /** Called once `nodeCode` has been taken, so the host can clear it. */
+  onNodeCodeHandled?: () => void;
+  /** Opens the host app's scanner; "Scan its code" is offered only when given. */
+  onScan?: () => void;
 }
 
-export default function CadreManager({ theme: themeOverrides }: CadreManagerProps = {}) {
+export default function CadreManager({ theme: themeOverrides, ...props }: CadreManagerProps) {
   const theme = useMemo(() => resolveTheme(themeOverrides), [themeOverrides]);
   return (
     <CadreThemeContext.Provider value={theme}>
-      <CadreManagerInner />
+      <CadreManagerInner {...props} />
     </CadreThemeContext.Provider>
   );
 }
 
-function CadreManagerInner() {
+function CadreManagerInner({ model, nodeCode, onNodeCodeHandled, onScan }: Omit<CadreManagerProps, 'theme'>) {
   const theme = useCadreTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const cadre = useCadreManager();
-  const hasKeys = cadre.keys.length > 0;
-  const [seedModal, setSeedModal] = useState<{ visible: boolean; seed: string | null; error: string | null }>(
-    { visible: false, seed: null, error: null },
-  );
+  const store = useMemo(() => cadreManagerStore(model), [model]);
+  const load = useSyncExternalStore(store.subscribe as (cb: () => void) => () => void, store.get, store.get);
+  const status: CadreStatus | undefined = load.value;
+
+  const [pasteVisible, setPasteVisible] = useState(false);
+  const [claiming, setClaiming] = useState<string | null>(null);
   const [exportModal, setExportModal] = useState<{ visible: boolean; value: string | null; error: string | null }>(
     { visible: false, value: null, error: null },
   );
-  const [importVisible, setImportVisible] = useState(false);
-  const [seedApplyVisible, setSeedApplyVisible] = useState(false);
 
-  const onCopyPartyId = useCallback(() => {
-    if (cadre.partyId) {
-      Clipboard.setString(cadre.partyId);
-      Alert.alert(STRINGS.copied);
-    }
-  }, [cadre.partyId]);
-
-  const onCopyPeerId = useCallback((peerId: string) => {
-    Clipboard.setString(peerId);
+  const copy = useCallback((text: string) => {
+    Clipboard.setString(text);
     Alert.alert(STRINGS.copied);
   }, []);
 
-  /** Generate (or return existing) authority key, refresh UI. */
-  const ensureAuthorityKey = useCallback(async (): Promise<boolean> => {
-    try {
-      await cadreService.createAuthorityKey();
-      await cadre.refresh();
-      return true;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      Alert.alert(STRINGS.keyCreatedFailed, msg);
-      return false;
+  const claim = useCallback(async (code: string, peerId: string) => {
+    setClaiming(peerId);
+    const result = await model.cadre.claimNode(code);
+    setClaiming(null);
+    store.reload();
+    if (result.ok) {
+      Alert.alert(STRINGS.added, STRINGS.addedBody(peerId));
+      return;
     }
-  }, [cadre]);
+    const { message, retryable } = result.error;
+    Alert.alert(STRINGS.addFailed, message, retryable
+      ? [{ text: STRINGS.cancel, style: 'cancel' }, { text: STRINGS.retry, onPress: () => { void claim(code, peerId); } }]
+      : undefined);
+  }, [model, store]);
 
-  const onExportKey = useCallback(async () => {
-    setExportModal({ visible: true, value: null, error: null });
-    try {
-      const priv = await cadreService.exportAuthorityPrivateKey();
-      if (!priv) {
-        setExportModal({ visible: true, value: null, error: STRINGS.exportEmpty });
-      } else {
-        setExportModal({ visible: true, value: priv, error: null });
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setExportModal({ visible: true, value: null, error: msg });
-    }
-  }, []);
+  /** Read a code and ask before claiming: `null` when it was usable, else what is wrong with it. */
+  const review = useCallback(async (code: string): Promise<string | null> => {
+    const read = await model.cadre.inspectNodeCode(code);
+    if (!read.ok) return read.error.message;
+    const preview = read.value;
+    Alert.alert(STRINGS.confirmTitle, STRINGS.confirmBody(preview, store.get().value?.ownerFingerprint ?? null), [
+      { text: STRINGS.cancel, style: 'cancel' },
+      { text: STRINGS.add, onPress: () => { void claim(code, preview.peerId); } },
+    ]);
+    return null;
+  }, [model, store, claim]);
 
-  const onAddKey = useCallback(() => {
-    Alert.alert(STRINGS.addKey, undefined, [
-      {
-        text: STRINGS.addKeyVault,
-        onPress: async () => {
-          const ok = await ensureAuthorityKey();
-          if (ok) Alert.alert(STRINGS.keyCreated);
-        },
-      },
-      {
-        text: STRINGS.importMenuLabel,
-        onPress: () => setImportVisible(true),
-      },
-      { text: STRINGS.addKeyDongle, style: 'cancel' },
+  // A code handed in by the host (scanner or link): review it once.
+  const handledCode = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!nodeCode || handledCode.current === nodeCode) return;
+    handledCode.current = nodeCode;
+    onNodeCodeHandled?.();
+    void review(nodeCode).then(problem => { if (problem) Alert.alert(STRINGS.badCode, problem); });
+  }, [nodeCode, onNodeCodeHandled, review]);
+
+  const onAddMachine = useCallback(() => {
+    if (!onScan) { setPasteVisible(true); return; }
+    Alert.alert(STRINGS.addMachine, undefined, [
+      { text: STRINGS.addScan, onPress: onScan },
+      { text: STRINGS.addPaste, onPress: () => setPasteVisible(true) },
       { text: STRINGS.cancel, style: 'cancel' },
     ]);
-  }, [ensureAuthorityKey]);
+  }, [onScan]);
 
-  const onAddDrone = useCallback(async () => {
-    // JIT: ensure an authority key exists before creating a seed.
-    if (!cadreService.hasAuthorityKey) {
-      const ok = await ensureAuthorityKey();
-      if (!ok) return;
-    }
-    setSeedModal({ visible: true, seed: null, error: null });
-    try {
-      const encoded = await cadreService.createDroneSeed();
-      setSeedModal({ visible: true, seed: encoded, error: null });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setSeedModal({ visible: true, seed: null, error: msg });
-    }
-  }, [ensureAuthorityKey]);
-
-  const onAddNode = useCallback(() => {
-    Alert.alert(STRINGS.addNode, undefined, [
-      { text: STRINGS.addNodeDrone, onPress: onAddDrone },
-      { text: STRINGS.addNodeJoinSeed, onPress: () => setSeedApplyVisible(true) },
-      {
-        text: STRINGS.addNodeServerQr,
-        onPress: () =>
-          Alert.alert(STRINGS.notImplementedTitle, STRINGS.notImplementedQr),
-      },
-      {
-        text: STRINGS.addNodeBrowser,
-        onPress: () =>
-          Alert.alert(STRINGS.notImplementedTitle, STRINGS.notImplementedBrowser),
-      },
-      {
-        text: STRINGS.addNodePhone,
-        onPress: () =>
-          Alert.alert(STRINGS.notImplementedTitle, STRINGS.notImplementedPhone),
-      },
-      { text: STRINGS.cancel, style: 'cancel' },
-    ]);
-  }, [onAddDrone]);
-
-  const onRemoveNode = useCallback((node: CadreNodeRow) => {
-    if (node.isThisDevice) return;
-    Alert.alert(STRINGS.removeNodeTitle, STRINGS.removeNodeBody, [
+  const onRemove = useCallback((machine: CadreMachine) => {
+    Alert.alert(STRINGS.removeTitle, STRINGS.removeBody, [
       { text: STRINGS.cancel, style: 'cancel' },
       {
         text: STRINGS.remove,
         style: 'destructive',
-        onPress: () =>
-          // TODO(seed-flow): remove from CadrePeer; revoke peer identity if owned.
-          Alert.alert(STRINGS.notImplementedTitle, STRINGS.notImplementedRemove),
+        onPress: async () => {
+          const result = await model.cadre.removeMachine(machine.peerId);
+          store.reload();
+          if (!result.ok) Alert.alert(STRINGS.removeFailed, result.error.message);
+        },
       },
     ]);
-  }, []);
+  }, [model, store]);
+
+  const onBackUp = useCallback(() => {
+    Alert.alert(STRINGS.backUpConfirmTitle, STRINGS.backUpConfirmBody, [
+      { text: STRINGS.cancel, style: 'cancel' },
+      {
+        text: STRINGS.show,
+        onPress: async () => {
+          setExportModal({ visible: true, value: null, error: null });
+          const result = await model.cadre.exportOwnerKey();
+          setExportModal(result.ok
+            ? { visible: true, value: result.value, error: null }
+            : { visible: true, value: null, error: result.error.message });
+        },
+      },
+    ]);
+  }, [model]);
 
   // ─────────────────────────────────────────────────────────────────────────
 
-  if (cadre.loading) {
+  if (!status) {
     return (
       <View style={[styles.container, styles.center]}>
-        <Text style={styles.muted}>{STRINGS.loading}</Text>
+        <Text style={styles.muted}>{load.state === 'failed' ? load.error.message : STRINGS.loading}</Text>
+        {load.state === 'failed' && (
+          <TouchableOpacity onPress={() => store.reload()} hitSlop={HIT_SLOP}>
+            <Text style={[styles.link, { marginTop: 8 }]}>{STRINGS.retry}</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
 
-  if (cadre.error) {
-    return (
-      <View style={[styles.container, styles.center]}>
-        <Text style={styles.muted}>{cadre.error}</Text>
-      </View>
-    );
-  }
+  const others = status.machines.filter(m => !m.thisDevice).length;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ padding: 16 }}
-      refreshControl={<RefreshControl refreshing={false} onRefresh={cadre.refresh} />}
-    >
+    <View style={styles.container}>
       {/* Status strip */}
       <View style={styles.statusStrip}>
-        <View
-          style={[
-            styles.dot,
-            { backgroundColor: cadre.isRunning ? theme.online : theme.danger },
-          ]}
-        />
+        <View style={[styles.dot, { backgroundColor: status.running ? theme.online : theme.danger }]} />
         <Text style={styles.statusText} numberOfLines={1}>
-          {(cadre.isRunning ? STRINGS.statusRunning : STRINGS.statusStopped)
-            + ' · '
-            + (cadre.hasAuthorityKey ? STRINGS.statusKeyOk : STRINGS.statusKeyNone)
-            + ' · '
-            + STRINGS.statusNodes(cadre.remoteNodeCount)}
+          {(status.running ? STRINGS.statusRunning : STRINGS.statusStopped)
+            + ' · ' + (status.ownerEnrolled ? STRINGS.statusOwner : STRINGS.statusNoOwner)
+            + ' · ' + STRINGS.statusMachines(others)}
         </Text>
       </View>
 
       {/* Network ID */}
       <SectionHeader label={STRINGS.networkId} />
-      <TouchableOpacity style={styles.card} onPress={onCopyPartyId} testID="cadre-partyid">
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => status.partyId && copy(status.partyId)}
+        testID="cadre-partyid"
+      >
         <Ionicons name="finger-print-outline" size={20} color={theme.textPrimary} />
-        <Text
-          style={[styles.cardTitle, styles.monoLike, { flex: 1, marginLeft: 12 }]}
-          numberOfLines={1}
-          ellipsizeMode="middle"
-        >
-          {cadre.partyId ?? '—'}
+        <Text style={[styles.cardTitle, styles.monoLike, styles.grow]} numberOfLines={1} ellipsizeMode="middle">
+          {status.partyId ?? '—'}
         </Text>
         <Ionicons name="copy-outline" size={18} color={theme.textMuted} />
       </TouchableOpacity>
 
-      {/* My Keys */}
+      {/* Owner key */}
+      <SectionHeader label={STRINGS.ownerKey} />
+      <View style={styles.card} testID="cadre-owner-key">
+        <Ionicons name="key-outline" size={20} color={theme.textPrimary} />
+        <View style={styles.grow}>
+          {status.ownerEnrolled && status.ownerFingerprint ? (
+            <>
+              <Text style={[styles.cardTitle, styles.monoLike]}>{status.ownerFingerprint}</Text>
+              <Text style={styles.cardSubtitle}>{STRINGS.ownerHint}</Text>
+            </>
+          ) : (
+            <Text style={styles.cardSubtitle}>{STRINGS.ownerNotReady}</Text>
+          )}
+        </View>
+        {status.ownerEnrolled && (
+          <TouchableOpacity onPress={onBackUp} hitSlop={HIT_SLOP} testID="cadre-owner-backup">
+            <Text style={styles.link}>{STRINGS.backUp}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Machines */}
       <SectionHeader
-        label={`${STRINGS.myKeys} (${cadre.keys.length})`}
-        onAdd={onAddKey}
+        label={`${STRINGS.machines} (${status.machines.length})`}
+        onAdd={onAddMachine}
+        addDisabled={!status.ownerEnrolled || claiming !== null}
       />
-      {hasKeys ? (
-        cadre.keys.map(key => (
-          <KeyRow key={key.id} keyRow={key} onLongPress={onExportKey} />
-        ))
-      ) : (
+      {status.machines.map(machine => (
+        <MachineRow key={machine.peerId} machine={machine} onCopy={copy} onRemove={onRemove} />
+      ))}
+      {others === 0 && claiming === null && (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>{STRINGS.noKeys}</Text>
-          <Text style={styles.emptyHint}>{STRINGS.noKeysHint}</Text>
+          <Text style={styles.emptyHint}>{STRINGS.noMachines}</Text>
         </View>
       )}
-
-      {/* My Nodes */}
-      <SectionHeader
-        label={`${STRINGS.myNodes} (${cadre.nodes.length})`}
-        onAdd={onAddNode}
-      />
-      {cadre.nodes.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyHint}>{STRINGS.noNodes}</Text>
+      {claiming !== null && (
+        <View style={styles.card} testID="cadre-claiming">
+          <ActivityIndicator color={theme.accent} />
+          <Text style={[styles.cardSubtitle, styles.grow]}>{STRINGS.adding(claiming)}</Text>
         </View>
-      ) : (
-        cadre.nodes.map(node => (
-          <NodeRow
-            key={node.id}
-            node={node}
-            onCopyPeerId={onCopyPeerId}
-            onRemove={onRemoveNode}
-          />
-        ))
       )}
-
-      <SecretDisplayModal
-        visible={seedModal.visible}
-        title={STRINGS.seedTitle}
-        hint={STRINGS.seedHint}
-        value={seedModal.seed}
-        error={seedModal.error}
-        onClose={() => setSeedModal({ visible: false, seed: null, error: null })}
-      />
 
       <SecretDisplayModal
         visible={exportModal.visible}
@@ -334,26 +300,8 @@ function CadreManagerInner() {
         onClose={() => setExportModal({ visible: false, value: null, error: null })}
       />
 
-      <KeyImportModal
-        visible={importVisible}
-        onClose={() => setImportVisible(false)}
-        onImport={async (priv) => {
-          const res = await cadreService.importAuthorityKey(priv);
-          await cadre.refresh();
-          return res;
-        }}
-      />
-
-      <SeedApplyModal
-        visible={seedApplyVisible}
-        onClose={() => setSeedApplyVisible(false)}
-        onApply={async (seed) => {
-          const res = await cadreService.applySeedFromCode(seed);
-          await cadre.refresh();
-          return res;
-        }}
-      />
-    </ScrollView>
+      <NodeCodeModal visible={pasteVisible} onClose={() => setPasteVisible(false)} onSubmit={review} />
+    </View>
   );
 }
 
@@ -388,102 +336,36 @@ function SectionHeader({
   );
 }
 
-function KeyRow({
-  keyRow,
-  onLongPress,
-}: {
-  keyRow: CadreKeyRow;
-  onLongPress?: () => void;
-}) {
-  const theme = useCadreTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
-  const icon =
-    keyRow.type === 'vault'
-      ? 'key-outline'
-      : keyRow.type === 'dongle'
-        ? 'hardware-chip-outline'
-        : 'document-outline';
-  return (
-    <TouchableOpacity
-      style={styles.card}
-      onLongPress={onLongPress}
-      delayLongPress={500}
-      activeOpacity={onLongPress ? 0.7 : 1}
-    >
-      <Ionicons name={icon} size={20} color={theme.textPrimary} />
-      <View style={{ flex: 1, marginLeft: 12, minWidth: 0 }}>
-        <Text style={styles.cardTitle}>
-          {keyRow.type} · <Text style={styles.cardSubtitle}>{keyRow.protection}</Text>
-        </Text>
-        <Text
-          style={[styles.cardSubtitle, styles.monoLike]}
-          numberOfLines={1}
-          ellipsizeMode="middle"
-        >
-          {keyRow.publicKey}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-function NodeRow({
-  node,
-  onCopyPeerId,
+function MachineRow({
+  machine,
+  onCopy,
   onRemove,
 }: {
-  node: CadreNodeRow;
-  onCopyPeerId: (peerId: string) => void;
-  onRemove: (node: CadreNodeRow) => void;
+  machine: CadreMachine;
+  onCopy: (peerId: string) => void;
+  onRemove: (machine: CadreMachine) => void;
 }) {
   const theme = useCadreTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const icon =
-    node.deviceType === 'phone'
-      ? 'phone-portrait-outline'
-      : node.deviceType === 'desktop'
-        ? 'desktop-outline'
-        : node.deviceType === 'server'
-          ? 'server-outline'
-          : node.deviceType === 'browser'
-            ? 'globe-outline'
-            : 'hardware-chip-outline';
-
-  const statusColor =
-    node.status === 'online' ? theme.online : node.status === 'unknown' ? theme.textMuted : theme.danger;
-  const statusText =
-    node.status === 'online'
-      ? STRINGS.statusOnline
-      : node.status === 'unknown'
-        ? STRINGS.statusUnknown
-        : STRINGS.statusUnreachable;
-
   return (
-    <View style={styles.card} testID={`cadre-node-${node.id}`}>
-      <Ionicons name={icon} size={20} color={theme.textPrimary} />
-      <View style={{ flex: 1, marginLeft: 12, minWidth: 0 }}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{node.name}</Text>
-        <View style={styles.statusRow}>
-          <View style={[styles.dot, { backgroundColor: statusColor }]} />
-          <Text style={styles.cardSubtitle}>{statusText}</Text>
-          <Text style={[styles.cardSubtitle, { marginHorizontal: 6 }]}>·</Text>
-          <TouchableOpacity
-            onPress={() => onCopyPeerId(node.peerId)}
-            hitSlop={HIT_SLOP}
-            style={{ flex: 1, minWidth: 0 }}
-          >
-            <Text
-              style={[styles.cardSubtitle, styles.monoLike]}
-              numberOfLines={1}
-              ellipsizeMode="middle"
-            >
-              {node.peerId}
-            </Text>
-          </TouchableOpacity>
-        </View>
+    <View style={styles.card} testID={`cadre-machine-${machine.peerId}`}>
+      <Ionicons
+        name={machine.thisDevice ? 'phone-portrait-outline' : 'server-outline'}
+        size={20}
+        color={theme.textPrimary}
+      />
+      <View style={styles.grow}>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {machine.thisDevice ? STRINGS.thisDevice : `${STRINGS.machine} ${shortPeerId(machine.peerId)}`}
+        </Text>
+        <TouchableOpacity onPress={() => onCopy(machine.peerId)} hitSlop={HIT_SLOP}>
+          <Text style={[styles.cardSubtitle, styles.monoLike]} numberOfLines={1} ellipsizeMode="middle">
+            {machine.peerId}
+          </Text>
+        </TouchableOpacity>
       </View>
-      {!node.isThisDevice && (
-        <TouchableOpacity onPress={() => onRemove(node)} hitSlop={HIT_SLOP}>
+      {!machine.thisDevice && (
+        <TouchableOpacity onPress={() => onRemove(machine)} hitSlop={HIT_SLOP} testID="cadre-machine-remove">
           <Ionicons name="trash-outline" size={20} color={theme.danger} />
         </TouchableOpacity>
       )}
@@ -495,7 +377,9 @@ function NodeRow({
 
 function makeStyles(theme: CadreManagerTheme) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.background },
+    container: { flex: 1, backgroundColor: theme.background, padding: 16 },
+    grow: { flex: 1, marginLeft: 12, minWidth: 0 },
+    link: { color: theme.accent, fontWeight: '600' },
     center: { alignItems: 'center', justifyContent: 'center' },
     muted: { color: theme.textMuted },
     sectionHeader: {
@@ -527,7 +411,6 @@ function makeStyles(theme: CadreManagerTheme) {
     // Slight tracking + monospace-leaning family for IDs/keys so the
     // ellipsizeMode='middle' truncation reads as intended.
     monoLike: { fontFamily: 'monospace', letterSpacing: 0.2 },
-    statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
     dot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
     statusStrip: {
       flexDirection: 'row',
@@ -549,7 +432,6 @@ function makeStyles(theme: CadreManagerTheme) {
       marginBottom: 8,
       alignItems: 'center',
     },
-    emptyTitle: { fontSize: 14, color: theme.textSecondary, marginBottom: 2 },
     emptyHint: { fontSize: 12, color: theme.textMuted, textAlign: 'center' },
   });
 }

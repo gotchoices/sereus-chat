@@ -1,145 +1,87 @@
 # CadreManager component
 
 A React Native drop-in screen for viewing and managing a Sereus cadre — the
-user's own cluster of devices. Designed to be **app-agnostic** so any sereus
-app can embed it on a settings/profile route.
+user's own machines, and the owner key that binds them. Designed to be
+**app-agnostic** so any sereus app can embed it on a settings/profile route.
 
-This package is developed in chat first, then will be proposed upstream as
-`@sereus/cadre-rn-ui` (or similar). Until the upstream package exists, app
-authors copy this folder verbatim.
+Developed in chat first. Much of what sits beneath it (reading node codes,
+sorting a claim's failure) is expected to move into sereus itself
+(gotchoices/sereus#45); health has the same pieces today. The component's
+contract is the `cadre` area of a `ChatModel` (`@chat/core`), so it renders the
+same over the Sereus model or the mock.
 
 ## Scope
 
 What the component owns:
 
-- **Party ID** display (cadre identity, tap-to-copy)
-- **My Keys** list — authority keys that authorize cadre changes
-- **My Nodes** list — devices in this cadre (this device pinned first)
+- **Network ID** — the party id, tap-to-copy
+- **Owner key** — its fingerprint, and a guarded backup
+- **My machines** — this device first, then the machines it has claimed;
+  add (claim) and remove
 
 What the component does **not** own:
 
-- **Strand-level membership / partners / guests.** That concept is app-specific
-  — chat has its own invitation flow, other apps may surface guests on the
-  same page. Apps render their own widgets below the component.
-- **The chosen sApp ID.** Configured by the host app via `cadreService` setup.
+- **Strand-level membership / partners / guests.** App-specific — chat has its
+  own invitation flow. Apps render their own widgets below the component.
+- **The scanner.** The host passes `onScan` to offer one, and hands a scanned
+  code back as `nodeCode`.
 
-## Surface
+## Adding a machine (sereus 1.14 claiming)
 
-```
-┌──────────────────────────────────┐
-│ ← Manage Devices                 │ ← native header (host app)
-├──────────────────────────────────┤
-│ NETWORK ID                       │
-│ ┌──────────────────────────────┐ │
-│ │ 🔒 b72a42a7…           [📋]  │ │   ← tap to copy
-│ └──────────────────────────────┘ │
-│                                  │
-│ MY KEYS (0)                  [+] │
-│ ┌──────────────────────────────┐ │
-│ │ No keys yet                  │ │
-│ │ One is created automatically │ │
-│ │ when you add your first node │ │
-│ └──────────────────────────────┘ │
-│                                  │
-│ MY NODES (1)                 [+] │
-│ ┌──────────────────────────────┐ │
-│ │ 📱 This device               │ │   ← always first
-│ │    online · 12D3Koo…SFPjQ    │ │
-│ └──────────────────────────────┘ │
-└──────────────────────────────────┘
-```
+A machine waiting to join shows a **node code** (`sereus-join:…`, as a QR code,
+a link or text). The user scans or pastes it; the component reads it, asks —
+showing the machine's short peer id, the owner key it will belong to, and
+whether it can be reached from anywhere or only on its own network — and then
+claims it. A failure says what to do (join its Wi-Fi, check it is running) and
+offers to retry when retrying can help.
+
+The code carries a one-time claim secret: it is never logged or displayed back.
 
 ## Sections
 
-### Network ID
+- **Status strip** — running · owner key on file · how many other machines.
+- **Network ID** — one card, truncated, tap to copy.
+- **Owner key** — fingerprint and a *Back up* action, behind a confirmation;
+  shows the private key in `SecretDisplayModal`. "Not ready" until owner
+  genesis has run, and adding is disabled until then.
+- **My machines** — "This device" first, never removable. Each other machine:
+  short peer id, full peer id (tap to copy), remove (confirmed). `+` offers
+  *Scan its code* (when the host gave `onScan`) or *Paste its code*.
 
-- Renders the party id as a single card. Truncated, full id revealed on tap.
-- Tap-to-copy via `Clipboard.setString`. Brief toast/alert confirms.
-- Always visible; cadre is the unit of identity in sereus.
-
-### My Keys
-
-- Header: `MY KEYS (n)` with a `+` icon on the right.
-- Empty state: explanatory text. **A key is created Just-In-Time** the first
-  time the user attempts to add a remote node — the `+` is mostly for adding
-  *additional* keys later (external import, dongle).
-- Each row: type icon, protection label, abbreviated public key.
-- Key types surfaced (matching health's domain spec):
-  - `vault` — local Keychain/Keystore (biometric)
-  - `external` — JWK file or QR scan
-  - `dongle` — hardware signer (future; disabled menu entry)
-- Tap `+`: action sheet with the three options above; `dongle` shown disabled.
-
-### My Nodes
-
-- Header: `MY NODES (n)` with a `+` icon on the right.
-- "This device" always appears first; never has a remove control.
-- Each remote node row: device-type icon (phone/desktop/server/other),
-  display name, status dot (online/unknown/unreachable), abbreviated peer id
-  (tap to copy), trash icon (remove).
-- Tap `+`: action sheet with options:
-  - **Drone (server)** — `createSeed()` → deliver via provider API → dial
-  - **Server with QR** — scan QR/link from a server you control → dial
-  - **Browser node** — quoomb / web cadre node (future)
-  - **Another phone** (future, relay-routed)
-- "+" stays enabled even with no keys; JIT key creation runs when the user
-  picks a node type.
-
-### Connectivity (status dots)
-
-On screen entry, status is best-effort. Initial values come from cadre state;
-optional Fret/DHT probes can update them. Component renders whatever the hook
-provides without blocking.
+Status is best-effort and never blocks: the list comes from a bounded read of
+the control network and fills in when it answers.
 
 ## Reusability requirements
 
-- **No host-app imports.** The component reaches data only through the cadre
-  engine (`cadreService` from `src/cadre/`). When this folder is extracted,
-  the engine moves with it.
-- **Theme via prop or context.** All visible colors are tokens declared in
-  [theme.ts](theme.ts). Host apps override with `<CadreManager theme={...} />`
-  passing any subset of `CadreManagerTheme`; missing tokens fall back to
-  `DEFAULT_THEME`. Subcomponents read via `useCadreTheme()` from
-  `CadreThemeContext` so apps can also wrap larger trees in a provider.
-  Spacing/sizing intentionally aren't tokens — they're layout, not branding.
-- **i18n-friendly.** Visible strings centralised at the top of the component
-  for easy override; no `t()` calls today (host apps wrap if needed).
-- **Action handlers are stubs in v0.** Add-key, add-node, remove-node all
-  surface intent (action sheets) but the actual cadre mutations require
-  cadre-core APIs not yet wired (seed/formation flows). Each stub posts a
-  clear "not yet implemented" alert; the menu structure is correct so
-  wiring is incremental.
+- **No host-app imports.** Data only through the `ChatModel` it is given.
+- **Theme via prop or context.** All colors are tokens in [theme.ts](theme.ts);
+  `<CadreManager theme={...} />` takes any subset of `CadreManagerTheme`.
+- **i18n-friendly.** Visible strings are centralised at the top of the
+  component.
 
 ## Embedding
 
 ```tsx
 import { CadreManager } from './cadre-ui';
 
-// React Navigation example:
-<Stack.Screen name="CadreManager" component={CadreManager} options={{ title: 'My Devices' }} />
+<CadreManager
+  model={chatModel}
+  theme={tokens}
+  onScan={() => navigation.navigate('QrScanner')}
+  nodeCode={route.params?.nodeCode}
+  onNodeCodeHandled={() => navigation.setParams({ nodeCode: undefined })}
+/>
 ```
-
-The component reads from the cadre engine singleton; no props required.
-Host apps must boot the cadre layer at app startup (chat does this in
-`App.tsx` via `ensureDefaultChatStrand` which transitively calls
-`cadreService.ensureStarted`).
 
 ## Out of scope (today)
 
-- Key generation flow (real cryptographic create + Keychain/Keystore storage)
-- Seed-delivery to a remote drone
-- QR scan integration for server-add
-- Live status probes via Fret
-- Edit display names / device labels
-- Theme/styling props
-
-All of the above are tracked in the host app's STATUS.md under the cadre
-surface; this SPEC.md is the canonical layout/behavior contract once wiring
-catches up.
+- Device invitations (another phone joining as a peer of this cadre)
+- Live status probes and "last heard from"
+- Device names / labels
+- Opening a node-code link from outside the app (the `sereus-join:` scheme
+  would be claimed by every sereus app on the phone)
 
 ## Provenance
 
-Adapted from `ser/health/apps/mobile/src/screens/SereusConnections.tsx`
-(layout + section breakdown), with `Strand Guests` removed and JIT key
-behavior added. Identifiers and copy are chat-flavored; nothing chat-specific
-is imported by the implementation.
+Layout from health's *Sereus Connections*, with strand guests removed; the
+claiming flow follows health's (`readNodeCode` → approve → `claimNode`).

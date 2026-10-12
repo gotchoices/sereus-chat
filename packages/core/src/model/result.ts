@@ -32,6 +32,14 @@ export type ChatErrorKind =
   | 'join-incomplete'
   /** Joining: the invitation cannot be used, for a reason with no kind of its own. */
   | 'invitation-unusable'
+  /** A node code that cannot be used; `reason`: `not-node-code`, `newer-version` or `damaged`. */
+  | 'invalid-node-code'
+  /** Claiming a node: no address answered. `reason`: the node's reach, `anywhere` or `home-network`. */
+  | 'node-unreachable'
+  /** Claiming a node: it answered and said no. `reason`: its refusal code, when it sent one. */
+  | 'claim-refused'
+  /** Claiming a node: reached, then the exchange or a local step failed. Safe to repeat. */
+  | 'claim-failed'
   /** Anything else. */
   | 'unexpected';
 
@@ -39,6 +47,8 @@ export interface ChatError {
   kind: ChatErrorKind;
   retryable: boolean;
   message: string;
+  /** A finer, stable code within the kind (e.g. a claim refusal), for the UI to choose words. */
+  reason?: string;
   /** The underlying error, for logs. */
   cause?: unknown;
 }
@@ -51,12 +61,13 @@ export function ok<T>(value?: T): Result<T | undefined> {
   return { ok: true, value };
 }
 
-export function fail<T = never>(kind: ChatErrorKind, message: string, opts: { retryable?: boolean; cause?: unknown } = {}): Result<T> {
-  return { ok: false, error: { kind, message, retryable: opts.retryable ?? defaultRetryable(kind), cause: opts.cause } };
+export function fail<T = never>(kind: ChatErrorKind, message: string, opts: { retryable?: boolean; reason?: string; cause?: unknown } = {}): Result<T> {
+  return { ok: false, error: { kind, message, retryable: opts.retryable ?? defaultRetryable(kind), reason: opts.reason, cause: opts.cause } };
 }
 
 const RETRYABLE: ReadonlySet<ChatErrorKind> = new Set<ChatErrorKind>([
   'unreachable', 'unavailable', 'not-a-member', 'join-inviter-unreachable', 'invitation-not-ready', 'join-host-busy',
+  'node-unreachable', 'claim-failed',
 ]);
 
 export function defaultRetryable(kind: ChatErrorKind): boolean {

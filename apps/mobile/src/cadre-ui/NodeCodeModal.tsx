@@ -1,14 +1,13 @@
 /**
- * SeedApplyModal — paste a base64url cadre seed (produced by another node, e.g.
- * a drone/server via cadre-cli) to join that cadre.
+ * NodeCodeModal — paste a machine's node code (`sereus-join:…`), the text a cadre node
+ * shows while it waits to be claimed. The screen reads the code and asks before
+ * claiming; this only collects the text.
  *
- * The seed carries the peers to dial and the authority that signed it; applying
- * it connects this device to the cadre so its control network gains a cohort.
+ * The code carries the node's one-time claim secret: it is never logged.
  */
 
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   Modal,
   StyleSheet,
   Text,
@@ -22,49 +21,33 @@ import { useCadreTheme, type CadreManagerTheme } from './theme';
 interface Props {
   visible: boolean;
   onClose: () => void;
-  /** Apply the pasted seed; returns how many peers were added, throws on failure. */
-  onApply: (encodedSeed: string) => Promise<{ peersAdded: number }>;
+  /** Read the pasted code: `null` when it is usable (the modal closes), else what is wrong. */
+  onSubmit: (code: string) => Promise<string | null>;
 }
 
-export default function SeedApplyModal({ visible, onClose, onApply }: Props) {
+export default function NodeCodeModal({ visible, onClose, onSubmit }: Props) {
   const theme = useCadreTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const reset = () => {
+  const close = () => {
     setText('');
     setBusy(false);
     setError(null);
-  };
-
-  const close = () => {
-    reset();
     onClose();
   };
 
   const submit = async () => {
     const v = text.trim();
-    if (!v) {
-      setError('Paste a seed code');
-      return;
-    }
+    if (!v) return;
     setBusy(true);
     setError(null);
-    try {
-      const { peersAdded } = await onApply(v);
-      Alert.alert(
-        'Connected',
-        `Seed applied — ${peersAdded} peer(s) added to your cadre.`,
-      );
-      reset();
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
+    const problem = await onSubmit(v);
+    setBusy(false);
+    if (problem) setError(problem);
+    else close();
   };
 
   return (
@@ -72,18 +55,18 @@ export default function SeedApplyModal({ visible, onClose, onApply }: Props) {
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.header}>
-            <Text style={styles.title}>Join with a seed</Text>
+            <Text style={styles.title}>Paste a node code</Text>
             <TouchableOpacity onPress={close} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={22} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
           <Text style={styles.hint}>
-            Paste a seed code produced by another node in your cadre (for example a
-            drone or server via cadre-cli). This connects your phone to that node.
+            A machine waiting to join shows a code starting with sereus-join:. Paste it here
+            to add that machine to your network.
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="seed:…"
+            placeholder="sereus-join:…"
             placeholderTextColor={theme.textMuted}
             value={text}
             onChangeText={(t) => { setText(t); setError(null); }}
@@ -91,7 +74,7 @@ export default function SeedApplyModal({ visible, onClose, onApply }: Props) {
             autoCorrect={false}
             multiline
             editable={!busy}
-            testID="cadre-seed-input"
+            testID="cadre-node-code-input"
           />
           {error && <Text style={styles.error}>{error}</Text>}
           <View style={styles.actions}>
@@ -102,9 +85,9 @@ export default function SeedApplyModal({ visible, onClose, onApply }: Props) {
               style={[styles.btnPrimary, (busy || !text.trim()) && { opacity: 0.5 }]}
               onPress={submit}
               disabled={busy || !text.trim()}
-              testID="cadre-seed-apply"
+              testID="cadre-node-code-next"
             >
-              <Text style={styles.btnPrimaryText}>{busy ? 'Connecting…' : 'Connect'}</Text>
+              <Text style={styles.btnPrimaryText}>Next</Text>
             </TouchableOpacity>
           </View>
         </View>

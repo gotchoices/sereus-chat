@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useT } from '../i18n';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import { EmptyState } from '../components';
-import { parseInviteToken } from '@chat/core';
+import { nodeCodeFromUrl, parseInviteToken } from '@chat/core';
 import { useTheme, typography, spacing, radius } from '../theme';
 
 export default function QrScanner() {
@@ -40,9 +40,12 @@ export default function QrScanner() {
     return () => { mounted = false; };
   }, []);
 
-  // Accepts both the https App Link and the chat:// fallback (inviteLink.ts).
+  // Accepts both the https App Link and the chat:// fallback (inviteLink.ts), and a
+  // machine's node code (`sereus-join:…`), which goes to the cadre manager to be claimed.
+  // A node code carries a claim secret: never log `value`.
   const token = useMemo(() => parseInviteToken(value), [value]);
-  const valid = token !== null;
+  const nodeCode = useMemo(() => nodeCodeFromUrl(value), [value]);
+  const valid = token !== null || nodeCode !== null;
 
   const cameraReady = permission === 'authorized' && device && !isSimulator;
 
@@ -86,7 +89,9 @@ export default function QrScanner() {
         style={[styles.openBtn, { backgroundColor: theme.accent }, !valid && styles.openBtnDisabled]}
         disabled={!valid}
         onPress={() => {
-          if (token) navigation.navigate('InvitationAcceptance', { token });
+          // popTo: back to the cadre manager when the scan started there, else opens it.
+          if (nodeCode) navigation.popTo('CadreManager', { nodeCode });
+          else if (token) navigation.navigate('InvitationAcceptance', { token });
         }}
         accessibilityLabel="Open invite"
         testID="qr-open"

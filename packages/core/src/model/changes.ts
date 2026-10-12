@@ -10,4 +10,6 @@ export interface ChangesModel {
   strand(strandId: string, onChange: () => void): () => void;
   /** This device's addresses or relay reservation changed. */
   reachability(onChange: () => void): () => void;
+  /** The cadre's control network connected or disconnected, or its machines changed. */
+  cadre(onChange: () => void): () => void;
 }

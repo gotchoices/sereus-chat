@@ -34,8 +34,8 @@ notices and why they would act.
 7. Months later he notices the other things a sleeping phone costs him: messages sit until he opens
    the app, reaching into the past makes him wait ([21](21-receiving-media.md)), and nothing wakes
    him however he sets his notifications ([41](41-settings.md)).
-8. So he adds a machine of his own. Those three things change, and he stops depending on anybody
-   else's goodwill to be reachable at all.
+8. So he adds a machine of his own: it shows a code, and he scans or pastes it on his phone. Those
+   three things change, and he stops depending on anybody else's goodwill to be reachable at all.
 9. He can remove a machine later, and is told what he would be giving back.
 
 ### Alternative Path A: the borrowed one goes away
@@ -113,8 +113,6 @@ built. Chat's version deliberately excludes strand membership, because chat has 
 flow ([02](02-start-a-strand.md), [05](05-add-someone-to-a-strand.md)); health puts guests on the
 same page instead.
 
-Known rough edges already recorded in those specs, and the reason this story stays vague: adding a
-machine is currently a seed handed to it out of band rather than anything automatic; removal is not
-fully supported beneath the UI; machine status renders as unknown until live probing is wired; and a
-solo node cannot reliably read its own control database, so the screen must time-box those reads or
-it hangs forever on first visit.
+How a machine is added follows sereus (its "claiming": the machine shows a one-time code, and the
+phone that reads it takes it in). This story stays at that level on purpose, so it holds as sereus
+moves; the detail lives in the component's `SPEC.md`.

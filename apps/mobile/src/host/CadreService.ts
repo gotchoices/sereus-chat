@@ -17,7 +17,6 @@
  */
 
 import {
-  pinnedKeyTrustPolicy,
   type CadreNode,
   type CadreNodeEvents,
   type ControlDatabase,
@@ -26,7 +25,6 @@ import {
 } from '@serfab/cadre-core';
 import {
   createPhoneNode,
-  runOwnerGenesis,
   type PhoneNodeOptions,
   type PhoneNodeStatus,
 } from '@serfab/cadre-rn/phone-node';
@@ -154,8 +152,6 @@ class CadreServiceImpl {
   private pendingNoiseMode: NoiseCryptoMode | null = null;
   private _startError: string | null = null;
   private _startPromise: Promise<void> | null = null;
-  /** Owner genesis that succeeded through `createAuthorityKey` after a start that did not enroll. */
-  private enrolledLate = false;
 
   /** `on()` registrations, so `off()` can find the kit's unsubscribe for a handler. */
   private readonly subscriptions: Array<{ event: string; handler: unknown; unsubscribe: () => void }> = [];
@@ -218,112 +214,16 @@ class CadreServiceImpl {
   }
 
   // -----------------------------------------------------------------------
-  // Authority key + seed flows
+  // Owner
   // -----------------------------------------------------------------------
 
-  /** True iff owner genesis has run and seed flows are armed. */
-  get hasAuthorityKey(): boolean {
+  /**
+   * True once owner genesis has run: this device's identity is an owner of its cadre,
+   * so it can claim machines into it (the core's `cadre` area; sereus 1.14 claiming).
+   */
+  get ownerEnrolled(): boolean {
     const status = phone.status;
-    return status.state === 'running' && (status.owner === 'enrolled' || this.enrolledLate);
-  }
-
-  /** The authority public key (base64url) — the node identity's owner key, once enrolled. */
-  get authorityPublicKey(): string | null {
-    return this.hasAuthorityKey ? phone.ownerPublicKey() : null;
-  }
-
-  /**
-   * The "create authority key" UI affordance. There is nothing to create — the
-   * cadre's owner key IS the node identity — so this runs owner genesis again if the
-   * start's own genesis did not enroll (it is idempotent), and reports the outcome.
-   */
-  async createAuthorityKey(): Promise<{ publicKey: string }> {
-    await this.ensureStarted();
-    const node = phone.node;
-    if (!node) throw new Error('CadreNode not running');
-    if (!this.hasAuthorityKey) {
-      const result = await runOwnerGenesis(node, OWNER_GENESIS_TIMEOUT_MS);
-      if (result !== 'enrolled') throw new Error(`Owner genesis ${result === 'timed-out' ? 'timed out' : 'failed'}`);
-      this.enrolledLate = true;
-    }
-    const publicKey = phone.ownerPublicKey();
-    if (!publicKey) throw new Error('Owner key unavailable');
-    return { publicKey };
-  }
-
-  /**
-   * Reveal the authority private key for offline backup. Use only from explicit
-   * user-confirmed UI ("Export key for recovery") — never log it. Because authority ==
-   * node identity, this IS the device's identity secret, held in the keychain.
-   */
-  async exportAuthorityPrivateKey(): Promise<string | null> {
-    await this.ensureStarted();
-    const node = phone.node;
-    if (!node) return null;
-    try {
-      return node.getIdentityOwnerKey().privateKeyB64;
-    } catch (err) {
-      console.warn('[CadreService] exportAuthorityPrivateKey failed:', err);
-      return null;
-    }
-  }
-
-  /**
-   * Not supported: the authority key is derived from the node identity, and the node
-   * refuses to sign with any key whose public half does not match its PeerId.
-   * Recovering a cadre means restoring the node identity, or enrolling this device as
-   * a new peer of the existing cadre with a seed. See tmp/cadre-key-recovery-upstream.md.
-   */
-  async importAuthorityKey(_privateKeyB64u: string): Promise<{ publicKey: string }> {
-    throw new Error(
-      'Importing a standalone authority key is not supported: the authority key is derived from this ' +
-        "device's node identity. To recover a cadre, restore the node identity key, or enrol this " +
-        'device with a seed from an existing node.',
-    );
-  }
-
-  /**
-   * A base64url seed for bringing a new node (typically a drone, via cadre-cli) into
-   * this cadre. Requires owner genesis.
-   */
-  async createDroneSeed(): Promise<string> {
-    await this.ensureStarted();
-    const node = phone.node;
-    if (!node) throw new Error('CadreNode not running');
-    if (!this.hasAuthorityKey) {
-      throw new Error('No authority key — call createAuthorityKey() first');
-    }
-    const seed = await node.createSeed();
-    return node.encodeSeed(seed);
-  }
-
-  /**
-   * Join an existing cadre from a base64url seed produced by another node. Trust is
-   * pinned to the seed's own `signerKey`: deliberate trust-on-paste, the boundary being
-   * the user choosing to enter this specific seed. Mirrors `applySeed` in
-   * reference-app-rn/src/use-cadre.ts.
-   */
-  async applySeedFromCode(encoded: string): Promise<{ peersAdded: number }> {
-    await this.ensureStarted();
-    const node = phone.node;
-    if (!node) throw new Error('CadreNode not running');
-
-    let seed;
-    try {
-      seed = node.decodeSeed(encoded.trim());
-    } catch {
-      throw new Error('Invalid seed: not a base64url-encoded cadre seed.');
-    }
-    const result = await node.applySeed(seed, {
-      trustPolicy: pinnedKeyTrustPolicy([seed.signerKey]),
-    });
-    if (!result.success) {
-      throw new Error(result.error ?? 'Seed could not be applied.');
-    }
-    console.info(
-      `[CadreService] ✓ applied seed for party ${seed.partyId} — ${result.peersAdded} peer(s) added`,
-    );
-    return { peersAdded: result.peersAdded };
+    return status.state === 'running' && status.owner === 'enrolled';
   }
 
   // -----------------------------------------------------------------------

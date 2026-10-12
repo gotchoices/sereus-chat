@@ -24,11 +24,14 @@ standing state, not the decision.
 Shown here rather than in Settings because a user does not distinguish "a machine of mine" from "a
 relay I borrow": both are how they are connected.
 
-## The shared component. **Not chat's to design.** Its contract is `apps/mobile/src/cadre-ui/SPEC.md`,
-intended for extraction as a shared sereus package; health's *Sereus Connections* is the
-furthest-along sibling.
+## The shared component
 
-Chat owns the route, its entry from Profile, and the theme passed in.
+**Not chat's to design.** Its contract is `apps/mobile/src/cadre-ui/SPEC.md`; much beneath it is
+expected to move into sereus, and health's *Sereus Connections* is its sibling. A machine is added
+by scanning or pasting the code it shows.
+
+Chat owns the route, its entry from Profile, the theme passed in, and the scanner: a scanned node
+code (from here or from the general Scan screen) is handed to this screen.
 
 ## Constraints
 

@@ -25,7 +25,6 @@ import { Avatar, IconButton } from '../components';
 import { reachabilityStore } from '@chat/core';
 import { useModel, useStore } from '../data/bind';
 import { useTheme, useThemeContext, typography, radius } from '../theme';
-import { USE_SEREUS } from '../data/config';
 
 const Stack = createNativeStackNavigator();
 
@@ -240,14 +239,6 @@ export default function AppNavigator() {
   );
 }
 
-/** CadreManager is a self-themed component; feed it our active tokens so it
- *  matches the rest of the app instead of its built-in defaults.
- *
- *  On mocks there is no cadre to read, and the component would sit on its own
- *  loading state forever.  Say so instead — the consolidation is explicit that
- *  this screen must never block (design/generated/mobile/screens/CadreManager.md).
- *  We do NOT reimplement any of the component here; we simply do not mount it
- *  when there is nothing behind it. */
 /** Chat's own section, rendered below the shared component — the seam its own
  *  SPEC sanctions (health uses it for guests).  Relays are how the user is
  *  reachable; a borrowed relay is not one of their machines, which is why the
@@ -348,41 +339,39 @@ function RelayLinkButton({ label, url }: { label: string; url: string }) {
   );
 }
 
-function ThemedCadreManager() {
+/** CadreManager is a self-themed component on the model's `cadre` area; feed it our
+ *  active tokens so it matches the rest of the app. On mocks the model has a sample
+ *  cadre, so the screen is the same either way. */
+function ThemedCadreManager({ route, navigation }: any) {
   const theme = useTheme();
-
-  if (!USE_SEREUS) {
-    return (
-      <View style={{ flex: 1, padding: 16, gap: 8, backgroundColor: theme.background }}>
-        <Text style={{ ...typography.title, color: theme.textPrimary }}>
-          Your machines live on the real network
-        </Text>
-        <Text style={{ ...typography.body, color: theme.textMuted, lineHeight: 22 }}>
-          This build is running on sample data, so there is no cadre to show. On the live network
-          this is where you would see what acts for you, and add something that stays awake so your
-          messages keep moving while your phone is asleep.
-        </Text>
-      </View>
-    );
-  }
+  const model = useModel();
+  // A node code handed over by the scanner; cleared once the component has taken it.
+  const nodeCode: string | undefined = route?.params?.nodeCode;
+  const onNodeCodeHandled = React.useCallback(() => navigation.setParams({ nodeCode: undefined }), [navigation]);
+  const onScan = React.useCallback(() => navigation.navigate('QrScanner'), [navigation]);
+  const cadreTheme = React.useMemo(() => ({
+    background: theme.background,
+    surface: theme.surfaceAlt,
+    border: theme.border,
+    textPrimary: theme.textPrimary,
+    textSecondary: theme.textSecondary,
+    textMuted: theme.textMuted,
+    accent: theme.accent,
+    accentText: theme.accentText,
+    danger: theme.danger,
+    online: theme.success,
+    sectionLabel: theme.textSecondary,
+    backdrop: theme.overlay,
+  }), [theme]);
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.background }}>
     <CadreManager
-      theme={{
-        background: theme.background,
-        surface: theme.surfaceAlt,
-        border: theme.border,
-        textPrimary: theme.textPrimary,
-        textSecondary: theme.textSecondary,
-        textMuted: theme.textMuted,
-        accent: theme.accent,
-        accentText: theme.accentText,
-        danger: theme.danger,
-        online: theme.success,
-        sectionLabel: theme.textSecondary,
-        backdrop: theme.overlay,
-      }}
+      model={model}
+      theme={cadreTheme}
+      nodeCode={nodeCode}
+      onNodeCodeHandled={onNodeCodeHandled}
+      onScan={onScan}
     />
     <RelaySection />
     </ScrollView>

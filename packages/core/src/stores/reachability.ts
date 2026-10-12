@@ -28,3 +28,16 @@ export function outstandingInvitationsStore(model: ChatModel, strandId?: string 
     },
   });
 }
+
+/**
+ * The cadre: this device, its other machines, and whether it is an enrolled owner. Re-read
+ * when the control network connects or drops; a slow backstop poll catches machines
+ * added or removed elsewhere.
+ */
+export function cadreManagerStore(model: ChatModel) {
+  return loader({
+    load: () => model.cadre.status(),
+    changes: onChange => model.changes.cadre(onChange),
+    pollMs: 30_000,
+  });
+}

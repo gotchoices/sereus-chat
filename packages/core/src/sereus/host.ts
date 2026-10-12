@@ -46,6 +46,10 @@ export interface NodeHost {
    */
   getRelayAddrs(): Promise<string[]>;
   applyRelays(addrs: string[]): Promise<void>;
+  /** This party's id: the node's, or the one the next start will use. */
+  partyId(): string | null;
+  /** This device is an enrolled owner (owner genesis ran), so it can sign claims. */
+  ownerEnrolled(): boolean;
   /** The relay reservation's status now (`RelayReservationState.status`), or null with no node. */
   relayStatus(): string | null;
   /** This device's addresses changed (a reservation granted, lost or moved), or its node restarted. */

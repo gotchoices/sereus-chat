@@ -60,10 +60,12 @@ export interface TestParty extends SereusModel {
  */
 export async function createTestParty(tag: string, opts: { relayAddr?: string; listen?: boolean }): Promise<TestParty> {
   const scopes = new Map<string, MemoryRawStorage>();
+  const partyId = `${tag}-${newId()}`;
+  let owned = false;
   const relayAddrs = opts.relayAddr ? [opts.relayAddr] : [];
   const node = new CadreNode({
     privateKey: await generateKeyPair('Ed25519'),
-    controlNetwork: { partyId: `${tag}-${newId()}`, bootstrapNodes: [] },
+    controlNetwork: { partyId, bootstrapNodes: [] },
     profile: 'transaction',
     strandFilter: { mode: 'sAppId', sAppId: CHAT_SAPP_ID },
     storage: {
@@ -94,6 +96,7 @@ export async function createTestParty(tag: string, opts: { relayAddr?: string; l
         const owner = node.getIdentityOwnerKey();
         await node.getControlDatabase()!.ensureOwnerKey(owner.publicKeyB64);
         await node.initializeSeedBootstrap(owner.privateKeyB64);
+        owned = true;
       })();
       return started;
     },
@@ -104,6 +107,8 @@ export async function createTestParty(tag: string, opts: { relayAddr?: string; l
     onRebuilt() { return () => {}; },
     async getRelayAddrs() { return [...relayAddrs]; },
     async applyRelays() { throw new Error('the test host does not change relays'); },
+    partyId: () => partyId,
+    ownerEnrolled: () => owned,
     relayStatus: () => (node.isRunning ? node.getRelayReservationState()?.status ?? null : null),
     onReachabilityChange(callback) {
       const control = node.getControlNode();

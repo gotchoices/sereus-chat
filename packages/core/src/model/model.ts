@@ -6,6 +6,7 @@
  * Chat's product model, not a general one (docs/app-family.md). Semantics:
  * design/specs/domain/ops.md.
  */
+import type { CadreModel } from './cadre.js';
 import type { ChangesModel } from './changes.js';
 import type { InvitationsModel } from './invitations.js';
 import type { MediaModel } from './media.js';
@@ -27,5 +28,6 @@ export interface ChatModel {
   profile: ProfileModel;
   prefs: PrefsModel;
   reachability: ReachabilityModel;
+  cadre: CadreModel;
   changes: ChangesModel;
 }
