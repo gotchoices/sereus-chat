@@ -92,7 +92,7 @@ export default function App() {
         // stored strands about 100 ms after start and never re-offers them — then
         // start the node, then re-attach strands joined through someone else's
         // invitation, last because it is the only step that dials other parties.
-        const { bootSereus } = await import('./src/data/adapter');
+        const { bootSereus } = await import('./src/data/model');
         await bootSereus();
       } catch (err) {
         // Expected on a solo node: attaching the default strand reads the

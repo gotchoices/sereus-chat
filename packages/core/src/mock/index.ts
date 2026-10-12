@@ -252,11 +252,15 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
     },
 
     reachability: {
-      async get() { return { reachable: !isUnreachable(), relayPending: false }; },
+      async get() { return { reachable: !isUnreachable(), relayPending: false, relays: prefs.relayAddrs, relayStatus: null }; },
     },
 
     changes: {
       strands(onChange) {
+        strandsListeners.add(onChange);
+        return () => { strandsListeners.delete(onChange); };
+      },
+      reachability(onChange) {
         strandsListeners.add(onChange);
         return () => { strandsListeners.delete(onChange); };
       },

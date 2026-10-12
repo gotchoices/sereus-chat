@@ -6,6 +6,13 @@ export type Reachability = {
    * "nowhere to be reached": the user has just done what that screen asked of them.
    */
   relayPending: boolean;
+  /** The relays this device is configured with. */
+  relays: string[];
+  /**
+   * The relay reservation, read live: a configured relay is not a working one. `null`
+   * when there is no node (the mock, or before start).
+   */
+  relayStatus: 'none' | 'dialing' | 'reserved' | 'failed' | (string & {}) | null;
 };
 
 export interface ReachabilityModel {

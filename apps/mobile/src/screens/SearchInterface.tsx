@@ -11,13 +11,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, FlatList, StyleSheet } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { search } from '../data/adapter';
-import type { SearchHit } from '../data/types';
+import type { SearchHit } from '@chat/core';
+import { orThrow, useModel } from '../data/bind';
 import { useT } from '../i18n';
 import { ListRow, EmptyState, Banner } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
 export default function SearchInterface() {
+  const model = useModel();
   const navigation: any = useNavigation();
   const route: any = useRoute();
   const scopedStrandId: string | undefined = route?.params?.strandId;
@@ -39,7 +40,8 @@ export default function SearchInterface() {
     abort.current = ctrl;
     setHits([]); setProgress(null); setError(null); setRunning(true);
     try {
-      for await (const batch of search(q, { strandId: scopedStrandId, signal: ctrl.signal })) {
+      for await (const result of model.search.run(q, { strandId: scopedStrandId, signal: ctrl.signal })) {
+        const batch = orThrow(result);
         if (ctrl.signal.aborted) return;
         // Append only — never reorder what the reader is already looking at.
         setHits(prev => [...prev, ...batch.results]);
@@ -50,7 +52,7 @@ export default function SearchInterface() {
     } finally {
       if (!ctrl.signal.aborted) setRunning(false);
     }
-  }, [scopedStrandId]);
+  }, [model, scopedStrandId]);
 
   useEffect(() => {
     const id = setTimeout(() => void run(query), 300);

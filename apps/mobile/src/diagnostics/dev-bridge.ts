@@ -20,11 +20,12 @@
  * `__chatDev.start(id, method, ...args)` and its outcome collected later with
  * `__chatDev.take(id)` → undefined while pending, then { ok, value } or { ok: false, error }.
  *
- * `arm` subscribes with `watchStrand` and records the first time each message's text
+ * `arm` subscribes with `changes.strand` and records the first time each message's text
  * appears after a wake, so "seen" measures the watch path the chat screen relies on,
  * not a poll. Installed only when `__DEV__`.
  */
-import { listStrands, listMessages, send, watchStrand, createInvitation, acceptInvitation, getPrefs, setPrefs } from '../data/adapter';
+import { orThrow } from '../data/bind';
+import { chatModel as model } from '../data/model';
 import { parseInviteToken } from '@chat/core';
 import { cadreService } from '../host/CadreService';
 
@@ -47,8 +48,7 @@ type NodeLike = { getConnections(): ConnLike[] };
 
 /** Every libp2p node this party runs, labelled: the control node and one per live strand. */
 function libp2pNodes(): Array<[string, NodeLike]> {
-  // Dev-only reach past the service's boundary: the cadre node is private there.
-  const cadre = (cadreService as unknown as { node?: { getControlNode(): NodeLike | null } }).node;
+  const cadre = cadreService.cadreNode as unknown as { getControlNode(): NodeLike | null } | null;
   const out: Array<[string, NodeLike]> = [];
   const control = cadre?.getControlNode();
   if (control) out.push(['control', control]);
@@ -96,7 +96,7 @@ const firstSeen = new Map<string, number>();
 const armed = new Map<string, () => void>();
 
 async function record(strandId: string): Promise<void> {
-  const msgs = await listMessages(strandId);
+  const msgs = orThrow(await model.messages.list(strandId));
   const now = Date.now();
   for (const m of msgs) if (!firstSeen.has(m.content)) firstSeen.set(m.content, now);
 }
@@ -105,11 +105,11 @@ export function installDevBridge(): void {
   if (!__DEV__) return;
   const bridge: Bridge = {
     async strands() {
-      return (await listStrands()).map(s => ({ id: s.id, title: s.title }));
+      return orThrow(await model.strands.list()).map(s => ({ id: s.id, title: s.title }));
     },
     async send(strandId, text) {
       const t0 = Date.now();
-      await send(strandId, { content: text, replyToId: null });
+      orThrow(await model.messages.send(strandId, { content: text, replyToId: null }));
       return { ms: Date.now() - t0 };
     },
     async arm(strandId) {
@@ -117,8 +117,7 @@ export function installDevBridge(): void {
       // Armed only once the strand can be read: the watch itself subscribes even
       // before a strand opens, so it says nothing about whether the strand is up.
       try { await record(strandId); } catch { return false; }
-      const unwatch = await watchStrand(strandId, () => { void record(strandId).catch(() => {}); });
-      if (!unwatch) return false;
+      const unwatch = model.changes.strand(strandId, () => { void record(strandId).catch(() => {}); });
       armed.set(strandId, unwatch);
       return true;
     },
@@ -126,20 +125,20 @@ export function installDevBridge(): void {
       return firstSeen.get(text) ?? null;
     },
     async invite() {
-      const inv = await createInvitation({ visibility: 'private', grantsInviteRight: false });
+      const inv = orThrow(await model.invitations.create({ visibility: 'private', grantsInviteRight: false }));
       return { url: inv.url, strandId: inv.strandId };
     },
     traffic(seconds) {
       return sampleTraffic(seconds);
     },
     async relays(addrs) {
-      if (addrs) await setPrefs({ relayAddrs: addrs });
-      return (await getPrefs()).relayAddrs;
+      if (addrs) orThrow(await model.prefs.set({ relayAddrs: addrs }));
+      return orThrow(await model.prefs.get()).relayAddrs;
     },
     async accept(url) {
       const token = parseInviteToken(url);
       if (!token) throw new Error('not an invitation link');
-      return acceptInvitation(token);
+      return orThrow(await model.invitations.accept(token));
     },
     start(id, method, ...args) {
       const call = (bridge[method] as (...a: unknown[]) => Promise<unknown>)(...args);

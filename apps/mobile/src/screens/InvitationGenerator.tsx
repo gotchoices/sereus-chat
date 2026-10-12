@@ -9,16 +9,21 @@
  * conversation is already under way.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, Switch, StyleSheet, Share, Alert, Linking, ActivityIndicator } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import QRCode from 'react-native-qrcode-svg';
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import { createInvitation, listOutstandingInvitations, cancelInvitation, reachability, getProfile, getStrandState } from '../data/adapter';
-import type { Invitation, InvitationValidity } from '../data/types';
-import { INVITATION_VALIDITY, defaultInvitationTerms } from '../data/types';
+import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
+import {
+  INVITATION_VALIDITY, defaultInvitationTerms, loader, ok, outstandingInvitationsStore, reachabilityStore,
+  type Invitation, type InvitationValidity,
+} from '@chat/core';
+import { useModel, useStore } from '../data/bind';
+
+const NO_INVITATIONS: Invitation[] = [];
+/** Before a new strand's first invitation there is no strand, and nothing to list. */
+const NO_INVITATIONS_STORE = loader<Invitation[]>({ load: async () => ok(NO_INVITATIONS) });
 import { useT } from '../i18n';
-import { UnreachableError } from '../data/errors';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Banner, IconButton, ListRow, SectionHeader } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
@@ -48,13 +53,21 @@ export default function InvitationGenerator() {
   const [termsTouched, setTermsTouched] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
-  const [outstanding, setOutstanding] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(false);
   const [showQr, setShowQr] = useState(true);   // human spec: default on
   const [error, setError] = useState<string | null>(null);
   const [unreachable, setUnreachable] = useState(false);
+  const model = useModel();
+  const focused = useIsFocused();
+  /**
+   * Reachability, live while "nowhere to answer" is showing: coming back from choosing
+   * a relay (story 02 6.4, story 42 step 6), the panel must not outlive the problem. The
+   * core's store re-reads when this device's addresses change (no 3 s poll).
+   */
+  const reach = useStore(useMemo(() => reachabilityStore(model), [model]), focused && unreachable);
   /** A relay has been chosen but is not carrying anybody yet. */
-  const [relayPending, setRelayPending] = useState(false);
+  const relayPending = unreachable && !!reach.value && !reach.value.reachable && reach.value.relayPending;
+  useEffect(() => { if (unreachable && reach.value?.reachable) setUnreachable(false); }, [unreachable, reach.value]);
   /** When the current wait for a chosen relay began, to stop it spinning silently forever. */
   const [pendingSince, setPendingSince] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -78,44 +91,29 @@ export default function InvitationGenerator() {
   // strand it leads into (story 02), and other strands' belong on their own
   // detail screens. Before a new strand's first invitation there is no strand,
   // so there is nothing to list.
-  const refresh = useCallback(() => {
-    if (!strandId) { setOutstanding([]); return; }
-    listOutstandingInvitations()
-      .then(all => setOutstanding(all.filter(i => i.strandId === strandId && i.direction !== 'incoming')))
-      .catch(() => {});
-  }, [strandId]);
-  useEffect(refresh, [refresh]);
-  useEffect(() => { getProfile().then(p => setInviterName(p.name?.trim() ?? '')).catch(() => {}); }, []);
+  const outstandingStore = useMemo(
+    () => (strandId ? outstandingInvitationsStore(model, strandId) : null),
+    [model, strandId],
+  );
+  const outstandingView = useStore(outstandingStore ?? NO_INVITATIONS_STORE, focused);
+  const outstanding = outstandingView.value ?? NO_INVITATIONS;
+  const refresh = useCallback(() => { outstandingStore?.reload(); }, [outstandingStore]);
+  useEffect(() => {
+    void model.profile.get().then(p => { if (p.ok) setInviterName(p.value.name?.trim() ?? ''); });
+  }, [model]);
 
   // Opened from a Pending row: show the invitation it names, and let any new one
   // go into the same strand.
   useEffect(() => {
     if (!routeToken) return;
-    listOutstandingInvitations().then(list => {
-      const found = list.find(i => i.token === routeToken);
+    void model.invitations.listOutstanding().then(list => {
+      const found = list.ok ? list.value.find(i => i.token === routeToken) : undefined;
       if (found) {
         setInvitation(found);
         if (found.strandId) setFoundedStrandId(found.strandId);
       }
-    }).catch(() => {});
-  }, [routeToken]);
-
-  // Coming back from choosing a relay (story 02 6.4, story 42 step 6): the
-  // "nowhere to answer" panel must not outlive the problem. Re-ask whenever the
-  // screen regains focus, and keep asking while a chosen relay is connecting.
-  const recheckRef = useRef<() => void>(() => {});
-  recheckRef.current = () => {
-    if (!unreachable) return;
-    reachability().then(r => {
-      setRelayPending(!r.reachable && r.relayPending);
-      if (r.reachable) setUnreachable(false);
-    }).catch(() => {});
-  };
-  useFocusEffect(useCallback(() => {
-    recheckRef.current();
-    const id = setInterval(() => recheckRef.current(), 3000);
-    return () => clearInterval(id);
-  }, []));
+    });
+  }, [model, routeToken]);
 
   // Defaults by strand kind: the choice on a new strand, or the existing strand's own.
   useEffect(() => {
@@ -125,11 +123,11 @@ export default function InvitationGenerator() {
   }, [visibility, termsTouched, addingToExisting]);
   useEffect(() => {
     if (!addingToExisting || !routeStrandId) return;
-    getStrandState(routeStrandId).then(st => {
-      if (termsTouched) return;
-      const d = defaultInvitationTerms(st.visibility);
+    void model.strands.state(routeStrandId).then(st => {
+      if (!st.ok || termsTouched) return;
+      const d = defaultInvitationTerms(st.value.visibility);
       setSingleUse(d.singleUse); setValidity(d.validity);
-    }).catch(() => {});
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addingToExisting, routeStrandId]);
 
@@ -148,14 +146,16 @@ export default function InvitationGenerator() {
   const generate = useCallback(async () => {
     if (loading) return;
     setLoading(true); setError(null); setUnreachable(false);
-    try {
-      const minted = await createInvitation({
+    const result = await model.invitations.create({
         strandId,
         visibility: addingToExisting ? undefined : visibility,
         grantsInviteRight,
         singleUse,
         validForMs: INVITATION_VALIDITY[validity],
       });
+    setLoading(false);
+    if (result.ok) {
+      const minted = result.value;
       // Dev-only: an invitation is a QR or a share sheet for a real user, but in
       // development it has to cross from one device to another with no camera in
       // the loop.  Logging the URL lets `link.sh` deliver it to the other device.
@@ -163,20 +163,15 @@ export default function InvitationGenerator() {
       setInvitation(minted);
       if (!strandId && minted.strandId) setFoundedStrandId(minted.strandId);
       refresh();
-    } catch (err) {
-      setInvitation(null);
-      // Story 02 Alt A: "nowhere to be reached yet" is not an error he caused,
-      // so it never goes through the error Banner (which offers a Retry that
-      // could not possibly work).  It gets its own state, below.
-      if (err instanceof UnreachableError) {
-        setUnreachable(true); setError(null);
-        reachability().then(r => setRelayPending(r.relayPending)).catch(() => {});
-      }
-      else { setError(err instanceof Error ? err.message : String(err)); }
-    } finally {
-      setLoading(false);
+      return;
     }
-  }, [loading, strandId, addingToExisting, visibility, grantsInviteRight, singleUse, validity, refresh]);
+    setInvitation(null);
+    // Story 02 Alt A: "nowhere to be reached yet" is not an error he caused, so it
+    // never goes through the error Banner (which offers a Retry that could not
+    // possibly work).  It gets its own state, below.
+    if (result.error.kind === 'unreachable') { setUnreachable(true); setError(null); }
+    else setError(result.error.message);
+  }, [loading, model, strandId, addingToExisting, visibility, grantsInviteRight, singleUse, validity, refresh]);
 
   // What goes in the message. A bare 600-character link says nothing about what
   // it is to somebody who has never heard of the app.
@@ -493,7 +488,7 @@ export default function InvitationGenerator() {
                     'Taking it off this list does not cancel it: whoever holds it can still use it until it runs out.'), [
                   { text: t('common.shareAgain', 'Share again'), onPress: () => Share.share({ message: shareText(inv.url) }) },
                   { text: t('screens.invite.forget', 'Take it off the list'), style: 'destructive',
-                    onPress: () => cancelInvitation(inv.id).then(refresh).catch(() => {}) },
+                    onPress: () => { void model.invitations.cancel(inv.id).then(refresh); } },
                   { text: t('common.cancel', 'Cancel'), style: 'cancel' },
                 ])}
               />

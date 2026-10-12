@@ -423,27 +423,83 @@ Ed25519 file until sereus#33) and lifecycle runner.
   watch subscribes even before a strand opens, so arming said nothing about
   readiness, and the first send went out mid-start.
 
-## Phase 6 — Stores
+## Phase 6 — Stores (6a–6e done 2026-10-12; 6f open)
 
-- [ ] Store primitive (`subscribe`, `get`, stable immutable snapshots,
-      reference-counted start and stop)
-- [ ] Loader store: `loading`/`ready`/`failed` over `Result<T>`, change-driven,
-      debounced, one read at a time, optional backstop poll
-- [ ] Strand-list store: replaces `StrandList` polling and its `watchStrand`
-      wiring; owns sort order and the settling / failed / ready states
-- [ ] Chat store: replaces `ChatInterface` polling; owns paging, the pending
-      "Sending…" rows, and the read cursor
-- [ ] Invitation store: expiry countdown and recheck from `InvitationGenerator`
-- [ ] Reachability store: replaces `AppNavigator`'s 4 s poll of the relay
-      reservation state with the node's events
-- [ ] Cadre-manager store from `cadre-ui/useCadreManager.ts`
-- [ ] Stores expose status codes; user-facing text comes from the string
-      catalogs
-- [ ] `apps/mobile` screens bind through a `useStore` hook over
-      `useSyncExternalStore`; no screen imports the model or the stack, and the
-      Phase 3 lint rule reports zero violations
-- [ ] Idle check on the phones: `devcall.mjs <dev> traffic 60` shows no more
-      traffic than before the move
+Done in steps, each type-checked and run on a phone.
+
+- [x] **6a. Primitives** (`core/stores`).
+      - `writable` (the Svelte contract plus `get()`, stable snapshots,
+        reference-counted start and stop) and `derived`.
+      - `loader`: `loading`/`ready`/`failed` over `Result<T>`, with `error` kept
+        beside a stale value. Change-driven, debounced, one read at a time with
+        one more if asked during a read, and an optional backstop poll.
+      - App: `src/data/model.ts` (the one `ChatModel`, chosen by `USE_SEREUS`) and
+        `src/data/bind.ts`:
+        - `useStore(store, active)`, where `active` false (an unfocused screen)
+          stops the store's work;
+        - `useModel()` and `useLoader()`;
+        - `orThrow`, in `or-throw.ts`.
+- [x] **6b. Strand list.** `strandListStore` reads strands, invitation counts,
+      member names, settling and boot error.
+      - It re-reads on `changes.strands` and on a watch for every listed strand,
+        polling every 3 s while settling and every 60 s after.
+      - `sortStrands` and `matchesStrand` (the mute and mention ranking, and
+        narrowing) are core policy.
+      - The screen binds only while focused. Its polling and `watchStrand` wiring
+        are gone.
+- [x] **6c. Chat.** `chatStore` reads messages, members, state, the invitation
+      count while nobody else is here, and `opening`.
+      - `send` shows a pending row (`isSending`) until the stored message
+        replaces it, or, on failure, drops it and returns the error. `edit`
+        shows at once; `delete` and `react` re-read.
+      - It re-reads on `changes.strand`, polling every 10 s while opening and
+        every 30 s after.
+      - On the S7: the list and chat rendered from the stores, and a message
+        typed in the composer showed "Sending…", then stored.
+- [x] **6d. Invitations and reachability.**
+      - New in the model: `changes.reachability`. `Reachability` gains `relays`
+        and `relayStatus`. The host adds `relayStatus()` and
+        `onReachabilityChange()`, driven by `CadreService`'s address watcher and
+        its node status.
+      - New stores: `reachabilityStore` (event-driven, 30 s backstop) and
+        `outstandingInvitationsStore`.
+      - The navigator's relay section dropped its 4 s poll and
+        `InvitationGenerator` its 3 s recheck. The generator detects "nowhere to
+        answer" by the `unreachable` kind.
+- [x] **6e. Every other screen on the model; the adapter deleted.**
+      - `StrandDetail`, `InvitationAcceptance`, `Profile`, `Settings`,
+        `RelayOffer`, `SearchInterface`, `StrandMedia`, `MediaViewer`,
+        `Diagnostics`, the dev bridge and `two-party-check` all use
+        `useModel()`/`chatModel` with results; one-call try/catch blocks use
+        `orThrow`.
+      - Deleted: `data/adapter.ts`, `legacy-adapter.ts`, `types.ts`, `errors.ts`.
+        `src/data/` is now `model`, `bind`, `or-throw`, `config`, `data-format`,
+        `mock-fixtures`, `persisted-names` and `attachmentDraft`.
+      - Fixed on the way: the bridge's `traffic` had lost the control node since
+        2a (it read a removed field), and leave/forget failures now show instead
+        of being dropped.
+- [ ] **6f. Cadre manager.** `cadre-ui/` still calls `CadreService` directly: authority
+      key, seeds, the device list. That is not a stack import, so lint allows it,
+      but web needs the same screen. It needs a `cadre` namespace in the model, the
+      host methods behind it, and a store.
+- Checks:
+  - Core: 47 tests, including the stores against the mock (pending and
+    failed sends, strand-list contents, mute ranking).
+  - App: `tsc` clean; Jest 7 pass (`App*.tsx` still fail as before).
+  - Lint: 14 stack-import violations, all in `diagnostics/` (Phase 8), so
+    "zero" waits for Phase 8.
+  - Two phones (bridge path): all messages delivered.
+  - The S7's loop sits at 5–11% blocked with the list on screen.
+- Open: the emulator's loop is 51–55% blocked even when idle, and its strand took 44 s to
+  open (5.6 s in the 2b recheck).
+  - **Why it looks like the emulator:** a CPU profile shows no store code
+    among the busy functions; the time goes to network encryption and
+    streams, as in the S7's idle profile. Android's own `system_server` and
+    `surfaceflinger` sit at about 65% CPU each.
+  - **Likely cause:** recovery from the cache trim and app recompile after
+    the 2a install.
+  - **To do:** cold-boot the emulator and re-measure before trusting its
+    numbers.
 
 **→ `apps/web` can start here.**
 

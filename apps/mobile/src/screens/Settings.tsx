@@ -11,8 +11,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { getPrefs, setPrefs, storageUsage } from '../data/adapter';
-import type { Prefs, StorageUsage } from '../data/types';
+import type { Prefs, StorageUsage } from '@chat/core';
+import { orThrow, useModel } from '../data/bind';
 import { useT } from '../i18n';
 import { Banner, ListRow, SectionHeader } from '../components';
 import { useTheme, useThemeContext, typography, spacing, radius } from '../theme';
@@ -45,6 +45,7 @@ function Choice<T extends string>({ options, value, onChange }: {
 }
 
 export default function Settings() {
+  const model = useModel();
   const navigation: any = useNavigation();
   const t = useT();
   const theme = useTheme();
@@ -54,12 +55,12 @@ export default function Settings() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getPrefs().then(setLocal).catch(() => {});
-    storageUsage().then(setUsage).catch(e => setError(e?.message ?? 'Could not measure storage'));
-  }, []);
+    void model.prefs.get().then(r => { if (r.ok) setLocal(r.value); });
+    void model.media.storageUsage().then(r => (r.ok ? setUsage(r.value) : setError(r.error.message)));
+  }, [model]);
 
   const patch = async (p: Partial<Prefs>) => {
-    const next = await setPrefs(p);
+    const next = orThrow(await model.prefs.set(p));
     setLocal(next);
     if (p.theme && typeof setScheme === 'function') setScheme(p.theme);
   };

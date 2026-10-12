@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Linking } from 'react-native';
-import { setMockVariant } from '../data/adapter';
+import { setMockVariant } from '../data/model';
 
 export type Variant = 'happy' | 'empty' | 'error' | string;
 

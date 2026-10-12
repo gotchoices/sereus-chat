@@ -604,13 +604,13 @@ export function createSereusModel(host: ChatHost): SereusModel {
       async get() {
         const node = host.node.node;
         const reachable = !!node && node.getMultiaddrs().length > 0;
-        if (reachable) return { reachable, relayPending: false };
-        const relays = await host.node.getRelayAddrs().catch(() => []);
-        return { reachable, relayPending: relays.length > 0 };
+        const relays = await host.node.getRelayAddrs().catch(() => [] as string[]);
+        return { reachable, relayPending: !reachable && relays.length > 0, relays, relayStatus: host.node.relayStatus() };
       },
     },
 
     changes: {
+      reachability: onChange => host.node.onReachabilityChange(onChange),
       strands(onChange) {
         const events = [...STRAND_UP_EVENTS, ...STRAND_DOWN_EVENTS, 'strand:discovered'] as const;
         const unsubscribe = events.map(event => host.node.on(event, () => onChange()));

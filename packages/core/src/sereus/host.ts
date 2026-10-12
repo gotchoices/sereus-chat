@@ -46,6 +46,10 @@ export interface NodeHost {
    */
   getRelayAddrs(): Promise<string[]>;
   applyRelays(addrs: string[]): Promise<void>;
+  /** The relay reservation's status now (`RelayReservationState.status`), or null with no node. */
+  relayStatus(): string | null;
+  /** This device's addresses changed (a reservation granted, lost or moved), or its node restarted. */
+  onReachabilityChange(callback: () => void): () => void;
 }
 
 export interface ChatHost {

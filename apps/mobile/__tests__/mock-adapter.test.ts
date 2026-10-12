@@ -1,42 +1,39 @@
 /**
- * The app's mock path: the core's mock model, over this app's bundled fixture list,
- * behind the throwing adapter screens still call (docs/STATUS.md, Phase 4).
+ * The app's mock path: the core's mock model over this app's bundled fixture list —
+ * every fixture the app bundles is there, and failures come back as model results.
  */
 import { createMockModel } from '@chat/core';
 import { appFixtures } from '../src/data/mock-fixtures';
-import { adapterFromModel } from '../src/data/legacy-adapter';
-import { UnreachableError } from '../src/data/errors';
+import { orThrow } from '../src/data/or-throw';
 
-function mock() {
-  const { model, controls } = createMockModel(appFixtures);
-  return { adapter: adapterFromModel(model), controls };
-}
-
-describe('mock adapter over the core model', () => {
+describe('mock model over the bundled fixtures', () => {
   it('serves every fixture the app bundles', async () => {
-    const { adapter } = mock();
-    const strands = await adapter.listStrands();
+    const { model } = createMockModel(appFixtures);
+    const strands = orThrow(await model.strands.list());
     expect(strands.length).toBeGreaterThan(0);
     const id = strands[0].id;
-    await expect(adapter.listMessages(id)).resolves.toBeInstanceOf(Array);
-    await expect(adapter.listMembers(id)).resolves.toBeInstanceOf(Array);
-    await expect(adapter.listAttachments(id)).resolves.toBeInstanceOf(Array);
-    await expect(adapter.getStrandState(id)).resolves.toHaveProperty('settled');
-    await expect(adapter.listOutstandingInvitations()).resolves.toBeInstanceOf(Array);
-    await expect(adapter.storageUsage()).resolves.toHaveProperty('totalBytes');
-    await expect(adapter.getProfile()).resolves.toHaveProperty('name');
-    await expect(adapter.getPrefs()).resolves.toHaveProperty('theme');
+    expect(orThrow(await model.messages.list(id))).toBeInstanceOf(Array);
+    expect(orThrow(await model.members.list(id))).toBeInstanceOf(Array);
+    expect(orThrow(await model.media.list(id))).toBeInstanceOf(Array);
+    expect(orThrow(await model.strands.state(id))).toHaveProperty('settled');
+    expect(orThrow(await model.invitations.listOutstanding())).toBeInstanceOf(Array);
+    expect(orThrow(await model.media.storageUsage())).toHaveProperty('totalBytes');
+    expect(orThrow(await model.profile.get())).toHaveProperty('name');
+    expect(orThrow(await model.prefs.get())).toHaveProperty('theme');
   });
 
-  it('throws the model error with its kind', async () => {
-    const { adapter, controls } = mock();
+  it('turns a failed result into an Error with its kind', async () => {
+    const { model, controls } = createMockModel(appFixtures);
     controls.setVariant('error');
-    await expect(adapter.listStrands()).rejects.toMatchObject({ kind: 'unavailable', retryable: true });
+    const result = await model.strands.list();
+    expect(() => orThrow(result)).toThrow();
+    try { orThrow(result); } catch (e) { expect(e).toMatchObject({ kind: 'unavailable', retryable: true }); }
   });
 
-  it('throws UnreachableError for the unreachable kind', async () => {
-    const { adapter, controls } = mock();
+  it('reports the unreachable kind for an invitation with nowhere to answer', async () => {
+    const { model, controls } = createMockModel(appFixtures);
     controls.setVariant('unreachable');
-    await expect(adapter.createInvitation({ grantsInviteRight: false })).rejects.toBeInstanceOf(UnreachableError);
+    const created = await model.invitations.create({ grantsInviteRight: false });
+    expect(created.ok ? null : created.error.kind).toBe('unreachable');
   });
 });

@@ -21,7 +21,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, typography, spacing, radius } from '../theme';
-import type { StrandState } from '../data/types';
+import type { StrandState } from '@chat/core';
 
 export type StrandStatusKind = 'public' | 'canChange' | 'settled';
 

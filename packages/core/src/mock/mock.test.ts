@@ -22,7 +22,7 @@ describe('mock variants', () => {
     controls.setVariant('unreachable');
     const created = await model.invitations.create({ grantsInviteRight: false });
     expect(created.ok ? null : created.error.kind).toBe('unreachable');
-    expect(await model.reachability.get()).toEqual({ reachable: false, relayPending: false });
+    expect(await model.reachability.get()).toMatchObject({ reachable: false, relayPending: false });
   });
 
   it('serves empty lists in the empty variant, and signals a variant change', async () => {

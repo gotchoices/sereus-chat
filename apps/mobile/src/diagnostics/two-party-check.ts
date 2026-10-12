@@ -41,7 +41,8 @@ import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { LevelDBRawStorage, openOptimysticRNDb } from '@optimystic/db-p2p-storage-rn';
 import { LevelDB, LevelDBWriteBatch } from 'rn-leveldb';
 import { getChatSAppConfig, CHAT_SAPP_ID } from '@chat/core';
-import { getPrefs } from '../data/adapter';
+import { orThrow } from '../data/bind';
+import { chatModel } from '../data/model';
 import { cadreService } from '../host/CadreService';
 import { buildNoiseCrypto, DEFAULT_NOISE_CRYPTO_MODE } from '@serfab/cadre-rn/noise-crypto';
 
@@ -208,7 +209,7 @@ export async function runTwoPartyCheck(opts: TwoPartyOptions = {}): Promise<TwoP
   };
 
   try {
-    const { relayAddrs } = await getPrefs();
+    const { relayAddrs } = orThrow(await chatModel.prefs.get());
     if (!relayAddrs?.length) {
       return { ok: false, detail: 'No relay configured — set one first; this check is about relay-only peers.', log };
     }

@@ -1,10 +1,10 @@
 import React from 'react';
-import { NavigationContainer, DefaultTheme, DarkTheme, useFocusEffect, getStateFromPath as defaultGetStateFromPath } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, getStateFromPath as defaultGetStateFromPath } from '@react-navigation/native';
 import type { LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, Text, Pressable, ScrollView, StyleSheet, Linking, Image } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { getProfile } from '../data/adapter';
+import { chatModel } from '../data/model';
 import StrandList from '../screens/StrandList';
 import SearchInterface from '../screens/SearchInterface';
 import InvitationGenerator from '../screens/InvitationGenerator';
@@ -21,9 +21,9 @@ import Diagnostics from '../screens/Diagnostics';
 import ChatInterface from '../screens/ChatInterface';
 import MediaPicker from '../screens/MediaPicker';
 import { CadreManager } from '../cadre-ui';
-import { cadreService } from '../host';
 import { Avatar, IconButton } from '../components';
-import { getPrefs, setPrefs } from '../data/adapter';
+import { reachabilityStore } from '@chat/core';
+import { useModel, useStore } from '../data/bind';
 import { useTheme, useThemeContext, typography, radius } from '../theme';
 import { USE_SEREUS } from '../data/config';
 
@@ -48,11 +48,11 @@ export default function AppNavigator() {
   const [firstRun, setFirstRun] = React.useState<boolean | null>(null);
   React.useEffect(() => {
     let alive = true;
-    getProfile()
-      .then(p => { if (alive) setFirstRun(!p?.name?.trim()); })
+    void chatModel.profile.get().then(p => {
       // Unreadable profile: treat as a returning user rather than trapping them
       // behind a form they may have already filled in.
-      .catch(() => { if (alive) setFirstRun(false); });
+      if (alive) setFirstRun(p.ok ? !p.value.name?.trim() : false);
+    });
     return () => { alive = false; };
   }, []);
 
@@ -252,38 +252,23 @@ export default function AppNavigator() {
  *  SPEC sanctions (health uses it for guests).  Relays are how the user is
  *  reachable; a borrowed relay is not one of their machines, which is why the
  *  screen is "My network" rather than "My machines". */
+const NO_RELAYS: string[] = [];
+
 function RelaySection() {
   const theme = useTheme();
-  const [addrs, setAddrs] = React.useState<string[]>([]);
-  const [status, setStatus] = React.useState<string | null>(null);
-
-  // Re-read on every focus, not once: accepting a relay on the offer screen
-  // returns HERE, and a mount-only read left "No relay yet" on screen beside a
-  // node that had just become reachable through the relay it names.
-  useFocusEffect(React.useCallback(() => {
-    getPrefs().then(p => setAddrs(p.relayAddrs ?? [])).catch(() => {});
-  }, []));
-
-  /* Listing a relay under "How you are reachable" is a claim, and a configured
-     relay is not a working one: the reservation is granted by the relay and can
-     be lost again afterwards.  So the posture is read live rather than inferred
-     from the fact that an address is saved. */
-  React.useEffect(() => {
-    if (!USE_SEREUS) return;
-    let alive = true;
-    const read = () => {
-      const st = cadreService.getRelayReservationState();
-      if (alive) setStatus(st ? st.status : null);
-    };
-    read();
-    const id = setInterval(read, 4000);
-    return () => { alive = false; clearInterval(id); };
-  }, [addrs]);
+  /* The relays, and whether the reservation holds — read live from the core's
+     reachability store: a configured relay is not a working one, and a reservation
+     can be lost after it was granted. The store re-reads when this device's
+     addresses change (no more 4 s poll), and while the drawer is open only. */
+  const model = useModel();
+  const store = React.useMemo(() => reachabilityStore(model), [model]);
+  const view = useStore(store);
+  const addrs = view.value?.relays ?? NO_RELAYS;
+  const status = view.value?.relayStatus ?? null;
 
   const drop = async (a: string) => {
-    const next = addrs.filter(x => x !== a);
-    setAddrs(next);
-    await setPrefs({ relayAddrs: next }).catch(() => {});
+    await model.prefs.set({ relayAddrs: addrs.filter(x => x !== a) });
+    store.reload();
   };
 
   const short = (a: string) => {

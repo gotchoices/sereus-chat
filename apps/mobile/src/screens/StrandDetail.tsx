@@ -9,11 +9,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert, Share, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import {
-  getStrandState, listMembers, listAttachments, getStrandSettings, setStrandMuted, setStrandArchived,
-  leaveStrand, resignManager, removeMember, listOutstandingInvitations, cancelInvitation,
-} from '../data/adapter';
-import type { StrandState, Member, Attachment, Invitation } from '../data/types';
+import type { StrandState, Member, Attachment, Invitation } from '@chat/core';
+import { useModel } from '../data/bind';
 import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { Avatar, ListRow, Banner, SectionHeader, StrandStatus } from '../components';
@@ -44,27 +41,28 @@ export default function StrandDetail() {
   const [muted, setMuted] = useState<'none' | 'soft' | 'hard'>('none');
   const [archived, setArchived] = useState(false);
 
+  const model = useModel();
   const load = useCallback(async () => {
-    try {
-      const [s, m] = await Promise.all([getStrandState(strandId), listMembers(strandId)]);
-      setState(s);
+    const [s, m] = await Promise.all([model.strands.state(strandId), model.members.list(strandId)]);
+    if (s.ok && m.ok) {
+      setState(s.value);
       // Members: me first, then managers, then everyone else.
-      setMembers([...m].sort((a, b) =>
+      setMembers([...m.value].sort((a, b) =>
         Number(b.isMe) - Number(a.isMe) || Number(b.isManager) - Number(a.isManager) || a.name.localeCompare(b.name)));
       setError(null);
-    } catch (e: any) {
-      setError(e?.message ?? 'Could not load members');
+    } else {
+      setError((!s.ok ? s.error : !m.ok ? m.error : null)?.message ?? 'Could not load members');
     }
-    listAttachments(strandId).then(setMedia).catch(() => {});
-    listOutstandingInvitations()
-      .then(all => setInvites(all.filter(i => i.strandId === strandId && i.direction !== 'incoming')))
-      .catch(() => {});
-    // Device-local settings, read straight from storage — never a reason to fail
-    // the screen, so they are fetched apart from the strand's own data.
-    getStrandSettings(strandId)
-      .then(p => { setMuted(p.muted); setArchived(p.archived); })
-      .catch(() => {});
-  }, [strandId]);
+    void model.media.list(strandId).then(r => { if (r.ok) setMedia(r.value); });
+    void model.invitations.listOutstanding().then(r => {
+      if (r.ok) setInvites(r.value.filter(i => i.strandId === strandId && i.direction !== 'incoming'));
+    });
+    // Device-local settings — never a reason to fail the screen, so they are fetched
+    // apart from the strand's own data.
+    void model.strands.settings(strandId).then(r => {
+      if (r.ok) { setMuted(r.value.muted); setArchived(r.value.archived); }
+    });
+  }, [model, strandId]);
 
   useEffect(() => { void load(); }, [load, rev]);
 
@@ -98,7 +96,7 @@ export default function StrandDetail() {
       [
         { text: t('common.cancel', 'Cancel'), style: 'cancel' },
         { text: t('screens.strand.removeConfirm', 'Remove'), style: 'destructive',
-          onPress: () => removeMember(strandId, m.id).then(load).catch(e => setError(e.message)) },
+          onPress: () => { void model.members.remove(strandId, m.id).then(r => (r.ok ? load() : setError(r.error.message))); } },
       ],
     );
   };
@@ -113,7 +111,7 @@ export default function StrandDetail() {
       [
         { text: t('common.shareAgain', 'Share again'), onPress: () => { void Share.share({ message: inv.url }); } },
         { text: t('screens.invite.forget', 'Take it off the list'), style: 'destructive',
-          onPress: () => { cancelInvitation(inv.id).then(load).catch(() => {}); } },
+          onPress: () => { void model.invitations.cancel(inv.id).then(() => load()); } },
         { text: t('common.cancel', 'Cancel'), style: 'cancel' },
       ],
     );
@@ -136,7 +134,7 @@ export default function StrandDetail() {
       [
         { text: t('common.cancel', 'Cancel'), style: 'cancel' },
         { text: t('screens.strand.resignConfirm', 'Give it up'), style: 'destructive',
-          onPress: () => resignManager(strandId).then(load).catch(e => setError(e.message)) },
+          onPress: () => { void model.members.resignManager(strandId).then(r => (r.ok ? load() : setError(r.error.message))); } },
       ],
     );
   };
@@ -149,7 +147,7 @@ export default function StrandDetail() {
       [
         { text: t('common.cancel', 'Cancel'), style: 'cancel' },
         { text: t('actions.leave', 'Leave'), style: 'destructive',
-          onPress: () => leaveStrand(strandId, { keepIdentity: true }).then(() => navigation.popToTop()) },
+          onPress: () => { void model.strands.leave(strandId, { keepIdentity: true }).then(r => (r.ok ? navigation.popToTop() : setError(r.error.message))); } },
       ],
     );
   };
@@ -176,7 +174,7 @@ export default function StrandDetail() {
             [
               { text: t('common.cancel', 'Cancel'), style: 'cancel' },
               { text: t('screens.strand.forgetIt', 'Forget it'), style: 'destructive',
-                onPress: () => leaveStrand(strandId, { keepIdentity: false }).then(() => navigation.popToTop()) },
+                onPress: () => { void model.strands.leave(strandId, { keepIdentity: false }).then(r => (r.ok ? navigation.popToTop() : setError(r.error.message))); } },
             ],
           ) },
       ],
@@ -272,9 +270,10 @@ export default function StrandDetail() {
           onPress={() => {
             const next = muted === 'none' ? 'soft' : muted === 'soft' ? 'hard' : 'none';
             setMuted(next);
-            setStrandMuted(strandId, next).catch((e: any) => {
+            void model.strands.setMuted(strandId, next).then(r => {
+              if (r.ok) return;
               setMuted(muted);   // put the switch back; it did not take
-              setError(e?.message ?? 'That setting could not be saved');
+              setError(r.error.message);
             });
           }}
         />
@@ -284,9 +283,10 @@ export default function StrandDetail() {
           onPress={() => {
             const next = !archived;
             setArchived(next);
-            setStrandArchived(strandId, next).catch((e: any) => {
+            void model.strands.setArchived(strandId, next).then(r => {
+              if (r.ok) return;
               setArchived(!next);
-              setError(e?.message ?? 'That setting could not be saved');
+              setError(r.error.message);
             });
           }}
         />

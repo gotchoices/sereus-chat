@@ -7,6 +7,7 @@
     "android": "yarn core:build && sh ./scripts/android.sh",
     "android:emu": "yarn core:build && sh ./scripts/android.sh --active-arch-only",
     "emulator": "sh -c '. ./env-defaults.sh && \"${ANDROID_HOME:-$HOME/Library/Android/sdk}/emulator/emulator\" -avd \"$AVD_NAME\" -port \"$EMULATOR_PORT\"'",
+    "emulator:cold": "sh -c '. ./env-defaults.sh && \"${ANDROID_HOME:-$HOME/Library/Android/sdk}/emulator/emulator\" -avd \"$AVD_NAME\" -port \"$EMULATOR_PORT\" -no-snapshot-load'",
     "ios": "react-native run-ios",
     "start": "yarn core:build && sh -c '. ./env-defaults.sh && react-native start --port \"$METRO_PORT\"'",
     "test": "yarn core:build && jest",

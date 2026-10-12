@@ -104,6 +104,13 @@ export async function createTestParty(tag: string, opts: { relayAddr?: string; l
     onRebuilt() { return () => {}; },
     async getRelayAddrs() { return [...relayAddrs]; },
     async applyRelays() { throw new Error('the test host does not change relays'); },
+    relayStatus: () => (node.isRunning ? node.getRelayReservationState()?.status ?? null : null),
+    onReachabilityChange(callback) {
+      const control = node.getControlNode();
+      if (!control) return () => {};
+      control.addEventListener('self:peer:update', callback);
+      return () => control.removeEventListener('self:peer:update', callback);
+    },
   };
   const host: ChatHost = { node: nodeHost, slot: memorySlots() };
   const { model, boot } = createSereusModel(host);

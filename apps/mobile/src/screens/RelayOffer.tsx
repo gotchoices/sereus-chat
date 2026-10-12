@@ -10,7 +10,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { getPrefs, setPrefs } from '../data/adapter';
+import { orThrow, useModel } from '../data/bind';
 import { useT } from '../i18n';
 import { Banner } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
@@ -28,6 +28,7 @@ function parseAddr(addr: string): { host: string | null; peerId: string | null }
 }
 
 export default function RelayOffer() {
+  const model = useModel();
   const navigation: any = useNavigation();
   const route: any = useRoute();
   const addr: string = route?.params?.addr ?? '';
@@ -44,11 +45,11 @@ export default function RelayOffer() {
   const accept = async () => {
     setBusy(true);
     try {
-      const prefs = await getPrefs();
+      const prefs = orThrow(await model.prefs.get());
       const next = prefs.relayAddrs.includes(addr)
         ? prefs.relayAddrs
         : [...prefs.relayAddrs, addr];   // append, never replace
-      await setPrefs({ relayAddrs: next });
+      orThrow(await model.prefs.set({ relayAddrs: next }));
       // Back to whatever sent them looking — usually the invitation they were
       // making (story 42 step 6: "His invitation works"), which re-checks its
       // reachability on focus. Only a cold arrival, with nothing underneath,

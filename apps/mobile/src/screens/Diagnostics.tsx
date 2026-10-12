@@ -17,7 +17,7 @@ import type { CheckResult } from '../diagnostics/found-strand-check';
 import { runHandshakeCostCheck, runSocketFrameCost } from '../diagnostics/handshake-cost';
 import { runTwoPartyCheck } from '../diagnostics/two-party-check';
 import type { TwoPartyResult } from '../diagnostics/two-party-check';
-import { getPrefs } from '../data/adapter';
+import { orThrow, useModel } from '../data/bind';
 import { SectionHeader } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
@@ -34,6 +34,7 @@ const VARIANTS: Variant[] = [
 const TIMEOUT_MS = 10 * 60 * 1000;
 
 export default function Diagnostics() {
+  const model = useModel();
   const theme = useTheme();
   const [running, setRunning] = useState<string | null>(null);
   const [lines, setLines] = useState<string[]>([]);
@@ -83,7 +84,7 @@ export default function Diagnostics() {
 
       // The non-crypto half needs a relay to talk to; skip cleanly without one
       // rather than failing the whole run.
-      const { relayAddrs } = await getPrefs();
+      const { relayAddrs } = orThrow(await model.prefs.get());
       const relay = relayAddrs?.[0];
       const m = relay ? /\/ip4\/([^/]+)\/tcp\/(\d+)\/ws/.exec(relay) : null;
       if (!m) {
@@ -102,7 +103,7 @@ export default function Diagnostics() {
     } finally {
       setRunning(null);
     }
-  }, []);
+  }, [model]);
 
   /**
    * Both sides of a two-party strand, inside this one process.

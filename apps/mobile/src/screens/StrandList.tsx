@@ -4,18 +4,18 @@
  * Consolidation: design/generated/mobile/screens/StrandList.md
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, SectionList, StyleSheet, RefreshControl, Alert, Pressable, ActivityIndicator } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { listStrands, watchStrand, strandsSettling, strandsBootError, retryBoot, listOutstandingInvitations, listMembers, setStrandMuted, setStrandArchived } from '../data/adapter';
-import type { StrandSummary, Invitation } from '../data/types';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { matchesStrand, sortStrands, strandListStore, type StrandSort, type StrandSummary } from '@chat/core';
+import { useModel, useStore } from '../data/bind';
 import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { ActionSheet, Avatar, ListRow, Badge, EmptyState, Banner, IconButton, SectionHeader } from '../components';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTheme, typography, spacing, radius } from '../theme';
 
-type SortMode = 'recent' | 'alpha' | 'unread';
+type SortMode = StrandSort;
 
 /** Relative under a day, date beyond. */
 function when(iso?: string | null): string {
@@ -47,154 +47,46 @@ export default function StrandList() {
   const t = useT();
   const rev = useDataRevision();
   const theme = useTheme();
-  const [strands, setStrands] = useState<StrandSummary[]>([]);
+  /**
+   * The list, its invitation counts, member names and start-up state, from the core's
+   * strand-list store. Bound only while this screen is focused, so a list hidden under
+   * an open chat does no work. The store re-reads when a strand changes, and polls only
+   * as a backstop (see `strandListStore`).
+   */
+  const model = useModel();
+  const store = useMemo(() => strandListStore(model), [model]);
+  const view = useStore(store, useIsFocused());
+  useEffect(() => { if (rev) store.reload(); }, [rev, store]);
   /**
    * Has the first read finished? Until it has, an empty list means "not asked
-   * yet", not "nothing here" — and those must not look the same. Attaching
-   * strands takes seconds on a phone, so the screen used to open on "No strands
-   * yet. Until you have one, nobody can reach you" and then quietly fill in. That
-   * sentence is story 01's introduction to the whole idea; showing it to someone
-   * who HAS strands reads as data loss.
+   * yet", not "nothing here" — and those must not look the same. Story 01's
+   * introduction to strands, shown to someone who HAS strands, reads as data loss.
    */
-  const [loaded, setLoaded] = useState(false);
-  /** True while the node is still opening strands — see `strandsSettling`. */
-  const [settling, setSettling] = useState(true);
-  /**
-   * Why start-up failed, if it did. Without this a failed boot renders as the
-   * same endless spinner as a slow one, which is how a broken app looks exactly
-   * like a patient one.
-   */
-  const [bootError, setBootError] = useState<string | null>(null);
-  const [invites, setInvites] = useState<Invitation[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const loaded = view.state !== 'loading';
+  const strands = useMemo(() => view.value?.strands ?? [], [view.value]);
+  const memberNames = useMemo(() => view.value?.memberNames ?? {}, [view.value]);
+  /** True while the node is still opening strands. */
+  const settling = view.value?.settling ?? view.state === 'loading';
+  /** Why start-up failed — a failed boot must not render as an endless spinner. */
+  const bootError = view.value?.bootError ?? null;
+  const [actionError, setActionError] = useState<string | null>(null);
+  const error = actionError ?? view.error?.message ?? null;
   const [refreshing, setRefreshing] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
-  // Member names per strand, so narrowing can match "the group with Priya in it".
-  // Loaded once with the list — never fetched on a keystroke.
-  const [memberNames, setMemberNames] = useState<Record<string, string[]>>({});
+  const load = useCallback(() => { setActionError(null); store.reload(); }, [store]);
 
-  const load = useCallback(async () => {
-    try {
-      const [s, i] = await Promise.all([
-        listStrands(),
-        listOutstandingInvitations().catch(() => [] as Invitation[]),
-      ]);
-      setStrands(s);
-      setInvites(i);
-      setError(null);
-      const names: Record<string, string[]> = {};
-      await Promise.all(s.map(async st => {
-        try { names[st.id] = (await listMembers(st.id)).map(m => m.name); } catch { names[st.id] = []; }
-      }));
-      setMemberNames(names);
-    } catch (e: any) {
-      setError(e?.message || 'Could not reach your strands right now');
-    } finally {
-      setLoaded(true);
-    }
-    // Asked AFTER the read, so the two agree: if a strand finished opening while
-    // the read was in flight, the next poll picks it up rather than this one
-    // declaring the list empty.
-    try { setSettling(await strandsSettling()); } catch { setSettling(false); }
-    try { setBootError(await strandsBootError()); } catch { /* leave as-is */ }
-  }, []);
-
-  /**
-   * Re-read when a listed strand changes. Each open strand is watched (the same
-   * local `watchStrand` the chat screen uses), and a burst of changes — a send
-   * touches Message and Member — becomes one reload.
-   *
-   * A poll stays, for what no watch can see: a strand that is still opening
-   * (`watchStrand` returns null until it is), and a strand joined from another
-   * party that discovery offers AFTER the boot sweep (seen on sereus 1.8, where
-   * joined strands are recorded party-wide) — with polling stopped it never
-   * appeared, and a phone that had just rejoined its conversation showed "No
-   * strands yet", which reads as data loss. Every 3 s while the node is still
-   * bringing strands up, 10 s while any listed strand is unwatched, then 60 s.
-   *
-   * The 10 s poll was the whole mechanism until 2026-10-09; each pass read every
-   * strand, and each read asks the other member for its latest revision — about
-   * a third of a phone's idle traffic (STATUS, "Where the time goes on 1.14").
-   */
-  const [allWatched, setAllWatched] = useState(false);
-  const loading = useRef<Promise<void> | null>(null);
-  const reloadAfter = useRef(false);
-  /** One read at a time; a request during a read runs once more after it. */
-  const reload = useCallback(() => {
-    if (loading.current) { reloadAfter.current = true; return; }
-    loading.current = load().finally(() => {
-      loading.current = null;
-      if (reloadAfter.current) { reloadAfter.current = false; reload(); }
-    });
-  }, [load]);
-
-  const openIds = useMemo(
-    () => strands.filter(s => !s.opening && !s.pending).map(s => s.id).sort().join(','),
-    [strands],
-  );
-  useFocusEffect(useCallback(() => {
-    const ids = openIds ? openIds.split(',') : [];
-    let alive = true;
-    let debounce: ReturnType<typeof setTimeout> | null = null;
-    const onChange = () => {
-      if (debounce) return;
-      debounce = setTimeout(() => { debounce = null; if (alive) reload(); }, 500);
-    };
-    const unwatch: Array<() => void> = [];
-    void Promise.all(ids.map(id => watchStrand(id, onChange).catch(() => null))).then(subs => {
-      for (const u of subs) if (u) unwatch.push(u);
-      if (!alive) { unwatch.forEach(u => u()); return; }
-      setAllWatched(subs.every(Boolean));
-    });
-    return () => {
-      alive = false;
-      if (debounce) clearTimeout(debounce);
-      unwatch.forEach(u => u());
-      setAllWatched(false);
-    };
-  }, [openIds, reload]));
-
-  useFocusEffect(useCallback(() => {
-    reload();
-    const every = settling ? 3000 : allWatched ? 60_000 : 10_000;
-    const timer = setInterval(reload, every);
-    return () => clearInterval(timer);
-  }, [reload, settling, allWatched]));
-  useEffect(() => { reload(); }, [reload, rev]);
-
-  // Narrowing is free: a string match over names already held.  No adapter
-  // call, no network, works with nothing reachable (story 32).
-  const matches = useCallback((s: StrandSummary) => {
-    const q = query.trim().toLowerCase();
-    if (!q) return true;
-    if (s.title.toLowerCase().includes(q)) return true;
-    return (memberNames[s.id] ?? []).some(n => n.toLowerCase().includes(q));
-  }, [query, memberNames]);
+  // Narrowing is free: a string match over names already held.  No read, no
+  // network, works with nothing reachable (story 32).
+  const matches = useCallback((s: StrandSummary) => matchesStrand(s, query, memberNames), [query, memberNames]);
 
   const sections = useMemo(() => {
     const active = strands.filter(s => !s.archived && !s.pending && matches(s));
     const archived = strands.filter(s => s.archived && matches(s));
 
-    const sorted = [...active].sort((a, b) => {
-      if (sortMode === 'alpha') return a.title.localeCompare(b.title);
-      if (sortMode === 'unread') {
-        const av = a.mentioned ? 1e9 : a.unreadCount;
-        const bv = b.mentioned ? 1e9 : b.unreadCount;
-        return bv - av || a.title.localeCompare(b.title);
-      }
-      // Muted strands are not promoted by ordinary traffic — they keep their
-      // place rather than jumping the list every time somebody talks.  Being
-      // NAMED is not ordinary traffic: a soft mute exists precisely to let a
-      // mention through, so it must be able to surface the row.  Only a hard
-      // mute stays put no matter what, because that is what was asked for.
-      const rank = (x: StrandSummary) =>
-        x.muted === 'hard' ? 0 : x.mentioned || x.muted === 'none'
-          ? Date.parse(x.lastMessage?.timestamp ?? '0')
-          : 0;
-      return rank(b) - rank(a);
-    });
+    // The order is the core's policy (`sortStrands`): mutes and mentions included.
+    const sorted = sortStrands(active, sortMode);
 
     const out: Array<{ title: string | null; data: any[] }> = [];
     // ONE ROW PER STRAND (human spec): there is no Pending section. An outstanding
@@ -214,20 +106,13 @@ export default function StrandList() {
    * count claims nothing about anyone else's. One whose strand is not listed yet
    * is simply not counted until it is — it never becomes a row.
    */
-  const invitesOut = useMemo(() => {
-    const out: Record<string, number> = {};
-    for (const inv of invites) {
-      if (inv.direction === 'incoming' || !inv.strandId) continue;
-      out[inv.strandId] = (out[inv.strandId] ?? 0) + 1;
-    }
-    return out;
-  }, [invites]);
+  const invitesOut = view.value?.invitationsOut ?? {};
   const invitesOutText = (n: number) =>
     n === 0 ? t('screens.strands.noInvitationOut', 'No invitation out')
     : n === 1 ? t('screens.strands.oneInvitationOut', '1 invitation out')
     : t('screens.strands.invitationsOut', '{{n}} invitations out').replace('{{n}}', String(n));
 
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  const onRefresh = async () => { setRefreshing(true); setActionError(null); await store.refresh(); setRefreshing(false); };
 
   /**
    * Long-press menu. An ActionSheet, not `Alert.alert`: Android dialogs hold three
@@ -245,13 +130,13 @@ export default function StrandList() {
 
   const applyMute = async (s: StrandSummary) => {
     const next = s.muted === 'none' ? 'soft' : s.muted === 'soft' ? 'hard' : 'none';
-    try { await setStrandMuted(s.id, next); await load(); }
-    catch (e: any) { setError(e?.message ?? 'That setting could not be saved'); }
+    const done = await model.strands.setMuted(s.id, next);
+    if (done.ok) store.reload(); else setActionError(done.error.message);
   };
 
   const applyHide = async (s: StrandSummary) => {
-    try { await setStrandArchived(s.id, !s.archived); await load(); }
-    catch (e: any) { setError(e?.message ?? 'That setting could not be saved'); }
+    const done = await model.strands.setArchived(s.id, !s.archived);
+    if (done.ok) store.reload(); else setActionError(done.error.message);
   };
 
   const isEmpty = strands.length === 0;
@@ -303,10 +188,8 @@ export default function StrandList() {
             label: t('common.retry', 'Retry'),
             onPress: () => {
               void (async () => {
-                setBootError(null);
-                setSettling(true);
-                try { await retryBoot(); } catch { /* re-read reports it */ }
-                await load();
+                await model.strands.retryBoot(); // a failure shows in the next read
+                store.reload();
               })();
             },
           }}

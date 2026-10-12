@@ -18,12 +18,10 @@ import {
 import { KeyboardEvents } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Clipboard from '@react-native-clipboard/clipboard';
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import {
-  listMessages, listMembers, getStrandState, send, deleteMessage, react, editMessage,
-  listOutstandingInvitations, watchStrand, getDraft, saveDraft, getReadCursor, saveReadCursor,
-} from '../data/adapter';
-import type { Message, Member, StrandState, Attachment } from '../data/types';
+import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
+import { chatStore, isSending } from '@chat/core';
+import { useModel, useStore } from '../data/bind';
+import type { Message, Member, StrandState, Attachment } from '@chat/core';
 import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { ActionSheet,
@@ -31,8 +29,8 @@ import { ActionSheet,
 } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
-/** Id prefix of a message whose write is still in flight. Never a stored id (those are UUIDs). */
-const SENDING_PREFIX = 'sending-';
+const EMPTY_MESSAGES: Message[] = [];
+const EMPTY_MEMBERS: Member[] = [];
 const GROUP_GAP_MS = 5 * 60 * 1000;
 
 const dayOf = (iso: string) => new Date(iso).toDateString();
@@ -107,24 +105,31 @@ export default function ChatInterface() {
   const theme = useTheme();
   const listRef = useRef<FlatList<Row>>(null);
 
-  const [messages, setMessages] = useState<Message[]>([]);
   /**
-   * Messages whose write is still in flight, shown at once and marked "Sending…".
-   * Kept apart from `messages` so the periodic reload cannot drop them, and removed
-   * when the write returns: replaced by the stored message, or taken back into the
-   * composer if it failed.
+   * The conversation, from the core's chat store: messages (with any still being sent,
+   * marked "Sending…"), members, state, and whether the strand is still opening. Bound
+   * only while this screen is focused. The store re-reads when the strand changes —
+   * the watch follows the strand as it opens, sleeps and wakes — with a slow poll
+   * behind it (see `chatStore`).
    */
-  const [outgoing, setOutgoing] = useState<Message[]>([]);
-  const shown = useMemo(() => (outgoing.length ? [...messages, ...outgoing] : messages), [messages, outgoing]);
-  /** False until the first read answers. Before that, "nothing said yet" would be a guess. */
-  const [loaded, setLoaded] = useState(false);
-  const [members, setMembers] = useState<Member[]>([]);
+  const model = useModel();
+  const store = useMemo(() => chatStore(model, strandId), [model, strandId]);
+  const view = useStore(store, useIsFocused());
+  useEffect(() => { if (rev) store.reload(); }, [rev, store]);
+  const shown = view.value?.messages ?? EMPTY_MESSAGES;
+  const members = view.value?.members ?? EMPTY_MEMBERS;
+  const state: StrandState | null = view.value?.state ?? null;
   /** The user's own outstanding invitations for this strand; only read while nobody else is here. */
-  const [invitesOut, setInvitesOut] = useState(0);
+  const invitesOut = view.value?.invitationsOut ?? 0;
+  /** The strand is known but not open on this device yet (cold start, re-attaching). */
+  const opening = view.value?.opening ?? false;
+  /** False until the first read answers (and the strand is open). Before that, "nothing said yet" would be a guess. */
+  const loaded = view.state !== 'loading' && !opening;
   /** Only the user is a member so far: the strand exists, nobody has taken up an invitation yet. */
   const awaitingJoin = members.length > 0 && members.every(m => m.isMe);
-  const [state, setState] = useState<StrandState | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const error = actionError ?? view.error?.message ?? null;
+  const load = useCallback(() => { setActionError(null); store.reload(); }, [store]);
   const [draft, setDraft] = useState('');
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
@@ -138,91 +143,12 @@ export default function ChatInterface() {
     [members],
   );
 
-  /** One refresh at a time: a read can wait seconds on a slow peer (Optimystic#25), and stacked reads were what made the S7 crawl. */
-  const loading = useRef(false);
-  /** The strand is known but not open on this device yet (cold start, re-attaching). */
-  const [opening, setOpening] = useState(false);
-
-  /** A wake arrived during a load: run one more when it finishes, so no change is missed. */
-  const reloadAfter = useRef(false);
-
-  const load = useCallback(async () => {
-    if (loading.current) { reloadAfter.current = true; return; }
-    loading.current = true;
-    try {
-      const [msgs, mem] = await Promise.all([listMessages(strandId), listMembers(strandId)]);
-      setMessages(msgs);
-      setMembers(mem);
-      setError(null);
-      setOpening(false);
-      if (mem.length > 0 && mem.every(m => m.isMe)) {
-        listOutstandingInvitations()
-          .then(all => setInvitesOut(all.filter(i => i.strandId === strandId && i.direction !== 'incoming').length))
-          .catch(() => {});
-      }
-    } catch (e: any) {
-      const message: string = e?.message ?? 'Could not reach this conversation right now';
-      if (/not attached on this device/.test(message)) {
-        // Still opening, not failed: keep the spinner and try again on the next pass.
-        setOpening(true);
-        return;
-      }
-      setError(message);
-    } finally {
-      loading.current = false;
-      if (reloadAfter.current) { reloadAfter.current = false; void Promise.resolve().then(() => load()); }
-    }
-    setLoaded(true);
-    getStrandState(strandId).then(setState).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strandId]);
-
-  useEffect(() => { void load(); }, [load, rev]);
-
-  /**
-   * Incoming messages, which otherwise never arrive.
-   *
-   * A WATCH, with a slow poll behind it. Quereus's `Database.watch` on the strand's
-   * tables (`watchStrand`) wakes on any commit this device's storage applies: its
-   * own, and in a two-person strand the other phone's too, because both store every
-   * block. With sereus 1.12's `strandReactivity` it also wakes on commits applied
-   * only elsewhere (larger strands). A wake reloads; a wake during a load queues
-   * exactly one more.
-   *
-   * The poll stays as the safety net: every 10 s until the watch is in place (the
-   * strand may still be opening), then every 30 s. One pass at a time. 3 s was
-   * tried on 2026-10-02 and reverted: on the S7 a pass takes 2.5–4.4 s, and a 3 s
-   * poll kept it reading almost continuously.
-   */
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-      let unwatch: (() => void) | null = null;
-      let closed = false;
-      let timer: ReturnType<typeof setInterval> | null = null;
-      const arm = async () => {
-        if (unwatch || closed) return;
-        try { unwatch = await watchStrand(strandId, () => { void load(); }); } catch { unwatch = null; }
-        if (closed && unwatch) { unwatch(); unwatch = null; }
-      };
-      const schedule = (ms: number) => {
-        if (timer) clearInterval(timer);
-        timer = setInterval(() => {
-          void load();
-          if (!unwatch) void arm().then(() => { if (unwatch && !closed) schedule(30_000); });
-        }, ms);
-      };
-      void arm().then(() => { if (!closed) schedule(unwatch ? 30_000 : 10_000); });
-      return () => { closed = true; if (timer) clearInterval(timer); unwatch?.(); unwatch = null; };
-    }, [load, strandId]),
-  );
-
   // Draft and read cursor are device-local.  Nothing unsent leaves the phone.
   useEffect(() => {
-    getDraft(strandId).then(v => v && setDraft(v)).catch(() => {});
-    getReadCursor(strandId).then(setReadCursor).catch(() => {});
-  }, [strandId]);
-  useEffect(() => { saveDraft(strandId, draft).catch(() => {}); }, [draft, strandId]);
+    void model.messages.draft(strandId).then(r => { if (r.ok && r.value) setDraft(r.value); });
+    void model.messages.readCursor(strandId).then(r => { if (r.ok) setReadCursor(r.value); });
+  }, [model, strandId]);
+  useEffect(() => { void model.messages.saveDraft(strandId, draft); }, [model, draft, strandId]);
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -263,40 +189,22 @@ export default function ChatInterface() {
       // Edit in place — no version chain, no history (story 13).
       const target = editing;
       setEditing(null); setDraft('');
-      try {
-        await editMessage(strandId, target.id, text);
-        setMessages(prev => prev.map(m => (m.id === target.id
-          ? { ...m, content: text, editedAt: new Date().toISOString() } : m)));
-      } catch (e: any) {
+      const done = await store.edit(target.id, text);
+      if (!done.ok) {
         setDraft(text); setEditing(target);
-        setError(e?.message ?? 'That change could not be saved');
+        setActionError(done.error.message);
       }
       return;
     }
     setDraft('');
     const pendingReply = replyTo?.id ?? null;
     setReplyTo(null);
-    const temp: Message = {
-      id: `${SENDING_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      memberId: me?.id ?? '',
-      content: text,
-      timestamp: new Date().toISOString(),
-      replyToId: pendingReply,
-      editedAt: null,
-      attachments: [],
-      reactions: [],
-    };
-    setOutgoing(prev => [...prev, temp]);
-    try {
-      const msg = await send(strandId, { content: text, replyToId: pendingReply });
-      setMessages(prev => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]));
-      await saveReadCursor(strandId, msg.id);
-    } catch (e: any) {
+    // Shown at once as "Sending…"; the store swaps in the stored message when the write returns.
+    const sent = await store.send({ content: text, replyToId: pendingReply, memberId: me?.id });
+    if (!sent.ok) {
       // A genuine write failure — keep what they wrote.
       setDraft(text);
-      setError(e?.message ?? 'That message could not be written');
-    } finally {
-      setOutgoing(prev => prev.filter(m => m.id !== temp.id));
+      setActionError(sent.error.message);
     }
   };
 
@@ -317,12 +225,12 @@ export default function ChatInterface() {
             { label: t('actions.edit', 'Edit'),
               onPress: () => { setEditing(m); setReplyTo(null); setDraft(m.content); } },
             { label: t('actions.delete', 'Delete'), destructive: true,
-              onPress: () => { void deleteMessage(strandId, m.id).then(load).catch(() => {}); } },
+              onPress: () => { void store.delete(m.id); } },
           ]
         : [
             { label: t('actions.reply', 'Reply'), onPress: () => setReplyTo(m) },
             { label: t('actions.react', 'React 👍'),
-              onPress: () => { void react(strandId, m.id, '👍').then(load).catch(() => {}); } },
+              onPress: () => { void store.react(m.id, '👍'); } },
           ]),
       { label: t('actions.copy', 'Copy'), onPress: () => Clipboard.setString(m.content) },
     ];
@@ -343,8 +251,8 @@ export default function ChatInterface() {
     }
     const m = item.msg;
     const mine = m.memberId === me?.id;
-    const sending = m.id.startsWith(SENDING_PREFIX);
-    const parent = m.replyToId ? messages.find(x => x.id === m.replyToId) : undefined;
+    const sending = isSending(m);
+    const parent = m.replyToId ? shown.find(x => x.id === m.replyToId) : undefined;
     const grouped = m.reactions.reduce<Record<string, { count: number; mine: boolean }>>((acc, r) => {
       const e = (acc[r.symbol] ||= { count: 0, mine: false });
       e.count++; if (r.memberId === me?.id) e.mine = true;

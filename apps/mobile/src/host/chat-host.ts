@@ -36,6 +36,8 @@ const nodeHost: NodeHost = {
   },
   getRelayAddrs: () => cadreService.getRelayAddrs(),
   applyRelays: addrs => cadreService.applyRelays(addrs),
+  relayStatus: () => cadreService.getRelayReservationState()?.status ?? null,
+  onReachabilityChange: callback => cadreService.onReachabilityChange(callback),
 };
 
 export const chatHost: ChatHost = {

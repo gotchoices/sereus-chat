@@ -164,6 +164,20 @@ class CadreServiceImpl {
   /** The address set most recently observed. See `watchReachability`. */
   private lastSeenAddrs: string[] = [];
   private reachabilityListener: (() => void) | null = null;
+  /** Told when this device's addresses change or its node starts or stops. */
+  private readonly reachabilityWatchers = new Set<() => void>();
+
+  /** Subscribe to reachability changes (addresses, reservation, node restarts). */
+  onReachabilityChange(callback: () => void): () => void {
+    this.reachabilityWatchers.add(callback);
+    return () => { this.reachabilityWatchers.delete(callback); };
+  }
+
+  private notifyReachability(): void {
+    for (const callback of this.reachabilityWatchers) {
+      try { callback(); } catch (err) { console.warn('[CadreService] reachability watcher threw:', err); }
+    }
+  }
 
   constructor() {
     phone.onStatus(status => this.onStatus(status));
@@ -468,6 +482,7 @@ class CadreServiceImpl {
   // -----------------------------------------------------------------------
 
   private onStatus(status: PhoneNodeStatus): void {
+    this.notifyReachability();
     switch (status.state) {
       case 'running':
         console.info(
@@ -507,6 +522,7 @@ class CadreServiceImpl {
       const previous = this.lastSeenAddrs;
       this.lastSeenAddrs = current;
       console.info(`[CadreService] reachability ${previous.length} → ${current.length} address(es)`);
+      this.notifyReachability();
     };
     controlNode.addEventListener('self:peer:update', onSelfUpdate);
     this.reachabilityListener = () => controlNode.removeEventListener('self:peer:update', onSelfUpdate);

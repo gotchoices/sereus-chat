@@ -10,13 +10,14 @@ import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
 // Android included (global/ui.md). Same component health's forms use.
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { getProfile, saveProfile } from '../data/adapter';
-import type { Profile as ProfileT } from '../data/types';
+import type { Profile as ProfileT } from '@chat/core';
+import { orThrow, useModel } from '../data/bind';
 import { useT } from '../i18n';
 import { Avatar, Banner, IconButton, ListRow, SectionHeader } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
 export default function Profile() {
+  const model = useModel();
   const navigation: any = useNavigation();
   const route: any = useRoute();
   /**
@@ -38,10 +39,11 @@ export default function Profile() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getProfile()
-      .then(p => { setProfile(p); setFirstRun(!p?.name?.trim()); })
-      .catch(e => setError(e?.message ?? 'Could not load your profile'));
-  }, []);
+    void model.profile.get().then(r => {
+      if (r.ok) { setProfile(r.value); setFirstRun(!r.value?.name?.trim()); }
+      else setError(r.error.message);
+    });
+  }, [model]);
 
   const update = (patch: Partial<ProfileT>) => { setProfile(p => ({ ...p, ...patch })); setDirty(true); };
 
@@ -51,7 +53,7 @@ export default function Profile() {
       return;
     }
     try {
-      await saveProfile(profile);
+      orThrow(await model.profile.save(profile));
       setDirty(false);
       // They have a name now, whatever they had before.
       setFirstRun(false);

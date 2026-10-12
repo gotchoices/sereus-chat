@@ -11,14 +11,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { inspectInvitation, acceptInvitation } from '../data/adapter';
-import type { InvitationPreview } from '../data/types';
+import type { InvitationPreview } from '@chat/core';
+import { orThrow, useModel } from '../data/bind';
 import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { Avatar, Banner, IconButton, StrandStatus, strandStatusKind } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
 export default function InvitationAcceptance() {
+  const model = useModel();
   const route: any = useRoute();
   const navigation: any = useNavigation();
   const t = useT();
@@ -31,16 +32,16 @@ export default function InvitationAcceptance() {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    try { setPreview(await inspectInvitation(token)); setError(null); }
+    try { setPreview(orThrow(await model.invitations.inspect(token))); setError(null); }
     catch (e: any) { setError(e?.message ?? 'That invitation could not be read'); }
-  }, [token]);
+  }, [model, token]);
 
   useEffect(() => { void load(); }, [load, rev]);
 
   const accept = async () => {
     setBusy(true);
     try {
-      const { strandId } = await acceptInvitation(token);
+      const { strandId } = orThrow(await model.invitations.accept(token));
       navigation.replace('ChatInterface', { strandId });
     } catch (e: any) {
       // Dev-only: accepting crosses the network into cadre-core's formation

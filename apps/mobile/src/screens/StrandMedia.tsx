@@ -9,8 +9,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, FlatList, Pressable, Image, StyleSheet } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { listAttachments } from '../data/adapter';
-import type { Attachment } from '../data/types';
+import type { Attachment } from '@chat/core';
+import { orThrow, useModel } from '../data/bind';
 import { useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { Banner, EmptyState, ListRow } from '../components';
@@ -25,6 +25,7 @@ const MB = 1024 * 1024;
 const size = (b?: number | null) => (b ? (b >= 1024 * MB ? `${(b / (1024 * MB)).toFixed(1)} GB` : `${Math.round(b / MB)} MB`) : '');
 
 export default function StrandMedia() {
+  const model = useModel();
   const navigation: any = useNavigation();
   const route: any = useRoute();
   const { strandId, title } = route.params ?? {};
@@ -37,9 +38,9 @@ export default function StrandMedia() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    try { setItems(await listAttachments(strandId)); setError(null); }
+    try { setItems(orThrow(await model.media.list(strandId))); setError(null); }
     catch (e: any) { setError(e?.message ?? 'Could not list what was shared here'); }
-  }, [strandId]);
+  }, [model, strandId]);
 
   useEffect(() => { void load(); }, [load, rev]);
 

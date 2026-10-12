@@ -6,8 +6,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, Image, FlatList, useWindowDimensions, StyleSheet, Share, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { listAttachments } from '../data/adapter';
-import type { Attachment } from '../data/types';
+import type { Attachment } from '@chat/core';
+import { orThrow, useModel } from '../data/bind';
 import { useT } from '../i18n';
 import { IconButton, Banner } from '../components';
 import { useTheme, typography, spacing } from '../theme';
@@ -16,6 +16,7 @@ import { useTheme, typography, spacing } from '../theme';
 const ON_DARK = '#e8eaec';
 
 export default function MediaViewer() {
+  const model = useModel();
   const navigation: any = useNavigation();
   const route: any = useRoute();
   const { strandId, attachmentId, setFilter } = route.params ?? {};
@@ -29,7 +30,7 @@ export default function MediaViewer() {
 
   const load = useCallback(async () => {
     try {
-      const all = await listAttachments(strandId);
+      const all = orThrow(await model.media.list(strandId));
       // The swipe set is what the caller was showing — never silently wider.
       const set = setFilter && setFilter !== 'all' ? all.filter(a => a.type === setFilter) : all;
       setItems(set);
@@ -38,7 +39,7 @@ export default function MediaViewer() {
     } catch (e: any) {
       setError(e?.message ?? 'That could not be opened');
     }
-  }, [strandId, attachmentId, setFilter]);
+  }, [model, strandId, attachmentId, setFilter]);
 
   useEffect(() => { void load(); }, [load]);
 
