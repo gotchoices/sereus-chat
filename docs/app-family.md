@@ -217,7 +217,7 @@ One object with a namespace per area of the product:
 | `messages` | Page, send, edit, delete, react, unreact; drafts and read cursors |
 | `members` | List, remove, resign as manager |
 | `invitations` | Create with terms, list outstanding with use counts, inspect, accept, cancel listing; join-failure kinds |
-| `media` | Attachments: list, add to a send |
+| `media` | Attachments: list; storage usage and trimming |
 | `search` | Streaming search |
 | `profile` | The local profile and its sync to strands |
 | `prefs` | App preferences: behavior settings, storage ceiling |
@@ -231,9 +231,10 @@ Rules, all inherited from experience with the current adapter:
 - **Operations return `Result<T>`**, never throw for expected failures:
   `{ ok: true, value }` or `{ ok: false, error }`, where `error` is a
   `ChatError` with a `kind` (a stable code such as `'unreachable'`,
-  `'token-spent'`, `'not-a-member'`), `retryable`, and optional `detail` for
-  logs. UIs render the kind through the string catalogs. Today's
-  `explainJoinFailure` English text becomes kinds.
+  `'invitation-spent'`, `'not-a-member'`), `retryable`, an English `message`
+  for logs, and the underlying `cause`. UIs render the kind through the string
+  catalogs; until those exist (STATUS Phase 7) they show `message`.
+  `core/model/result.ts` lists the kinds.
 - **Change signals are scoped.** `changes.strands(fn)` fires when the set of
   strands or a summary changes (node strand events, discovery, local writes).
   `changes.strand(id, fn)` fires when that strand's tables change (today's

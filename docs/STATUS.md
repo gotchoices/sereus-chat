@@ -15,17 +15,17 @@ the first web work.
 |---|---|---|
 | `data/chat-sapp.ts` | `core/protocol` | Schema generated from `chat-sapp.qsql` into TS; sApp id and config. Member-key generation moves to `core/sereus`. |
 | `data/inviteLink.ts` | `core/protocol` | Link and QR payload formats, hosts, scheme |
-| `data/types.ts` | `core/model/*` | Split by namespace |
+| `data/types.ts` | `core/model/*` | Split by namespace (done, Phase 4; the app file re-exports) |
 | `data/errors.ts` | `core/model` | Becomes `ChatError` kinds |
 | `data/adapter.ts` | `core/model` | `DataAdapter` becomes `ChatModel`; backend selection stays in the app |
 | `data/adapters/sereus.ts` | `core/sereus/*` | Split by namespace; AsyncStorage use becomes slots; `perf()` timing kept behind the host's logger |
-| `data/adapters/mock.ts` | `core/mock` | Fixtures through `FixtureSource` from root `mock/data` |
+| `data/adapters/mock.ts` | `core/mock` | Fixtures through `FixtureSource` from root `mock/data` (done, Phase 4) |
 | `data/chat-operations.ts` | `core/sereus` | SQL over a strand database |
 | `data/chat-strand.ts` | `core/sereus/strands` | Attach, re-attach, joins, discovery, self-registration |
 | `data/strand-prefs.ts`, `strand-summary-cache.ts`, `outgoing-invitations.ts`, `data-format.ts` | `core/sereus` | Over slots (app-family.md, *Device-local state*) |
 | `screens/ChatInterface.tsx` drafts and read cursors | `core/sereus` (`messages`) | Slots `drafts`, `readCursors` |
 | `cadre/async.ts` | `core` (util) | Timeouts and helpers |
-| `theme/colorHash.ts` | `core/model/members` | Pure derivation |
+| `theme/colorHash.ts` | `packages/resources/tokens` | A color palette: design tokens, not model (Phase 7) |
 | `cadre/CadreService.ts` | `apps/mobile/src/host/` | Replaced by `createPhoneNode` (Phase 2); reachability reading and `applyRelays` move to `core/sereus/reachability`, over `NodeHost.options` and `restart` |
 | `cadre/rn-durable-slot.ts` | `apps/mobile/src/host/` | The AsyncStorage `DurableSlot` behind the core's slots |
 | `cadre-ui/useCadreManager.ts` | `core/stores` | Cadre-manager store; the RN components stay in the app |
@@ -291,16 +291,65 @@ Ed25519 file until sereus#33) and lifecycle runner.
   and the check. The phone check above ran on the old config, which is safe only
   because the core does not import the stack at runtime yet.
 
-## Phase 4 — `ChatModel` and the mock
+## Phase 4 — `ChatModel` and the mock (done 2026-10-12)
 
-- [ ] Define `ChatModel` by namespace in `core/model`, from today's
-      `DataAdapter` and `design/specs/domain/ops.md`: `Result<T>`, `ChatError`
-      kinds, and the change signals `changes.strands` / `changes.strand(id)`
-- [ ] Map today's thrown errors and `explainJoinFailure` texts to error kinds
-- [ ] Move the mock into `core/mock`, reading fixtures through `FixtureSource`.
-      Fixture JSON moves to root `mock/data`; `apps/mobile` supplies a source of
-      static `require`s
-- [ ] Contract suite skeleton in `core`, running against the mock
+- [x] `ChatModel` in `core/model`, one file per namespace, each holding its shapes,
+      policy and slice of the interface. The namespaces: `strands`, `messages`,
+      `members`, `invitations`, `media` (attachments and storage), `search`,
+      `profile`, `prefs`, `reachability`, `changes`.
+      - The shapes moved from the app's `types.ts`, which now re-exports them.
+      - Operations return `Result<T>` (`ok` / `fail`). `search.run` yields
+        `Result<SearchBatch>` items.
+      - `changes.strands(fn)` and `changes.strand(id, fn)` return unsubscribe
+        functions and must outlive hibernation.
+      - Shared policy lives here too: `isSettled`, `INVITATION_VALIDITY` and
+        `defaultInvitationTerms`.
+      - Not yet in the interface:
+        - the cadre-manager operations (Phase 6, with their store);
+        - drafts and read cursors (Phase 5).
+- [x] `ChatError { kind, retryable, message, cause }` with 13 kinds.
+      - `message` is English, for logs and, until the string catalogs (Phase 7),
+        for display.
+      - `explainJoinFailure` in the app's Sereus adapter now returns errors that
+        carry these kinds: `join-inviter-unreachable`, `invitation-spent`,
+        `invitation-not-ready`, `join-refused`, `join-host-busy`,
+        `join-host-outdated`, `join-incomplete`, `invitation-unusable`.
+- [x] The mock moved to `core/mock`: `createMockModel(fixtures)` returns
+      `{ model, controls }`.
+      - The variant (`happy`, `empty`, `error`, `unreachable`) belongs to each
+        instance, not a module global.
+      - Writes and variant changes fire the change signals.
+      - The app supplies `src/data/mock-fixtures.ts`, the repo root's `mock/data`
+        as static `require`s. `apps/mobile/mock` was already a symlink to it.
+      - The old `adapters/mock.ts` is deleted.
+- [x] Transitional `src/data/legacy-adapter.ts`: the throwing, flat `DataAdapter`
+      over a `ChatModel`.
+      - An error result is thrown as an `Error` with `kind` and `retryable`, and
+        `unreachable` becomes `UnreachableError`.
+      - The mock path uses it now; the Sereus model will in Phase 5. Deleted in
+        Phase 6.
+- [x] The core declares the few host globals it uses (`setTimeout`,
+      `AbortSignal`, `console`) in `src/globals.d.ts`, instead of the DOM or Node
+      libraries. Its tests get Node types; the build does not.
+- [x] Contract suite (`core/src/testing/contract.ts`,
+      `describeChatModelContract`) runs against the mock. It checks:
+      - unique strand ids and plausible summaries;
+      - `settled` agrees with `isSettled`;
+      - exactly one member is this device;
+      - a sent message comes back newest-last and signals the strand;
+      - an invitation's link carries its token;
+      - prefs merge and the profile round-trips;
+      - search batches end with every strand searched.
+
+      The fixtures pass it. Core: 15 tests pass.
+- [x] App:
+      - `tsc` clean.
+      - Jest: 7 tests pass, including `mock-adapter.test.ts` (every bundled
+        fixture served; an error result throws with its kind; `unreachable`
+        throws `UnreachableError`).
+      - Lint: 22 stack-import violations, unchanged.
+      - Two phones, under the restarted Metro with the pin: 2 rounds each way,
+        none missed, no resolution errors.
 
 ## Phase 5 — The Sereus model over a host
 

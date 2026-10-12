@@ -1,7 +1,7 @@
 /**
  * Single-point data backend switch.
  *
- * `USE_SEREUS = false` → MockAdapter, JSON fixtures.  Default for development
+ * `USE_SEREUS = false` → the core mock model (createMockModel), JSON fixtures.  Default for development
  * and screenshots; no native modules, no networking.
  *
  * `USE_SEREUS = true`  → SereusAdapter, talks to the live cadre stack:

@@ -26,7 +26,8 @@ import {
   insertAttachments,
 } from '../chat-operations';
 import { UnreachableError } from '../errors';
-import { buildInviteUrl, CHAT_SAPP_ID } from '@chat/core';
+import { buildInviteUrl, CHAT_SAPP_ID, defaultRetryable, type ChatErrorKind } from '@chat/core';
+import { toThrown } from '../legacy-adapter';
 import { rememberOutgoingInvitation, forgetOutgoingInvitation, listOutgoingInvitations } from '../outgoing-invitations';
 import { cadreService } from '../../cadre';
 import { STORAGE_KEYS } from '../persisted-names';
@@ -82,45 +83,39 @@ async function retryAfterRestart<T>(write: () => Promise<T>): Promise<T> {
  * A join failure in words the person can act on. Since sereus 1.10 `formStrand` throws
  * typed errors: `FormationRejectedError` with a fixed `code` and a `retryable` flag
  * when the inviter answered no, and `FormationUnreachableError` when nothing answered.
- * The original stays as `cause` for the logs.
+ * Each carries its `ChatError` kind and `retryable`; the original stays as `cause`.
  */
 function explainJoinFailure(err: unknown): Error {
-  let message: string;
+  const as = (kind: ChatErrorKind, message: string, retryable = defaultRetryable(kind)) =>
+    toThrown({ kind, message, retryable, cause: err });
   if (err instanceof FormationUnreachableError) {
-    message = 'Could not reach the person who invited you. Their app may be closed or offline — try again when they are back.';
-  } else if (err instanceof FormationRejectedError) {
+    return as('join-inviter-unreachable', 'Could not reach the person who invited you. Their app may be closed or offline — try again when they are back.');
+  }
+  if (err instanceof FormationRejectedError) {
     switch (err.code) {
       case 'token-spent':
-        message = 'This invitation has already been used or has expired. Ask for a new one.';
-        break;
+        return as('invitation-spent', 'This invitation has already been used or has expired. Ask for a new one.');
       case 'token-unknown':
-        message = 'The invitation is not ready on their side yet. Try again in a moment.';
-        break;
+        return as('invitation-not-ready', 'The invitation is not ready on their side yet. Try again in a moment.');
       case 'approval-refused':
-        message = 'The person who invited you did not let this join go through.';
-        break;
+        return as('join-refused', 'The person who invited you did not let this join go through.');
       case 'busy':
       case 'provisioning-timeout':
       case 'host-strand-unavailable':
       case 'approval-unavailable':
-        message = 'Their side could not finish this join just now. Try again in a moment.';
-        break;
+        return as('join-host-busy', 'Their side could not finish this join just now. Try again in a moment.');
       case 'host-strand-must-be-recreated':
-        message = 'This conversation was made with an older version and cannot take new members. Ask for a new invitation.';
-        break;
+        return as('join-host-outdated', 'This conversation was made with an older version and cannot take new members. Ask for a new invitation.');
       default:
-        message = err.retryable
-          ? 'The join did not go through this time. Try again in a moment.'
-          : 'This invitation cannot be used. Ask for a new one.';
+        return err.retryable
+          ? as('join-host-busy', 'The join did not go through this time. Try again in a moment.', true)
+          : as('invitation-unusable', 'This invitation cannot be used. Ask for a new one.');
     }
-  } else if (err instanceof FormationPostApprovalError) {
-    message = 'You were let in, but this phone could not finish setting up the conversation. Ask for a new invitation.';
-  } else {
-    return err instanceof Error ? err : new Error(String(err));
   }
-  const out = new Error(message);
-  (out as Error & { cause?: unknown }).cause = err;
-  return out;
+  if (err instanceof FormationPostApprovalError) {
+    return as('join-incomplete', 'You were let in, but this phone could not finish setting up the conversation. Ask for a new invitation.');
+  }
+  return err instanceof Error ? err : new Error(String(err));
 }
 
 export class SereusAdapter implements DataAdapter {

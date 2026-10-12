@@ -10,6 +10,7 @@ import type {
   SearchBatch, SearchOptions, Invitation, InvitationPreview,
   Prefs, StorageUsage, SendInput,
 } from './types';
+import type { MockControls } from '@chat/core';
 import { USE_SEREUS } from './config';
 
 export interface DataAdapter {
@@ -106,14 +107,28 @@ export interface DataAdapter {
 }
 
 let currentAdapter: DataAdapter | null = null;
+let mockControls: MockControls | null = null;
 
 async function createAdapter(): Promise<DataAdapter> {
   if (USE_SEREUS) {
     const { SereusAdapter } = await import('./adapters/sereus');
     return new SereusAdapter();
   }
-  const { MockAdapter } = await import('./adapters/mock');
-  return new MockAdapter();
+  // The core's mock model, behind the throwing adapter screens still call (Phase 4).
+  const { createMockModel } = await import('@chat/core');
+  const { appFixtures } = await import('./mock-fixtures');
+  const { adapterFromModel } = await import('./legacy-adapter');
+  const mock = createMockModel(appFixtures);
+  mockControls = mock.controls;
+  mockControls.setVariant(pendingVariant);
+  return adapterFromModel(mock.model);
+}
+
+/** The mock variant to serve; applied when the mock is created, and to it after. */
+let pendingVariant: string = 'happy';
+export function setMockVariant(variant: string): void {
+  pendingVariant = variant;
+  mockControls?.setVariant(variant);
 }
 
 export async function getAdapter(): Promise<DataAdapter> {
