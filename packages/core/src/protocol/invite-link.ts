@@ -1,5 +1,5 @@
 /**
- * inviteLink.ts — the ONE place that defines chat's invitation URL shape.
+ * invite-link.ts — the ONE place that defines chat's invitation URL shape.
  *
  * Primary (shared) form is an Android App Link / iOS Universal Link:
  *   https://sereus.org/chat/invite/#<token>
@@ -10,7 +10,7 @@
  *
  * Path-based on the existing `sereus.org` host (rather than a `chat.sereus.org`
  * subdomain) so it reuses the site's TLS cert / vhost — see the design decision
- * in ../../../../site/README.md.  The two verification files therefore live at the
+ * in site/README.md (repo root).  The two verification files therefore live at the
  * APEX (`sereus.org/.well-known/`), shared with other Sereus apps.
  *
  * Older forms are still accepted on the parse side (see `parseInviteToken`),
@@ -23,7 +23,7 @@
  * so it's handy for same-device / pre-domain testing.
  *
  * Generator, QR scanner, and the navigator linking config all go through here,
- * so the scheme can never drift out of sync across the app again.
+ * in every app of the family, so the scheme can never drift out of sync again.
  */
 
 /** Web host that owns the App Link / Universal Link. */

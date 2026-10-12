@@ -26,9 +26,8 @@ import {
   insertAttachments,
 } from '../chat-operations';
 import { UnreachableError } from '../errors';
-import { buildInviteUrl } from '../inviteLink';
+import { buildInviteUrl, CHAT_SAPP_ID } from '@chat/core';
 import { rememberOutgoingInvitation, forgetOutgoingInvitation, listOutgoingInvitations } from '../outgoing-invitations';
-import { CHAT_SAPP_ID } from '../chat-sapp';
 import { cadreService } from '../../cadre';
 import { STORAGE_KEYS } from '../persisted-names';
 import { withTimeout, CONTROL_OP_TIMEOUT_MS } from '../../cadre/async';

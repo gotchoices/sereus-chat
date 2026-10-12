@@ -1,4 +1,3 @@
-const fs = require('fs');
 let upstreamTransformer;
 try {
   upstreamTransformer = require('@react-native/metro-babel-transformer');
@@ -7,10 +6,9 @@ try {
 }
 
 /**
- * Metro transformer that imports `.qsql` files as raw strings at bundle time,
- * so app code can do:
- *
- *   import schemaSQL from '../../../../design/specs/domain/schema.qsql';
+ * Metro transformer: the upstream Babel transformer, told which babel.config.js to use.
+ * (It also imported `.qsql` files as strings until the schema became a generated module
+ * in @chat/core.)
  */
 // THE APP'S babel.config.js MUST BE THE ONE BABEL SEES. Metro's projectRoot is the
 // repo root (metro.config.js: `path.resolve(__dirname, '../..')`, so watchFolders
@@ -23,11 +21,5 @@ try {
 const APP_ROOT = __dirname;
 
 module.exports.transform = function transform({ src, filename, options }) {
-  const babelOptions = { ...options, projectRoot: APP_ROOT };
-  if (filename.endsWith('.qsql')) {
-    const contents = fs.readFileSync(filename, 'utf8');
-    const code = `module.exports = ${JSON.stringify(contents)};`;
-    return upstreamTransformer.transform({ src: code, filename, options: babelOptions });
-  }
-  return upstreamTransformer.transform({ src, filename, options: babelOptions });
+  return upstreamTransformer.transform({ src, filename, options: { ...options, projectRoot: APP_ROOT } });
 };

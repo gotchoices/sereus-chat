@@ -46,7 +46,7 @@ import { AppState } from 'react-native';
 
 import { keychainSecureStore } from './keychain';
 // TODO(extraction): the one chat-aware import; becomes host configuration in Phase 5.
-import { CHAT_SAPP_ID } from '../data/chat-sapp';
+import { CHAT_SAPP_ID } from '@chat/core';
 import { DATA_FORMAT } from '../data/data-format';
 import { NODE_STORAGE_NAMES } from '../data/persisted-names';
 import { OWNER_GENESIS_TIMEOUT_MS } from './async';

@@ -226,31 +226,70 @@ cause, and the open RN convergence work gains no confounds.
 **Phase 2 is complete.** `apps/mobile` runs on the kit's node, polyfills (plus the
 Ed25519 file until sereus#33) and lifecycle runner.
 
-## Phase 3 — `packages/core` skeleton and `protocol`
+## Phase 3 — `packages/core` skeleton and `protocol` (done 2026-10-12)
 
-- [ ] Create `packages/core` (`@chat/core`, `"private": true`, ESM, TypeScript,
-      vitest, `tsc` build to `dist/`); stack as `peerDependencies`
-- [ ] `apps/mobile` depends on it as `link:../../packages/core`, with Metro
-      `watchFolders` and a `core:build` script run before Metro and the native
-      builds
-- [ ] Pin linked code to the app's stack (app-family.md, *Linked code must
-      resolve the app's copy of the stack*):
-      - **Metro:** a `resolveRequest` that resolves the core's peer
-        dependencies from `apps/mobile/node_modules` when the importing file is
-        under `packages/*`, with the peer list read from
-        `packages/core/package.json`;
-      - **Jest:** the same, as a resolver.
-- [ ] Build check: fail if the bundle holds more than one copy of
-      `@serfab/cadre-core` or `@libp2p/interface`
-- [ ] Lint rule: `no-restricted-imports` on the stack's scopes in `apps/mobile`,
-      allowed only in `src/host/` and the polyfill entry. Expect violations
-      until Phase 6; record the count here and drive it to zero
-- [ ] Schema codegen: a script turns `design/specs/domain/chat-sapp.qsql` into
-      a TS module in `core/protocol` (generated on build, never hand-edited).
-      `apps/mobile` drops its Metro `.qsql` transformer
-- [ ] Move `chat-sapp.ts` (schema, sApp id, config) and `inviteLink.ts` into
-      `core/protocol`; `protocol` imports nothing else from the core
-- [ ] `apps/mobile` imports them from `@chat/core`; delete the originals
+- [x] `packages/core`: `@chat/core`, private, ESM, TypeScript 5.9, vitest 4, `tsc`
+      build to `dist/`. Its only peer dependency so far is `@serfab/cadre-core`
+      (used for types). Rule: the core's runtime dependencies are all peers.
+      Anything else would resolve from the repo root's `node_modules`, which the
+      app's bundler blocks.
+- [x] `apps/mobile` depends on it as `link:../../packages/core`.
+      - `yarn core:build` runs first in `start`, `android`, `android:emu`, `test`,
+        `typecheck`, the fastlane `build:*` scripts and `detox:build:android`. Yarn
+        4 does not run `pre*` scripts.
+      - The repo root is already a Metro watch folder, so `packages/` needed no
+        new `watchFolders` entry.
+- [x] Linked code resolves the app's copy of the stack:
+      - **Metro:** `resolveRequest` resolves the core's peer dependencies as if the
+        app had imported them, when the importing file is under `packages/`. The
+        peer list is read from `packages/core/package.json`. Probed with a
+        temporary runtime import of cadre-core in the core: the bundle held one
+        cadre-core, the app's.
+      - **Jest:** `jest.resolver.js` does the same, and also for
+        `@babel/runtime/*`. The app's Babel transform inserts those helpers into
+        linked code, which then looked for them beside its own path. That was the
+        first failure, as the docs predicted.
+- [x] Build check: Metro's `resolveRequest` records each resolution into
+      `@serfab/cadre-core` or `@libp2p/interface` and fails the bundle if a second
+      root appears, naming both. Checked by feeding the resolver two roots.
+- [x] Lint rule: `no-restricted-imports` on the stack's scopes in
+      `apps/mobile/.eslintrc.js`, allowed in `src/cadre/` (the host until Phase 5),
+      `polyfills/` and `index.js`. **22 violations** at the start:
+      - `diagnostics/two-party-check.ts`: 8;
+      - `diagnostics/found-strand-check.ts`: 6;
+      - `data/adapters/sereus.ts`, `data/chat-operations.ts`, `data/chat-sapp.ts`:
+        2 each;
+      - `data/chat-strand.ts`, `data/persisted-names.ts`: 1 each.
+
+      Phases 5, 6 and 8 take this to zero.
+- [x] Schema codegen: `packages/core/scripts/gen-schema.mjs` writes
+      `src/protocol/schema.generated.ts` from `chat-sapp.qsql` on every build,
+      typecheck and test. The output is gitignored. The Metro `.qsql` transformer
+      branch and the `qsql` source extension are gone; the transformer stays,
+      because it points Babel at the app's `babel.config.js`.
+- [x] Moved into `core/protocol`:
+      - from `chat-sapp.ts`: `CHAT_SAPP_ID`, `CHAT_SAPP_VERSION`,
+        `getChatSAppConfig`, the schema DDL;
+      - all of `inviteLink.ts`.
+
+      `protocol` imports nothing else from the core (a type from cadre-core only).
+      The app's `chat-sapp.ts` keeps `createChatStrand` and `joinChatStrand`, which
+      need a node, until Phase 5. `inviteLink.ts` is deleted.
+- [x] Checks:
+      - Core: 5 vitest tests pass (invite-link forms, the sApp config and schema).
+      - App: `tsc` clean. Jest: `persisted-names` and the new `core-link` test pass.
+      - A one-off Android bundle includes the core's modules, with no
+        duplicate-copy error.
+      - Two phones: 2 rounds each way, none missed (commit median 4.1 s / 5.3 s,
+        delivery 7.3 s / 11.0 s).
+- Already failing, not caused by this phase:
+  - `__tests__/App*.tsx` fail on an unmocked `react-native-keyboard-controller`.
+  - `e2e/*.e2e.test.js` are Detox tests that plain `jest` also picks up.
+
+  Both fail the same way without the new resolver.
+- Metro reads its config at startup: restart it with `--reset-cache` to get the pin
+  and the check. The phone check above ran on the old config, which is safe only
+  because the core does not import the stack at runtime yet.
 
 ## Phase 4 — `ChatModel` and the mock
 

@@ -1,0 +1,34 @@
+{
+  "name": "@chat/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Sereus Chat's shared core: protocol, model, stores. Platform-free; see docs/app-family.md.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "codegen": "node scripts/gen-schema.mjs",
+    "build": "node scripts/gen-schema.mjs && tsc -p tsconfig.build.json",
+    "watch": "node scripts/gen-schema.mjs && tsc -p tsconfig.build.json --watch",
+    "typecheck": "node scripts/gen-schema.mjs && tsc -p tsconfig.json --noEmit",
+    "test": "node scripts/gen-schema.mjs && vitest run"
+  },
+  "peerDependencies": {
+    "@serfab/cadre-core": "^1.14.0"
+  },
+  "devDependencies": {
+    "@serfab/cadre-core": "1.14.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17"
+  }
+}

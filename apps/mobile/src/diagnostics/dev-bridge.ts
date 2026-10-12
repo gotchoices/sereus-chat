@@ -25,7 +25,7 @@
  * not a poll. Installed only when `__DEV__`.
  */
 import { listStrands, listMessages, send, watchStrand, createInvitation, acceptInvitation, getPrefs, setPrefs } from '../data/adapter';
-import { parseInviteToken } from '../data/inviteLink';
+import { parseInviteToken } from '@chat/core';
 import { cadreService } from '../cadre/CadreService';
 
 type Bridge = {

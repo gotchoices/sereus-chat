@@ -10,6 +10,50 @@ const workspaceRoot = path.resolve(__dirname, '../../..');
 
 const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// ── Linked packages (packages/*) resolve the APP's copy of the stack ─────────────
+//
+// `@chat/core` is linked (`link:../../packages/core`), so Metro sees its files at their
+// real path, packages/core/dist/…, and an import from there would walk up to
+// packages/core/node_modules or the repo root's node_modules — both of which hold a
+// copy of the stack for the core's own tests — before this app's. `nodeModulesPaths`
+// is searched only after that walk, so it cannot prevent it. Instead, an import made
+// FROM a linked package of one of the core's peer dependencies is resolved as if this
+// app had made it. Only the peers: everything they import then resolves from the app's
+// copy by the normal walk, and transitive packages that legitimately differ between
+// stack packages (@noble/*, @multiformats/*) are left alone.
+// (docs/app-family.md, "Linked code must resolve the app's copy of the stack".)
+const packagesDir = path.join(projectRoot, 'packages') + path.sep;
+const corePeers = Object.keys(
+  require(path.join(projectRoot, 'packages/core/package.json')).peerDependencies ?? {},
+);
+const isCorePeer = name => corePeers.some(p => name === p || name.startsWith(p + '/'));
+const appOrigin = path.join(__dirname, 'index.js');
+
+// ── Build check: one copy of the stack's identity-bearing packages ───────────────
+//
+// Two copies of either in one bundle breaks `instanceof` checks and transport
+// registration, silently. Every resolution into one of them records the package's
+// root; a second root fails the bundle with both paths named.
+const SINGLE_COPY = ['@serfab/cadre-core', '@libp2p/interface'];
+const singleCopyRoots = new Map();
+function checkSingleCopy(resolution) {
+  const file = resolution && resolution.filePath;
+  if (!file) return resolution;
+  for (const name of SINGLE_COPY) {
+    const marker = `${path.sep}node_modules${path.sep}${name}${path.sep}`;
+    const at = file.lastIndexOf(marker);
+    if (at < 0) continue;
+    const root = file.slice(0, at + marker.length);
+    const seen = singleCopyRoots.get(name);
+    if (seen && seen !== root) {
+      throw new Error(`Two copies of ${name} in the bundle:\n  ${seen}\n  ${root}\n` +
+        'See docs/app-family.md, "Linked code must resolve the app\'s copy of the stack".');
+    }
+    singleCopyRoots.set(name, root);
+  }
+  return resolution;
+}
+
 // Stack mode is derived from package.json — the same file `scripts/use-stack.sh` (repo root) edits.
 // In `local` mode the ser packages are portal:'d to local clones and we alias
 // them to source below; in `npm` mode they come from node_modules like any
@@ -127,7 +171,7 @@ const config = {
     ...(localStack ? [workspaceRoot] : []),
   ],
   transformer: {
-    // Lets us `import schema from './schema.qsql'` and get the raw SQL string.
+    // Points Babel at this app's babel.config.js (see metro.transformer.js).
     babelTransformerPath: require.resolve('./metro.transformer.js'),
   },
   resolver: {
@@ -148,8 +192,6 @@ const config = {
       new RegExp(`^${escapeRegExp(path.join(projectRoot, 'node_modules'))}/`),
       new RegExp(`^${escapeRegExp(path.join(projectRoot, 'test'))}/`),
     ].flat().filter(Boolean),
-    assetExts: defaultConfig.resolver.assetExts.filter(ext => ext !== 'qsql'),
-    sourceExts: [...defaultConfig.resolver.sourceExts, 'qsql'],
     nodeModulesPaths: [
       path.resolve(__dirname, 'node_modules'),
       path.resolve(workspaceRoot, 'node_modules'),
@@ -167,52 +209,62 @@ const config = {
       ...(localStack ? serSourceAliases : {}),
       ...nodeBuiltinStubs,
     },
-    resolveRequest: (context, moduleName, platform) => {
-      // Local-stack only: @multiformats/multiaddr v13 dropped the `/convert`
-      // subpath that @chainsafe/libp2p-gossipsub still imports.  A portal
-      // install forces every consumer to v13 (because @serfab/strand-proto and
-      // @optimystic/db-p2p declare incompatible ranges and yarn berry's portal
-      // protocol refuses to link them otherwise).  Redirect the specific
-      // subpath to the v12.5.1 copy in the sereus workspace, where /convert is
-      // still exported.
-      //
-      // In npm mode there is no multiaddr resolution pin, so yarn nests v12
-      // under gossipsub and v13 under db-p2p and ordinary resolution works.
-      // Drop the local-mode branch once the sereus stack aligns strand-proto
-      // and db-p2p on the same multiaddr major.
-      if (localStack && moduleName === '@multiformats/multiaddr/convert') {
-        return {
-          type: 'sourceFile',
-          filePath: path.resolve(
-            workspaceRoot,
-            'sereus/node_modules/@multiformats/multiaddr/dist/src/convert.js',
-          ),
-        };
-      }
-
-      // Force @babel/runtime helpers to CJS.
-      //
-      // @babel/runtime's exports field lists conditions: node → import → default.
-      // With 'import' active (needed for ESM-only packages like @libp2p/crypto),
-      // Metro picks the ESM wrapper and require() receives the module *object*
-      // instead of the helper *function*, causing:
-      //   "TypeError: _interopRequireDefault is not a function (it is Object)"
-      // require.resolve() uses the 'node' condition (first in the exports map),
-      // so it always returns the CJS path.
-      if (moduleName.startsWith('@babel/runtime/')) {
-        try {
-          return { type: 'sourceFile', filePath: require.resolve(moduleName) };
-        } catch {
-          // Fall through to default resolution
-        }
-      }
-      return context.resolveRequest(
-        { ...context, resolveRequest: undefined },
-        moduleName,
-        platform,
-      );
-    },
+    resolveRequest: (context, moduleName, platform) =>
+      checkSingleCopy(resolveChat(context, moduleName, platform)),
   },
 };
+
+function resolveChat(context, moduleName, platform) {
+  // Local-stack only: @multiformats/multiaddr v13 dropped the `/convert`
+  // subpath that @chainsafe/libp2p-gossipsub still imports.  A portal
+  // install forces every consumer to v13 (because @serfab/strand-proto and
+  // @optimystic/db-p2p declare incompatible ranges and yarn berry's portal
+  // protocol refuses to link them otherwise).  Redirect the specific
+  // subpath to the v12.5.1 copy in the sereus workspace, where /convert is
+  // still exported.
+  //
+  // In npm mode there is no multiaddr resolution pin, so yarn nests v12
+  // under gossipsub and v13 under db-p2p and ordinary resolution works.
+  // Drop the local-mode branch once the sereus stack aligns strand-proto
+  // and db-p2p on the same multiaddr major.
+  if (localStack && moduleName === '@multiformats/multiaddr/convert') {
+    return {
+      type: 'sourceFile',
+      filePath: path.resolve(
+        workspaceRoot,
+        'sereus/node_modules/@multiformats/multiaddr/dist/src/convert.js',
+      ),
+    };
+  }
+
+  // Force @babel/runtime helpers to CJS.
+  //
+  // @babel/runtime's exports field lists conditions: node → import → default.
+  // With 'import' active (needed for ESM-only packages like @libp2p/crypto),
+  // Metro picks the ESM wrapper and require() receives the module *object*
+  // instead of the helper *function*, causing:
+  //   "TypeError: _interopRequireDefault is not a function (it is Object)"
+  // require.resolve() uses the 'node' condition (first in the exports map),
+  // so it always returns the CJS path.
+  if (moduleName.startsWith('@babel/runtime/')) {
+    try {
+      return { type: 'sourceFile', filePath: require.resolve(moduleName) };
+    } catch {
+      // Fall through to default resolution
+    }
+  }
+  if (context.originModulePath.startsWith(packagesDir) && isCorePeer(moduleName)) {
+    return context.resolveRequest(
+      { ...context, originModulePath: appOrigin, resolveRequest: undefined },
+      moduleName,
+      platform,
+    );
+  }
+  return context.resolveRequest(
+    { ...context, resolveRequest: undefined },
+    moduleName,
+    platform,
+  );
+}
 
 module.exports = mergeConfig(defaultConfig, config);

@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useT } from '../i18n';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import { EmptyState } from '../components';
-import { parseInviteToken } from '../data/inviteLink';
+import { parseInviteToken } from '@chat/core';
 import { useTheme, typography, spacing, radius } from '../theme';
 
 export default function QrScanner() {

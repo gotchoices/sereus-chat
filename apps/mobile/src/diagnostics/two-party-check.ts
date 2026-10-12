@@ -40,7 +40,7 @@ import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { LevelDBRawStorage, openOptimysticRNDb } from '@optimystic/db-p2p-storage-rn';
 import { LevelDB, LevelDBWriteBatch } from 'rn-leveldb';
-import { getChatSAppConfig, CHAT_SAPP_ID } from '../data/chat-sapp';
+import { getChatSAppConfig, CHAT_SAPP_ID } from '@chat/core';
 import { getPrefs } from '../data/adapter';
 import { cadreService } from '../cadre/CadreService';
 import { buildNoiseCrypto, DEFAULT_NOISE_CRYPTO_MODE } from '@serfab/cadre-rn/noise-crypto';

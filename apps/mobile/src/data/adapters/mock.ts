@@ -3,7 +3,7 @@
 
 import type { DataAdapter } from '../adapter';
 import { UnreachableError } from '../errors';
-import { buildInviteUrl } from '../inviteLink';
+import { buildInviteUrl } from '@chat/core';
 import type {
   Profile, StrandSummary, StrandState, Member, Message, Attachment,
   SearchBatch, SearchOptions, Invitation, InvitationPreview,
