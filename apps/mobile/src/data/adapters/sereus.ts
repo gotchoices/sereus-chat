@@ -616,8 +616,11 @@ export class SereusAdapter implements DataAdapter {
   private async strandFor(strandId?: string | null): Promise<StrandInstance> {
     if (!strandId) throw new Error('No strand was named.');
     const attached = cadreService.getStrands().get(strandId);
-    if (attached) return attached;
-    throw new Error(`Strand ${strandId} is not attached on this device.`);
+    if (!attached) throw new Error(`Strand ${strandId} is not attached on this device.`);
+    // Hibernated while the app was in the background: wait for it to wake rather
+    // than fail with "database not available".
+    await cadreService.ensureAwake(strandId);
+    return attached;
   }
 
   /**
@@ -856,25 +859,48 @@ export class SereusAdapter implements DataAdapter {
    * other phone's too, since both store every block. With `STRAND_REACTIVITY` on
    * (sereus 1.12) it also wakes on commits applied only elsewhere.
    */
+  // A strand hibernates when the app goes to the background and is rebuilt when it
+  // wakes, with a NEW database. So the watch follows the strand: it lets go on
+  // `strand:hibernating` and re-attaches on `strand:waking`, reporting a change then,
+  // since anything may have arrived while it slept. Callers keep one subscription.
   watchStrand(strandId: string, onChange: () => void): (() => void) | null {
-    const strand = cadreService.getStrands().get(strandId);
-    if (!strand?.database) return null;
-    const db = strand.database.getDatabase();
-    const subs: Array<{ unsubscribe(): void }> = [];
-    try {
-      for (const table of ['Message', 'Reaction', 'Attachment', 'Member']) {
-        // The statement is only needed for its scope.
-        const stmt = db.prepare(`select * from App.${table}`);
-        const scope = stmt.getChangeScope();
-        void stmt.finalize().catch(() => {});
-        subs.push(db.watch(scope, () => { onChange(); }));
+    let subs: Array<{ unsubscribe(): void }> = [];
+    const detach = () => { subs.forEach(sub => sub.unsubscribe()); subs = []; };
+    const attach = (): boolean => {
+      detach();
+      const strand = cadreService.getStrands().get(strandId);
+      if (!strand?.database) return false;
+      const db = strand.database.getDatabase();
+      try {
+        for (const table of ['Message', 'Reaction', 'Attachment', 'Member']) {
+          // The statement is only needed for its scope.
+          const stmt = db.prepare(`select * from App.${table}`);
+          const scope = stmt.getChangeScope();
+          void stmt.finalize().catch(() => {});
+          subs.push(db.watch(scope, () => { onChange(); }));
+        }
+        return true;
+      } catch (err) {
+        detach();
+        console.warn('[SereusAdapter] watch unavailable for', strandId, err instanceof Error ? err.message : err);
+        return false;
       }
-    } catch (err) {
-      subs.forEach(sub => sub.unsubscribe());
-      console.warn('[SereusAdapter] watch unavailable for', strandId, err instanceof Error ? err.message : err);
-      return null;
-    }
-    return () => subs.forEach(sub => sub.unsubscribe());
+    };
+    if (!attach()) return null;
+
+    const onWaking = ({ strandId: id }: { strandId: string }) => {
+      if (id === strandId && attach()) onChange();
+    };
+    const onHibernating = ({ strandId: id }: { strandId: string }) => {
+      if (id === strandId) detach();
+    };
+    cadreService.on('strand:waking', onWaking);
+    cadreService.on('strand:hibernating', onHibernating);
+    return () => {
+      detach();
+      cadreService.off('strand:waking', onWaking);
+      cadreService.off('strand:hibernating', onHibernating);
+    };
   }
   /** Stops LISTING it; does not withdraw it — see outgoing-invitations.ts. */
   async cancelInvitation(id: string): Promise<void> {

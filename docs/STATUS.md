@@ -130,7 +130,7 @@ cause, and the open RN convergence work gains no confounds.
   debug APK (240 MB). Install an x86_64-only build there:
   `./gradlew app:assembleDebug -PreactNativeArchitectures=x86_64`.
 
-**2b. The kit's polyfills.** (2026-10-12; restart timing to recheck)
+**2b. The kit's polyfills.** (done 2026-10-12)
 - [x] `index.js` imports `@serfab/cadre-rn/polyfills` and `@serfab/cadre-rn/boot-check`.
       Chat's copies (`hermes`, `event`, `intl-pluralrules`, `audit`, `registry`) are
       deleted; apart from comments they matched the kit's.
@@ -150,7 +150,12 @@ cause, and the open RN convergence work gains no confounds.
       - no native-crypto warnings.
 - [x] Two-phone check before restart: 3 rounds each way, none missed. Commit
       median 2.8 s / 3.4 s, delivery median 4.8 s / 4.9 s.
-- [ ] Restart check: run again on a quiet machine.
+- [x] Restart check on a quiet machine (load average 5).
+      - Launch to node running: emulator 28 s, S7 34 s.
+      - Strand start: emulator 5.6 s, S7 19.9 s.
+      - Both writable 40 s after the harness connected; 2 rounds each way, none
+        missed.
+- First attempt, on a loaded machine:
       - **What happened:** after restarting both, the emulator's strand was still
         starting at 90 s. The harness then failed one send and could not arm its
         watch.
@@ -167,9 +172,33 @@ cause, and the open RN convergence work gains no confounds.
         writable (`ARM_WAIT_MS`, default 5 min) and reports how long that took,
         instead of relying on a fixed sleep.
 
-**2c. The background runner.**
-- [ ] Start the runner from `@serfab/cadre-rn/lifecycle` over `AppState`.
-- [ ] Two-phone check, including backgrounding and resuming each phone.
+**2c. The background runner.** (done 2026-10-12)
+- [x] `createBackgroundRunner({ ...phoneNodeLifecycle(phone), appState: AppState })`,
+      started after the first successful start.
+      - **Background:** it hibernates every non-realtime strand (`hibernateAll`) and
+        keeps the control node up.
+      - **Return:** it restarts the node from its saved start if the process lost it,
+        and waits, bounded, for the control network.
+- [x] **The kit never wakes the strands, so chat does.** The kit wakes a hibernated
+      strand only on a push (`serviceWake`). With the runner alone, the first send
+      after returning failed with "database not available (status: hibernating)",
+      and the other phone's message was not seen. Three changes:
+      - `CadreService` wakes every hibernated strand, one at a time, once the runner
+        reports the foreground. Measured after 30 s in the background: 14.5 s on the
+        emulator, 19.1 s on the S7.
+      - `ensureAwake(strandId)`: the adapter's `strandFor` waits for a hibernated or
+        waking strand, sharing the sweep's wake, instead of failing. A send made 3 s
+        after returning committed in 31 s (16.8 s of wake, then the write) and was
+        delivered.
+      - Waking rebuilds the strand with a new database, so `watchStrand` follows
+        the strand. It drops its subscriptions on `strand:hibernating`, re-attaches
+        on `strand:waking`, and reports a change. Callers keep one subscription.
+- [x] Two-phone check, each phone in turn sent to the background for 30 s and
+      brought back: all messages delivered both ways, watches working after the
+      wake (the harness's "seen" depends on them). Commit 2.7–5.3 s, delivery
+      5.4–11.6 s.
+- Follow-up: the first write after a wake is slow (about 14 s). Look at it with the
+  device profiling tools when strand reactivity (2d) is settled.
 
 **2d. Strand reactivity, as its own experiment.**
 - [ ] Enable `strandReactivity: { enabled: true }` with a long backstop poll.

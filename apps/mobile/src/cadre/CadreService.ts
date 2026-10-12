@@ -40,7 +40,9 @@ import {
   DEFAULT_NOISE_CRYPTO_MODE,
   type NoiseCryptoMode,
 } from '@serfab/cadre-rn/noise-crypto';
+import { createBackgroundRunner, phoneNodeLifecycle } from '@serfab/cadre-rn/lifecycle';
 import { LevelDB, LevelDBWriteBatch } from 'rn-leveldb';
+import { AppState } from 'react-native';
 
 import { keychainSecureStore } from './keychain';
 // TODO(extraction): the one chat-aware import; becomes host configuration in Phase 5.
@@ -83,6 +85,58 @@ const phone = createPhoneNode({
     ...(STRAND_REACTIVITY ? { strandReactivity: { enabled: true } } : {}),
   }),
 });
+
+/**
+ * The kit's lifecycle runner (Phase 2c). When the app goes to the background it
+ * hibernates every non-realtime strand (`hibernateAll`) and keeps the control node up for
+ * as long as the OS allows; on the way back it restarts the node from its saved start if
+ * the process lost it, and waits (bounded) for the control network to reconnect.
+ * Started once, after the first successful start: it assumes a node exists.
+ */
+const runner = createBackgroundRunner({ ...phoneNodeLifecycle(phone), appState: AppState });
+runner.onStateChange(state => {
+  console.info(
+    `[CadreService] lifecycle: ${state}${runner.resuming ? ' (resuming)' : ''}${runner.degraded ? ' (degraded)' : ''}`,
+  );
+  if (state === 'foreground' && !runner.resuming) void wakeHibernatedStrands();
+});
+
+/**
+ * Wake every strand the runner hibernated. The kit wakes a hibernated strand only on a
+ * push (`serviceWake`), so on a plain return to the app every conversation would stay
+ * down — measured: the first send after returning failed with "database not available
+ * (status: hibernating)". One at a time, to keep a phone's return from rebuilding every
+ * strand network at once. Waking rebuilds the strand's database; `watchStrand`
+ * re-attaches to it on `strand:waking`. Idempotent: only hibernating strands are touched.
+ */
+async function wakeHibernatedStrands(): Promise<void> {
+  const node = phone.node;
+  if (!node) return;
+  for (const [strandId, instance] of node.getStrands()) {
+    if (instance.status !== 'hibernating') continue;
+    await wakeStrand(strandId).catch(() => { /* logged in wakeStrand */ });
+  }
+}
+
+/** Wakes in flight, so a send waiting on a strand joins the sweep's wake of it. */
+const wakes = new Map<string, Promise<void>>();
+
+function wakeStrand(strandId: string): Promise<void> {
+  const inFlight = wakes.get(strandId);
+  if (inFlight) return inFlight;
+  const node = phone.node;
+  if (!node) return Promise.resolve();
+  const t0 = Date.now();
+  const wake = node.wakeStrand(strandId).then(
+    () => console.info(`[CadreService] woke strand ${strandId.slice(0, 8)} in ${Date.now() - t0}ms`),
+    (err: unknown) => {
+      console.warn(`[CadreService] waking strand ${strandId.slice(0, 8)} failed:`, err);
+      throw err;
+    },
+  ).finally(() => wakes.delete(strandId));
+  wakes.set(strandId, wake);
+  return wake;
+}
 
 class CadreServiceImpl {
   /**
@@ -141,6 +195,19 @@ class CadreServiceImpl {
   /** Live snapshot of strand instances managed by this node. */
   getStrands(): Map<string, StrandInstance> {
     return phone.node?.getStrands() ?? new Map();
+  }
+
+  /**
+   * Make sure a strand is awake before it is used. A strand hibernated while the app
+   * was in the background has no database until it is rebuilt, which takes 15–20 s on
+   * a phone; a send made in that window would fail with "status: hibernating". This
+   * waits for the wake instead, joining the foreground sweep's wake if one is running.
+   * Resolves at once for a strand that is not hibernating or waking.
+   */
+  async ensureAwake(strandId: string): Promise<void> {
+    const instance = phone.node?.getStrands().get(strandId);
+    if (!instance) return;
+    if (wakes.has(strandId) || instance.status === 'hibernating') await wakeStrand(strandId);
   }
 
   /** Look up a single strand by id (null if not attached). */
@@ -296,6 +363,7 @@ class CadreServiceImpl {
       console.info('[CadreService] starting node for party', options.partyId);
       await phone.start(options);
       this.options = phone.options ?? options;
+      runner.start(); // idempotent
       this.pendingRelays = null;
       this.pendingNoiseMode = null;
     } catch (err) {
