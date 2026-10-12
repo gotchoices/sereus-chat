@@ -200,12 +200,31 @@ cause, and the open RN convergence work gains no confounds.
 - Follow-up: the first write after a wake is slow (about 14 s). Look at it with the
   device profiling tools when strand reactivity (2d) is settled.
 
-**2d. Strand reactivity, as its own experiment.**
-- [ ] Enable `strandReactivity: { enabled: true }` with a long backstop poll.
-      Taleus runs it with a 120 s poll; chat turned it off for a proof-of-work
-      cost that optimystic 1.12 removed.
-- [ ] Two-phone check, plus idle traffic (`devcall.mjs <dev> traffic 60`)
-      against 2c. Keep it only if delivery is no worse and idle cost no higher.
+**2d. Strand reactivity, as its own experiment.** (done 2026-10-12: stays off)
+- [x] A/B on the same phones and strand, quiet machine. Each side: restart both, 3
+      rounds each way, 60 s of idle traffic, then the emulator in the background for
+      30 s and back, and 1 round.
+
+      | | Off | On |
+      |---|---|---|
+      | Commit median (A→B / B→A) | 3.8 / 3.3 s | 5.3 / 7.0 s |
+      | Delivery median | 6.2 / 5.5 s | 11.1 / 12.5 s |
+      | Idle strand streams per minute (emulator / S7) | 137 / 138 | 220 / 219 |
+      | of which `sync` | 8 / 7 | 22 / 19 |
+      | of which fret (inbound) | 51 / 56 | 78 / 85 |
+      | Wake after the background | 17.3 s | 29.0 s |
+      | Delivery after the wake | 9.4 / 15.3 s | 37.5 / 33.2 s |
+
+      Worse on every measure, so `STRAND_REACTIVITY` stays `false`. The comment in
+      `src/data/config.ts` now carries these numbers instead of the proof-of-work
+      cost, which optimystic 1.12 replaced with a signed self-endorsement. Single
+      runs; the gaps are large and all point the same way.
+- Note: with StrandList on watches (2026-10-09), idle `sync` streams are now 7–8 a
+  minute, against 20–29 before. Fret is the largest share of idle traffic
+  (gotchoices/Fret#2).
+
+**Phase 2 is complete.** `apps/mobile` runs on the kit's node, polyfills (plus the
+Ed25519 file until sereus#33) and lifecycle runner.
 
 ## Phase 3 — `packages/core` skeleton and `protocol`
 
