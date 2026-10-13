@@ -44,6 +44,19 @@ export type StrandState = {
 /** This device's own settings for a strand (story 33). Never strand data. */
 export type StrandSettings = { muted: Muted; archived: boolean };
 
+/**
+ * What a strand is, in one of three states — and only three (strand-detail spec):
+ * `public` (anyone with the link joins; nobody can be removed), `canChange` (invited
+ * people only; someone can still add or remove), `settled` (nobody, ever). Derived only
+ * from recorded state, never from activity. Words: `status.strand.<kind>` in the catalogs.
+ */
+export type StrandStatusKind = 'public' | 'canChange' | 'settled';
+
+export function strandStatusKind(state: Pick<StrandState, 'visibility' | 'managerCount'>): StrandStatusKind {
+  if (state.visibility === 'public') return 'public';
+  return state.managerCount === 0 ? 'settled' : 'canChange';
+}
+
 /** The one rule `StrandState.settled` follows (ops.md). */
 export function isSettled(state: Pick<StrandState, 'visibility' | 'managerCount'>): boolean {
   return state.visibility === 'private' && state.managerCount === 0;

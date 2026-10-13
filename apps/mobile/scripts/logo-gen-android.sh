@@ -11,7 +11,7 @@
 # is inset to the adaptive safe zone (~66-80% of the 108dp canvas) so masks and
 # the notch/face don't get clipped.
 #
-# Source:  docs/images/logo_3_m.svg  (green disc on transparent)
+# Source:  packages/resources/brand/logo.svg  (green disc on transparent)
 # Output:  mipmap-*/ic_launcher_foreground.png, legacy ic_launcher[_round].png,
 #          values/ic_launcher_background.xml (colour), src/assets/logo.png
 
@@ -20,8 +20,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"               # chat/apps/mobile
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"    # chat/
-ASSETS_DIR="$PROJECT_ROOT/docs/images"
-SRC="$ASSETS_DIR/logo_3_m.svg"
+SRC="$PROJECT_ROOT/packages/resources/brand/logo.svg"
 
 # --- knobs -----------------------------------------------------------------
 BG_COLOR="#fdf8f0"   # icon background (peach, shared with the Sereus family)

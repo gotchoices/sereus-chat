@@ -9,19 +9,9 @@
  * legible (AA) in both light and dark themes; we don't vary lightness by theme
  * so a contact keeps a stable identity color.
  */
+import { colors } from '@chat/resources';
 
-const AVATAR_COLORS = [
-  '#3b7dd8', // blue
-  '#2c8a3f', // green
-  '#c4392f', // red
-  '#b8860b', // amber
-  '#7b4fc0', // purple
-  '#0f8a8a', // teal
-  '#c85a9e', // pink
-  '#5b6bbf', // indigo
-  '#2f8f6b', // emerald
-  '#a05a2c', // brown
-];
+const AVATAR_COLORS = colors.avatar; // shared tokens (@chat/resources)
 
 /** Pick a stable avatar fill color for a display name. */
 export function avatarColor(name: string): string {

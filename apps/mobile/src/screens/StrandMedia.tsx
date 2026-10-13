@@ -11,16 +11,13 @@ import { View, Text, FlatList, Pressable, Image, StyleSheet } from 'react-native
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { Attachment } from '@chat/core';
 import { orThrow, useModel } from '../data/bind';
-import { useT } from '../i18n';
+import { useErrorText, useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { Banner, EmptyState, ListRow } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
 type Kind = 'all' | Attachment['type'];
 
-const KIND_LABEL: Record<Kind, string> = {
-  all: 'All', image: 'Photos', video: 'Videos', file: 'Files', voice: 'Voice',
-};
 const MB = 1024 * 1024;
 const size = (b?: number | null) => (b ? (b >= 1024 * MB ? `${(b / (1024 * MB)).toFixed(1)} GB` : `${Math.round(b / MB)} MB`) : '');
 
@@ -30,6 +27,7 @@ export default function StrandMedia() {
   const route: any = useRoute();
   const { strandId, title } = route.params ?? {};
   const t = useT();
+  const errorText = useErrorText();
   const rev = useDataRevision();
   const theme = useTheme();
 
@@ -39,8 +37,8 @@ export default function StrandMedia() {
 
   const load = useCallback(async () => {
     try { setItems(orThrow(await model.media.list(strandId))); setError(null); }
-    catch (e: any) { setError(e?.message ?? 'Could not list what was shared here'); }
-  }, [model, strandId]);
+    catch (e: any) { setError(errorText(e, 'Could not list what was shared here')); }
+  }, [model, strandId, errorText]);
 
   useEffect(() => { void load(); }, [load, rev]);
 
@@ -59,9 +57,9 @@ export default function StrandMedia() {
     // file or voice note is simply here — it just has no thumbnail.  Labelling
     // it "not reachable" would tell the user something false.
     const label =
-      a.locality === 'fetching' ? t('screens.media.fetching', 'Coming…')
-        : a.locality === 'unreachable' ? t('screens.media.unreachable', 'Not reachable right now')
-          : a.name ?? KIND_LABEL[a.type];
+      a.locality === 'fetching' ? t('media.fetching')
+        : a.locality === 'unreachable' ? t('media.unreachable')
+          : a.name ?? t(`media.kind.${a.type}`);
     return (
       <View style={[styles.thumb, styles.placeholder, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
         <Text style={[typography.small, { color: theme.textMuted }]} numberOfLines={3}>
@@ -78,18 +76,18 @@ export default function StrandMedia() {
           <Pressable key={k} onPress={() => setKind(k)}
             style={[styles.filter, { borderColor: kind === k ? theme.accent : theme.border }]}>
             <Text style={[typography.small, { color: kind === k ? theme.accent : theme.textMuted }]}>
-              {t(`screens.media.kind.${k}`, KIND_LABEL[k])}
+              {t(`media.kind.${k}`)}
             </Text>
           </Pressable>
         ))}
       </View>
 
       {error ? (
-        <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: load }} />
+        <Banner message={error} action={{ label: t('common.retry'), onPress: load }} />
       ) : shown.length === 0 ? (
         <EmptyState icon="images-outline"
-          title={t('screens.media.emptyTitle', 'Nothing shared here yet')}
-          hint={t('screens.media.empty', 'Photos, files and voice messages will collect here.')} />
+          title={t('media.emptyTitle')}
+          hint={t('media.empty')} />
       ) : (
         <FlatList
           key={isGrid ? 'grid' : 'list'}
@@ -106,7 +104,7 @@ export default function StrandMedia() {
               <ListRow
                 title={item.name ?? item.type}
                 subtitle={[size(item.byteSize), item.locality !== 'local'
-                  ? (item.locality === 'fetching' ? t('screens.media.fetching', 'Coming…') : t('screens.media.unreachable', 'Not reachable right now'))
+                  ? (item.locality === 'fetching' ? t('media.fetching') : t('media.unreachable'))
                   : null].filter(Boolean).join(' · ')}
                 onPress={() => open(item)}
               />
@@ -117,7 +115,7 @@ export default function StrandMedia() {
 
       <View style={[styles.footer, { borderTopColor: theme.divider, backgroundColor: theme.surface }]}>
         <Text style={[typography.small, { color: theme.textMuted }]}>
-          {t('screens.media.usage', '{{n}} things · {{size}} on this phone')
+          {t('media.usage')
             .replace('{{n}}', String(items.length)).replace('{{size}}', size(totalBytes) || '0 MB')}
         </Text>
       </View>

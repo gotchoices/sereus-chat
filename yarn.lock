@@ -68,7 +68,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@chat/core@workspace:packages/core":
+"@chat/core@workspace:*, @chat/core@workspace:packages/core":
   version: 0.0.0-use.local
   resolution: "@chat/core@workspace:packages/core"
   dependencies:
@@ -88,6 +88,16 @@ __metadata:
   peerDependencies:
     "@quereus/quereus": ^4.20.2
     "@serfab/cadre-core": ^1.14.0
+  languageName: unknown
+  linkType: soft
+
+"@chat/resources@workspace:packages/resources":
+  version: 0.0.0-use.local
+  resolution: "@chat/resources@workspace:packages/resources"
+  dependencies:
+    "@chat/core": "workspace:*"
+    typescript: "npm:^5.9.3"
+    vitest: "npm:^4.0.17"
   languageName: unknown
   linkType: soft
 

@@ -11,7 +11,7 @@ import { View, Text, ScrollView, StyleSheet, Alert, Share, ActivityIndicator } f
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { StrandState, Member, Attachment, Invitation } from '@chat/core';
 import { useModel } from '../data/bind';
-import { useT } from '../i18n';
+import { useErrorText, useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { Avatar, ListRow, Banner, SectionHeader, StrandStatus } from '../components';
 import { useTheme, typography, spacing } from '../theme';
@@ -21,6 +21,7 @@ export default function StrandDetail() {
   const route: any = useRoute();
   const { strandId, title } = route.params ?? {};
   const t = useT();
+  const errorText = useErrorText();
   const rev = useDataRevision();
   const theme = useTheme();
 
@@ -73,46 +74,44 @@ export default function StrandDetail() {
     // from here — they are a member of this strand, not an address.
     Alert.alert(m.name, undefined, [
       {
-        text: t('screens.strand.startStrand', 'Start a strand with them'),
+        text: t('strand.startStrand'),
         onPress: () => navigation.navigate('InvitationGenerator'),
       },
-      { text: t('screens.strand.rename', 'Rename for myself') },
+      { text: t('strand.rename') },
       ...(state?.canIManage
         ? [{
-            text: t('screens.strand.remove', 'Remove from this strand'),
+            text: t('strand.remove'),
             style: 'destructive' as const,
             onPress: () => confirmRemove(m),
           }]
         : []),
-      { text: t('common.cancel', 'Cancel'), style: 'cancel' as const },
+      { text: t('common.cancel'), style: 'cancel' as const },
     ]);
   };
 
   const confirmRemove = (m: Member) => {
     Alert.alert(
-      t('screens.strand.removeTitle', 'Remove {{name}}?').replace('{{name}}', m.name),
-      t('screens.strand.removeBody',
-        'Nothing further reaches them. It does not undo anything they have already read.'),
+      t('strand.removeTitle').replace('{{name}}', m.name),
+      t('strand.removeBody'),
       [
-        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
-        { text: t('screens.strand.removeConfirm', 'Remove'), style: 'destructive',
-          onPress: () => { void model.members.remove(strandId, m.id).then(r => (r.ok ? load() : setError(r.error.message))); } },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('strand.removeConfirm'), style: 'destructive',
+          onPress: () => { void model.members.remove(strandId, m.id).then(r => (r.ok ? load() : setError(errorText(r.error)))); } },
       ],
     );
   };
 
   const invitationActions = (inv: Invitation) => {
     Alert.alert(
-      t('screens.strand.invitationTitle', 'Invitation'),
+      t('strand.invitationTitle'),
       // Honest about what removing it does: cadre-core cannot withdraw an
       // invitation yet (see data/outgoing-invitations.ts).
-      t('screens.invite.forgetNote',
-        'Taking it off this list does not cancel it: whoever holds it can still use it until it runs out.'),
+      t('invite.forgetNote'),
       [
-        { text: t('common.shareAgain', 'Share again'), onPress: () => { void Share.share({ message: inv.url }); } },
-        { text: t('screens.invite.forget', 'Take it off the list'), style: 'destructive',
+        { text: t('common.shareAgain'), onPress: () => { void Share.share({ message: inv.url }); } },
+        { text: t('invite.forget'), style: 'destructive',
           onPress: () => { void model.invitations.cancel(inv.id).then(() => load()); } },
-        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
       ],
     );
   };
@@ -124,37 +123,34 @@ export default function StrandDetail() {
   const confirmResign = () => {
     const others = (state?.managerCount ?? 1) - 1;
     Alert.alert(
-      t('screens.strand.resignTitle', 'Give up adding and removing people?'),
+      t('strand.resignTitle'),
       others > 0
         // The exposure warning belongs in this body, not in a second dialog.
-        ? t('screens.strand.resignExposed',
-            'This cannot be undone. Afterwards you will not be able to remove anyone — and the others who still can will be able to remove you.')
-        : t('screens.strand.resignFinal',
-            'This cannot be undone. Nobody will be able to add or remove anyone, ever. This is who the strand will always be.'),
+        ? t('strand.resignExposed')
+        : t('strand.resignFinal'),
       [
-        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
-        { text: t('screens.strand.resignConfirm', 'Give it up'), style: 'destructive',
-          onPress: () => { void model.members.resignManager(strandId).then(r => (r.ok ? load() : setError(r.error.message))); } },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('strand.resignConfirm'), style: 'destructive',
+          onPress: () => { void model.members.resignManager(strandId).then(r => (r.ok ? load() : setError(errorText(r.error)))); } },
       ],
     );
   };
 
   const confirmLeave = () => {
     Alert.alert(
-      t('screens.strand.leaveTitle', 'Leave this strand?'),
-      t('screens.strand.leaveBody',
-        'It carries on without you and nothing more reaches you. You keep what identifies you here, so if you are invited back you return as yourself.'),
+      t('strand.leaveTitle'),
+      t('strand.leaveBody'),
       [
-        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
-        { text: t('actions.leave', 'Leave'), style: 'destructive',
-          onPress: () => { void model.strands.leave(strandId, { keepIdentity: true }).then(r => (r.ok ? navigation.popToTop() : setError(r.error.message))); } },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('actions.leave'), style: 'destructive',
+          onPress: () => { void model.strands.leave(strandId, { keepIdentity: true }).then(r => (r.ok ? navigation.popToTop() : setError(errorText(r.error)))); } },
       ],
     );
   };
 
   const confirmForget = () => {
     Alert.alert(
-      t('screens.strand.forgetTitle', 'Forget this strand entirely?'),
+      t('strand.forgetTitle'),
       // HONEST ABOUT WHAT IT CANNOT DO. Story 33 describes forgetting as
       // "discarding what identifies him and what he holds of the strand", and we
       // deliver the first half only: cadre-core's `unpublishStrand` is documented
@@ -163,18 +159,17 @@ export default function StrandDetail() {
       // promises the identity discard, which is real, and says plainly that the
       // messages stay on the device, rather than claiming an erasure that does not
       // happen. Restore the stronger wording when upstream can back it.
-      t('screens.strand.forgetBody',
-        'Permanent. What identifies you here is discarded, so if you are ever invited back you arrive as a stranger and what you said before stays under who you used to be. The messages themselves remain stored on this device.'),
+      t('strand.forgetBody'),
       [
-        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
-        { text: t('common.continue', 'Continue'), style: 'destructive', onPress: () =>
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.continue'), style: 'destructive', onPress: () =>
           Alert.alert(
-            t('screens.strand.forgetConfirm', 'This cannot be undone.'),
+            t('strand.forgetConfirm'),
             undefined,
             [
-              { text: t('common.cancel', 'Cancel'), style: 'cancel' },
-              { text: t('screens.strand.forgetIt', 'Forget it'), style: 'destructive',
-                onPress: () => { void model.strands.leave(strandId, { keepIdentity: false }).then(r => (r.ok ? navigation.popToTop() : setError(r.error.message))); } },
+              { text: t('common.cancel'), style: 'cancel' },
+              { text: t('strand.forgetIt'), style: 'destructive',
+                onPress: () => { void model.strands.leave(strandId, { keepIdentity: false }).then(r => (r.ok ? navigation.popToTop() : setError(errorText(r.error)))); } },
             ],
           ) },
       ],
@@ -183,23 +178,23 @@ export default function StrandDetail() {
 
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.content}>
-      {error ? <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: load }} /> : null}
+      {error ? <Banner message={error} action={{ label: t('common.retry'), onPress: load }} /> : null}
 
-      <SectionHeader label={t('screens.strand.whatThisIs', 'What this is')} />
+      <SectionHeader label={t('strand.whatThisIs')} />
       {state ? <StrandStatus state={state} variant="full" testID="strand-status" />
         // Reading a strand's state and members can take tens of seconds on a slow
         // phone while it syncs; bare headings with nothing under them read as empty.
         : !error ? <ActivityIndicator style={styles.loading} color={theme.textMuted} /> : null}
 
-      <SectionHeader label={t('screens.strand.members', 'Members')} />
+      <SectionHeader label={t('strand.members')} />
       <View style={styles.rows}>
         {members.map(m => (
           <ListRow
             key={m.id}
             testID={`member-${m.id}`}
             title={m.name}
-            subtitle={[m.isMe ? t('screens.strand.you', 'you') : null,
-                       m.isManager ? t('screens.strand.manager', 'can add and remove people') : null]
+            subtitle={[m.isMe ? t('strand.you') : null,
+                       m.isManager ? t('strand.manager') : null]
               .filter(Boolean).join(' · ') || undefined}
             leading={<Avatar name={m.name} uri={m.avatarUri} size="sm" />}
             onPress={() => memberActions(m)}
@@ -207,14 +202,14 @@ export default function StrandDetail() {
         ))}
         {nobodyElse ? (
           <Text style={[typography.small, { color: theme.textMuted }]}>
-            {t('screens.strand.nobodyYet', 'Nobody else has joined yet.')}
+            {t('strand.nobodyYet')}
           </Text>
         ) : null}
       </View>
 
       {canGrow ? (
         <>
-          <SectionHeader label={t('screens.strand.invitationsOut', 'Invitations you have out ({{n}})')
+          <SectionHeader label={t('strand.invitationsOut')
             .replace('{{n}}', String(invites.length))} />
           <View style={styles.rows}>
             {invites.map(inv => {
@@ -224,10 +219,10 @@ export default function StrandDetail() {
                   key={inv.id}
                   testID={`invitation-${inv.id}`}
                   title={made
-                    ? t('screens.strand.invitationMade', 'Made {{when}}').replace('{{when}}', new Date(made).toLocaleString())
-                    : t('screens.strand.invitationTitle', 'Invitation')}
+                    ? t('strand.invitationMade').replace('{{when}}', new Date(made).toLocaleString())
+                    : t('strand.invitationTitle')}
                   subtitle={inv.expiresAt
-                    ? t('screens.invite.expires', 'Runs out {{when}}').replace('{{when}}', new Date(inv.expiresAt).toLocaleDateString())
+                    ? t('invite.expires').replace('{{when}}', new Date(inv.expiresAt).toLocaleDateString())
                     : undefined}
                   onPress={() => navigation.navigate('InvitationGenerator', { strandId, token: inv.token })}
                   onLongPress={() => invitationActions(inv)}
@@ -235,24 +230,23 @@ export default function StrandDetail() {
               );
             })}
             {state?.canIManage ? (
-              <ListRow title={t('screens.strand.makeInvitation', 'Make an invitation')}
+              <ListRow title={t('strand.makeInvitation')}
                 onPress={() => navigation.navigate('InvitationGenerator', { strandId })} />
             ) : null}
             <Text style={[typography.small, { color: theme.textMuted }]}>
-              {t('screens.strand.othersInvitations',
-                'Invitations other members have out are not shown: an invitation is known only to whoever made it.')}
+              {t('strand.othersInvitations')}
             </Text>
           </View>
         </>
       ) : null}
 
-      <SectionHeader label={t('screens.strand.sharedHere', 'Shared here')} />
+      <SectionHeader label={t('strand.sharedHere')} />
       <ListRow
-        title={t('screens.strand.mediaCount', '{{n}} things shared').replace('{{n}}', String(media.length))}
+        title={t('strand.mediaCount').replace('{{n}}', String(media.length))}
         onPress={() => navigation.navigate('StrandMedia', { strandId, title })}
       />
 
-      <SectionHeader label={t('screens.strand.thisConversation', 'This conversation')} />
+      <SectionHeader label={t('strand.thisConversation')} />
       <View style={styles.rows}>
         {/* Story 33 offers mute in two depths, and says which you are in — "He
             chooses how quiet: silent unless somebody names him, or silent whatever
@@ -261,11 +255,11 @@ export default function StrandDetail() {
             out. Both settings are device-local and reversible, which is why they
             sit above Leave. */}
         <ListRow
-          title={t('actions.mute', 'Mute')}
+          title={t('actions.mute')}
           subtitle={
-            muted === 'soft' ? t('screens.strand.muteSoftOn', 'Quiet, unless somebody names you')
-            : muted === 'hard' ? t('screens.strand.muteHardOn', 'Silent, whatever happens')
-            : t('screens.strand.muteHint', 'Quiet, unless somebody names you')
+            muted === 'soft' ? t('strand.muteSoftOn')
+            : muted === 'hard' ? t('strand.muteHardOn')
+            : t('strand.muteHint')
           }
           onPress={() => {
             const next = muted === 'none' ? 'soft' : muted === 'soft' ? 'hard' : 'none';
@@ -273,38 +267,38 @@ export default function StrandDetail() {
             void model.strands.setMuted(strandId, next).then(r => {
               if (r.ok) return;
               setMuted(muted);   // put the switch back; it did not take
-              setError(r.error.message);
+              setError(errorText(r.error));
             });
           }}
         />
         <ListRow
-          title={archived ? t('actions.unhide', 'Unhide') : t('actions.hide', 'Hide')}
-          subtitle={t('screens.strand.hideHint', 'Out of your list until you look for it; nothing changes for anyone else')}
+          title={archived ? t('actions.unhide') : t('actions.hide')}
+          subtitle={t('strand.hideHint')}
           onPress={() => {
             const next = !archived;
             setArchived(next);
             void model.strands.setArchived(strandId, next).then(r => {
               if (r.ok) return;
               setArchived(!next);
-              setError(r.error.message);
+              setError(errorText(r.error));
             });
           }}
         />
-        <ListRow title={t('actions.leave', 'Leave')} onPress={confirmLeave} />
-        <ListRow title={t('screens.strand.forget', 'Forget entirely')} onPress={confirmForget} />
+        <ListRow title={t('actions.leave')} onPress={confirmLeave} />
+        <ListRow title={t('strand.forget')} onPress={confirmForget} />
       </View>
 
       {state?.canIManage ? (
         <>
-          <SectionHeader label={t('screens.strand.managing', 'Because you can add and remove people')} />
+          <SectionHeader label={t('strand.managing')} />
           <View style={styles.rows}>
-            <ListRow title={t('screens.strand.resign', 'Give up adding and removing')} onPress={confirmResign} />
+            <ListRow title={t('strand.resign')} onPress={confirmResign} />
           </View>
         </>
       ) : null}
 
       <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
-        {t('screens.strand.noDelete', 'A strand cannot be deleted. Leaving is what you can do; it carries on for everyone else.')}
+        {t('strand.noDelete')}
       </Text>
     </ScrollView>
   );

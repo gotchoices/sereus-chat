@@ -35,10 +35,11 @@
     "logs": "sh ./scripts/logs.sh",
     "stack:check": "cd ../../test/stack && node found-strand.mjs",
     "stack:two-party": "cd ../../test/stack && node two-party-formation.mjs",
-    "core:build": "yarn --cwd ../../packages/core build"
+    "core:build": "yarn --cwd ../../packages/resources build && yarn --cwd ../../packages/core build"
   },
   "dependencies": {
     "@chat/core": "link:../../packages/core",
+    "@chat/resources": "link:../../packages/resources",
     "@craftzdog/react-native-buffer": "^6.1.2",
     "@libp2p/websockets": "^10.1.21",
     "@noble/hashes": "^2.0.0",

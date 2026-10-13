@@ -6,10 +6,5 @@
     "pastePlaceholder": "https://sereus.org/chat/invite/#abc123",
     "simulatorNote": "Cámara no disponible en el simulador. Pega un enlace abajo.",
     "title": "Escanear QR"
-  },
-  "chat": {
-    "empty": "Di algo: sois solo vosotros dos hasta que se invite a alguien más.",
-    "sending": "Enviando…",
-    "connecting": "Conectando con esta conversación…"
   }
 }

@@ -1,12 +1,4 @@
 {
-  "QrScanner": {
-    "cameraUnavailable": "Camera unavailable",
-    "open": "Open",
-    "pasteLabel": "Paste invite link",
-    "pastePlaceholder": "https://sereus.org/chat/invite/#abc123",
-    "simulatorNote": "Camera not available in simulator. Paste an invite link below.",
-    "title": "Scan QR"
-  },
   "accept": {
     "accept": "Join this strand",
     "askBody": "There is nothing to send. Ask them the way you would ask anybody — the app carries no request and will not chase them. If they agree, this will say the membership is settled.",
@@ -23,32 +15,123 @@
     "invalid": "This is not an invitation we can read",
     "invitesYou": "invites you to a strand",
     "invitesYouUnattributed": "invites you to a strand. The invitation does not say who sent it — trust it as far as you trust them.",
+    "joining": "Joining — reaching them and copying the conversation so far. This can take a minute or two.",
     "spent": "This invitation has already been used",
     "unattributed": "Whoever gave you this link"
   },
+  "actions": {
+    "attach": "Attach",
+    "copy": "Copy",
+    "delete": "Delete",
+    "edit": "Edit",
+    "hide": "Hide",
+    "leave": "Leave",
+    "mute": "Mute",
+    "newStrand": "New strand",
+    "profile": "Profile",
+    "react": "React 👍",
+    "record": "Record a voice message",
+    "reply": "Reply",
+    "scan": "Scan",
+    "search": "Search",
+    "send": "Send",
+    "sort": "Sort",
+    "unhide": "Unhide"
+  },
   "chat": {
+    "connecting": "Connecting to this conversation…",
     "editing": "Editing — this replaces what you said",
     "empty": "Say something — it is just the two of you until anyone else is invited.",
+    "emptyAlone": "You can write before anyone joins. Whoever takes up an invitation will be able to read it.",
     "emptyTitle": "Nothing said yet",
+    "invitations": "Invitations",
     "jump": "Latest",
     "micBody": "You can type for now.",
     "micTitle": "Voice messages are not built yet",
+    "nobodyYet": "Nobody has joined yet",
     "placeholder": "Message",
     "replyingTo": "Replying to {{name}}",
-    "unread": "New",
     "sending": "Sending…",
-    "connecting": "Connecting to this conversation…"
+    "unread": "New"
+  },
+  "common": {
+    "back": "Back",
+    "cancel": "Cancel",
+    "close": "Close",
+    "continue": "Continue",
+    "copied": "Copied",
+    "copy": "Copy",
+    "done": "Done",
+    "ok": "OK",
+    "retry": "Retry",
+    "save": "Save",
+    "share": "Share",
+    "shareAgain": "Share again"
+  },
+  "errors": {
+    "unreachable": "There is nowhere for them to answer yet.",
+    "not-attached": "This conversation is not on this device.",
+    "unavailable": {
+      "default": "Could not get through just now. Try again in a moment.",
+      "owner-not-ready": "This device is still setting up its network. Try again in a moment."
+    },
+    "not-a-member": "This device could not be added as a member of the conversation.",
+    "not-supported": "That is not possible yet.",
+    "join-inviter-unreachable": "Could not reach the person who invited you. Their app may be closed or offline — try again when they are back.",
+    "invitation-spent": "This invitation has already been used or has expired. Ask for a new one.",
+    "invitation-not-ready": "The invitation is not ready on their side yet. Try again in a moment.",
+    "join-refused": "The person who invited you did not let this join go through.",
+    "join-host-busy": "Their side could not finish this join just now. Try again in a moment.",
+    "join-host-outdated": "This conversation was made with an older version and cannot take new members. Ask for a new invitation.",
+    "join-incomplete": "You were let in, but this device could not finish setting up the conversation. Ask for a new invitation.",
+    "invitation-unusable": "This invitation cannot be used. Ask for a new one.",
+    "invalid-node-code": {
+      "default": "This is not a usable node code.",
+      "not-node-code": "This is not a node code.",
+      "newer-version": "This code comes from a newer version of the node software. Update the app to use it.",
+      "damaged": "This code is incomplete or damaged."
+    },
+    "node-unreachable": {
+      "default": "Could not reach that machine. Check that it is running and try again.",
+      "home-network": "Could not reach that machine. It can only be reached on its own network: join that Wi-Fi and try again.",
+      "anywhere": "Could not reach that machine. Check that it is running and try again."
+    },
+    "claim-refused": {
+      "default": "The machine refused to join.",
+      "claim-rate-limited": "The machine is refusing for now after too many tries. Wait a little and try again."
+    },
+    "claim-failed": {
+      "default": "Adding the machine did not finish. Trying again is safe.",
+      "busy": "A machine is already being added."
+    },
+    "unexpected": "Something went wrong."
   },
   "invite": {
     "abandon": "Abandon",
+    "anyoneAndRights": "Anyone who finds this link can join and then add or remove anyone, including you. It cannot be recalled.",
     "canInviteOff": "They cannot add or remove anyone",
+    "canInviteOffShort": "they cannot add or remove anyone",
     "canInviteOn": "They can add and remove people",
+    "canInviteOnShort": "they can add and remove people",
+    "change": "Change",
+    "existingStrand": "this strand",
     "expires": "Runs out {{when}}",
+    "forAnyone": "Anyone with the link",
+    "forAnyoneBody": "Works for everyone who has it, until it runs out. It cannot be recalled.",
+    "forOne": "For one person",
+    "forOneBody": "Spent once used, so a lost copy is useless to anyone else.",
+    "forget": "Take it off the list",
+    "forgetNote": "Taking it off this list does not cancel it: whoever holds it can still use it until it runs out.",
     "generate": "Make an invitation",
+    "generateAnother": "Make another invitation",
+    "goodFor": "good for {{period}}",
+    "goodForLabel": "Good for",
     "historyWarning": "Whoever takes this up will be able to read everything already said here, including what was said before they arrived.",
     "kind": "What kind of strand",
+    "madeAt": "Made {{when}}",
     "nothingYet": "The strand is ready. Nobody else is in it until somebody accepts.",
     "outstanding": "Still outstanding",
+    "outstandingHere": "Also out for this strand",
     "post": "Post into the strand",
     "postBody": "Everyone in this strand will be able to use it. That hands every member a one-off ability to bring somebody in. If you can reach the person another way, do that instead.",
     "postConfirm": "Post it",
@@ -58,50 +141,45 @@
     "public": "Open to anyone",
     "publicBody": "Anyone with the link can join, and nobody can be removed.",
     "regenerate": "Make a new one",
+    "relayPendingBody": "This usually takes a few seconds. You can make the invitation as soon as it is connected.",
+    "relayPendingTitle": "Connecting to your relay",
+    "relaySlow": "This is taking longer than it should. The relay may be down, or this network may block it — some work, school and public Wi-Fi do. Try another network, or choose another relay.",
+    "relaySlowManage": "See or change your relay",
     "rights": "On this invitation",
     "rightsBody": "Passing this on gives them the same reach you have — including over you.",
+    "shareBody": "You are invited to talk privately on Sereus Chat. Open this link on your phone:",
+    "shareBodyNamed": "{{name}} invites you to talk privately on Sereus Chat. Open this link on your phone:",
     "showQr": "Show QR code",
-    "unreachableBody": "A phone cannot accept connections from the Internet on its own, so the person you invite would have no way to answer. A relay fixes that: a machine with a public Internet address that passes connections through to your phone.",
-    "unreachableTitle": "Your phone needs a relay first",
+    "termsKept": "Kept for when you come back: {{kind}}, {{rights}}.",
+    "unreachableSwitch": "You can start with one and change later.",
+    "unreachableWays": "Two ways to get one",
+    "usedOnce": "Used once",
+    "usedTimes": "Used {{n}} times",
+    "validDay": "1 day",
+    "validMonth": "1 month",
+    "validWeek": "1 week",
     "wayBorrow": "Use an open relay",
     "wayBorrowBody": "The quick way: free, nothing to set up. Whoever runs it can see that you talk to someone, when, and roughly how much — never what you say. Opens the list on sereus.org; you confirm your pick here.",
     "wayOwn": "Run your own relay",
     "wayOwnBody": "The private way: nobody else sees who you talk to. Needs a machine that stays on. Opens the instructions on sereus.org.",
-    "validDay": "1 day",
-    "validWeek": "1 week",
-    "validMonth": "1 month",
-    "forOne": "For one person",
-    "forAnyone": "Anyone with the link",
-    "goodFor": "good for {{period}}",
-    "change": "Change",
     "whoCanUse": "Who can use it",
-    "forOneBody": "Spent once used, so a lost copy is useless to anyone else.",
-    "forAnyoneBody": "Works for everyone who has it, until it runs out. It cannot be recalled.",
-    "goodForLabel": "Good for",
-    "anyoneAndRights": "Anyone who finds this link can join and then add or remove anyone, including you. It cannot be recalled.",
-    "usedOnce": "Used once",
-    "usedTimes": "Used {{n}} times"
+    "working": "Making the invitation…"
   },
   "media": {
     "empty": "Photos, files and voice messages will collect here.",
     "emptyTitle": "Nothing shared here yet",
     "fetching": "Coming…",
-    "unreachable": "Not reachable right now",
-    "usage": "{{n}} things · {{size}} on this phone"
-  },
-  "mediaPicker": {
-    "camera": "Camera",
-    "close": "Close picker",
-    "file": "File",
-    "gallery": "Gallery",
-    "location": "Location",
-    "title": "Attach"
+    "kind": {
+      "all": "All",
+      "file": "Files",
+      "image": "Photos",
+      "video": "Videos",
+      "voice": "Voice"
+    },
+    "unreachable": "Not reachable right now"
   },
   "profile": {
-    "changePhoto": "Change photo",
     "emailLabel": "Email",
-    "machines": "My network",
-    "machinesHint": "How you are reachable, and what acts for you",
     "nameLabel": "Name",
     "namePlaceholder": "What your friends call you",
     "nameRequired": "A name is needed so people recognise you.",
@@ -109,8 +187,6 @@
     "notesLabel": "Notes / bio",
     "phoneLabel": "Phone",
     "private": "Stays on this device",
-    "privateNote": "This never leaves your phone and is never sent to anyone.",
-    "removePhoto": "Remove photo",
     "shared": "What others see",
     "sharedNote": "Your name and picture go to the people in your strands. In a strand that can still grow, people you have not met may come to see them."
   },
@@ -125,7 +201,6 @@
     "host": "Where",
     "lede": "A relay passes traffic along so people can reach you. You are not signing up for anything, and you can stop using it whenever you like.",
     "peer": "Machine",
-    "pinned": "That last part names one exact machine. If anything else answers instead, your phone will refuse it — so you will always be talking to this one.",
     "title": "Use this relay?"
   },
   "search": {
@@ -147,12 +222,40 @@
     "mentions": "When named",
     "none": "Nothing",
     "notifications": "Notifications",
-    "notifyLimit": "This decides what the app tells you. Whether anything can reach a sleeping phone depends on something of yours being awake.",
     "overCeiling": "You are at the limit you set. Nothing has been deleted — raise the limit, trim what you are holding, or add a machine.",
     "overrides": "{{n}} strands have their own setting, which this does not change.",
     "storage": "Storage",
     "system": "System",
     "title": "Settings"
+  },
+  "status": {
+    "relay": {
+      "reserved": "Working — people can reach you through this.",
+      "dialing": "Connecting…",
+      "notWorking": "Not working yet. Still trying — you are not reachable until it does."
+    },
+    "reach": {
+      "anywhere": "Can be reached from anywhere.",
+      "home-network": "Can only be reached on its own network."
+    },
+    "strand": {
+      "public": {
+        "label": "Open to anyone",
+        "sentence": "Anyone with the link can join. Nobody can be removed."
+      },
+      "settled": {
+        "label": "Settled",
+        "sentence": "Nobody can be added or removed. This is who it will always be."
+      },
+      "canChange": {
+        "label": "Can still change",
+        "one": "One person",
+        "many": "{{n}} people",
+        "sentence": "Only invited people are here. {{who}} can add or remove anyone{{you}}.",
+        "includingYou": " — including you",
+        "youRemovable": ", including you being removed"
+      }
+    }
   },
   "strand": {
     "addSomeone": "Add someone",
@@ -162,14 +265,23 @@
     "forgetConfirm": "This cannot be undone.",
     "forgetIt": "Forget it",
     "forgetTitle": "Forget this strand entirely?",
+    "hideHint": "Out of your list until you look for it; nothing changes for anyone else",
+    "invitationMade": "Made {{when}}",
+    "invitationTitle": "Invitation",
+    "invitationsOut": "Invitations you have out ({{n}})",
     "leaveBody": "It carries on without you and nothing more reaches you. You keep what identifies you here, so if you are invited back you return as yourself.",
     "leaveTitle": "Leave this strand?",
+    "makeInvitation": "Make an invitation",
     "manager": "can add and remove people",
     "managing": "Because you can add and remove people",
     "mediaCount": "{{n}} things shared",
     "members": "Members",
+    "muteHardOn": "Silent, whatever happens",
     "muteHint": "Quiet, unless somebody names you",
+    "muteSoftOn": "Quiet, unless somebody names you",
     "noDelete": "A strand cannot be deleted. Leaving is what you can do; it carries on for everyone else.",
+    "nobodyYet": "Nobody else has joined yet.",
+    "othersInvitations": "Invitations other members have out are not shown: an invitation is known only to whoever made it.",
     "remove": "Remove from this strand",
     "removeBody": "Nothing further reaches them. It does not undo anything they have already read.",
     "removeConfirm": "Remove",
@@ -190,14 +302,28 @@
     "archived": "Archived",
     "awaitingThem": "Sent — not taken up yet",
     "awaitingYou": "Waiting for your answer",
+    "bootFailed": "Could not start",
+    "connecting": "Connecting…",
     "draft": "Draft",
     "empty": "A strand is a conversation you and somebody else agree to. Until you have one, nobody can reach you — and you can reach nobody.",
     "emptyCta": "Start a strand",
     "emptyTitle": "No strands yet",
     "filter": "Find a conversation",
+    "hidden": "Hidden",
+    "hideHint": "Out of your list until you look for it; nothing changes for anyone else",
     "invitation": "Invitation",
+    "invitationsOut": "{{n}} invitations out",
+    "loading": "Looking for your strands…",
+    "muteHard": "Silence completely",
+    "muteHardNow": "Currently silent whatever happens",
+    "muteHint": "Stays in your list; you are just not told about it",
+    "muteSoftNow": "Currently quiet unless somebody names you",
+    "noInvitationOut": "No invitation out",
     "noMessages": "No messages yet",
     "nothingNew": "Nothing new.",
+    "oneInvitationOut": "1 invitation out",
+    "openDetails": "Open…",
+    "openDetailsHint": "Members, what is shared, and leaving",
     "pending": "Pending",
     "searchCost": "Looks inside every strand, and wakes the ones that are asleep",
     "searchMessages": "Search messages for “{{q}}”",
@@ -205,16 +331,11 @@
     "sortRecent": "Recent",
     "sortTitle": "Order by",
     "sortUnread": "Unread first",
-    "connecting": "Connecting…"
+    "unmute": "Unmute"
   },
   "viewer": {
     "fetching": "Still coming…",
     "goToMessage": "Go to the message",
-    "save": "Save",
-    "saved": "Saved to your phone",
-    "savedNote": "It is in your own library now, outside this app.",
-    "share": "Share",
-    "unreachable": "This is not reachable right now. Nothing has been lost — no machine holding it can be reached from here at the moment.",
-    "unsupported": "Nothing on this phone can display this. You can still keep it, or open it elsewhere."
+    "unreachable": "This is not reachable right now. Nothing has been lost — no machine holding it can be reached from here at the moment."
   }
 }

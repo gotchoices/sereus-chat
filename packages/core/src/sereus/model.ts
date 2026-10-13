@@ -467,8 +467,8 @@ export function createSereusModel(host: ChatHost): SereusModel {
           isMe: r.Id === me,
         }));
       }),
-      remove: async () => fail('unexpected', 'Removing a member is not supported yet.'),
-      resignManager: async () => fail('unexpected', 'Resigning as manager is not supported yet.'),
+      remove: async () => fail('not-supported', 'Removing a member is not supported yet.'),
+      resignManager: async () => fail('not-supported', 'Resigning as manager is not supported yet.'),
     },
 
     invitations: {
@@ -537,7 +537,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       }),
       // Dropping local copies without weakening what the strand can serve is an open
       // platform question (domain/sereus.md).
-      trim: async () => fail('unexpected', 'Trimming storage is not supported yet.'),
+      trim: async () => fail('not-supported', 'Trimming storage is not supported yet.'),
     },
 
     search: {
@@ -656,12 +656,12 @@ export function createSereusModel(host: ChatHost): SereusModel {
       async claimNode(text) {
         const reading = readNodeCode(text);
         if (!reading.ok) return fail('invalid-node-code', 'This is not a usable node code.', { reason: reading.problem });
-        if (claiming) return fail('claim-failed', 'A machine is already being added.', { retryable: true });
+        if (claiming) return fail('claim-failed', 'A machine is already being added.', { retryable: true, reason: 'busy' });
         claiming = true;
         try {
           const node = requireNode();
           if (!host.node.ownerEnrolled()) {
-            return fail('unavailable', 'This device is not yet an owner of its cadre; try again in a moment.');
+            return fail('unavailable', 'This device is not yet an owner of its cadre; try again in a moment.', { reason: 'owner-not-ready' });
           }
           // The code carries the claim secret: log the peer id only.
           console.info('[sereus-model] claiming node', reading.payload.peerId);

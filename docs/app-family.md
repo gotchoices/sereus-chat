@@ -391,13 +391,26 @@ and `devcall.mjs` drive phones, browsers and Node the same way.
 
 Platform-neutral data the UIs share:
 
-- **Strings** — message catalogs per locale, keyed by meaning, including every
-  error kind and status code the core emits. Each app loads them through its
-  own i18n mechanism.
+- **Strings** — message catalogs per locale (`strings/<locale>.json`), keyed by
+  meaning (`area.key`), including every error kind the core returns
+  (`errors.<kind>[.<reason>]`) and its status words (`status.*`).
+  - **Shared or the app's own.** Shared are the words every chat app would say
+    the same way: concepts and their consequences, states, errors, common
+    actions. An app keeps its own catalog for what only it shows (device
+    features, platform wording, its own navigation), and may override any shared
+    key.
+  - **Lookup.** `createTranslator(locale, appCatalogs)` gives every app the same
+    order: app, shared, app English, shared English. `errorText` words a
+    `ChatError`.
+  - **No fallback text in code**: an app wraps the translator in its own i18n
+    mechanism, and the catalogs are the only copy of the words.
 - **Design tokens** — color roles (light and dark), spacing, type scale, radii,
   as data. Each app maps them onto its styling system.
-- **Brand art** — the canonical logo vector and the icon-generation inputs.
+- **Brand art** — the canonical logo vector (`brand/logo.svg`).
   Each app keeps its own icon-generation script and generated assets.
+
+The JSON files are the source; a build step embeds them into the package's JS, so
+no consumer needs JSON-import support.
 
 ## What each app owns
 

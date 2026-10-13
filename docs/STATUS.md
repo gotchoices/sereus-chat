@@ -423,7 +423,7 @@ Ed25519 file until sereus#33) and lifecycle runner.
   watch subscribes even before a strand opens, so arming said nothing about
   readiness, and the first send went out mid-start.
 
-## Phase 6 — Stores (6a–6e done 2026-10-12; 6f open)
+## Phase 6 — Stores (done 2026-10-12)
 
 Done in steps, each type-checked and run on a phone.
 
@@ -478,8 +478,10 @@ Done in steps, each type-checked and run on a phone.
       - Fixed on the way: the bridge's `traffic` had lost the control node since
         2a (it read a removed field), and leave/forget failures now show instead
         of being dropped.
-- [ ] **6f. Cadre manager**, on sereus 1.14's claiming model (the one health
-      uses). Code done; the device check is still to do.
+- [x] **6f. Cadre manager**, on sereus 1.14's claiming model (the one health
+      uses). The screen renders on the S7 and the emulator. A real claim from a
+      phone waits for a claimable node (a `test/stack` script or cadre-cli),
+      deferred by choice.
       - Core: a `cadre` area on the model (`status`, `inspectNodeCode`,
         `claimNode`, `removeMachine`, `exportOwnerKey`), `changes.cadre`, and
         `cadreManagerStore`. It is implemented in the Sereus model, the mock and
@@ -506,8 +508,8 @@ Done in steps, each type-checked and run on a phone.
         sereus app on the phone would claim that scheme; that is a question for
         sereus.
 - Checks:
-  - Core: 47 tests, including the stores against the mock (pending and
-    failed sends, strand-list contents, mute ranking).
+  - Core: 51 tests, including the stores against the mock (pending and
+    failed sends, strand-list contents, mute ranking) and a real node claim.
   - App: `tsc` clean; Jest 7 pass (`App*.tsx` still fail as before).
   - Lint: 14 stack-import violations, all in `diagnostics/` (Phase 8), so
     "zero" waits for Phase 8.
@@ -526,15 +528,54 @@ Done in steps, each type-checked and run on a phone.
 
 **→ `apps/web` can start here.**
 
-## Phase 7 — `packages/resources`
+## Phase 7 — `packages/resources` (done 2026-10-12)
 
-- [ ] Move the string catalogs (`src/i18n/locales/*`) to
-      `packages/resources/strings`; add keys for every error kind and status
-      code the core emits
-- [ ] Extract design tokens from `src/theme` into `packages/resources/tokens`
-      (data only); `apps/mobile/src/theme` maps them onto RN styles
-- [ ] Move the canonical logo vector (`docs/images/logo_3_m.svg`) to
-      `packages/resources/brand`; point the icon-generation scripts there
+- [x] **Strings.** `@chat/resources` holds the shared catalogs
+      (`strings/en.json`, `es.json`): 244 keys plus errors and statuses.
+      - **What is shared:** keys are by meaning (`invite.historyWarning`), not by
+        screen. Shared means the words any chat app would say the same way:
+        concepts and their consequences, states, `common`/`actions` words, and
+        `errors.<kind>[.<reason>]` for every `ChatErrorKind`. A test checks that
+        every kind has words, and that other locales add no keys English lacks.
+      - **What the app keeps:** its own words in
+        `apps/mobile/src/i18n/locales/<l>/app.json` (28 keys). That covers device
+        features (scanner, media picker, saving to the phone's library),
+        phone-specific wording ("your phone needs a relay") and its own
+        navigation labels. An app may override any shared key.
+      - `createTranslator(locale, appCatalogs)` looks in the app's catalog first,
+        then shared, then English, and fills `{{name}}` placeholders.
+        `errorText` words a `ChatError` by reason, then kind, then the core's
+        message.
+      - The app's `useT()` is now that translator. The `screens.` prefix is gone
+        from keys.
+      - The in-code fallback texts were removed (301), so code and catalog cannot
+        drift. They already had: `strand.forgetBody` differed, and the catalog's
+        text, which was what showed, was kept.
+      - Displayed model errors go through `useErrorText()`.
+      - Strand status and relay status words come from `status.*`.
+      - Core changes: `CHAT_ERROR_KINDS`; a `not-supported` kind for operations
+        the Sereus model cannot do yet (they were `unexpected`); reasons
+        `owner-not-ready` and `busy`; `strandStatusKind` moved into the core.
+- [x] **Tokens.** `tokens/colors.json` (light, dark, avatar palette) and
+      `tokens/layout.json` (type, spacing, radius, hit slop).
+      `ThemeProvider`, `useTheme` and `colorHash` read them; values are unchanged.
+- [x] **Brand.** The canonical logo moved from `docs/images/logo_3_m.svg` to
+      `packages/resources/brand/logo.svg`; the icon scripts and image README
+      point there.
+- Build: JSON is the source. `scripts/gen-data.mjs` embeds it into TS, so Metro,
+  Vite, Node and a CLI all import plain JS. The app's `core:build` builds
+  resources, then core.
+- Checks:
+  - Resources: 5 tests. Core: 51.
+  - App: `tsc` clean; Jest 7 pass.
+  - S7: the strand list and network screen render from the catalogs.
+  - Two phones, S7 and emulator, 3 rounds: all delivered. Delivery medians were
+    13.1–14.0 s against Phase 5's 8.7–10.1 s. Nothing here touches the message
+    path; the emulator had just restarted (18 s to arm). Re-time on a settled
+    emulator.
+- Not done: string literals that never went through `t()` (alerts and labels in
+  several screens, the cadre manager's `STRINGS`). Sweep them when a second
+  locale or app needs them.
 
 ## Phase 8 — Diagnostics and the Node harness
 

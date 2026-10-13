@@ -3,8 +3,9 @@
  * a screen must handle; a thrown error is a defect.
  *
  * A `ChatError` carries a stable `kind` that UIs render through the string catalogs
- * (packages/resources, Phase 7), and `retryable`, which says whether trying again can
- * help. `message` is English text for logs and, until the catalogs exist, for display.
+ * (`@chat/resources`: `errors.<kind>`, or `errors.<kind>.<reason>`), and `retryable`,
+ * which says whether trying again can help. `message` is English text for logs, and the
+ * words to show when a catalog has none.
  */
 
 export type ChatErrorKind =
@@ -40,8 +41,20 @@ export type ChatErrorKind =
   | 'claim-refused'
   /** Claiming a node: reached, then the exchange or a local step failed. Safe to repeat. */
   | 'claim-failed'
+  /** The operation exists in the model but this implementation cannot do it yet. */
+  | 'not-supported'
   /** Anything else. */
   | 'unexpected';
+
+/** Every kind, for catalogs and tools that must cover them all. */
+const KINDS: Record<ChatErrorKind, true> = {
+  'unreachable': true, 'not-attached': true, 'unavailable': true, 'not-a-member': true,
+  'join-inviter-unreachable': true, 'invitation-spent': true, 'invitation-not-ready': true,
+  'join-refused': true, 'join-host-busy': true, 'join-host-outdated': true, 'join-incomplete': true,
+  'invitation-unusable': true, 'invalid-node-code': true, 'node-unreachable': true,
+  'claim-refused': true, 'claim-failed': true, 'not-supported': true, 'unexpected': true,
+};
+export const CHAT_ERROR_KINDS = Object.keys(KINDS) as readonly ChatErrorKind[];
 
 export interface ChatError {
   kind: ChatErrorKind;

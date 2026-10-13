@@ -13,7 +13,7 @@ import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { Prefs, StorageUsage } from '@chat/core';
 import { orThrow, useModel } from '../data/bind';
-import { useT } from '../i18n';
+import { useErrorText, useT } from '../i18n';
 import { Banner, ListRow, SectionHeader } from '../components';
 import { useTheme, useThemeContext, typography, spacing, radius } from '../theme';
 
@@ -48,6 +48,7 @@ export default function Settings() {
   const model = useModel();
   const navigation: any = useNavigation();
   const t = useT();
+  const errorText = useErrorText();
   const theme = useTheme();
   const { setScheme } = useThemeContext() as any;
   const [prefs, setLocal] = useState<Prefs | null>(null);
@@ -56,8 +57,8 @@ export default function Settings() {
 
   useEffect(() => {
     void model.prefs.get().then(r => { if (r.ok) setLocal(r.value); });
-    void model.media.storageUsage().then(r => (r.ok ? setUsage(r.value) : setError(r.error.message)));
-  }, [model]);
+    void model.media.storageUsage().then(r => (r.ok ? setUsage(r.value) : setError(errorText(r.error))));
+  }, [model, errorText]);
 
   const patch = async (p: Partial<Prefs>) => {
     const next = orThrow(await model.prefs.set(p));
@@ -71,55 +72,53 @@ export default function Settings() {
 
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.content}>
-      <SectionHeader label={t('screens.settings.appearance', 'Appearance')} />
+      <SectionHeader label={t('settings.appearance')} />
       <Choice
         value={prefs.theme}
         onChange={v => patch({ theme: v })}
         options={[
-          { value: 'system', label: t('screens.settings.system', 'System') },
-          { value: 'light', label: t('screens.settings.light', 'Light') },
-          { value: 'dark', label: t('screens.settings.dark', 'Dark') },
+          { value: 'system', label: t('settings.system') },
+          { value: 'light', label: t('settings.light') },
+          { value: 'dark', label: t('settings.dark') },
         ]}
       />
 
-      <SectionHeader label={t('screens.settings.language', 'Language')} />
+      <SectionHeader label={t('settings.language')} />
       <Choice
         value={prefs.language}
         onChange={v => patch({ language: v })}
         options={[{ value: 'en', label: 'English' }, { value: 'es', label: 'Español' }]}
       />
       <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
-        {t('screens.settings.languageNote', "Only the app's own words change. Messages are never translated.")}
+        {t('settings.languageNote')}
       </Text>
 
-      <SectionHeader label={t('screens.settings.notifications', 'Notifications')} />
+      <SectionHeader label={t('settings.notifications')} />
       <Choice
         value={prefs.notifyDefault}
         onChange={v => patch({ notifyDefault: v })}
         options={[
-          { value: 'all', label: t('screens.settings.all', 'Everything') },
-          { value: 'mentions', label: t('screens.settings.mentions', 'When named') },
-          { value: 'none', label: t('screens.settings.none', 'Nothing') },
+          { value: 'all', label: t('settings.all') },
+          { value: 'mentions', label: t('settings.mentions') },
+          { value: 'none', label: t('settings.none') },
         ]}
       />
       {/* The limit stated beside the switch, not in a help page. */}
       <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
-        {t('screens.settings.notifyLimit',
-          'This decides what the app tells you. Whether anything can reach a sleeping phone depends on something of yours being awake.')}
+        {t('settings.notifyLimit')}
       </Text>
       {prefs.perStrandOverrides > 0 ? (
         <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
-          {t('screens.settings.overrides', '{{n}} strands have their own setting, which this does not change.')
+          {t('settings.overrides')
             .replace('{{n}}', String(prefs.perStrandOverrides))}
         </Text>
       ) : null}
 
-      <SectionHeader label={t('screens.settings.storage', 'Storage')} />
+      <SectionHeader label={t('settings.storage')} />
       {error ? <Banner message={error} /> : null}
       {overCeiling ? (
         <Banner
-          message={t('screens.settings.overCeiling',
-            'You are at the limit you set. Nothing has been deleted — raise the limit, trim what you are holding, or add a machine.')}
+          message={t('settings.overCeiling')}
         />
       ) : null}
       {usage ? (
@@ -141,7 +140,7 @@ export default function Settings() {
         </>
       ) : null}
       <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
-        {t('screens.settings.ceilingNote', 'The limit is yours to set. Nothing is imposed, and nothing is deleted on your behalf.')}
+        {t('settings.ceilingNote')}
       </Text>
 
       {/* Dev-only.  Deliberately untranslated and outside the story set: this is a

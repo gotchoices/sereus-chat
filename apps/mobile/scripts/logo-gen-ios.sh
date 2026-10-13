@@ -6,15 +6,14 @@
 # black) that the OS masks to a rounded rect. So: brand-colour square with the
 # green disc centered on top, written at every required size + Contents.json.
 #
-# Source: docs/images/logo_3_m.svg
+# Source: packages/resources/brand/logo.svg
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"               # chat/apps/mobile
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"    # chat/
-ASSETS_DIR="$PROJECT_ROOT/docs/images"
-SRC="$ASSETS_DIR/logo_3_m.svg"
+SRC="$PROJECT_ROOT/packages/resources/brand/logo.svg"
 APPICONSET_DIR="$APP_DIR/ios/mobile/Images.xcassets/AppIcon.appiconset"
 
 # --- knobs -----------------------------------------------------------------

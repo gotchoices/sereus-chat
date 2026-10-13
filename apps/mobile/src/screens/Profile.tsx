@@ -12,7 +12,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { Profile as ProfileT } from '@chat/core';
 import { orThrow, useModel } from '../data/bind';
-import { useT } from '../i18n';
+import { useErrorText, useT } from '../i18n';
 import { Avatar, Banner, IconButton, ListRow, SectionHeader } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
@@ -32,6 +32,7 @@ export default function Profile() {
    */
   const [firstRun, setFirstRun] = useState<boolean>(route?.params?.firstRun ?? false);
   const t = useT();
+  const errorText = useErrorText();
   const theme = useTheme();
 
   const [profile, setProfile] = useState<ProfileT>({ name: '', avatarUri: null });
@@ -41,15 +42,15 @@ export default function Profile() {
   useEffect(() => {
     void model.profile.get().then(r => {
       if (r.ok) { setProfile(r.value); setFirstRun(!r.value?.name?.trim()); }
-      else setError(r.error.message);
+      else setError(errorText(r.error));
     });
-  }, [model]);
+  }, [model, errorText]);
 
   const update = (patch: Partial<ProfileT>) => { setProfile(p => ({ ...p, ...patch })); setDirty(true); };
 
   const save = async () => {
     if (!profile.name.trim()) {
-      Alert.alert(t('screens.profile.nameRequired', 'A name is needed so people recognise you.'));
+      Alert.alert(t('profile.nameRequired'));
       return;
     }
     try {
@@ -61,7 +62,7 @@ export default function Profile() {
       else navigation.goBack();
     } catch (e: any) {
       // Keep what they typed — never lose input on a failed save.
-      setError(e?.message ?? 'Could not save your profile');
+      setError(errorText(e, 'Could not save your profile'));
     }
   };
 
@@ -88,7 +89,7 @@ export default function Profile() {
           size={22}
           variant={canSave ? 'accent' : 'plain'}
           disabled={!canSave}
-          accessibilityLabel={firstRun ? t('common.continue', 'Continue') : t('common.save', 'Save')}
+          accessibilityLabel={firstRun ? t('common.continue') : t('common.save')}
           onPress={save}
           style={canSave ? undefined : styles.dim}
         />
@@ -105,7 +106,7 @@ export default function Profile() {
       // first tap only dismissing it.
       keyboardShouldPersistTaps="handled"
     >
-      {error ? <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: save }} /> : null}
+      {error ? <Banner message={error} action={{ label: t('common.retry'), onPress: save }} /> : null}
 
       <View style={styles.avatarBlock}>
         <Avatar name={profile.name || '?'} uri={profile.avatarUri} size="lg" />
@@ -113,7 +114,7 @@ export default function Profile() {
           name="camera-outline"
           size={20}
           variant="bordered"
-          accessibilityLabel={t('screens.profile.changePhoto', 'Change photo')}
+          accessibilityLabel={t('profile.changePhoto')}
           onPress={() => navigation.navigate('MediaPicker', { purpose: 'avatar' })}
         />
         {profile.avatarUri ? (
@@ -121,38 +122,37 @@ export default function Profile() {
             name="trash-outline"
             size={20}
             variant="bordered"
-            accessibilityLabel={t('screens.profile.removePhoto', 'Remove photo')}
+            accessibilityLabel={t('profile.removePhoto')}
             onPress={() => update({ avatarUri: null })}
           />
         ) : null}
       </View>
 
-      <SectionHeader label={t('screens.profile.shared', 'What others see')} />
+      <SectionHeader label={t('profile.shared')} />
       <View style={[styles.field, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
         <Text style={[typography.small, { color: theme.textMuted }]}>
-          {t('screens.profile.nameLabel', 'Name')}
+          {t('profile.nameLabel')}
         </Text>
         <TextInput
           testID="profile-name"
           value={profile.name}
           onChangeText={v => update({ name: v })}
-          placeholder={t('screens.profile.namePlaceholder', 'What your friends call you')}
+          placeholder={t('profile.namePlaceholder')}
           placeholderTextColor={theme.textMuted}
           style={[typography.body, { color: theme.textPrimary }]}
         />
       </View>
       <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
-        {t('screens.profile.sharedNote',
-          'Your name and picture go to the people in your strands. In a strand that can still grow, people you have not met may come to see them.')}
+        {t('profile.sharedNote')}
       </Text>
 
       {!firstRun ? (
         <>
-          <SectionHeader label={t('screens.profile.private', 'Stays on this device')} />
+          <SectionHeader label={t('profile.private')} />
           {([
-            ['email', t('screens.profile.emailLabel', 'Email'), false],
-            ['phone', t('screens.profile.phoneLabel', 'Phone'), false],
-            ['notes', t('screens.profile.notesLabel', 'Notes / bio'), true],
+            ['email', t('profile.emailLabel'), false],
+            ['phone', t('profile.phoneLabel'), false],
+            ['notes', t('profile.notesLabel'), true],
           ] as Array<[keyof ProfileT, string, boolean]>).map(([key, label, multi]) => (
             <View key={key} style={[styles.field, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
               <Text style={[typography.small, { color: theme.textMuted }]}>{label}</Text>
@@ -165,21 +165,21 @@ export default function Profile() {
             </View>
           ))}
           <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
-            {t('screens.profile.privateNote', 'This never leaves your phone and is never sent to anyone.')}
+            {t('profile.privateNote')}
           </Text>
 
           <View style={styles.rows}>
-            <ListRow title={t('screens.settings.title', 'Settings')} onPress={() => navigation.navigate('Settings')} />
+            <ListRow title={t('settings.title')} onPress={() => navigation.navigate('Settings')} />
             <ListRow
-              title={t('screens.profile.machines', 'My network')}
-              subtitle={t('screens.profile.machinesHint', 'How you are reachable, and what acts for you')}
+              title={t('profile.machines')}
+              subtitle={t('profile.machinesHint')}
               onPress={() => navigation.navigate('CadreManager')}
             />
           </View>
         </>
       ) : (
         <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
-          {t('screens.profile.noAccount', 'No account is being created. There is no password and nothing to sign in to.')}
+          {t('profile.noAccount')}
         </Text>
       )}
 

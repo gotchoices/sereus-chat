@@ -1,0 +1,34 @@
+{
+  "name": "@chat/resources",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Sereus Chat's shared resources: string catalogs, design tokens, brand art. Data only; see docs/app-family.md.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./brand/*": "./brand/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "strings",
+    "tokens",
+    "brand"
+  ],
+  "scripts": {
+    "codegen": "node scripts/gen-data.mjs",
+    "build": "node scripts/gen-data.mjs && tsc -p tsconfig.json",
+    "typecheck": "node scripts/gen-data.mjs && tsc -p tsconfig.json --noEmit",
+    "test": "node scripts/gen-data.mjs && vitest run"
+  },
+  "devDependencies": {
+    "@chat/core": "workspace:*",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17"
+  }
+}

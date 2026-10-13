@@ -1,0 +1,46 @@
+{
+  "QrScanner": {
+    "cameraUnavailable": "Camera unavailable",
+    "open": "Open",
+    "pasteLabel": "Paste invite link",
+    "pastePlaceholder": "https://sereus.org/chat/invite/#abc123",
+    "simulatorNote": "Camera not available in simulator. Paste an invite link below.",
+    "title": "Scan QR"
+  },
+  "invite": {
+    "unreachableBody": "A phone cannot accept connections from the Internet on its own, so the person you invite would have no way to answer. A relay fixes that: a machine with a public Internet address that passes connections through to your phone.",
+    "unreachableTitle": "Your phone needs a relay first",
+    "workingFound": "Setting up the strand. On some phones this takes up to a minute."
+  },
+  "media": {
+    "usage": "{{n}} things · {{size}} on this phone"
+  },
+  "mediaPicker": {
+    "camera": "Camera",
+    "close": "Close picker",
+    "file": "File",
+    "gallery": "Gallery",
+    "location": "Location",
+    "title": "Attach"
+  },
+  "profile": {
+    "changePhoto": "Change photo",
+    "machines": "My network",
+    "machinesHint": "How you are reachable, and what acts for you",
+    "privateNote": "This never leaves your phone and is never sent to anyone.",
+    "removePhoto": "Remove photo"
+  },
+  "relay": {
+    "pinned": "That last part names one exact machine. If anything else answers instead, your phone will refuse it — so you will always be talking to this one."
+  },
+  "settings": {
+    "notifyLimit": "This decides what the app tells you. Whether anything can reach a sleeping phone depends on something of yours being awake."
+  },
+  "viewer": {
+    "save": "Save",
+    "saved": "Saved to your phone",
+    "savedNote": "It is in your own library now, outside this app.",
+    "share": "Share",
+    "unsupported": "Nothing on this phone can display this. You can still keep it, or open it elsewhere."
+  }
+}

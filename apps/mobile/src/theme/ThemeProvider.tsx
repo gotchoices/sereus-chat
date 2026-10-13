@@ -2,14 +2,15 @@
  * ThemeProvider — app-wide semantic color tokens with system/light/dark
  * selection, persisted to AsyncStorage.
  *
- * Token names and values are the single source of truth from
- * `design/specs/mobile/global/ui.md` → "Colors (semantic tokens)".  Screens and
+ * Token names follow `design/specs/mobile/global/ui.md` → "Colors (semantic tokens)";
+ * the values are the shared tokens in `@chat/resources`, so every app's palette matches.  Screens and
  * shared components reference tokens by name only — never raw hex.
  */
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { colors } from '@chat/resources';
 import { STORAGE_KEYS } from '../data/persisted-names';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
@@ -45,39 +46,9 @@ export interface Theme {
   overlay: string;
 }
 
-const lightTheme: Theme = {
-  background: '#ffffff',
-  surface: '#ffffff',
-  surfaceAlt: '#f2f4f7',
-  textPrimary: '#111111',
-  textSecondary: '#555555',
-  textMuted: '#888888',
-  border: '#e2e2e2',
-  divider: '#eeeeee',
-  accent: '#1a7f5a',
-  accentText: '#ffffff',
-  success: '#2c8a3f',
-  danger: '#c4392f',
-  bannerError: '#ffeeee',
-  overlay: 'rgba(0,0,0,0.4)',
-};
-
-const darkTheme: Theme = {
-  background: '#000000',
-  surface: '#111111',
-  surfaceAlt: '#1c1f24',
-  textPrimary: '#eeeeee',
-  textSecondary: '#bbbbbb',
-  textMuted: '#888888',
-  border: '#2a2d31',
-  divider: '#222222',
-  accent: '#37b283',
-  accentText: '#06231a',
-  success: '#52c46b',
-  danger: '#ef5350',
-  bannerError: '#330000',
-  overlay: 'rgba(0,0,0,0.6)',
-};
+// The values are the shared design tokens (@chat/resources, tokens/colors.json).
+const lightTheme: Theme = colors.light;
+const darkTheme: Theme = colors.dark;
 
 interface ThemeContextValue {
   theme: Theme;

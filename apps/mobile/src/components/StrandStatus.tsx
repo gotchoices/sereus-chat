@@ -21,14 +21,12 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, typography, spacing, radius } from '../theme';
-import type { StrandState } from '@chat/core';
+import { useT } from '../i18n';
+import { strandStatusKind, type StrandState, type StrandStatusKind } from '@chat/core';
+import type { Translator } from '@chat/resources';
 
-export type StrandStatusKind = 'public' | 'canChange' | 'settled';
-
-export function strandStatusKind(state: StrandState): StrandStatusKind {
-  if (state.visibility === 'public') return 'public';
-  return state.managerCount === 0 ? 'settled' : 'canChange';
-}
+export { strandStatusKind };
+export type { StrandStatusKind };
 
 export interface StrandStatusProps {
   state: StrandState;
@@ -37,30 +35,19 @@ export interface StrandStatusProps {
   testID?: string;
 }
 
-const LABEL: Record<StrandStatusKind, string> = {
-  public: 'Open to anyone',
-  canChange: 'Can still change',
-  settled: 'Settled',
-};
-
-function sentence(kind: StrandStatusKind, state: StrandState): string {
-  switch (kind) {
-    case 'public':
-      return 'Anyone with the link can join. Nobody can be removed.';
-    case 'settled':
-      return 'Nobody can be added or removed. This is who it will always be.';
-    case 'canChange': {
-      const n = state.managerCount;
-      const who = n === 1 ? 'One person' : `${n} people`;
-      const you = state.canIManage ? ' — including you' : ', including you being removed';
-      return `Only invited people are here. ${who} can add or remove anyone${you}.`;
-    }
-  }
+function sentence(t: Translator, kind: StrandStatusKind, state: StrandState): string {
+  if (kind !== 'canChange') return t(`status.strand.${kind}.sentence`);
+  const n = state.managerCount;
+  const who = n === 1 ? t('status.strand.canChange.one') : t('status.strand.canChange.many', undefined, { n });
+  const you = state.canIManage ? t('status.strand.canChange.includingYou') : t('status.strand.canChange.youRemovable');
+  return t('status.strand.canChange.sentence', undefined, { who, you });
 }
 
 export function StrandStatus({ state, variant = 'full', testID }: StrandStatusProps) {
   const theme = useTheme();
+  const t = useT();
   const kind = strandStatusKind(state);
+  const label = t(`status.strand.${kind}.label`);
 
   // Semantic, not decorative: settled is the only reassuring one.
   const tint =
@@ -71,7 +58,7 @@ export function StrandStatus({ state, variant = 'full', testID }: StrandStatusPr
       <View testID={testID} style={styles.compactRow}>
         <View style={[styles.dot, { backgroundColor: tint }]} />
         <Text style={[typography.small, { color: theme.textMuted }]} numberOfLines={1}>
-          {LABEL[kind]}
+          {label}
         </Text>
       </View>
     );
@@ -85,10 +72,10 @@ export function StrandStatus({ state, variant = 'full', testID }: StrandStatusPr
     >
       <View style={styles.compactRow}>
         <View style={[styles.dot, { backgroundColor: tint }]} />
-        <Text style={[typography.body, styles.label, { color: theme.textPrimary }]}>{LABEL[kind]}</Text>
+        <Text style={[typography.body, styles.label, { color: theme.textPrimary }]}>{label}</Text>
       </View>
       <Text style={[typography.body, styles.sentence, { color: theme.textMuted }]}>
-        {sentence(kind, state)}
+        {sentence(t, kind, state)}
       </Text>
     </View>
   );

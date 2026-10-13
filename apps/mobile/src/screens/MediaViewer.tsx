@@ -8,7 +8,7 @@ import { View, Text, Image, FlatList, useWindowDimensions, StyleSheet, Share, Al
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { Attachment } from '@chat/core';
 import { orThrow, useModel } from '../data/bind';
-import { useT } from '../i18n';
+import { useErrorText, useT } from '../i18n';
 import { IconButton, Banner } from '../components';
 import { useTheme, typography, spacing } from '../theme';
 
@@ -22,6 +22,7 @@ export default function MediaViewer() {
   const { strandId, attachmentId, setFilter } = route.params ?? {};
   const { width, height } = useWindowDimensions();
   const t = useT();
+  const errorText = useErrorText();
   const theme = useTheme();
 
   const [items, setItems] = useState<Attachment[]>([]);
@@ -37,17 +38,17 @@ export default function MediaViewer() {
       const i = set.findIndex(a => a.id === attachmentId);
       setIndex(i >= 0 ? i : 0);
     } catch (e: any) {
-      setError(e?.message ?? 'That could not be opened');
+      setError(errorText(e, 'That could not be opened'));
     }
-  }, [model, strandId, attachmentId, setFilter]);
+  }, [model, strandId, attachmentId, setFilter, errorText]);
 
   useEffect(() => { void load(); }, [load]);
 
   const current = items[index];
 
   const save = () => Alert.alert(
-    t('screens.viewer.saved', 'Saved to your phone'),
-    t('screens.viewer.savedNote', 'It is in your own library now, outside this app.'),
+    t('viewer.saved'),
+    t('viewer.savedNote'),
   );
 
   const shareOut = async () => {
@@ -58,13 +59,12 @@ export default function MediaViewer() {
 
   const body = (a: Attachment) => {
     if (a.locality === 'fetching') {
-      return <Text style={[typography.body, styles.msg, styles.onDark]}>{t('screens.viewer.fetching', 'Still coming…')}</Text>;
+      return <Text style={[typography.body, styles.msg, styles.onDark]}>{t('viewer.fetching')}</Text>;
     }
     if (a.locality === 'unreachable') {
       return (
         <Text style={[typography.body, styles.msg, styles.onDark]}>
-          {t('screens.viewer.unreachable',
-            'This is not reachable right now. Nothing has been lost — no machine holding it can be reached from here at the moment.')}
+          {t('viewer.unreachable')}
         </Text>
       );
     }
@@ -74,7 +74,7 @@ export default function MediaViewer() {
     return (
       <Text style={[typography.body, styles.msg, styles.onDark]}>
         {a.name ? `${a.name}\n\n` : ''}
-        {t('screens.viewer.unsupported', 'Nothing on this phone can display this. You can still keep it, or open it elsewhere.')}
+        {t('viewer.unsupported')}
       </Text>
     );
   };
@@ -83,15 +83,15 @@ export default function MediaViewer() {
     <View style={styles.container}>
       <View style={styles.chrome}>
         <IconButton name="close-outline" size={24} color={ON_DARK}
-          accessibilityLabel={t('common.close', 'Close')} onPress={() => navigation.goBack()} />
+          accessibilityLabel={t('common.close')} onPress={() => navigation.goBack()} />
         <Text style={[typography.small, styles.onDark]} numberOfLines={1}>
           {current?.name ?? ''}
         </Text>
         <View style={styles.chromeRight}>
           <IconButton name="download-outline" size={22} color={ON_DARK}
-            accessibilityLabel={t('screens.viewer.save', 'Save')} onPress={save} />
+            accessibilityLabel={t('viewer.save')} onPress={save} />
           <IconButton name="share-outline" size={22} color={ON_DARK}
-            accessibilityLabel={t('screens.viewer.share', 'Share')} onPress={shareOut} />
+            accessibilityLabel={t('viewer.share')} onPress={shareOut} />
         </View>
       </View>
 
@@ -112,7 +112,7 @@ export default function MediaViewer() {
       {current ? (
         <View style={styles.footer}>
           <IconButton name="chatbubble-outline" size={20} color={ON_DARK}
-            accessibilityLabel={t('screens.viewer.goToMessage', 'Go to the message')}
+            accessibilityLabel={t('viewer.goToMessage')}
             onPress={() => navigation.navigate('ChatInterface', { strandId, anchorMessageId: current.messageId })} />
         </View>
       ) : null}

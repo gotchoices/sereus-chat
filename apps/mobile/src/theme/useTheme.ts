@@ -3,6 +3,7 @@
  * Import these instead of hard-coding font sizes or padding.
  */
 
+import { layout } from '@chat/resources';
 import { useThemeContext } from './ThemeProvider';
 
 export type { Theme, ThemeMode } from './ThemeProvider';
@@ -13,23 +14,21 @@ export function useTheme() {
   return useThemeContext().theme;
 }
 
+// The scales are the shared design tokens (@chat/resources, tokens/layout.json), mapped
+// onto React Native style values here.
+
 /** Typography scale (ui.md). */
 export const typography = {
-  title: { fontSize: 20, fontWeight: '600' as const },
-  body: { fontSize: 16, fontWeight: '400' as const },
-  small: { fontSize: 12, fontWeight: '400' as const },
+  title: { fontSize: layout.type.title.size, fontWeight: String(layout.type.title.weight) as '600' },
+  body: { fontSize: layout.type.body.size, fontWeight: String(layout.type.body.weight) as '400' },
+  small: { fontSize: layout.type.small.size, fontWeight: String(layout.type.small.weight) as '400' },
 };
 
 /** Spacing scale (ui.md): spacing[0]=4 … spacing[5]=24. */
-export const spacing = [4, 8, 12, 16, 20, 24] as const;
+export const spacing = layout.spacing;
 
 /** Card / surface radius; pills use `radius.pill`. */
-export const radius = {
-  card: 12,
-  bubble: 16,
-  control: 8,
-  pill: 999,
-} as const;
+export const radius = layout.radius;
 
 /** Minimum interactive target (a11y — ui.md). */
-export const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+export const HIT_SLOP = { top: layout.hitSlop, bottom: layout.hitSlop, left: layout.hitSlop, right: layout.hitSlop } as const;

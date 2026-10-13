@@ -13,7 +13,7 @@ import { View, Text, TextInput, FlatList, StyleSheet } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { SearchHit } from '@chat/core';
 import { orThrow, useModel } from '../data/bind';
-import { useT } from '../i18n';
+import { useErrorText, useT } from '../i18n';
 import { ListRow, EmptyState, Banner } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
@@ -23,6 +23,7 @@ export default function SearchInterface() {
   const route: any = useRoute();
   const scopedStrandId: string | undefined = route?.params?.strandId;
   const t = useT();
+  const errorText = useErrorText();
   const theme = useTheme();
 
   const [query, setQuery] = useState<string>(route?.params?.initialQuery ?? '');
@@ -48,11 +49,11 @@ export default function SearchInterface() {
         setProgress({ searched: batch.strandsSearched, total: batch.strandsTotal, skipped: batch.strandsSkipped });
       }
     } catch (e: any) {
-      setError(e?.message ?? 'Search could not run');
+      setError(errorText(e, 'Search could not run'));
     } finally {
       if (!ctrl.signal.aborted) setRunning(false);
     }
-  }, [model, scopedStrandId]);
+  }, [model, scopedStrandId, errorText]);
 
   useEffect(() => {
     const id = setTimeout(() => void run(query), 300);
@@ -64,10 +65,10 @@ export default function SearchInterface() {
   const done = !running && !!progress;
   const status = progress
     ? running
-      ? t('screens.search.progress', 'Looked in {{a}} of {{b}} strands…')
+      ? t('search.progress')
           .replace('{{a}}', String(progress.searched)).replace('{{b}}', String(progress.total))
       : progress.skipped > 0
-        ? t('screens.search.partial', '{{n}} strands could not be reached, so this is not everything.')
+        ? t('search.partial')
             .replace('{{n}}', String(progress.skipped))
         : null
     : null;
@@ -80,21 +81,21 @@ export default function SearchInterface() {
         onChangeText={setQuery}
         autoFocus={!route?.params?.initialQuery}
         placeholder={scopedStrandId
-          ? t('screens.search.inStrand', 'Search this conversation')
-          : t('screens.search.everywhere', 'Search everything')}
+          ? t('search.inStrand')
+          : t('search.everywhere')}
         placeholderTextColor={theme.textMuted}
         style={[typography.body, styles.input, { color: theme.textPrimary, backgroundColor: theme.surfaceAlt }]}
       />
 
-      {error ? <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: () => run(query) }} /> : null}
+      {error ? <Banner message={error} action={{ label: t('common.retry'), onPress: () => run(query) }} /> : null}
       {status ? (
         <Text style={[typography.small, styles.status, { color: theme.textMuted }]}>{status}</Text>
       ) : null}
 
       {done && hits.length === 0 && query.trim() ? (
         <EmptyState icon="search-outline"
-          title={t('screens.search.noneTitle', 'Nothing found')}
-          hint={t('screens.search.none', 'No message matched that.')} />
+          title={t('search.noneTitle')}
+          hint={t('search.none')} />
       ) : (
         <FlatList
           testID="search-results"

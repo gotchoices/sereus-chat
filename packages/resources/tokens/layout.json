@@ -1,0 +1,31 @@
+{
+  "type": {
+    "title": {
+      "size": 20,
+      "weight": 600
+    },
+    "body": {
+      "size": 16,
+      "weight": 400
+    },
+    "small": {
+      "size": 12,
+      "weight": 400
+    }
+  },
+  "spacing": [
+    4,
+    8,
+    12,
+    16,
+    20,
+    24
+  ],
+  "radius": {
+    "card": 12,
+    "bubble": 16,
+    "control": 8,
+    "pill": 999
+  },
+  "hitSlop": 8
+}

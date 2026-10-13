@@ -22,7 +22,7 @@ import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-na
 import { chatStore, isSending } from '@chat/core';
 import { useModel, useStore } from '../data/bind';
 import type { Message, Member, StrandState, Attachment } from '@chat/core';
-import { useT } from '../i18n';
+import { useErrorText, useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { ActionSheet,
   MessageBubble, EmptyState, Banner, IconButton, Avatar, StrandStatus,
@@ -101,6 +101,7 @@ export default function ChatInterface() {
     };
   }, []));
   const t = useT();
+  const errorText = useErrorText();
   const rev = useDataRevision();
   const theme = useTheme();
   const listRef = useRef<FlatList<Row>>(null);
@@ -192,7 +193,7 @@ export default function ChatInterface() {
       const done = await store.edit(target.id, text);
       if (!done.ok) {
         setDraft(text); setEditing(target);
-        setActionError(done.error.message);
+        setActionError(errorText(done.error));
       }
       return;
     }
@@ -204,7 +205,7 @@ export default function ChatInterface() {
     if (!sent.ok) {
       // A genuine write failure — keep what they wrote.
       setDraft(text);
-      setActionError(sent.error.message);
+      setActionError(errorText(sent.error));
     }
   };
 
@@ -222,17 +223,17 @@ export default function ChatInterface() {
     return [
       ...(mine
         ? [
-            { label: t('actions.edit', 'Edit'),
+            { label: t('actions.edit'),
               onPress: () => { setEditing(m); setReplyTo(null); setDraft(m.content); } },
-            { label: t('actions.delete', 'Delete'), destructive: true,
+            { label: t('actions.delete'), destructive: true,
               onPress: () => { void store.delete(m.id); } },
           ]
         : [
-            { label: t('actions.reply', 'Reply'), onPress: () => setReplyTo(m) },
-            { label: t('actions.react', 'React 👍'),
+            { label: t('actions.reply'), onPress: () => setReplyTo(m) },
+            { label: t('actions.react'),
               onPress: () => { void store.react(m.id, '👍'); } },
           ]),
-      { label: t('actions.copy', 'Copy'), onPress: () => Clipboard.setString(m.content) },
+      { label: t('actions.copy'), onPress: () => Clipboard.setString(m.content) },
     ];
   };
 
@@ -244,7 +245,7 @@ export default function ChatInterface() {
       return (
         <View style={styles.unreadRow}>
           <View style={[styles.rule, { backgroundColor: theme.accent }]} />
-          <Text style={[typography.small, { color: theme.accent }]}>{t('screens.chat.unread', 'New')}</Text>
+          <Text style={[typography.small, { color: theme.accent }]}>{t('chat.unread')}</Text>
           <View style={[styles.rule, { backgroundColor: theme.accent }]} />
         </View>
       );
@@ -267,7 +268,7 @@ export default function ChatInterface() {
         timestamp={item.showMeta ? clock(m.timestamp) : null}
         edited={!!m.editedAt}
         sending={sending}
-        status={sending ? t('screens.chat.sending', 'Sending…') : null}
+        status={sending ? t('chat.sending') : null}
         replyTo={
           m.replyToId
             ? {
@@ -302,7 +303,7 @@ export default function ChatInterface() {
         </Pressable>
       ) : null}
 
-      {error ? <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: load }} /> : null}
+      {error ? <Banner message={error} action={{ label: t('common.retry'), onPress: load }} /> : null}
 
       {/* Nobody but me yet (stories 02 step 9, 30 F). The strand is real and the
           founder may write in it; this says who is not here yet and leads to the
@@ -311,11 +312,11 @@ export default function ChatInterface() {
         <Banner
           variant="info"
           testID="awaiting-join"
-          message={`${t('screens.chat.nobodyYet', 'Nobody has joined yet')} · ${
-            invitesOut === 0 ? t('screens.strands.noInvitationOut', 'No invitation out')
-            : invitesOut === 1 ? t('screens.strands.oneInvitationOut', '1 invitation out')
-            : t('screens.strands.invitationsOut', '{{n}} invitations out').replace('{{n}}', String(invitesOut))}`}
-          action={{ label: t('screens.chat.invitations', 'Invitations'),
+          message={`${t('chat.nobodyYet')} · ${
+            invitesOut === 0 ? t('strands.noInvitationOut')
+            : invitesOut === 1 ? t('strands.oneInvitationOut')
+            : t('strands.invitationsOut').replace('{{n}}', String(invitesOut))}`}
+          action={{ label: t('chat.invitations'),
             onPress: () => navigation.navigate('StrandDetail', { strandId, title }) }}
         />
       ) : null}
@@ -325,16 +326,16 @@ export default function ChatInterface() {
           <ActivityIndicator color={theme.textMuted} />
           {opening ? (
             <Text style={[typography.small, { color: theme.textMuted, marginTop: spacing[1] }]}>
-              {t('screens.chat.connecting', 'Connecting to this conversation…')}
+              {t('chat.connecting')}
             </Text>
           ) : null}
         </View>
       ) : shown.length === 0 && !error ? (
         <EmptyState icon="chatbubble-ellipses-outline"
-          title={t('screens.chat.emptyTitle', 'Nothing said yet')}
+          title={t('chat.emptyTitle')}
           hint={awaitingJoin
-            ? t('screens.chat.emptyAlone', 'You can write before anyone joins. Whoever takes up an invitation will be able to read it.')
-            : t('screens.chat.empty', 'Say something — it is just the two of you until anyone else is invited.')} />
+            ? t('chat.emptyAlone')
+            : t('chat.empty')} />
       ) : (
         <FlatList
           ref={listRef}
@@ -353,7 +354,7 @@ export default function ChatInterface() {
         <Pressable style={[styles.jump, { backgroundColor: theme.accent }]}
           onPress={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}>
           <Text style={[typography.small, { color: theme.accentText }]}>
-            {t('screens.chat.jump', 'Latest')}
+            {t('chat.jump')}
           </Text>
         </Pressable>
       ) : null}
@@ -362,10 +363,10 @@ export default function ChatInterface() {
         <View style={[styles.replyBar, { backgroundColor: theme.surfaceAlt, borderTopColor: theme.divider }]}>
           <View style={styles.flex1}>
             <Text style={[typography.small, { color: theme.textMuted }]}>
-              {t('screens.chat.editing', 'Editing — this replaces what you said')}
+              {t('chat.editing')}
             </Text>
           </View>
-          <IconButton name="close-outline" size={18} accessibilityLabel={t('common.cancel', 'Cancel')}
+          <IconButton name="close-outline" size={18} accessibilityLabel={t('common.cancel')}
             onPress={() => { setEditing(null); setDraft(''); }} />
         </View>
       ) : null}
@@ -374,43 +375,43 @@ export default function ChatInterface() {
         <View style={[styles.replyBar, { backgroundColor: theme.surfaceAlt, borderTopColor: theme.divider }]}>
           <View style={styles.flex1}>
             <Text style={[typography.small, { color: theme.textMuted }]}>
-              {t('screens.chat.replyingTo', 'Replying to {{name}}').replace('{{name}}', nameOf(replyTo.memberId))}
+              {t('chat.replyingTo').replace('{{name}}', nameOf(replyTo.memberId))}
             </Text>
             <Text numberOfLines={1} style={[typography.small, { color: theme.textPrimary }]}>{replyTo.content}</Text>
           </View>
-          <IconButton name="close-outline" size={18} accessibilityLabel={t('common.cancel', 'Cancel')} onPress={() => setReplyTo(null)} />
+          <IconButton name="close-outline" size={18} accessibilityLabel={t('common.cancel')} onPress={() => setReplyTo(null)} />
         </View>
       ) : null}
 
       <View style={[styles.composer, { borderTopColor: theme.divider, backgroundColor: theme.surface }]}>
-        <IconButton name="add-outline" size={22} accessibilityLabel={t('actions.attach', 'Attach')}
+        <IconButton name="add-outline" size={22} accessibilityLabel={t('actions.attach')}
           onPress={() => navigation.navigate('MediaPicker', { purpose: 'attachment', strandId })} />
         <TextInput
           testID="composer"
           value={draft}
           onChangeText={setDraft}
           multiline
-          placeholder={t('screens.chat.placeholder', 'Message')}
+          placeholder={t('chat.placeholder')}
           placeholderTextColor={theme.textMuted}
           style={[typography.body, styles.input, { color: theme.textPrimary, backgroundColor: theme.surfaceAlt }]}
         />
         {draft.trim() ? (
           <IconButton name={editing ? 'checkmark-outline' : 'send-outline'} size={22} variant="accent"
-            accessibilityLabel={editing ? t('common.save', 'Save') : t('actions.send', 'Send')}
+            accessibilityLabel={editing ? t('common.save') : t('actions.send')}
             onPress={doSend} />
         ) : (
           // Empty composer shows the mic (human spec).  Recording is not built,
           // and says so rather than sitting there inert.
           <IconButton name="mic-outline" size={22}
-            accessibilityLabel={t('actions.record', 'Record a voice message')}
-            onPress={() => Alert.alert(t('screens.chat.micTitle', 'Voice messages are not built yet'),
-              t('screens.chat.micBody', 'You can type for now.'))} />
+            accessibilityLabel={t('actions.record')}
+            onPress={() => Alert.alert(t('chat.micTitle'),
+              t('chat.micBody'))} />
         )}
       </View>
       <ActionSheet
         visible={msgMenu !== null}
         title={msgMenu ? `${nameOf(msgMenu.memberId)} — ${msgMenu.content}` : undefined}
-        cancelLabel={t('common.cancel', 'Cancel')}
+        cancelLabel={t('common.cancel')}
         onDismiss={() => setMsgMenu(null)}
         options={msgMenu ? messageOptions(msgMenu) : []}
       />

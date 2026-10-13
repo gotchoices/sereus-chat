@@ -23,7 +23,7 @@ import { useModel, useStore } from '../data/bind';
 const NO_INVITATIONS: Invitation[] = [];
 /** Before a new strand's first invitation there is no strand, and nothing to list. */
 const NO_INVITATIONS_STORE = loader<Invitation[]>({ load: async () => ok(NO_INVITATIONS) });
-import { useT } from '../i18n';
+import { useErrorText, useT } from '../i18n';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Banner, IconButton, ListRow, SectionHeader } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
@@ -41,6 +41,7 @@ export default function InvitationGenerator() {
   const strandId = routeStrandId ?? foundedStrandId;
   const addingToExisting = !!routeStrandId;
   const t = useT();
+  const errorText = useErrorText();
   const theme = useTheme();
 
   const [visibility, setVisibility] = useState<'private' | 'public'>('private');
@@ -132,15 +133,15 @@ export default function InvitationGenerator() {
   }, [addingToExisting, routeStrandId]);
 
   const validityLabel = (v: InvitationValidity) =>
-    v === 'day' ? t('screens.invite.validDay', '1 day')
-    : v === 'week' ? t('screens.invite.validWeek', '1 week')
-    : t('screens.invite.validMonth', '1 month');
+    v === 'day' ? t('invite.validDay')
+    : v === 'week' ? t('invite.validWeek')
+    : t('invite.validMonth');
   const termsLine = [
-    singleUse ? t('screens.invite.forOne', 'For one person') : t('screens.invite.forAnyone', 'Anyone with the link'),
-    t('screens.invite.goodFor', 'good for {{period}}').replace('{{period}}', validityLabel(validity)),
+    singleUse ? t('invite.forOne') : t('invite.forAnyone'),
+    t('invite.goodFor').replace('{{period}}', validityLabel(validity)),
     grantsInviteRight
-      ? t('screens.invite.canInviteOnShort', 'they can add and remove people')
-      : t('screens.invite.canInviteOffShort', 'they cannot add or remove anyone'),
+      ? t('invite.canInviteOnShort')
+      : t('invite.canInviteOffShort'),
   ].join(' · ');
 
   const generate = useCallback(async () => {
@@ -170,30 +171,29 @@ export default function InvitationGenerator() {
     // never goes through the error Banner (which offers a Retry that could not
     // possibly work).  It gets its own state, below.
     if (result.error.kind === 'unreachable') { setUnreachable(true); setError(null); }
-    else setError(result.error.message);
-  }, [loading, model, strandId, addingToExisting, visibility, grantsInviteRight, singleUse, validity, refresh]);
+    else setError(errorText(result.error));
+  }, [loading, model, strandId, addingToExisting, visibility, grantsInviteRight, singleUse, validity, refresh, errorText]);
 
   // What goes in the message. A bare 600-character link says nothing about what
   // it is to somebody who has never heard of the app.
   const shareText = (url: string) =>
     (inviterName
-      ? t('screens.invite.shareBodyNamed', '{{name}} invites you to talk privately on Sereus Chat. Open this link on your phone:')
+      ? t('invite.shareBodyNamed')
           .replace('{{name}}', inviterName)
-      : t('screens.invite.shareBody', 'You are invited to talk privately on Sereus Chat. Open this link on your phone:'))
+      : t('invite.shareBody'))
     + '\n' + url;
 
   const postIntoStrand = () =>
     Alert.alert(
-      t('screens.invite.postTitle', 'Put it in the conversation?'),
+      t('invite.postTitle'),
       // An invitation works for whoever holds it.
-      t('screens.invite.postBody',
-        'Everyone in this strand will be able to use it. That hands every member a one-off ability to bring somebody in. If you can reach the person another way, do that instead.'),
-      [{ text: t('common.cancel', 'Cancel'), style: 'cancel' }, { text: t('screens.invite.postConfirm', 'Post it') }],
+      t('invite.postBody'),
+      [{ text: t('common.cancel'), style: 'cancel' }, { text: t('invite.postConfirm') }],
     );
 
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.content}>
-      {error ? <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: generate }} /> : null}
+      {error ? <Banner message={error} action={{ label: t('common.retry'), onPress: generate }} /> : null}
 
       {/* Story 02 Alt A — not reachable yet. Deliberately NOT the error Banner:
           this is where everyone starts, not a mistake, and a Retry here could not
@@ -204,18 +204,16 @@ export default function InvitationGenerator() {
           <View style={styles.pendingRow}>
             <ActivityIndicator color={theme.textMuted} />
             <Text style={[typography.title, styles.flex1, { color: theme.textPrimary }]}>
-              {t('screens.invite.relayPendingTitle', 'Connecting to your relay')}
+              {t('invite.relayPendingTitle')}
             </Text>
           </View>
           <Text style={[typography.body, styles.unreachableBody, { color: theme.textMuted }]}>
-            {t('screens.invite.relayPendingBody',
-              'This usually takes a few seconds. You can make the invitation as soon as it is connected.')}
+            {t('invite.relayPendingBody')}
           </Text>
           {relaySlow ? (
             <>
               <Text style={[typography.body, styles.unreachableBody, { color: theme.textPrimary }]}>
-                {t('screens.invite.relaySlow',
-                  'This is taking longer than it should. The relay may be down, or this network may block it — some work, school and public Wi-Fi do. Try another network, or choose another relay.')}
+                {t('invite.relaySlow')}
               </Text>
               <Pressable
                 accessibilityRole="link"
@@ -225,7 +223,7 @@ export default function InvitationGenerator() {
               >
                 <View style={styles.flex1}>
                   <Text style={[typography.body, styles.wayOutTitle, { color: theme.textPrimary }]}>
-                    {t('screens.invite.relaySlowManage', 'See or change your relay')}
+                    {t('invite.relaySlowManage')}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
@@ -236,14 +234,13 @@ export default function InvitationGenerator() {
       ) : unreachable ? (
         <View style={[styles.unreachable, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
           <Text style={[typography.title, { color: theme.textPrimary }]}>
-            {t('screens.invite.unreachableTitle', 'Your phone needs a relay first')}
+            {t('invite.unreachableTitle')}
           </Text>
           <Text style={[typography.body, styles.unreachableBody, { color: theme.textMuted }]}>
-            {t('screens.invite.unreachableBody',
-              'A phone cannot accept connections from the Internet on its own, so the person you invite would have no way to answer. A relay fixes that: a machine with a public Internet address that passes connections through to your phone.')}
+            {t('invite.unreachableBody')}
           </Text>
           <Text style={[typography.small, styles.unreachableLead, { color: theme.textSecondary }]}>
-            {t('screens.invite.unreachableWays', 'Two ways to get one')}
+            {t('invite.unreachableWays')}
           </Text>
 
           {/* Two equal choices, in the stories' order (02 6.3, 42): neither is
@@ -258,11 +255,10 @@ export default function InvitationGenerator() {
           >
             <View style={styles.flex1}>
               <Text style={[typography.body, styles.wayOutTitle, { color: theme.textPrimary }]}>
-                {t('screens.invite.wayOwn', 'Run your own relay')}
+                {t('invite.wayOwn')}
               </Text>
               <Text style={[typography.small, { color: theme.textMuted }]}>
-                {t('screens.invite.wayOwnBody',
-                  'The private way: nobody else sees who you talk to. Needs a machine that stays on. Opens the instructions on sereus.org.')}
+                {t('invite.wayOwnBody')}
               </Text>
             </View>
             <Ionicons name="open-outline" size={20} color={theme.textMuted} />
@@ -276,19 +272,17 @@ export default function InvitationGenerator() {
           >
             <View style={styles.flex1}>
               <Text style={[typography.body, styles.wayOutTitle, { color: theme.textPrimary }]}>
-                {t('screens.invite.wayBorrow', 'Use an open relay')}
+                {t('invite.wayBorrow')}
               </Text>
               <Text style={[typography.small, { color: theme.textMuted }]}>
-                {t('screens.invite.wayBorrowBody',
-                  'The quick way: free, nothing to set up. Whoever runs it can see that you talk to someone, when, and roughly how much — never what you say. Opens the list on sereus.org; you confirm your pick here.')}
+                {t('invite.wayBorrowBody')}
               </Text>
             </View>
             <Ionicons name="open-outline" size={20} color={theme.textMuted} />
           </Pressable>
 
           <Text style={[typography.small, { color: theme.textMuted }]}>
-            {t('screens.invite.unreachableSwitch',
-              'You can start with one and change later.')}
+            {t('invite.unreachableSwitch')}
           </Text>
         </View>
       ) : null}
@@ -297,27 +291,27 @@ export default function InvitationGenerator() {
         // The terms are still chosen; saying so in one line keeps them from
         // reading as a second question while the relay is the only one.
         <Text style={[typography.small, styles.keptTerms, { color: theme.textMuted }]}>
-          {t('screens.invite.termsKept', 'Kept for when you come back: {{kind}}, {{rights}}.')
+          {t('invite.termsKept')
             .replace('{{kind}}', addingToExisting
-              ? t('screens.invite.existingStrand', 'this strand')
-              : visibility === 'private' ? t('screens.invite.private', 'Private') : t('screens.invite.public', 'Open to anyone'))
+              ? t('invite.existingStrand')
+              : visibility === 'private' ? t('invite.private') : t('invite.public'))
             .replace('{{rights}}', termsLine.charAt(0).toLowerCase() + termsLine.slice(1))}
         </Text>
       ) : null}
 
       {unreachable ? null : !addingToExisting ? (
         <>
-          <SectionHeader label={t('screens.invite.kind', 'What kind of strand')} />
+          <SectionHeader label={t('invite.kind')} />
           {(['private', 'public'] as const).filter(v => !foundedStrandId || v === visibility).map(v => (
             <Pressable key={v} onPress={() => { if (!foundedStrandId) setVisibility(v); }}
               style={[styles.card, { borderColor: visibility === v ? theme.accent : theme.border, backgroundColor: theme.surfaceAlt }]}>
               <Text style={[typography.body, styles.cardTitle, { color: theme.textPrimary }]}>
-                {v === 'private' ? t('screens.invite.private', 'Private') : t('screens.invite.public', 'Open to anyone')}
+                {v === 'private' ? t('invite.private') : t('invite.public')}
               </Text>
               <Text style={[typography.small, { color: theme.textMuted }]}>
                 {v === 'private'
-                  ? t('screens.invite.privateBody', 'Only people you invite can be in it.')
-                  : t('screens.invite.publicBody', 'Anyone with the link can join, and nobody can be removed.')}
+                  ? t('invite.privateBody')
+                  : t('invite.publicBody')}
               </Text>
             </Pressable>
           ))}
@@ -325,19 +319,18 @@ export default function InvitationGenerator() {
       ) : (
         <Banner
           variant="info"
-          message={t('screens.invite.historyWarning',
-            'Whoever takes this up will be able to read everything already said here, including what was said before they arrived.')}
+          message={t('invite.historyWarning')}
         />
       )}
 
       {unreachable ? null : (<>
-      <SectionHeader label={t('screens.invite.rights', 'On this invitation')} />
+      <SectionHeader label={t('invite.rights')} />
       {/* One line a newcomer can leave alone; the choices are one tap away. */}
       <View style={[styles.card, styles.termsRow, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
         <Text testID="invite-terms" style={[typography.small, styles.flex1, { color: theme.textPrimary }]}>{termsLine}</Text>
         <Pressable accessibilityRole="button" onPress={() => setShowTerms(v => !v)} hitSlop={8}>
           <Text style={[typography.small, styles.cardTitle, { color: theme.accent }]}>
-            {showTerms ? t('common.done', 'Done') : t('screens.invite.change', 'Change')}
+            {showTerms ? t('common.done') : t('invite.change')}
           </Text>
         </Pressable>
       </View>
@@ -345,26 +338,26 @@ export default function InvitationGenerator() {
       {showTerms ? (
         <View style={styles.terms}>
           <Text style={[typography.small, { color: theme.textSecondary }]}>
-            {t('screens.invite.whoCanUse', 'Who can use it')}
+            {t('invite.whoCanUse')}
           </Text>
           <View style={styles.choiceRow}>
             {([true, false] as const).map(one => (
               <Pressable key={String(one)} onPress={() => { setSingleUse(one); setTermsTouched(true); }}
                 style={[styles.choice, { borderColor: singleUse === one ? theme.accent : theme.border, backgroundColor: theme.surfaceAlt }]}>
                 <Text style={[typography.small, styles.cardTitle, { color: theme.textPrimary }]}>
-                  {one ? t('screens.invite.forOne', 'For one person') : t('screens.invite.forAnyone', 'Anyone with the link')}
+                  {one ? t('invite.forOne') : t('invite.forAnyone')}
                 </Text>
                 <Text style={[typography.small, { color: theme.textMuted }]}>
                   {one
-                    ? t('screens.invite.forOneBody', 'Spent once used, so a lost copy is useless to anyone else.')
-                    : t('screens.invite.forAnyoneBody', 'Works for everyone who has it, until it runs out. It cannot be recalled.')}
+                    ? t('invite.forOneBody')
+                    : t('invite.forAnyoneBody')}
                 </Text>
               </Pressable>
             ))}
           </View>
 
           <Text style={[typography.small, { color: theme.textSecondary }]}>
-            {t('screens.invite.goodForLabel', 'Good for')}
+            {t('invite.goodForLabel')}
           </Text>
           <View style={styles.choiceRow}>
             {(['day', 'week', 'month'] as const).map(v => (
@@ -379,12 +372,11 @@ export default function InvitationGenerator() {
             style={[styles.card, { borderColor: grantsInviteRight ? theme.accent : theme.border, backgroundColor: theme.surfaceAlt }]}>
             <Text style={[typography.body, styles.cardTitle, { color: theme.textPrimary }]}>
               {grantsInviteRight
-                ? t('screens.invite.canInviteOn', 'They can add and remove people')
-                : t('screens.invite.canInviteOff', 'They cannot add or remove anyone')}
+                ? t('invite.canInviteOn')
+                : t('invite.canInviteOff')}
             </Text>
             <Text style={[typography.small, { color: theme.textMuted }]}>
-              {t('screens.invite.rightsBody',
-                'Passing this on gives them the same reach you have — including over you.')}
+              {t('invite.rightsBody')}
             </Text>
           </Pressable>
         </View>
@@ -394,8 +386,7 @@ export default function InvitationGenerator() {
         // Allowed (story 02 path F, 3.4), but said plainly.
         <Banner
           variant="info"
-          message={t('screens.invite.anyoneAndRights',
-            'Anyone who finds this link can join and then add or remove anyone, including you. It cannot be recalled.')}
+          message={t('invite.anyoneAndRights')}
         />
       ) : null}
 
@@ -411,15 +402,15 @@ export default function InvitationGenerator() {
           {loading ? <ActivityIndicator color={theme.accentText} /> : null}
           <Text style={[typography.body, styles.cardTitle, { color: theme.accentText }]}>
             {invitation
-              ? t('screens.invite.generateAnother', 'Make another invitation')
-              : t('screens.invite.generate', 'Make an invitation')}
+              ? t('invite.generateAnother')
+              : t('invite.generate')}
           </Text>
         </Pressable>
         {loading ? (
           <Text style={[typography.small, styles.progress, { color: theme.textMuted }]}>
             {foundedStrandId || addingToExisting
-              ? t('screens.invite.working', 'Making the invitation…')
-              : t('screens.invite.workingFound', 'Setting up the strand. On some phones this takes up to a minute.')}
+              ? t('invite.working')
+              : t('invite.workingFound')}
           </Text>
         ) : null}
       </View>
@@ -431,7 +422,7 @@ export default function InvitationGenerator() {
 
           <View style={styles.qrToggleRow}>
             <Text style={[typography.small, { color: theme.textPrimary }]}>
-              {t('screens.invite.showQr', 'Show QR code')}
+              {t('invite.showQr')}
             </Text>
             <Switch value={showQr} onValueChange={setShowQr} />
           </View>
@@ -443,16 +434,16 @@ export default function InvitationGenerator() {
           ) : null}
 
           <Text style={[typography.small, { color: theme.textMuted }]}>
-            {t('screens.invite.nothingYet', 'The strand is ready. Nobody else is in it until somebody accepts.')}
+            {t('invite.nothingYet')}
           </Text>
           <View style={styles.shareRow}>
-            <IconButton name="copy-outline" size={20} accessibilityLabel={t('common.copy', 'Copy')}
-              onPress={() => { Clipboard.setString(invitation.url); Alert.alert(t('common.copied', 'Copied')); }} />
-            <IconButton name="share-outline" size={20} accessibilityLabel={t('common.share', 'Share')}
+            <IconButton name="copy-outline" size={20} accessibilityLabel={t('common.copy')}
+              onPress={() => { Clipboard.setString(invitation.url); Alert.alert(t('common.copied')); }} />
+            <IconButton name="share-outline" size={20} accessibilityLabel={t('common.share')}
               onPress={() => Share.share({ message: shareText(invitation.url) })} />
             {addingToExisting ? (
               <IconButton name="chatbubble-outline" size={20}
-                accessibilityLabel={t('screens.invite.post', 'Post into the strand')} onPress={postIntoStrand} />
+                accessibilityLabel={t('invite.post')} onPress={postIntoStrand} />
             ) : null}
           </View>
         </View>
@@ -460,36 +451,35 @@ export default function InvitationGenerator() {
 
       {outstanding.filter(i => i.id !== invitation?.id).length ? (
         <>
-          <SectionHeader label={t('screens.invite.outstandingHere', 'Also out for this strand')} />
+          <SectionHeader label={t('invite.outstandingHere')} />
           <View style={styles.rows}>
             {outstanding.filter(i => i.id !== invitation?.id).map(inv => (
               <ListRow
                 key={inv.id}
-                title={inv.label ?? t('screens.invite.madeAt', 'Made {{when}}')
+                title={inv.label ?? t('invite.madeAt')
                   .replace('{{when}}', (inv as { createdAt?: string }).createdAt
                     ? new Date((inv as { createdAt?: string }).createdAt!).toLocaleString()
                     : '')}
                 subtitle={[
                   inv.singleUse === false
                     ? (inv.uses === undefined
-                        ? t('screens.invite.forAnyone', 'Anyone with the link')
+                        ? t('invite.forAnyone')
                         : inv.uses === 1
-                          ? t('screens.invite.usedOnce', 'Used once')
-                          : t('screens.invite.usedTimes', 'Used {{n}} times').replace('{{n}}', String(inv.uses)))
-                    : t('screens.invite.forOne', 'For one person'),
+                          ? t('invite.usedOnce')
+                          : t('invite.usedTimes').replace('{{n}}', String(inv.uses)))
+                    : t('invite.forOne'),
                   inv.expiresAt
-                    ? t('screens.invite.expires', 'Runs out {{when}}').replace('{{when}}', new Date(inv.expiresAt).toLocaleDateString())
+                    ? t('invite.expires').replace('{{when}}', new Date(inv.expiresAt).toLocaleDateString())
                     : null,
                 ].filter(Boolean).join(' · ')}
-                onPress={() => Alert.alert(inv.label ?? t('screens.strands.invitation', 'Invitation'),
+                onPress={() => Alert.alert(inv.label ?? t('strands.invitation'),
                   // Honest about what removing it does: cadre-core cannot withdraw
                   // an invitation yet — see data/outgoing-invitations.ts.
-                  t('screens.invite.forgetNote',
-                    'Taking it off this list does not cancel it: whoever holds it can still use it until it runs out.'), [
-                  { text: t('common.shareAgain', 'Share again'), onPress: () => Share.share({ message: shareText(inv.url) }) },
-                  { text: t('screens.invite.forget', 'Take it off the list'), style: 'destructive',
+                  t('invite.forgetNote'), [
+                  { text: t('common.shareAgain'), onPress: () => Share.share({ message: shareText(inv.url) }) },
+                  { text: t('invite.forget'), style: 'destructive',
                     onPress: () => { void model.invitations.cancel(inv.id).then(refresh); } },
-                  { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+                  { text: t('common.cancel'), style: 'cancel' },
                 ])}
               />
             ))}

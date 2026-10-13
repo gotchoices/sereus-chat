@@ -13,7 +13,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet, Alert, ActivityIndicator
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { InvitationPreview } from '@chat/core';
 import { orThrow, useModel } from '../data/bind';
-import { useT } from '../i18n';
+import { useErrorText, useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { Avatar, Banner, IconButton, StrandStatus, strandStatusKind } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
@@ -23,6 +23,7 @@ export default function InvitationAcceptance() {
   const route: any = useRoute();
   const navigation: any = useNavigation();
   const t = useT();
+  const errorText = useErrorText();
   const rev = useDataRevision();
   const theme = useTheme();
   const token: string = route?.params?.token || '';
@@ -33,8 +34,8 @@ export default function InvitationAcceptance() {
 
   const load = useCallback(async () => {
     try { setPreview(orThrow(await model.invitations.inspect(token))); setError(null); }
-    catch (e: any) { setError(e?.message ?? 'That invitation could not be read'); }
-  }, [model, token]);
+    catch (e: any) { setError(errorText(e, 'That invitation could not be read')); }
+  }, [model, token, errorText]);
 
   useEffect(() => { void load(); }, [load, rev]);
 
@@ -48,7 +49,7 @@ export default function InvitationAcceptance() {
       // protocol, and the surfaced message ("Responder result failed validation")
       // names a verdict, not a site. The stack is what makes it actionable.
       if (__DEV__) console.warn('[accept] failed:', e?.name, e?.message, '\nstack:', e?.stack);
-      setError(e?.message ?? 'That invitation could not be used');
+      setError(errorText(e, 'That invitation could not be used'));
     } finally { setBusy(false); }
   };
 
@@ -58,36 +59,34 @@ export default function InvitationAcceptance() {
 
   const askToClose = () =>
     Alert.alert(
-      t('screens.accept.askTitle', 'Ask them to close it first'),
-      t('screens.accept.askBody',
-        'There is nothing to send. Ask them the way you would ask anybody — the app carries no request and will not chase them. If they agree, this will say the membership is settled.'),
-      [{ text: t('common.ok', 'OK') }],
+      t('accept.askTitle'),
+      t('accept.askBody'),
+      [{ text: t('common.ok') }],
     );
 
   const dead = preview && preview.status !== 'live';
 
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.content}>
-      {error ? <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: load }} /> : null}
+      {error ? <Banner message={error} action={{ label: t('common.retry'), onPress: load }} /> : null}
 
       {dead ? (
         // Not the user's mistake, and no retry that could not work.
         <View style={[styles.card, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
           <Text style={[typography.title, { color: theme.textPrimary }]}>
             {preview!.status === 'spent'
-              ? t('screens.accept.spent', 'This invitation has already been used')
+              ? t('accept.spent')
               : preview!.status === 'expired'
-                ? t('screens.accept.expired', 'This invitation has run out')
+                ? t('accept.expired')
                 : preview!.status === 'cancelled'
-                  ? t('screens.accept.cancelled', 'This invitation was withdrawn')
-                  : t('screens.accept.invalid', 'This is not an invitation we can read')}
+                  ? t('accept.cancelled')
+                  : t('accept.invalid')}
           </Text>
           <Text style={[typography.body, { color: theme.textMuted }]}>
-            {t('screens.accept.deadBody',
-              'An invitation works once. Ask whoever sent it for another one.')}
+            {t('accept.deadBody')}
           </Text>
           <IconButton name="arrow-back-outline" size={22} variant="bordered"
-            accessibilityLabel={t('common.back', 'Back')} onPress={decline} />
+            accessibilityLabel={t('common.back')} onPress={decline} />
         </View>
       ) : preview ? (
         <>
@@ -102,13 +101,12 @@ export default function InvitationAcceptance() {
             <View style={styles.flex1}>
               <Text style={[typography.title, { color: theme.textPrimary }]}>
                 {preview.inviterName ||
-                  t('screens.accept.unattributed', 'Whoever gave you this link')}
+                  t('accept.unattributed')}
               </Text>
               <Text style={[typography.small, { color: theme.textMuted }]}>
                 {preview.inviterName
-                  ? t('screens.accept.invitesYou', 'invites you to a strand')
-                  : t('screens.accept.invitesYouUnattributed',
-                      'invites you to a strand. The invitation does not say who sent it — trust it as far as you trust them.')}
+                  ? t('accept.invitesYou')
+                  : t('accept.invitesYouUnattributed')}
               </Text>
             </View>
           </View>
@@ -119,13 +117,12 @@ export default function InvitationAcceptance() {
           {/* 3. What you will be taking on.  Said for every strand, not only groups. */}
           <View style={[styles.card, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
             <Text style={[typography.body, { color: theme.textPrimary }]}>
-              {t('screens.accept.history',
-                'If you join, you will be able to read everything already said here — including anything said before you arrived.')}
+              {t('accept.history')}
             </Text>
             <Text style={[typography.small, { color: theme.textMuted }]}>
               {preview.grantsInviteRight
-                ? t('screens.accept.canInvite', 'You would be able to add and remove people.')
-                : t('screens.accept.cannotInvite', 'You would not be able to add or remove anyone.')}
+                ? t('accept.canInvite')
+                : t('accept.cannotInvite')}
             </Text>
           </View>
 
@@ -136,14 +133,14 @@ export default function InvitationAcceptance() {
             <Pressable onPress={decline}
               style={[styles.btn, { borderColor: theme.border, backgroundColor: theme.surface }]}>
               <Text style={[typography.body, styles.btnText, { color: theme.textPrimary }]}>
-                {t('screens.accept.decline', 'No thanks')}
+                {t('accept.decline')}
               </Text>
             </Pressable>
             <Pressable onPress={accept} disabled={busy}
               style={[styles.btn, styles.btnRow, { borderColor: theme.accent, backgroundColor: theme.accent }, busy && styles.dim]}>
               {busy ? <ActivityIndicator color={theme.accentText} /> : null}
               <Text style={[typography.body, styles.btnText, { color: theme.accentText }]}>
-                {t('screens.accept.accept', 'Join this strand')}
+                {t('accept.accept')}
               </Text>
             </Pressable>
           </View>
@@ -152,8 +149,7 @@ export default function InvitationAcceptance() {
               this, a dimmed button is the only sign anything is happening. */}
           {busy ? (
             <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
-              {t('screens.accept.joining',
-                'Joining — reaching them and copying the conversation so far. This can take a minute or two.')}
+              {t('accept.joining')}
             </Text>
           ) : null}
 
@@ -163,13 +159,12 @@ export default function InvitationAcceptance() {
               onPress={askToClose}
               style={[typography.small, styles.ask, { color: theme.accent }]}
             >
-              {t('screens.accept.askLink', 'Or ask them to close it first')}
+              {t('accept.askLink')}
             </Text>
           ) : null}
 
           <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
-            {t('screens.accept.decliningNote',
-              'Declining creates nothing, and they are not told who declined.')}
+            {t('accept.decliningNote')}
           </Text>
         </>
       ) : !error ? (

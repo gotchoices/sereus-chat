@@ -1,20 +1,16 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Linking } from 'react-native';
-import enScreens from './locales/en/screens.json';
-import esScreens from './locales/es/screens.json';
+import { createTranslator, errorText, type AnyCatalog, type ErrorLike, type Translator } from '@chat/resources';
+import enApp from './locales/en/app.json';
+import esApp from './locales/es/app.json';
 
-// Minimal live i18n with Context. Later swappable with i18next.
+// Live i18n with Context over the shared catalogs (@chat/resources).
+// - Keys are `area.key`. This app's own catalog (locales/<l>/app.json) holds what only
+//   it shows — device features, its own layout — and may override any shared key.
 // - useT() provides a stable t() that re-renders on locale change
 // - Parses ?locale= from deep links (launch + runtime)
 
-type Translations = Record<string, unknown>;
-type Namespaces = Record<string, Translations>;
-type LocaleResources = Record<string, Namespaces>;
-
-const resources: LocaleResources = {
-  en: { screens: enScreens as Translations },
-  es: { screens: esScreens as Translations },
-};
+const appCatalogs: Record<string, AnyCatalog> = { en: enApp, es: esApp };
 
 type I18nContextValue = {
   locale: string;
@@ -25,16 +21,6 @@ const I18nContext = createContext<I18nContextValue>({
   locale: 'en',
   setLocale: () => {},
 });
-
-function getFromObject(obj: any, path: string): unknown {
-  const parts = path.split('.');
-  let cur: any = obj;
-  for (const p of parts) {
-    if (cur == null) return undefined;
-    cur = cur[p];
-  }
-  return cur;
-}
 
 function parseLocaleFromUrl(url: string | null): string | null {
   if (!url) return null;
@@ -78,20 +64,23 @@ export function useLocale() {
   return useContext(I18nContext).locale;
 }
 
-export function useT() {
+export function useT(): Translator {
   const { locale } = useContext(I18nContext);
-  const t = React.useCallback(
-    (key: string, defaultText?: string): string => {
-      const [namespace, ...rest] = key.split('.');
-      const path = rest.join('.');
-      const ns = resources[locale]?.[namespace];
-      const value = ns ? getFromObject(ns, path) : undefined;
-      if (typeof value === 'string') return value;
-      return defaultText ?? key;
-    },
-    [locale],
-  );
-  return t;
+  return useMemo(() => createTranslator(locale, appCatalogs), [locale]);
 }
 
-
+/**
+ * Words for a failure, in the current locale: a model error (a `ChatError`, or what
+ * `orThrow` threw) through the catalog by kind and reason; anything else by its own
+ * message, else `fallback`.
+ */
+export function useErrorText(): (error: unknown, fallback?: string) => string {
+  const t = useT();
+  return React.useCallback((error: unknown, fallback?: string) => {
+    if (error && typeof error === 'object' && 'kind' in error && 'message' in error) {
+      return errorText(t, error as ErrorLike);
+    }
+    const message = error instanceof Error ? error.message : undefined;
+    return message || fallback || t('errors.unexpected');
+  }, [t]);
+}

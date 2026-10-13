@@ -11,7 +11,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { orThrow, useModel } from '../data/bind';
-import { useT } from '../i18n';
+import { useErrorText, useT } from '../i18n';
 import { Banner } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
 
@@ -34,6 +34,7 @@ export default function RelayOffer() {
   const addr: string = route?.params?.addr ?? '';
   const claimedName: string | undefined = route?.params?.name;
   const t = useT();
+  const errorText = useErrorText();
   const theme = useTheme();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -57,7 +58,7 @@ export default function RelayOffer() {
       if (navigation.canGoBack()) navigation.goBack();
       else navigation.replace('CadreManager');
     } catch (e: any) {
-      setError(e?.message ?? 'That relay could not be saved');
+      setError(errorText(e, 'That relay could not be saved'));
       setBusy(false);
     }
   };
@@ -69,21 +70,19 @@ export default function RelayOffer() {
       {!usable ? (
         <View style={[styles.card, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
           <Text style={[typography.title, { color: theme.textPrimary }]}>
-            {t('screens.relay.badTitle', 'This is not a relay we can read')}
+            {t('relay.badTitle')}
           </Text>
           <Text style={[typography.body, { color: theme.textMuted }]}>
-            {t('screens.relay.badBody',
-              'A relay address has to name the exact machine it belongs to. This one does not, so there would be no way to tell whether you had reached the right one.')}
+            {t('relay.badBody')}
           </Text>
         </View>
       ) : (
         <>
           <Text style={[typography.title, { color: theme.textPrimary }]}>
-            {t('screens.relay.title', 'Use this relay?')}
+            {t('relay.title')}
           </Text>
           <Text style={[typography.body, styles.lede, { color: theme.textMuted }]}>
-            {t('screens.relay.lede',
-              'A relay passes traffic along so people can reach you. You are not signing up for anything, and you can stop using it whenever you like.')}
+            {t('relay.lede')}
           </Text>
 
           <View style={[styles.card, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
@@ -93,30 +92,27 @@ export default function RelayOffer() {
                   {claimedName}
                 </Text>
                 <Text style={[typography.small, { color: theme.textMuted }]}>
-                  {t('screens.relay.claimed', 'The name this link gives. Nothing proves it.')}
+                  {t('relay.claimed')}
                 </Text>
               </>
             ) : null}
             <Text style={[typography.small, styles.row, { color: theme.textMuted }]}>
-              {t('screens.relay.host', 'Where')}: <Text style={{ color: theme.textPrimary }}>{host ?? '—'}</Text>
+              {t('relay.host')}: <Text style={{ color: theme.textPrimary }}>{host ?? '—'}</Text>
             </Text>
             <Text style={[typography.small, { color: theme.textMuted }]} numberOfLines={1}>
-              {t('screens.relay.peer', 'Machine')}: <Text style={{ color: theme.textPrimary }}>{peerId}</Text>
+              {t('relay.peer')}: <Text style={{ color: theme.textPrimary }}>{peerId}</Text>
             </Text>
             <Text style={[typography.small, styles.row, { color: theme.textMuted }]}>
-              {t('screens.relay.pinned',
-                'That last part names one exact machine. If anything else answers instead, your phone will refuse it — so you will always be talking to this one.')}
+              {t('relay.pinned')}
             </Text>
           </View>
 
           <View style={[styles.card, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
             <Text style={[typography.body, { color: theme.textPrimary }]}>
-              {t('screens.relay.cost',
-                'Whoever runs it will be able to see that you are talking to someone, when, and roughly how much — never what you say.')}
+              {t('relay.cost')}
             </Text>
             <Text style={[typography.small, { color: theme.textMuted }]}>
-              {t('screens.relay.costNote',
-                'You are choosing this particular person to know that much. You can change it later.')}
+              {t('relay.costNote')}
             </Text>
           </View>
 
@@ -124,13 +120,13 @@ export default function RelayOffer() {
             <Pressable onPress={() => navigation.goBack()}
               style={[styles.btn, { borderColor: theme.border, backgroundColor: theme.surface }]}>
               <Text style={[typography.body, styles.strong, { color: theme.textPrimary }]}>
-                {t('screens.relay.decline', 'No thanks')}
+                {t('relay.decline')}
               </Text>
             </Pressable>
             <Pressable onPress={accept} disabled={busy}
               style={[styles.btn, { borderColor: theme.accent, backgroundColor: theme.accent }, busy && styles.dim]}>
               <Text style={[typography.body, styles.strong, { color: theme.accentText }]}>
-                {t('screens.relay.accept', 'Use this relay')}
+                {t('relay.accept')}
               </Text>
             </Pressable>
           </View>

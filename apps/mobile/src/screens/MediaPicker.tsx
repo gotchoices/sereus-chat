@@ -109,38 +109,38 @@ export default function MediaPicker(props: Props) {
       >
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.textPrimary }]}>
-            {t('screens.mediaPicker.title', 'Attach')}
+            {t('mediaPicker.title')}
           </Text>
           <IconButton
             name="close"
             size={22}
             variant="plain"
             onPress={close}
-            accessibilityLabel={t('screens.mediaPicker.close', 'Close picker')}
+            accessibilityLabel={t('mediaPicker.close')}
             testID="media-close"
           />
         </View>
 
         <ListRow
-          title={t('screens.mediaPicker.camera', 'Camera')}
+          title={t('mediaPicker.camera')}
           leading={leading('camera-outline')}
           onPress={pickFromCamera}
           testID="media-camera"
         />
         <ListRow
-          title={t('screens.mediaPicker.gallery', 'Gallery')}
+          title={t('mediaPicker.gallery')}
           leading={leading('images-outline')}
           onPress={pickFromGallery}
           testID="media-gallery"
         />
         <ListRow
-          title={t('screens.mediaPicker.file', 'File')}
+          title={t('mediaPicker.file')}
           leading={leading('document-outline')}
           onPress={pickFile}
           testID="media-file"
         />
         <ListRow
-          title={t('screens.mediaPicker.location', 'Location')}
+          title={t('mediaPicker.location')}
           leading={leading('location-outline')}
           onPress={() => onPick?.('location')}
           testID="media-location"

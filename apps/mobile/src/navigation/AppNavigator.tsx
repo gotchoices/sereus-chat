@@ -25,6 +25,7 @@ import { Avatar, IconButton } from '../components';
 import { reachabilityStore } from '@chat/core';
 import { useModel, useStore } from '../data/bind';
 import { useTheme, useThemeContext, typography, radius } from '../theme';
+import { useT } from '../i18n';
 
 const Stack = createNativeStackNavigator();
 
@@ -247,6 +248,7 @@ const NO_RELAYS: string[] = [];
 
 function RelaySection() {
   const theme = useTheme();
+  const t = useT();
   /* The relays, and whether the reservation holds — read live from the core's
      reachability store: a configured relay is not a working one, and a reservation
      can be lost after it was granted. The store re-reads when this device's
@@ -295,11 +297,7 @@ function RelaySection() {
       )}
       {addrs.length > 0 && status && status !== 'none' ? (
         <Text style={{ ...typography.small, color: status === 'reserved' ? theme.textSecondary : theme.textMuted }}>
-          {status === 'reserved'
-            ? 'Working — people can reach you through this.'
-            : status === 'dialing'
-              ? 'Connecting…'
-              : 'Not working yet. Still trying — you are not reachable until it does.'}
+          {t(status === 'reserved' || status === 'dialing' ? `status.relay.${status}` : 'status.relay.notWorking')}
         </Text>
       ) : null}
       {/* Real buttons, not an accent-coloured line of text, which did not read as

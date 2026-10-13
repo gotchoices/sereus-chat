@@ -9,7 +9,7 @@ import { View, Text, TextInput, SectionList, StyleSheet, RefreshControl, Alert, 
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { matchesStrand, sortStrands, strandListStore, type StrandSort, type StrandSummary } from '@chat/core';
 import { useModel, useStore } from '../data/bind';
-import { useT } from '../i18n';
+import { useErrorText, useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { ActionSheet, Avatar, ListRow, Badge, EmptyState, Banner, IconButton, SectionHeader } from '../components';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -45,6 +45,7 @@ function indicatorFor(s: StrandSummary): React.ReactNode {
 export default function StrandList() {
   const navigation: any = useNavigation();
   const t = useT();
+  const errorText = useErrorText();
   const rev = useDataRevision();
   const theme = useTheme();
   /**
@@ -96,7 +97,7 @@ export default function StrandList() {
     // "Hidden", matching the act that put them here. The data field is still
     // `archived` (that is `ops.md`'s name for it), but the word the user sees is
     // the one on the button they pressed — story 33 calls this hiding.
-    if (archived.length) out.push({ title: t('screens.strands.hidden', 'Hidden'), data: archived });
+    if (archived.length) out.push({ title: t('strands.hidden'), data: archived });
     return out;
   }, [strands, sortMode, matches, t]);
 
@@ -108,9 +109,9 @@ export default function StrandList() {
    */
   const invitesOut = view.value?.invitationsOut ?? {};
   const invitesOutText = (n: number) =>
-    n === 0 ? t('screens.strands.noInvitationOut', 'No invitation out')
-    : n === 1 ? t('screens.strands.oneInvitationOut', '1 invitation out')
-    : t('screens.strands.invitationsOut', '{{n}} invitations out').replace('{{n}}', String(n));
+    n === 0 ? t('strands.noInvitationOut')
+    : n === 1 ? t('strands.oneInvitationOut')
+    : t('strands.invitationsOut').replace('{{n}}', String(n));
 
   const onRefresh = async () => { setRefreshing(true); setActionError(null); await store.refresh(); setRefreshing(false); };
 
@@ -131,12 +132,12 @@ export default function StrandList() {
   const applyMute = async (s: StrandSummary) => {
     const next = s.muted === 'none' ? 'soft' : s.muted === 'soft' ? 'hard' : 'none';
     const done = await model.strands.setMuted(s.id, next);
-    if (done.ok) store.reload(); else setActionError(done.error.message);
+    if (done.ok) store.reload(); else setActionError(errorText(done.error));
   };
 
   const applyHide = async (s: StrandSummary) => {
     const done = await model.strands.setArchived(s.id, !s.archived);
-    if (done.ok) store.reload(); else setActionError(done.error.message);
+    if (done.ok) store.reload(); else setActionError(errorText(done.error));
   };
 
   const isEmpty = strands.length === 0;
@@ -152,12 +153,12 @@ export default function StrandList() {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.controls}>
         <IconButton name="search-outline" size={20} variant="bordered" style={styles.flex1}
-          accessibilityLabel={t('actions.search', 'Search')}
+          accessibilityLabel={t('actions.search')}
           onPress={() => setSearching(v => { if (v) setQuery(''); return !v; })} />
         <IconButton name="add-outline" size={20} variant="accent" style={styles.flex2}
-          accessibilityLabel={t('actions.newStrand', 'New strand')} onPress={() => navigation.navigate('InvitationGenerator')} />
+          accessibilityLabel={t('actions.newStrand')} onPress={() => navigation.navigate('InvitationGenerator')} />
         <IconButton name={sortIcon} size={20} variant="bordered" style={styles.flex1}
-          accessibilityLabel={t('actions.sort', 'Sort')} onPress={chooseSort} />
+          accessibilityLabel={t('actions.sort')} onPress={chooseSort} />
       </View>
 
       {searching ? (
@@ -166,7 +167,7 @@ export default function StrandList() {
           value={query}
           onChangeText={setQuery}
           autoFocus
-          placeholder={t('screens.strands.filter', 'Find a conversation')}
+          placeholder={t('strands.filter')}
           placeholderTextColor={theme.textMuted}
           style={[typography.body, styles.filter, { color: theme.textPrimary, backgroundColor: theme.surfaceAlt }]}
         />
@@ -174,7 +175,7 @@ export default function StrandList() {
 
       <View style={styles.flex1}>
       {error ? (
-        <Banner message={error} action={{ label: t('common.retry', 'Retry'), onPress: load }} />
+        <Banner message={error} action={{ label: t('common.retry'), onPress: load }} />
       ) : bootError ? (
         // A FAILED start, not a slow one. Before this branch existed both looked
         // like the spinner below, so "the app is broken" and "the app is working
@@ -183,9 +184,9 @@ export default function StrandList() {
         <Banner
           // `t` takes a key and a default, with no interpolation, so the reason
           // is appended rather than substituted.
-          message={`${t('screens.strands.bootFailed', 'Could not start')}: ${bootError}`}
+          message={`${t('strands.bootFailed')}: ${bootError}`}
           action={{
-            label: t('common.retry', 'Retry'),
+            label: t('common.retry'),
             onPress: () => {
               void (async () => {
                 await model.strands.retryBoot(); // a failure shows in the next read
@@ -201,7 +202,7 @@ export default function StrandList() {
         <View style={styles.loading}>
           <ActivityIndicator />
           <Text style={[typography.small, { color: theme.textMuted }]}>
-            {t('screens.strands.loading', 'Looking for your strands…')}
+            {t('strands.loading')}
           </Text>
         </View>
       ) : isEmpty ? (
@@ -212,10 +213,9 @@ export default function StrandList() {
           testID="empty-state"
           hintTestID="empty-state-text"
           icon="chatbubbles-outline"
-          title={t('screens.strands.emptyTitle', 'No strands yet')}
-          hint={t('screens.strands.empty',
-            'A strand is a conversation you and somebody else agree to. Until you have one, nobody can reach you — and you can reach nobody.')}
-          cta={{ label: t('screens.strands.emptyCta', 'Start a strand'), onPress: () => navigation.navigate('InvitationGenerator') }}
+          title={t('strands.emptyTitle')}
+          hint={t('strands.empty')}
+          cta={{ label: t('strands.emptyCta'), onPress: () => navigation.navigate('InvitationGenerator') }}
         />
       ) : (
         <SectionList
@@ -238,16 +238,16 @@ export default function StrandList() {
                 style={[styles.escalate, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}
               >
                 <Text style={[typography.body, { color: theme.accent }]}>
-                  {t('screens.strands.searchMessages', 'Search messages for “{{q}}”')
+                  {t('strands.searchMessages')
                     .replace('{{q}}', query.trim())}
                 </Text>
                 <Text style={[typography.small, { color: theme.textMuted }]}>
-                  {t('screens.strands.searchCost', 'Looks inside every strand, and wakes the ones that are asleep')}
+                  {t('strands.searchCost')}
                 </Text>
               </Pressable>
             ) : nothingNew ? (
               <View style={styles.nothingNew}>
-                <Banner variant="info" message={t('screens.strands.nothingNew', 'Nothing new.')} />
+                <Banner variant="info" message={t('strands.nothingNew')} />
               </View>
             ) : null
           }
@@ -259,13 +259,13 @@ export default function StrandList() {
             const awaiting = s.memberCount <= 1;
             const out = invitesOut[s.id] ?? 0;
             const preview = s.draftPreview
-              ? `${t('screens.strands.draft', 'Draft')}: ${s.draftPreview}`
+              ? `${t('strands.draft')}: ${s.draftPreview}`
               : s.lastMessage
                 ? s.lastMessage.senderName
                   ? `${s.lastMessage.senderName}: ${s.lastMessage.previewText}`
                   : s.lastMessage.previewText
-                : t('screens.strands.noMessages', 'No messages yet');
-            const connecting = t('screens.strands.connecting', 'Connecting…');
+                : t('strands.noMessages');
+            const connecting = t('strands.connecting');
             const subtitle = s.opening
               // Known from the last list, not open yet: say so instead of guessing.
               ? (s.lastMessage ? `${connecting} · ${preview}` : connecting)
@@ -299,39 +299,39 @@ export default function StrandList() {
 
       <ActionSheet
         visible={sortMenu}
-        title={t('screens.strands.sortTitle', 'Order by')}
-        cancelLabel={t('common.cancel', 'Cancel')}
+        title={t('strands.sortTitle')}
+        cancelLabel={t('common.cancel')}
         onDismiss={() => setSortMenu(false)}
         options={[
-          { label: t('screens.strands.sortRecent', 'Recent'), onPress: () => setSortMode('recent') },
-          { label: t('screens.strands.sortAlpha', 'Alphabetical'), onPress: () => setSortMode('alpha') },
-          { label: t('screens.strands.sortUnread', 'Unread first'), onPress: () => setSortMode('unread') },
+          { label: t('strands.sortRecent'), onPress: () => setSortMode('recent') },
+          { label: t('strands.sortAlpha'), onPress: () => setSortMode('alpha') },
+          { label: t('strands.sortUnread'), onPress: () => setSortMode('unread') },
         ]}
       />
 
       <ActionSheet
         visible={rowMenu !== null}
         title={rowMenu?.title}
-        cancelLabel={t('common.cancel', 'Cancel')}
+        cancelLabel={t('common.cancel')}
         onDismiss={() => setRowMenu(null)}
         options={rowMenu ? [
           {
-            label: rowMenu.muted === 'none' ? t('actions.mute', 'Mute')
-              : rowMenu.muted === 'soft' ? t('screens.strands.muteHard', 'Silence completely')
-              : t('screens.strands.unmute', 'Unmute'),
-            hint: rowMenu.muted === 'none' ? t('screens.strands.muteHint', 'Stays in your list; you are just not told about it')
-              : rowMenu.muted === 'soft' ? t('screens.strands.muteSoftNow', 'Currently quiet unless somebody names you')
-              : t('screens.strands.muteHardNow', 'Currently silent whatever happens'),
+            label: rowMenu.muted === 'none' ? t('actions.mute')
+              : rowMenu.muted === 'soft' ? t('strands.muteHard')
+              : t('strands.unmute'),
+            hint: rowMenu.muted === 'none' ? t('strands.muteHint')
+              : rowMenu.muted === 'soft' ? t('strands.muteSoftNow')
+              : t('strands.muteHardNow'),
             onPress: () => { void applyMute(rowMenu); },
           },
           {
-            label: rowMenu.archived ? t('actions.unhide', 'Unhide') : t('actions.hide', 'Hide'),
-            hint: t('screens.strands.hideHint', 'Out of your list until you look for it; nothing changes for anyone else'),
+            label: rowMenu.archived ? t('actions.unhide') : t('actions.hide'),
+            hint: t('strands.hideHint'),
             onPress: () => { void applyHide(rowMenu); },
           },
           {
-            label: t('screens.strands.openDetails', 'Open…'),
-            hint: t('screens.strands.openDetailsHint', 'Members, what is shared, and leaving'),
+            label: t('strands.openDetails'),
+            hint: t('strands.openDetailsHint'),
             onPress: () => navigation.navigate('StrandDetail', { strandId: rowMenu.id, title: rowMenu.title }),
           },
         ] : []}
@@ -339,9 +339,9 @@ export default function StrandList() {
 
       <View style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.divider }]}>
         <IconButton name="qr-code-outline" size={22} style={styles.flex1}
-          accessibilityLabel={t('actions.scan', 'Scan')} onPress={() => navigation.navigate('QrScanner')} />
+          accessibilityLabel={t('actions.scan')} onPress={() => navigation.navigate('QrScanner')} />
         <IconButton name="person-circle-outline" size={22} style={styles.flex1}
-          accessibilityLabel={t('actions.profile', 'Profile')} onPress={() => navigation.navigate('Profile')} />
+          accessibilityLabel={t('actions.profile')} onPress={() => navigation.navigate('Profile')} />
       </View>
     </View>
   );
