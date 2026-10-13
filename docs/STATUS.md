@@ -577,6 +577,57 @@ Done in steps, each type-checked and run on a phone.
   several screens, the cadre manager's `STRINGS`). Sweep them when a second
   locale or app needs them.
 
+## Phase 7a — `apps/cli` (serchat) scaffold (2026-10-12)
+
+A command-line client for testing, evaluating and debugging; chosen ahead of the
+web app. No background process: each run starts the node (seconds), and
+interactive mode is the way to avoid that.
+
+- [x] Stories (`design/stories/cli/`, five short ones) and a command and output
+      spec (`design/specs/cli/commands.md`).
+- [x] `apps/cli` is a workspace member, so it shares the core's single copy of
+      the stack. esbuild bundles `@chat/*` into `dist/serchat.js` and leaves the
+      stack as npm `dependencies`.
+- [x] **Host:** a cadre-core node shaped like the phone's, with file-backed
+      stores from cadre-core and optimystic (`FileKeyStore`, the file
+      trusted-owner, bootstrap, machine and strand-state stores,
+      `FileRawStorage`).
+      - It lives in `~/.serchat/<profile>/`: owner-only modes, the core's slots
+        as files.
+      - `--listen` uses a port chosen per profile and kept.
+- [x] **Commands:** `status`, `profile`, `prefs`, `relay`, `network`,
+      `strands`, `log`, `tail`, `send`, `members`, `mute`, `archive`,
+      `unarchive`, `leave`, `invite`, `invites`, `join`, `help`.
+      - Tab-separated or JSON lines, rows remembered for row references, and
+        exit codes from the error's `retryable`.
+      - Words come from `@chat/resources`.
+- [x] **Ways to run:** interactive (history, completion), one-shot (`\;`
+      separated), `-c`, and scripts on stdin (newlines and `#` comments).
+      - One-shot waits, bounded by `--wait`, for the relay reservation and for
+        strands to open.
+- Checks:
+  - 7 unit tests (lexing, output, naming).
+  - Two profiles through a local relay: a join; Bob → Alice delivered about
+    2 s after sending, to Alice's `tail`; Alice restarted, sent with a 1.3 s
+    commit, delivered to Bob's `tail` about 2 s later.
+  - Interactive mode tested through a pseudo-terminal.
+- Found:
+  - **Two profiles listening directly (no relay):** Bob → Alice worked, but
+    after Alice restarted her messages did not reach Bob within 90 s, even with
+    stable ports. Through a relay the same sequence works. Not pursued; the
+    relay is the phones' topology.
+  - A strand of two does not open while the other member is offline (shown as
+    `(opening)`), as on the phones.
+  - The Sereus model never fills `inviterName`, so `join` shows the
+    unattributed wording, as the phone does.
+  - The relay on port 4002 (started Oct 5 from sereus's libp2p-infra) is not
+    the one `.relay-data` describes: its peer id differs, so reservations
+    against `.relay-data`'s id retry forever. The test used a separate relay on
+    4011/4012, since stopped.
+- Not done: the dev-bridge commands (so `test/devices` tools drive serchat),
+  `--qr`, attachments, reactions, edits, search, claiming. A timing comparison
+  with the phones belongs with the bridge commands.
+
 ## Phase 8 — Diagnostics and the Node harness
 
 - [ ] Move `src/diagnostics/*` into `core/diagnostics` (`two-party-check`,

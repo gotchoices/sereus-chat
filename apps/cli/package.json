@@ -1,0 +1,39 @@
+{
+  "name": "serchat",
+  "version": "0.1.0",
+  "description": "Sereus Chat on the command line: a client for testing, evaluating and debugging Sereus Chat.",
+  "type": "module",
+  "bin": "dist/serchat.js",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "yarn workspace @chat/resources build && yarn workspace @chat/core build && node scripts/bundle.mjs",
+    "bundle": "node scripts/bundle.mjs",
+    "start": "node dist/serchat.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@chainsafe/libp2p-noise": "17.0.0",
+    "@chainsafe/libp2p-yamux": "8.0.1",
+    "@libp2p/circuit-relay-v2": "4.2.14",
+    "@libp2p/websockets": "10.1.22",
+    "@optimystic/db-p2p": "1.12.1",
+    "@optimystic/db-p2p-storage-fs": "1.12.1",
+    "@quereus/quereus": "4.20.2",
+    "@serfab/cadre-core": "1.14.0",
+    "libp2p": "3.3.11"
+  },
+  "devDependencies": {
+    "@chat/core": "workspace:*",
+    "@chat/resources": "workspace:*",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17"
+  }
+}

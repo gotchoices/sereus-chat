@@ -58,6 +58,7 @@ only if an engine probe points at the runtime (STATUS, Phase 8).
 chat/
   apps/                    deployable apps — one per Appeus target
     mobile/                React Native (stays where it is)
+    cli/                   serchat: Node command-line client for testing and debugging
     web/                   SvelteKit
     mobile-ns/             NativeScript (only if needed)
   packages/                shared libraries — never deployed on their own
@@ -68,7 +69,7 @@ chat/
   mock/                    shared fixture data (domain-shaped JSON)
   site/                    static landing site + .well-known association files
   docs/                    project documentation (this file)
-  package.json             Yarn workspace root for packages/* and test/stack
+  package.json             Yarn workspace root for packages/*, apps/cli and test/stack
 ```
 
 ### Why `packages/`, not `apps/lib`
@@ -98,6 +99,11 @@ Why:
   core arrives as plain ESM JavaScript plus declarations, the same thing the
   Node harness runs.
 - Each app upgrades its native and framework dependencies on its own schedule.
+
+**The exception: `apps/cli`.** It is a workspace member. It has no native modules
+and no framework, and as a member it shares the one installed copy of the stack
+with the core, so no single-copy pins are needed. Its published package is one
+esbuild bundle with `@chat/*` inside and the stack as ordinary `dependencies`.
 
 What it costs:
 
@@ -433,14 +439,14 @@ no consumer needs JSON-import support.
 
 ### Runtime matrix
 
-| | mobile | web | mobile-ns |
-|---|---|---|---|
-| Engine | Hermes (no JIT) | Browser | V8 (Android, JIT) / JSC (iOS) |
-| Bundler | Metro | Vite | webpack |
-| Node host | `@serfab/cadre-rn` `createPhoneNode` | Own, after `reference-app-web` `cadre-web.ts` | Own, after `reference-app-ns` `cadre-phone.ts` |
-| Block storage | LevelDB (`db-p2p-storage-rn`) | IndexedDB (`db-p2p-storage-web`) | SQLite (`db-p2p-storage-ns`) |
-| Slots | AsyncStorage | IndexedDB | SQLite or file |
-| Transports | WebSockets, circuit relay | WebSockets, circuit relay, WebRTC | WebSockets, circuit relay |
+| | mobile | cli | web | mobile-ns |
+|---|---|---|---|---|
+| Engine | Hermes (no JIT) | Node 22+ (V8) | Browser | V8 (Android, JIT) / JSC (iOS) |
+| Bundler | Metro | esbuild (publish only) | Vite | webpack |
+| Node host | `@serfab/cadre-rn` `createPhoneNode` | Own: a cadre-core node with cadre-core's file stores | Own, after `reference-app-web` `cadre-web.ts` | Own, after `reference-app-ns` `cadre-phone.ts` |
+| Block storage | LevelDB (`db-p2p-storage-rn`) | Files (`db-p2p-storage-fs`) | IndexedDB (`db-p2p-storage-web`) | SQLite (`db-p2p-storage-ns`) |
+| Slots | AsyncStorage | Files | IndexedDB | SQLite or file |
+| Transports | WebSockets, circuit relay | WebSockets, circuit relay (optional listen) | WebSockets, circuit relay, WebRTC | WebSockets, circuit relay |
 
 ## Design surface (Appeus)
 

@@ -1,15 +1,17 @@
 {
   "name": "sereus-chat",
   "private": true,
-  "description": "Sereus Chat app family. Workspace root for packages/* and test/stack; apps are not members (docs/app-family.md).",
+  "description": "Sereus Chat app family. Workspace root for packages/*, apps/cli and test/stack; the other apps are not members (docs/app-family.md).",
   "packageManager": "yarn@4.3.1",
   "workspaces": [
     "packages/*",
+    "apps/cli",
     "test/stack"
   ],
   "scripts": {
     "stack": "bash scripts/use-stack.sh",
-    "relay": "sh scripts/relay.sh"
+    "relay": "sh scripts/relay.sh",
+    "cli": "yarn workspace serchat build && node apps/cli/dist/serchat.js"
   },
   "resolutions": {
     "@optimystic/db-core": "1.12.1",

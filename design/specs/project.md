@@ -41,6 +41,7 @@ List the apps to be built:
 | App Name | Platform | Framework | Status |
 |----------|----------|-----------|--------|
 | mobile | iOS/Android | react-native | initial |
+| cli | node | typescript (serchat) | scaffold |
 | web | browser | sveltekit | planned |
 | desktop | unknown | unknown | possibly in future |
 
