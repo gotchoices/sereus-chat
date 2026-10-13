@@ -70,3 +70,25 @@ listen). The same call on a real device had not converged after 44 minutes.
 Deliberately one node, one table, no peers, no relay — the smallest thing that
 should be trivially true. It is a *validator*, not a test suite: it answers "is the
 stack usable at all from a cold start", and nothing else.
+
+## The other scripts, and what now covers them
+
+This folder is for reproducing **bare stack** behaviour — `CadreNode` with no chat model,
+often in shapes a test suite cannot take (separate processes, a frozen peer, a slow link)
+— as evidence for upstream issues. Chat-level behaviour is tested elsewhere now:
+`packages/core` (contract and diagnostics tests, in process) and `apps/cli/test`
+(serchat scenarios, real processes). Scripts are kept until the upstream question they
+support is settled, then retired.
+
+| Script | Question | Also covered by |
+|---|---|---|
+| `found-strand.mjs` | Does founding one strand converge? | Same code as the core's `runFoundStrandCheck` (core test, phone `diagnose found`) |
+| `handshake-cost.mjs` | Primitive crypto costs | Same code as `runCryptoCost` (core test, phone `diagnose crypto`) |
+| `two-party-formation.mjs` | Two parties form a strand through a relay (`--host`/`--join` for separate processes) | Core `runTwoPartyCheck` (in process); serchat scenario "invite, join and talk" (chat level) |
+| `restart-reconverge.mjs` | Do two relay-only parties converge after a restart? | serchat scenario "invite, join and talk … the inviter restarts" (chat level) |
+| `offline-inviter-join.mjs` | A join while the inviter is offline | serchat scenario "a join while the inviter is offline" (chat level) |
+| `message-latency.mjs` | Where one message's time goes | `test/devices/devtime.mjs` (two devices or serchat) |
+| `owner-recovery.mjs` | Recovery with an offline backup owner key | — (serchat `cadre` commands, Phase 7b) |
+| `slow-peer.mjs`, `contention-repro.sh`, `small-cohort-repro.sh` | Stalled peers, contention, two-machine cohorts | — |
+| `relay-reservation-cap.mjs`, `probe-services.mjs` | Relay limits; what a node exposes | — |
+| `cpu-cost.mjs`, `loop-hog.mjs`, `rn-timers.mjs`, `ws-latency.mjs`, `ws-trace.mjs` | Modules that model a device in Node (slow crypto, a starved loop, RN timers, link latency, socket tracing) | — (used by the scripts above) |

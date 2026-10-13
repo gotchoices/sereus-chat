@@ -1,0 +1,33 @@
+# A phone joins a strand that serchat (the other person) made, and they exchange messages.
+# Run by ../phone-joins-serchat.mjs, which supplies:
+#   LINK         chat://invite/<token>, minted by serchat
+#   PHONE_TEXT   what the phone sends
+#   REPLY_TEXT   what serchat sends back once it has seen PHONE_TEXT
+# APP_ID picks the app (one flow set for both mobile apps; default the React Native one).
+appId: ${APP_ID || 'org.sereus.chat'}
+---
+- openLink: ${LINK}
+# The invitation screen reads the invitation, then offers the decision.
+- extendedWaitUntil:
+    visible:
+      id: "invite-accept"
+    timeout: 90000
+- tapOn:
+    id: "invite-accept"
+# Joining reaches the other party and copies the conversation; minutes on a slow phone.
+- extendedWaitUntil:
+    visible:
+      id: "composer"
+    timeout: 300000
+- tapOn:
+    id: "composer"
+- inputText: ${PHONE_TEXT}
+- tapOn:
+    id: "composer-send"
+- extendedWaitUntil:
+    visible: ${PHONE_TEXT}
+    timeout: 30000
+# serchat answers once its copy shows the phone's message.
+- extendedWaitUntil:
+    visible: ${REPLY_TEXT}
+    timeout: 180000

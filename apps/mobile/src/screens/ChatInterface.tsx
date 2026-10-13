@@ -398,6 +398,7 @@ export default function ChatInterface() {
         {draft.trim() ? (
           <IconButton name={editing ? 'checkmark-outline' : 'send-outline'} size={22} variant="accent"
             accessibilityLabel={editing ? t('common.save') : t('actions.send')}
+            testID="composer-send"
             onPress={doSend} />
         ) : (
           // Empty composer shows the mic (human spec).  Recording is not built,

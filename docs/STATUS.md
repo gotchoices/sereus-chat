@@ -788,11 +788,27 @@ tests against a known counterpart. serchat provides both.
       - **Seen once:** an in-place reload ("RR") failed to install Nitro
         (quick-crypto's native layer) and the app did not load. A full restart
         recovered.
-- [ ] 4. **GUI against serchat:** a first Maestro flow. serchat invites; the phone
-      joins and sends through its screens; serchat confirms what arrived. Detox
-      (mock-only, not run since the refactor) is retired, not revived.
-- [ ] 5. **Tidy `test/stack`:** retire scripts the scenario suite covers; keep the
-      raw-stack reproductions.
+- [x] 4. **GUI against serchat** (done 2026-10-13):
+      `node test/gui/phone-joins-serchat.mjs [serial]` with
+      `flows/join-and-talk.yaml`. **Passes on the S7 in about 4 minutes.**
+      - serchat (bridge) makes a strand and an invitation; Maestro opens
+        `chat://invite/<token>` on the phone, taps `invite-accept`, and sends
+        from the composer.
+      - serchat sees the message (`arm`/`seen`) at about 230 s and replies
+        (commit 4.6 s); Maestro sees the reply on screen.
+      - Flows take `APP_ID`, for NativeScript later. Test IDs `invite-accept`,
+        `invite-decline` and `composer-send` added; `test/devices/bridge.mjs` is a
+        reusable bridge client.
+      - **Maestro 2.11.0**, from its own installer into `~/.maestro`. Homebrew's
+        tap failed to build on this Mac, and Homebrew's `maestro` cask is an
+        unrelated product. Analytics off (`MAESTRO_CLI_NO_ANALYTICS=1`). It puts
+        driver apps on the device.
+      - **Fixed:** the bridge's start-and-poll path failed on methods that answer
+        at once (`seen` returns a value, not a promise).
+- [x] 5. **`test/stack` tidied** (2026-10-13). Nothing deleted: those scripts are
+      bare-stack evidence for upstream. The README now has a table of each
+      script's question and what else covers it; scripts are retired when their
+      upstream question is settled.
 
 ## Phase 8 — Diagnostics and the Node harness
 

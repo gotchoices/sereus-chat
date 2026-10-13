@@ -130,13 +130,13 @@ export default function InvitationAcceptance() {
               most consequential decision in the app, and a bare tick and cross
               would make somebody guess at it. */}
           <View style={styles.actions}>
-            <Pressable onPress={decline}
+            <Pressable onPress={decline} testID="invite-decline"
               style={[styles.btn, { borderColor: theme.border, backgroundColor: theme.surface }]}>
               <Text style={[typography.body, styles.btnText, { color: theme.textPrimary }]}>
                 {t('accept.decline')}
               </Text>
             </Pressable>
-            <Pressable onPress={accept} disabled={busy}
+            <Pressable onPress={accept} disabled={busy} testID="invite-accept"
               style={[styles.btn, styles.btnRow, { borderColor: theme.accent, backgroundColor: theme.accent }, busy && styles.dim]}>
               {busy ? <ActivityIndicator color={theme.accentText} /> : null}
               <Text style={[typography.body, styles.btnText, { color: theme.accentText }]}>

@@ -24,7 +24,7 @@ import { parseInviteToken } from '../protocol/index.js';
 import type { ChatModel, Result } from '../model/index.js';
 import type { NodeHost } from '../sereus/host.js';
 
-export type DevBridgeMethod = 'strands' | 'send' | 'arm' | 'invite' | 'accept' | 'traffic' | 'relays';
+export type DevBridgeMethod = 'strands' | 'send' | 'arm' | 'seen' | 'invite' | 'accept' | 'traffic' | 'relays';
 
 export interface DevBridge {
   strands(): Promise<Array<{ id: string; title: string }>>;
@@ -144,7 +144,8 @@ export function createDevBridge(model: ChatModel, host?: NodeHost): DevBridge {
       return value(await model.invitations.accept(token));
     },
     start(id, method, ...args) {
-      const call = (bridge[method] as (...a: unknown[]) => Promise<unknown>)(...args);
+      // Some methods answer at once (`seen`): a plain value is a result like any other.
+      const call = Promise.resolve().then(() => (bridge[method] as (...a: unknown[]) => unknown)(...args));
       call.then(v => { results.set(id, { ok: true, value: v }); },
         err => { results.set(id, { ok: false, error: err instanceof Error ? err.message : String(err) }); });
       return true;
