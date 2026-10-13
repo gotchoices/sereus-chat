@@ -84,6 +84,12 @@ owner-recovery`), real nodes, about 33 s, passed three runs of three:
 6. R stops: the key goes back in the vault. P, now an owner, admits another node, and D
    accepts it.
 
+Known limit (1.15 release notes): **removal stops a machine's control access, not its
+strand access.** A removed — say, stolen — phone keeps the cadre's strand keys and can read
+and write shared strands until each strand is re-formed; Sereus has not decided what
+removal should do there. Recovery therefore regains control of the cadre, not exclusive
+access to its strands.
+
 What a backup needs beyond the key, learned on the way:
 - **The backup's node must be vouched too.** An owner key alone does not get a node onto
   the control network; the cadre admits member nodes. Because owner key = identity key in
@@ -199,6 +205,8 @@ serchat first, fully general: every Sereus mode reachable from a command, so Ser
 exercised (and its gaps shown) without touching a GUI. What proves out moves to the phone
 afterwards. Each step's commands go in `design/specs/cli/commands.md` as they land.
 
+0. **Upgrade to sereus 1.15.0** first. Step 1 builds on APIs that 1.15 adds or replaces
+   (`removeMachine`, `listMachines`, invitation `reach`, join requests).
 1. **Core: cadre administration in the model.** Extend `ChatModel.cadre` (the phone's
    cadre manager gains them later; the mock mirrors them):
    - status with owner keys, the anchor, and members both ways (`listMembers`,

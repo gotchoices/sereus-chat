@@ -9,8 +9,17 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+/**
+ * The form of everything a profile stores. Bump it when a stack upgrade or a change here
+ * makes older profiles unreadable (sereus 1.15 changed the control schema: parties made
+ * with 1.14 do not load). A profile in another form is refused, never misread.
+ */
+export const DATA_FORMAT = 'sereus-1.15';
+
 /** What `profile.json` holds: the node's start options, saved across runs. */
 export interface ProfileConfig {
+  /** `DATA_FORMAT` when the profile was made; absent in profiles from before it existed. */
+  dataFormat?: string;
   partyId: string;
   relays: string[];
   /**
@@ -65,8 +74,14 @@ export async function openProfile(dirs: ProfileDirs): Promise<{ config: ProfileC
   // (No effect on Windows, where the user's profile folder is the boundary.)
   await chmod(dirs.keys, 0o700).catch(() => {});
   const existing = await readJson<ProfileConfig>(dirs.configFile);
-  if (existing) return { config: existing, created: false };
-  const config: ProfileConfig = { partyId: randomUUID(), relays: [], createdAt: new Date().toISOString() };
+  if (existing) {
+    if (existing.dataFormat !== DATA_FORMAT) {
+      throw new Error(`profile ${dirs.name} was made in an older form (${existing.dataFormat ?? 'before formats were recorded'}) `
+        + `that this serchat (${DATA_FORMAT}) cannot read. Delete ${dirs.root} to start it again.`);
+    }
+    return { config: existing, created: false };
+  }
+  const config: ProfileConfig = { dataFormat: DATA_FORMAT, partyId: randomUUID(), relays: [], createdAt: new Date().toISOString() };
   await writeJsonAtomic(dirs.configFile, config);
   return { config, created: true };
 }

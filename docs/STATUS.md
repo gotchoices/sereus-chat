@@ -661,6 +661,37 @@ serchat profile is; and the steps below.
 
 - [x] Offline backup owner key recovery proven in v1.14
       (`test/stack/owner-recovery.mjs`, three runs of three, about 33 s).
+- [ ] 0. **Upgrade to sereus 1.15.0** (optimystic 1.13.0).
+      - Why: native Ed25519 on phones (our sereus#33), the ~18 s strand open
+        (#34), redial and owed writes (#44), commit durability, `removeMachine` and
+        `listMachines`, apps joining an existing cadre, `cadre init`/`code`.
+      - Breaking: parties must be recreated (`DATA_FORMAT` bump).
+      - Order: Node side first (core, serchat, `test/stack`; rerun the core tests
+        and `owner-recovery.mjs`), then mobile (kit native-crypto polyfill,
+        `LevelDBNative.destroy`, new `joining`/`removed` states, owner genesis
+        `member`), then S7 ↔ serchat.
+      - Node side done, 2026-10-13:
+        - `use-stack.sh` moved to 1.15.0 / optimystic 1.13.0 and gained
+          `db-p2p-storage-fs`; it now treats `apps/cli` as a workspace member
+          (dependencies only, no resolutions). One copy of cadre-core (1.15.0).
+        - Core 56 tests pass; the stack check converges.
+        - `owner-recovery.mjs` passes on 1.15 (35 s).
+        - serchat on `relay.sereus.org`:
+          - Bob joins, lists and sends in 27 s; Alice's `tail` has it 1.8 s
+            after sending.
+          - After a restart, Alice's whole run takes 4 s (7 s on 1.14);
+            delivered 2 s after sending.
+        - serchat profiles now record `dataFormat` (`sereus-1.15`); older ones
+          are refused with a message.
+        - Still failing on 1.15: two profiles with `--listen` and no relay; after
+          one restarts, its messages do not reach the other within 2 minutes.
+          Relayed (the phones' topology) works.
+      - Mobile code done; device check pending:
+        - the kit's `/polyfills/native-crypto` replaces our local copy (deleted);
+        - `LevelDBNative.destroy`;
+        - the `removed` status is handled (logged and reported; UI in step 8);
+        - `DATA_FORMAT` is `sereus-1.15`.
+        - `tsc` clean; Jest 7 pass.
 - [ ] 1. Core: cadre administration in `ChatModel.cadre`.
       - Owners, the anchor, and members.
       - Authorize by peer id; cadre invitations.

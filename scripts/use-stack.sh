@@ -8,7 +8,8 @@
 # Consumers (each package.json found here is rewritten together):
 #   .              the workspace root: `resolutions` for packages/* and test/stack
 #   apps/*         each app: `dependencies` and its own `resolutions` (apps are not
-#                  workspace members; see docs/app-family.md)
+#                  workspace members; see docs/app-family.md) — except an app the root
+#                  lists in its workspaces (apps/cli), which gets `dependencies` only
 #   test/stack     workspace member: `dependencies`
 #   packages/*     workspace members: `peerDependencies` (ranges) and `devDependencies`
 #
@@ -58,14 +59,15 @@ SER = os.path.dirname(ROOT)  # the ser/ folder holding the clones
 
 # name : (clone path under ser/, exact version, pinned in resolutions)
 PACKAGES = collections.OrderedDict([
-    ('@optimystic/db-core',                   ('optimystic/packages/db-core',                   '1.12.1', True)),
-    ('@optimystic/db-p2p',                    ('optimystic/packages/db-p2p',                    '1.12.1', True)),
-    ('@optimystic/db-p2p-storage-rn',         ('optimystic/packages/db-p2p-storage-rn',         '1.12.1', True)),
-    ('@optimystic/quereus-plugin-crypto',     ('optimystic/packages/quereus-plugin-crypto',     '1.12.1', True)),
-    ('@optimystic/quereus-plugin-optimystic', ('optimystic/packages/quereus-plugin-optimystic', '1.12.1', True)),
+    ('@optimystic/db-core',                   ('optimystic/packages/db-core',                   '1.13.0', True)),
+    ('@optimystic/db-p2p',                    ('optimystic/packages/db-p2p',                    '1.13.0', True)),
+    ('@optimystic/db-p2p-storage-rn',         ('optimystic/packages/db-p2p-storage-rn',         '1.13.0', True)),
+    ('@optimystic/db-p2p-storage-fs',         ('optimystic/packages/db-p2p-storage-fs',         '1.13.0', True)),
+    ('@optimystic/quereus-plugin-crypto',     ('optimystic/packages/quereus-plugin-crypto',     '1.13.0', True)),
+    ('@optimystic/quereus-plugin-optimystic', ('optimystic/packages/quereus-plugin-optimystic', '1.13.0', True)),
     ('@quereus/quereus',                      ('quereus/packages/quereus',                      '4.20.2', True)),
-    ('@serfab/cadre-core',                    ('sereus/packages/cadre-core',                    '1.14.0', True)),
-    ('@serfab/cadre-rn',                      ('sereus/packages/cadre-rn',                      '1.14.0', False)),
+    ('@serfab/cadre-core',                    ('sereus/packages/cadre-core',                    '1.15.0', True)),
+    ('@serfab/cadre-rn',                      ('sereus/packages/cadre-rn',                      '1.15.0', False)),
     ('p2p-fret',                              ('fret/packages/fret',                            '1.0.2',  True)),
 ])
 SENTINEL = '@serfab/cadre-core'
@@ -83,8 +85,12 @@ COMPAT_PINS = collections.OrderedDict([
 
 def consumers():
     found = [('.', 'root')]
+    # An app listed in the root's workspaces (apps/cli) is a member: the root's
+    # resolutions govern it, so it gets dependencies only.
+    members = set(load('.').get('workspaces', []))
     for pj in sorted(glob.glob(os.path.join(ROOT, 'apps', '*', 'package.json'))):
-        found.append((os.path.relpath(os.path.dirname(pj), ROOT), 'app'))
+        rel = os.path.relpath(os.path.dirname(pj), ROOT)
+        found.append((rel, 'member' if rel in members else 'app'))
     if os.path.exists(os.path.join(ROOT, 'test', 'stack', 'package.json')):
         found.append(('test/stack', 'member'))
     for pj in sorted(glob.glob(os.path.join(ROOT, 'packages', '*', 'package.json'))):

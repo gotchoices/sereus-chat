@@ -35,8 +35,11 @@ import { STORAGE_KEYS, STORAGE_KEY_PREFIX } from './persisted-names';
  *                identity, trusted owners and joined strands move to the keychain, the
  *                party id and relays to the kit's saved start, and the databases are
  *                renamed (`persisted-names.ts`). Nothing is carried over.
+ *   sereus-1.15  each machine's signed address record carries its node profile, so a
+ *                control store made by 1.14 fails its warm start ("parties created with
+ *                1.14 or earlier must be recreated"); optimystic 1.13.0.
  */
-export const DATA_FORMAT = 'sereus-1.14-kit';
+export const DATA_FORMAT = 'sereus-1.15';
 
 const MARKER_KEY = STORAGE_KEYS.dataFormat;
 const APP_PREFIX = STORAGE_KEY_PREFIX;

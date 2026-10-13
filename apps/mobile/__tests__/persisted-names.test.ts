@@ -43,6 +43,6 @@ describe('persisted names', () => {
 
   it('names the data format these were introduced with', () => {
     // Bump together with any change above.
-    expect(DATA_FORMAT).toBe('sereus-1.14-kit');
+    expect(DATA_FORMAT).toBe('sereus-1.15');
   });
 });

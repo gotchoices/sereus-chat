@@ -60,6 +60,9 @@ const phone = createPhoneNode({
   leveldb: {
     openFn: (name, createIfMissing, errorIfExists) => new LevelDB(name, createIfMissing, errorIfExists),
     WriteBatch: LevelDBWriteBatch,
+    // Deletes a closed database: the kit uses it to remove a cadre's data from the phone
+    // (removed from the cadre, or a cadre left behind on joining another).
+    destroy: (name: string) => LevelDB.destroyDB(name),
   },
   names: NODE_STORAGE_NAMES,
   dataVersion: DATA_FORMAT,
@@ -392,6 +395,13 @@ class CadreServiceImpl {
         break;
       case 'failed':
         this._startError = status.error.message;
+        this.unwatchReachability();
+        break;
+      case 'removed':
+        // An owner removed this device from its cadre. The kit has stopped the node and
+        // deleted that cadre's data. Showing it and offering a way back is Phase 7b, step 8.
+        console.warn('[CadreService] this device was removed from its cadre');
+        this._startError = 'This device was removed from its network.';
         this.unwatchReachability();
         break;
       default:

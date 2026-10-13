@@ -11,8 +11,8 @@
  * `AbortController.abort()` wrapper that dropped every abort reason). Fix bugs
  * UPSTREAM; do not patch around them here.
  *
- * One local file remains, `polyfills/native-crypto.js` (native Ed25519 and digest),
- * until gotchoices/sereus#33 puts it in the kit.
+ * Native Ed25519 and digest come from the kit too (`/polyfills/native-crypto`, sereus#33,
+ * since 1.15), so chat carries no polyfills of its own.
  */
 
 // Debug namespaces. Before the kit's polyfills, which set a default only when
@@ -25,8 +25,9 @@ import './src/debug-bootstrap';
 // DOMException, the AbortSignal family, WebSocket.bufferedAmount, timer ref(),
 // EventTarget, Intl.PluralRules.
 import '@serfab/cadre-rn/polyfills';
-// Native Ed25519 and SHA digest, before libp2p loads. Local until sereus#33 ships.
-import './polyfills/native-crypto';
+// Native Ed25519 and SHA digest through react-native-quick-crypto, before libp2p loads:
+// @libp2p/crypto picks WebCrypto or pure JS once, when it is first imported.
+import '@serfab/cadre-rn/polyfills/native-crypto';
 // Development builds: the native / polyfilled / gap / MISSING table, and a
 // `[reload] <reason>` line. Position is the point: after every polyfill, before the
 // app tree evaluates, so the table beats any import-time crash from a missing global.
