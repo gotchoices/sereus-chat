@@ -18,7 +18,7 @@ import type {
   Attachment, ChatModel, Invitation, InvitationPreview, Member, Message, Prefs, Profile,
   Result, SearchBatch, StorageUsage, StrandState, StrandSummary,
 } from '../model/index.js';
-import { fail, ok } from '../model/index.js';
+import { fail, ok, pageMessages } from '../model/index.js';
 
 export type FixtureName =
   | 'Strands' | 'Messages' | 'Members' | 'StrandMedia' | 'StrandState'
@@ -108,9 +108,9 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
     },
 
     messages: {
-      async list(strandId) {
+      async list(strandId, opts) {
         if (isError()) return unavailable('Could not reach this conversation right now');
-        return ok([...data<Message[]>('Messages'), ...(sent[strandId] ?? [])]);
+        return ok(pageMessages([...data<Message[]>('Messages'), ...(sent[strandId] ?? [])], opts));
       },
       async send(strandId, input) {
         if (isError()) return unavailable('Could not write that message');

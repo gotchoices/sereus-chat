@@ -13,7 +13,7 @@ import type {
   Attachment, ChatModel, Invitation, InvitationPreview, Member, Message, Prefs,
   SearchBatch, StorageUsage, StrandState, StrandSummary,
 } from '../model/index.js';
-import { fail, INVITATION_VALIDITY, ok } from '../model/index.js';
+import { fail, INVITATION_VALIDITY, ok, pageMessages } from '../model/index.js';
 import { attempt, ChatFailure, explainJoinFailure, withTimeout } from './errors.js';
 import type { ChatHost } from './host.js';
 import { LocalRecords, OutgoingInvitations, StrandPrefsStore, SummaryCache } from './local-state.js';
@@ -441,7 +441,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     },
 
     messages: {
-      list: id => attempt(() => listMessages(id)),
+      list: (id, opts) => attempt(async () => pageMessages(await listMessages(id), opts)),
       send: (id, input) => attempt(() => send(id, input)),
       edit: (id, messageId, content) => attempt(async () => updateMessage(await strandFor(id), messageId, content)),
       delete: (id, messageId) => attempt(async () => removeMessage(await strandFor(id), messageId)),

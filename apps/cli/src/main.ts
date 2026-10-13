@@ -12,9 +12,11 @@
 import { createInterface, type Interface } from 'node:readline';
 import { readFile, writeFile } from 'node:fs/promises';
 import { format } from 'node:util';
+import { open as openInspector } from 'node:inspector';
 import { createSereusModel } from '@chat/core/sereus';
+import { createDevBridge } from '@chat/core/diagnostics';
 import { DEFAULT_LISTEN, createCliHost, defaultListenAddress } from './host.js';
-import { openProfile, profileDirs } from './home.js';
+import { lockProfile, openProfile, profileDirs } from './home.js';
 import { createOutput } from './output.js';
 import { splitArgv, splitLine } from './lex.js';
 import { EXIT, createSession, type Session } from './session.js';
@@ -34,6 +36,8 @@ interface Globals {
   waitSeconds: number;
   verbose: boolean;
   script?: string;
+  /** Inspector port for the development bridge (`--bridge`). */
+  bridgePort?: number;
   help: boolean;
   version: boolean;
   /** The words after the options: commands, if any. */
@@ -50,6 +54,7 @@ const USAGE = `usage: serchat [options] [command [args] [\\; command ...]]
       --listen [<addr>]  also listen (default: loopback, on this profile's own port)
       --wait <seconds>   one-shot: how long to let strands settle first (default 30)
   -c <commands>          run these ";"-separated commands
+      --bridge <port>    development bridge for test/devices tools, on a loopback inspector port
   -v, --verbose          network-layer log lines on stderr
   -h, --help · --version
 
@@ -73,6 +78,7 @@ export function parseGlobals(argv: string[]): Globals {
     else if (a === '--listen') g.listen.push(argv[i + 1]?.startsWith('/') ? argv[++i] : DEFAULT_LISTEN);
     else if (a === '--wait') g.waitSeconds = Number(value(a));
     else if (a === '-c') g.script = value(a);
+    else if (a === '--bridge') g.bridgePort = Number(value(a));
     else if (a === '-v' || a === '--verbose') g.verbose = true;
     else if (a === '-h' || a === '--help') g.help = true;
     else if (a === '--version') g.version = true;
@@ -82,6 +88,7 @@ export function parseGlobals(argv: string[]): Globals {
   }
   g.rest = argv.slice(i);
   if (!Number.isFinite(g.waitSeconds) || g.waitSeconds < 0) throw new Error('--wait takes seconds');
+  if (g.bridgePort !== undefined && !(Number.isInteger(g.bridgePort) && g.bridgePort > 0 && g.bridgePort < 65536)) throw new Error('--bridge takes a port');
   return g;
 }
 
@@ -113,10 +120,18 @@ async function main(argv: string[]): Promise<number> {
 
   const dirs = profileDirs(g.profile, g.home);
   const { config, created } = await openProfile(dirs);
+  await lockProfile(dirs);
   const out = createOutput({ json: g.json, header: g.header });
   const listen = await Promise.all(g.listen.map(a => (a === DEFAULT_LISTEN ? defaultListenAddress(dirs, config) : a)));
   const host = createCliHost({ dirs, config, extraRelays: g.relays, listen, dev: g.verbose });
   const { model, boot } = createSereusModel(host);
+  if (g.bridgePort !== undefined) {
+    // The same bridge the phone installs, reached over Node's inspector instead of Metro's.
+    // Loopback only: an inspector runs any code it is sent.
+    (globalThis as { __chatDev?: unknown }).__chatDev = createDevBridge(model, host.node);
+    openInspector(g.bridgePort, '127.0.0.1');
+    out.note(`bridge: node:${g.bridgePort}`);
+  }
   out.note(`serchat ${VERSION} · profile ${dirs.name}${created ? ' (new)' : ''} · starting…`);
 
   let abort = new AbortController();
@@ -174,6 +189,10 @@ async function settle(session: Session, ms: number): Promise<void> {
 }
 
 async function shutdown(session: Session, code: number): Promise<number> {
+  // List once before stopping: the core saves the list it shows, and that saved list is
+  // how the next run knows which strands to wait for (see `settle`) — a strand that only
+  // arrived through the bridge or a `tail` would otherwise be unknown until rediscovered.
+  await Promise.race([session.model.strands.list().catch(() => {}), new Promise(r => setTimeout(r, 3000).unref())]);
   // Stopping can hang on a peer that does not answer; the exit does not wait forever.
   await Promise.race([session.host.node.stop().catch(() => {}), new Promise(r => setTimeout(r, 5000).unref())]);
   process.exit(code);

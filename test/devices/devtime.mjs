@@ -1,8 +1,10 @@
 import { createWriteStream } from 'node:fs';
+import { findTarget } from './target.mjs';
 // devtime.mjs — time messages between two devices through the app's dev bridge
 // (src/diagnostics/dev-bridge.ts), over Metro's inspector. No UI involved.
 //
-//   node devtime.mjs <deviceA-substr> <deviceB-substr> [rounds] [prefix]
+//   node devtime.mjs <deviceA> <deviceB> [rounds] [prefix]
+//                                 a device: a phone's title substring, or node:<port> for serchat --bridge
 //   PAIR=1 node devtime.mjs …     A invites B into a new private strand first, and times the join
 //   ARM_WAIT_MS=…                 how long to wait for both strands to be writable (default 5 min)
 //   LOG=out node devtime.mjs …    also write each device's console to out-A.log / out-B.log
@@ -16,9 +18,7 @@ const T0 = Date.now();
 const stamp = () => ((Date.now() - T0) / 1000).toFixed(3);
 
 async function connect(want, logPath) {
-  const list = await (await fetch('http://localhost:8084/json/list')).json();
-  const t = list.find(x => x.title.includes(want));
-  if (!t) throw new Error(`no debug target matching ${want}: ${list.map(x => x.title).join(', ')}`);
+  const t = await findTarget(want);
   const ws = new WebSocket(t.webSocketDebuggerUrl);
   await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
   let id = 0; const pending = new Map();

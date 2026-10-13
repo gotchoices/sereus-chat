@@ -15,6 +15,10 @@
       "types": "./dist/sereus/index.d.ts",
       "default": "./dist/sereus/index.js"
     },
+    "./diagnostics": {
+      "types": "./dist/diagnostics/index.d.ts",
+      "default": "./dist/diagnostics/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

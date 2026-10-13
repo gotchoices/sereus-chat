@@ -3,6 +3,7 @@
  * `<home>/<profile>/` (home: `--home`, else `$SERCHAT_HOME`, else `~/.serchat`).
  * Deleting the folder is a clean slate. Layout: design/specs/cli/commands.md.
  */
+import { unlinkSync } from 'node:fs';
 import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -30,6 +31,7 @@ export interface ProfileDirs {
   configFile: string;
   lastFile: string;
   historyFile: string;
+  lockFile: string;
 }
 
 const PROFILE_NAME = /^[A-Za-z0-9._-]{1,64}$/;
@@ -50,6 +52,7 @@ export function profileDirs(profile: string, home?: string): ProfileDirs {
     configFile: join(root, 'profile.json'),
     lastFile: join(root, 'last.json'),
     historyFile: join(root, 'history'),
+    lockFile: join(root, 'lock'),
   };
 }
 
@@ -92,4 +95,37 @@ export async function writeTextAtomic(path: string, text: string): Promise<void>
 
 export async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
   await writeTextAtomic(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+/**
+ * One process per profile: two nodes over the same files would corrupt them. Takes the
+ * profile's lock file (holding this process's id) or throws naming the holder; a lock
+ * left by a process that no longer runs is taken over. Released when this process exits.
+ */
+export async function lockProfile(dirs: ProfileDirs): Promise<void> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await writeFile(dirs.lockFile, `${process.pid}\n`, { flag: 'wx', mode: 0o600 });
+      process.on('exit', () => { try { unlinkSync(dirs.lockFile); } catch { /* already gone */ } });
+      return;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+      const holder = Number((await readFile(dirs.lockFile, 'utf8').catch(() => '')).trim());
+      if (holder && holder !== process.pid && isRunning(holder)) {
+        throw new Error(`profile ${dirs.name} is in use by process ${holder}`);
+      }
+      // Stale: its process is gone. Remove it and try once more.
+      try { unlinkSync(dirs.lockFile); } catch { /* raced with another taker */ }
+    }
+  }
+  throw new Error(`profile ${dirs.name} is in use`);
+}
+
+function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
 }

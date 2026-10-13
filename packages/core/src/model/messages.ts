@@ -20,9 +20,27 @@ export type SendInput = {
   replyToId?: string | null;
 };
 
+export type ListMessagesOptions = {
+  /** Only messages older than this one (by id). */
+  before?: string;
+  /** At most this many: the newest of what remains. */
+  limit?: number;
+};
+
+/** Apply `ListMessagesOptions` to a full list, newest last. Both implementations use it. */
+export function pageMessages(all: Message[], opts: ListMessagesOptions = {}): Message[] {
+  let page = all;
+  if (opts.before !== undefined) {
+    const at = all.findIndex(m => m.id === opts.before);
+    page = at < 0 ? [] : all.slice(0, at);
+  }
+  if (opts.limit !== undefined && opts.limit >= 0) page = page.slice(Math.max(0, page.length - opts.limit));
+  return page;
+}
+
 export interface MessagesModel {
   /** Newest last. */
-  list(strandId: string, opts?: { before?: string; limit?: number }): Promise<Result<Message[]>>;
+  list(strandId: string, opts?: ListMessagesOptions): Promise<Result<Message[]>>;
   send(strandId: string, input: SendInput): Promise<Result<Message>>;
   /** In place, no history. */
   edit(strandId: string, messageId: string, content: string): Promise<Result<void>>;

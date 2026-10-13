@@ -35,6 +35,7 @@ serchat [global options] -c '<command>; <command>'
 | `--relay <multiaddr>` | Use this relay for this run, in addition to saved ones (repeatable) |
 | `--listen [<multiaddr>]` | Also listen, so peers can dial in directly. Default: loopback on a port chosen on first use and kept in `profile.json`, so other profiles find this one again next run |
 | `--wait <seconds>` | One-shot: how long to wait, before running, for the relay reservation (if any) and for strands to open (default 30) |
+| `--bridge <port>` | Development bridge (`@chat/core/diagnostics`) on a loopback Node inspector port, for the `test/devices` tools (`node:<port>` as the device). An inspector runs any code it is sent: development only |
 | `-v, --verbose` | Network-layer log lines to stderr |
 | `-h, --help` · `--version` | |
 
@@ -96,7 +97,7 @@ Columns are listed in order. `[…]` optional, `<…>` required.
 
 ### `status`
 Key/value: `profile`, `peer`, `party`, `owner` (`yes`/`no`), `reachable` (`yes`/`no`),
-`relay` (repeat: `relay<TAB>status<TAB>addr`), `listen` (repeat), `strands` (count),
+`relay` (repeat: `relay<TAB>status<TAB>addr`), `address` (repeat: where this node can be reached, relay circuits included), `strands` (count),
 `settling` (`yes`/`no`). An empty multi-valued key prints no line.
 
 ### `profile [set <field>=<value> ...]`
@@ -131,12 +132,8 @@ Prints the sent message as a `log` line plus `commitMs`.
 ### `invite [--strand <strand>] [--public] [--manager] [--multi] [--valid day|week|month] [-o <file>]`
 Makes an invitation (a new strand unless `--strand`). Prints `id  url  expiresAt`.
 `-o <file>` also writes the link alone, one line, to the file (mode 0600: whoever holds the
-link can use it). QR codes are left to other tools:
-
-```
-serchat invite -o invite.txt && qrencode -t ansiutf8 < invite.txt
-serchat invite | cut -f2 | qrencode -o invite.png
-```
+link can use it). How the link reaches the other person — pasted, sent as a file, shown as a
+QR code made with some other tool — is up to the user; serchat only makes it.
 `invites` lists outstanding: `row  id  strandId  expiresAt  uses  url`. `invite cancel <id|row>`.
 
 ### `join <link|token> [--yes]`
@@ -149,10 +146,13 @@ asks; `--yes` skips the question (required when stdin is not a terminal). Prints
 ### `network`
 The cadre: `status`-like key/value for the node, then `machine<TAB>peerId<TAB>thisDevice`.
 
+### `idle`
+Keeps the node running — reachable and syncing — until Ctrl-C. With `--bridge`, it is how a
+test tool drives a serchat that has nothing else to do.
+
 ### `help [command]` (also `?`) · `quit`
 
 ## Not yet
 
 Attachments, reactions, edits and deletes (`react`, `edit`, `delete`), search, claiming a
-machine, and the development-bridge commands (`arm`, `seen`, `traffic`, …) shared with the
-phone. They fit the same patterns when wanted.
+machine. They fit the same patterns when wanted.

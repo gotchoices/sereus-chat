@@ -35,5 +35,15 @@ serchat -p alice invite \; tail --all          # prints the link, then follows
 serchat -p bob join '<link>' --yes \; strands \; send 1 hello
 ```
 
+Against a phone, with the `test/devices` tools (serchat on the phone's relay):
+
+```sh
+serchat -p cli relay add <the phone's relay>
+serchat -p cli --bridge 9301 idle &             # the bridge, on a loopback inspector port
+PAIR=1 node test/devices/devtime.mjs node:9301 SM-G935V 3
+```
+
+A profile is used by one process at a time (`lock` in its folder).
+
 `--listen` lets profiles dial each other directly instead, but a restarted profile may not
 find the other again without a relay; the relay is the topology phones use.

@@ -3,15 +3,15 @@
 //
 //   node devcall.mjs SM-G935V traffic 60
 //   node devcall.mjs sdk_gphone strands
+//   node devcall.mjs node:9301 strands      serchat started with --bridge 9301
 //
 // One debugger connection per device: close other tools on that device first.
+import { findTarget } from './target.mjs';
 const [WANT, METHOD, ...RAW] = process.argv.slice(2);
 const args = RAW.map(a => { try { return JSON.parse(a); } catch { return a; } });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-const list = await (await fetch('http://localhost:8084/json/list')).json();
-const t = list.find(x => x.title.includes(WANT));
-if (!t) { console.error(`no debug target matching ${WANT}: ${list.map(x => x.title).join(', ')}`); process.exit(2); }
+const t = await findTarget(WANT).catch(err => { console.error(err.message); process.exit(2); });
 const ws = new WebSocket(t.webSocketDebuggerUrl);
 await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
 let id = 0; const pending = new Map();

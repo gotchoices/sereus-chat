@@ -624,13 +624,37 @@ interactive mode is the way to avoid that.
     the one `.relay-data` describes: its peer id differs, so reservations
     against `.relay-data`'s id retry forever. The test used a separate relay on
     4011/4012, since stopped.
-- Not done: the dev-bridge commands (so `test/devices` tools drive serchat),
-  `--qr`, attachments, reactions, edits, search, claiming. A timing comparison
-  with the phones belongs with the bridge commands.
+- [x] **The development bridge moved into the core** (`@chat/core/diagnostics`,
+      `createDevBridge(model, nodeHost)`); this is Phase 8's first item.
+      - The phone installs it in development builds.
+      - `serchat --bridge <port>` installs it behind Node's inspector on loopback.
+      - `test/devices/target.mjs` lets `devtime.mjs` and `devcall.mjs` take
+        `node:<port>` as a device.
+      - New `idle` command keeps serchat's node running for a tool to drive.
+- [x] **serchat ↔ S7 through `relay.sereus.org`** (`devtime.mjs`, `PAIR=1`,
+      3 rounds):
+      - serchat invited in 12 s; the S7 joined in 86 s;
+      - all 6 messages delivered;
+      - median delivery 5.3 s (serchat → S7) and 5.8 s (S7 → serchat);
+      - commits about 3.2 s, apart from the first at 10 s.
+- Fixed on the way:
+  - **Profile lock.** A profile is locked to one process (`lock` holds the pid;
+    a lock left by a dead process is taken over). Two runs on one profile, which
+    happened during testing, would have damaged its storage.
+  - **Strands no one had listed.** Every run lists strands once before stopping,
+    so the core saves its list and the next run knows which strands to wait for.
+    Before this, a strand that arrived only through the bridge was unknown to the
+    next run until rediscovered, about 18 s after start.
+  - **Message paging, in the core.** `messages.list` ignored `before` and
+    `limit` in both the Sereus model and the mock. Shared `pageMessages`, with a
+    test; core now has 56 tests.
+  - `status` names this node's reachable addresses `address`, not `listen`.
+- Not done: attachments, reactions, edits, search, claiming.
 
 ## Phase 8 — Diagnostics and the Node harness
 
-- [ ] Move `src/diagnostics/*` into `core/diagnostics` (`two-party-check`,
+- [x] The dev bridge is in `core/diagnostics` (done with Phase 7a).
+- [ ] Move the rest of `src/diagnostics/*` into `core/diagnostics` (`two-party-check`,
       `found-strand-check`, `handshake-cost`, `loop-lag`), over the host. The
       two-party checks get their second node from `createExtraNode`.
       `apps/mobile/src/host/` implements it with the node construction that

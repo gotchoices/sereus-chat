@@ -19,7 +19,7 @@ const status: Command = {
       ['owner', host.node.ownerEnrolled()],
       ['reachable', reach.reachable],
       ['relay', reach.relays.map(addr => [reach.relayStatus ?? 'none', addr])],
-      ['listen', host.node.listenAddrs()],
+      ['address', host.node.listenAddrs()],
       ['strands', list.ok ? list.value.length : null],
       ['settling', await model.strands.settling()],
     ]);
@@ -118,4 +118,19 @@ const network: Command = {
   },
 };
 
-export const settingsCommands = [status, profile, prefs, relay, network];
+const idle: Command = {
+  name: 'idle',
+  noArgs: true,
+  summary: 'Keep the node running until Ctrl-C (reachable, syncing; for --bridge test tools)',
+  usage: '',
+  async run(session) {
+    session.out.note('idle; Ctrl-C to stop');
+    const signal = session.signal;
+    await new Promise<void>(resolve => {
+      if (signal.aborted) resolve();
+      signal.addEventListener('abort', () => resolve(), { once: true });
+    });
+  },
+};
+
+export const settingsCommands = [status, profile, prefs, relay, network, idle];
