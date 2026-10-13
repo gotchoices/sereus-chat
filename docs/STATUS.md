@@ -649,7 +649,33 @@ interactive mode is the way to avoid that.
     `limit` in both the Sereus model and the mock. Shared `pageMessages`, with a
     test; core now has 56 tests.
   - `status` names this node's reachable addresses `address`, not `listen`.
-- Not done: attachments, reactions, edits, search, claiming.
+- **Deferred (decided 2026-10-13):** attachments; reactions (emoji on a message);
+  search (dump with `log -n <many>` and filter with ordinary tools instead).
+- Not done yet: edits and deletes, claiming.
+
+## Phase 7b — serchat as the Sereus testbed (planned)
+
+Research, decisions and plan: [serchat.md](serchat.md). It covers how Sereus v1.14
+organises parties, members, nodes and owner keys; the backup-key recovery proof; what a
+serchat profile is; and the steps below.
+
+- [x] Offline backup owner key recovery proven in v1.14
+      (`test/stack/owner-recovery.mjs`, three runs of three, about 33 s).
+- [ ] 1. Core: cadre administration in `ChatModel.cadre`.
+      - Owners, the anchor, and members.
+      - Authorize by peer id; cadre invitations.
+      - Add and remove owners; create a backup key.
+      - The party's strands at control level.
+      - The mock gets the same.
+- [ ] 2. serchat `init found | seed | invitation | claimable | identity`.
+- [ ] 3. serchat `cadre …` commands, including `backup create`.
+- [ ] 4. Chat member identity = the party (domain contract); display name in the
+      Member row.
+- [ ] 5. Core fixes: leaving joined strands (`forgetJoinedStrand`), the
+      `joinedStrands` list, `isManager`.
+- [ ] 6. Background mode (local socket; later invocations attach).
+- [ ] 7. Shared serchat config.
+- [ ] 8. The phone takes up what proved out.
 
 ## Phase 8 — Diagnostics and the Node harness
 

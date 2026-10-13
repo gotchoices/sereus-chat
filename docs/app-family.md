@@ -170,8 +170,10 @@ platform has one app. Revisit if two apps ever share a platform.
 
 ### Packages are private
 
-All packages are private (`"private": true`) and are never published. There is
-no public API or compatibility promise to outside apps.
+All packages are private (`"private": true`): **not published to npm**, which
+is all the flag means; the code is open like the rest of the repo. They are
+used by the apps here, and serchat bundles them into its own published package.
+There is no public API or compatibility promise to outside apps.
 
 Whether to offer a public, stable API — so others can build compatible apps —
 is deliberately deferred until the core has stabilized across at least two of

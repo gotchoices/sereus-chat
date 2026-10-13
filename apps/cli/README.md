@@ -4,6 +4,7 @@ Sereus Chat on the command line — for testing, evaluating and debugging Sereus
 not for everyday chatting. A client of `@chat/core` like the phone app.
 
 - Stories: `design/stories/cli/` · commands and output: `design/specs/cli/commands.md`
+- What serchat is for, how Sereus's cadres work, and the plan: `docs/serchat.md`
 
 ```sh
 yarn workspace serchat build          # builds @chat/resources and @chat/core, then bundles
