@@ -14,7 +14,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { runFoundStrandCheck } from '../diagnostics/found-strand-check';
 import type { CheckResult } from '../diagnostics/found-strand-check';
-import { runHandshakeCostCheck, runSocketFrameCost } from '../diagnostics/handshake-cost';
+import { runCryptoCost, runSocketFrameCost } from '@chat/core/diagnostics';
 import { runTwoPartyCheck } from '../diagnostics/two-party-check';
 import type { TwoPartyResult } from '../diagnostics/two-party-check';
 import { orThrow, useModel } from '../data/bind';
@@ -73,7 +73,7 @@ export default function Diagnostics() {
     setTwoParty(null);
     setLines(['Measuring crypto primitives — no network, no strand…']);
     try {
-      const report = await runHandshakeCostCheck(l => setLines(p => [...p, l]));
+      const report = await runCryptoCost(l => setLines(p => [...p, l]));
       for (const m of report.measurements) {
         setLines(p => [...p,
           `${m.label}: ${m.msPerOp.toFixed(3)} ms/op (n=${m.iterations})` +

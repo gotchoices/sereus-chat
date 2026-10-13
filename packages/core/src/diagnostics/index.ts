@@ -1,2 +1,10 @@
 export { createDevBridge } from './dev-bridge.js';
 export type { DevBridge, DevBridgeMethod } from './dev-bridge.js';
+export { startLoopLag, formatLoopLag } from './loop-lag.js';
+export type { LoopLagReport } from './loop-lag.js';
+export { runCryptoCost, runSocketFrameCost, BRINGUP_FRAMES } from './crypto-cost.js';
+export type { CostReport, Measurement } from './crypto-cost.js';
+export { runFoundStrandCheck } from './found-strand.js';
+export type { FoundStrandPlatform, FoundStrandOptions, FoundStrandResult } from './found-strand.js';
+export { runTwoPartyCheck } from './two-party.js';
+export type { TwoPartyPlatform, TwoPartyOptions, TwoPartyResult } from './two-party.js';

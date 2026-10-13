@@ -78,6 +78,9 @@ __metadata:
     "@libp2p/crypto": "npm:5.1.24"
     "@libp2p/identify": "npm:4.1.15"
     "@libp2p/websockets": "npm:10.1.22"
+    "@noble/ciphers": "npm:2.4.0"
+    "@noble/curves": "npm:2.4.0"
+    "@noble/hashes": "npm:2.2.0"
     "@optimystic/db-p2p": "npm:1.13.0"
     "@quereus/quereus": "npm:4.20.2"
     "@serfab/cadre-core": "npm:1.15.0"
@@ -86,6 +89,9 @@ __metadata:
     typescript: "npm:^5.9.3"
     vitest: "npm:^4.0.17"
   peerDependencies:
+    "@noble/ciphers": ^2.2.0
+    "@noble/curves": ^2.2.0
+    "@noble/hashes": ^2.0.0
     "@quereus/quereus": ^4.20.2
     "@serfab/cadre-core": ^1.15.0
   languageName: unknown
@@ -740,14 +746,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@noble/ciphers@npm:^2.0.1":
+"@noble/ciphers@npm:2.4.0, @noble/ciphers@npm:^2.0.1":
   version: 2.4.0
   resolution: "@noble/ciphers@npm:2.4.0"
   checksum: 10c0/f8c0cfec0c96554a379385e0a851e4f4eb3ceb1ac645885d8f94f6e75b8d56233e4a434413cb2bf37ec08960cc05dad1ddf98d25311e990ea6505c56a1c1ca95
   languageName: node
   linkType: hard
 
-"@noble/curves@npm:^2.0.1":
+"@noble/curves@npm:2.4.0, @noble/curves@npm:^2.0.1":
   version: 2.4.0
   resolution: "@noble/curves@npm:2.4.0"
   dependencies:
@@ -1033,6 +1039,7 @@ __metadata:
   dependencies:
     "@chainsafe/libp2p-noise": "npm:^17.0.0"
     "@chainsafe/libp2p-yamux": "npm:^8.0.1"
+    "@chat/core": "workspace:*"
     "@libp2p/circuit-relay-v2": "npm:^4.2.13"
     "@libp2p/crypto": "npm:^5.1.23"
     "@libp2p/websockets": "npm:^10.1.21"

@@ -5,6 +5,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ChatHost, DurableSlot, NodeHost, SlotName } from '@chat/core/sereus';
+import { createExtraNode } from './extra-node';
 import { STORAGE_KEYS } from '../data/persisted-names';
 import { cadreService } from './CadreService';
 
@@ -45,5 +46,6 @@ const nodeHost: NodeHost = {
 export const chatHost: ChatHost = {
   node: nodeHost,
   slot: (name, key) => asyncStorageSlot(storageKey(name, key)),
+  createExtraNode,
   dev: __DEV__,
 };

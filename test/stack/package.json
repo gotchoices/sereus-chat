@@ -11,6 +11,7 @@
   "dependencies": {
     "@chainsafe/libp2p-noise": "^17.0.0",
     "@chainsafe/libp2p-yamux": "^8.0.1",
+    "@chat/core": "workspace:*",
     "@libp2p/circuit-relay-v2": "^4.2.13",
     "@libp2p/crypto": "^5.1.23",
     "@libp2p/websockets": "^10.1.21",

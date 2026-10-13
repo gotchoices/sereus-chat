@@ -266,7 +266,7 @@ interface ChatHost {
   node: NodeHost;                                   // the app's node
   slot(name: SlotName, key?: string): DurableSlot;  // device-local state; `key` names the strand for per-strand records
   dev?: boolean;                                    // development build: step timings, narrated joins
-  // planned (Phase 8): createExtraNode?(options): Promise<CadreNode> — diagnostics only
+  createExtraNode?: CreateExtraNode;                // diagnostics only: a throwaway relay-only party's node
 }
 
 interface NodeHost {
@@ -309,10 +309,10 @@ interface NodeHost {
   before a read or write uses it, joining any wake already under way.
   cadre-core coalesces wakes, so the host's own return sweep and the core never
   double-build a strand.
-- **`createExtraNode`** (Phase 8) will build a second, throwaway party in the
-  same process, with storage the host chooses. Only diagnostics will use it
-  (two-party checks on a phone). A host may omit it; those checks then report
-  themselves unavailable.
+- **`createExtraNode`** builds a second, throwaway party's node in the same process,
+  relay-only, with storage the host chooses (never the app's own). Only diagnostics use
+  it (the two-party check). A host may omit it; that check then reports itself
+  unavailable. `apps/mobile/src/host/extra-node.ts` is the phone's.
 - **Not in the host:** storage, transports, crypto and lifecycle are all inside
   the node the app built. The background runner, the data-format check and
   storage names are the app's business, and the core never sees them.
@@ -388,12 +388,24 @@ only through static `require`s. Tests read the same files from disk.
 
 ### Diagnostics and the dev bridge
 
-`core/diagnostics` holds the checks and the dev-bridge command set: `strands`,
-`send`, `arm`, `seen`, `invite`, `accept`, `traffic`. Commands run over
-`ChatModel` and the `NodeHost`. Checks that need a second party (two-party,
-found strand) get it from `ChatHost.createExtraNode`. Each app installs the bridge in development
-builds as `globalThis.__chatDev`, so `test/devices/devtime.mjs`, `devlog.mjs`
-and `devcall.mjs` drive phones, browsers and Node the same way.
+`@chat/core/diagnostics` holds the dev bridge and the checks, each written once and run
+on every runtime, so a difference in results points at the runtime:
+
+| Check | What the platform passes in |
+|---|---|
+| `startLoopLag` — how late timers fire | nothing |
+| `runCryptoCost`, `runSocketFrameCost` — primitive costs, pure JS and WebCrypto | nothing (a WebSocket URL for the second) |
+| `runFoundStrandCheck` — found one strand on one node | storage provider, transports, an identity |
+| `runTwoPartyCheck` — two relay-only parties form a strand and replicate | `createExtraNode`, relays, and how to pause the app's node |
+
+Node runs them as core tests and from `test/stack` (`found-strand.mjs`,
+`handshake-cost.mjs`); a phone runs them from its Diagnostics screen or the bridge.
+
+The bridge commands are `strands`, `send`, `arm`, `seen`, `invite`, `accept`,
+`traffic` and `relays`; an app may add its own (the phone adds `diagnose`). Each
+app installs the bridge in development builds as `globalThis.__chatDev` (serchat with
+`--bridge <port>`, behind Node's inspector), so `test/devices/devtime.mjs`,
+`devlog.mjs` and `devcall.mjs` drive phones, browsers and Node the same way.
 
 ## `packages/resources`
 

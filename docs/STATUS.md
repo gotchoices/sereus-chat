@@ -754,13 +754,40 @@ tests against a known counterpart. serchat provides both.
       - Unit tests (`src/`) and scenarios (`test/`) have separate vitest configs.
 - [ ] 2b. More scenarios as features land: cadre operations and recovery
       (Phase 7b), member identity (one person, two nodes).
-- [ ] 3. **Diagnostics into the core** (Phase 8). Each phone check mirrors a
-      `test/stack` script, and comparing the two is the point. Write each once in
-      `core/diagnostics` with the platform parts passed in:
-      - loop lag and handshake cost: platform-free, they move as they are;
-      - found strand: storage provider passed in;
-      - two-party check: `createExtraNode` on the host.
-      Run them as Node tests, and from the app on Hermes.
+- [x] 3. **Diagnostics into the core** (done 2026-10-13). Each check is written
+      once in `@chat/core/diagnostics`, with the platform parts passed in, and runs
+      in Node and on the phone:
+      - `startLoopLag` and `runCryptoCost` (now also times WebCrypto Ed25519, the
+        path libp2p uses with a native one);
+      - `runFoundStrandCheck` (storage, transports and identity passed in);
+      - `runTwoPartyCheck`, whose nodes come from the host's new
+        `createExtraNode` (phone: `src/host/extra-node.ts`).
+      - Node: core tests (60 now), and `test/stack/found-strand.mjs` and
+        `handshake-cost.mjs` became thin runners over the same code.
+      - Phone: thin triggers. The bridge gained `diagnose crypto|found|two-party`,
+        so the device tools can run them. **Stack-import lint violations: 14 → 0.**
+      - S7 results:
+
+        | | S7 | Node |
+        |---|---|---|
+        | Ed25519 verify, WebCrypto (native) | 0.43 ms | 0.15 ms |
+        | Ed25519 verify, pure JS | 83 ms | 2.6 ms |
+        | x25519, pure JS | 58 ms | 2.6 ms |
+        | Found strand | 5.6 s | 0.2 s |
+        | Two-party, converged | 4.6 min | seconds |
+
+        The two-party run on the S7: founding at 72 s, joiner attached at 159 s.
+      - Lead: x25519 in pure JS is about 234 ms per Noise handshake on the S7.
+        Whether the kit's Noise mode makes it native is worth checking.
+      - **Fixed:** relays set while the node was starting were accepted, then
+        dropped. After first-run setup the S7 came back with no relay.
+        `CadreService` now restarts with settings changed during a start.
+        Reproduced, then fixed, on the S7.
+      - **Fixed:** the extra node lacked the kit's connection-gater setting, so on
+        React Native it refused the ws:// relay.
+      - **Seen once:** an in-place reload ("RR") failed to install Nitro
+        (quick-crypto's native layer) and the app did not load. A full restart
+        recovered.
 - [ ] 4. **GUI against serchat:** a first Maestro flow. serchat invites; the phone
       joins and sends through its screens; serchat confirms what arrived. Detox
       (mock-only, not run since the refactor) is retired, not revived.

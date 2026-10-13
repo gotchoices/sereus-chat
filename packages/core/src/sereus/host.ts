@@ -56,10 +56,20 @@ export interface NodeHost {
   onReachabilityChange(callback: () => void): () => void;
 }
 
+/** Build and start a fresh party's node: relay-only, isolated storage. */
+export type CreateExtraNode = (opts: { tag: string; partyId: string; relayAddrs: string[] }) => Promise<CadreNode>;
+
 export interface ChatHost {
   node: NodeHost;
   /** The slot for one record. `key` names the strand for per-strand records. */
   slot(name: SlotName, key?: string): DurableSlot;
+  /**
+   * Diagnostics only: build and start a second, throwaway party's node in this process,
+   * relay-only, with storage the host chooses (never the app's own). Checks that need a
+   * second party (`@chat/core/diagnostics` `runTwoPartyCheck`) use it; without it they
+   * report themselves unavailable.
+   */
+  createExtraNode?: CreateExtraNode;
   /** Development build: step timings and narrated joins in the log. */
   dev?: boolean;
 }

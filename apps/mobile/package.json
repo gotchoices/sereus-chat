@@ -42,6 +42,8 @@
     "@chat/resources": "link:../../packages/resources",
     "@craftzdog/react-native-buffer": "^6.1.2",
     "@libp2p/websockets": "^10.1.21",
+    "@noble/ciphers": "^2.2.0",
+    "@noble/curves": "^2.2.0",
     "@noble/hashes": "^2.0.0",
     "@optimystic/db-core": "1.13.0",
     "@optimystic/db-p2p": "1.13.0",

@@ -260,17 +260,32 @@ class CadreServiceImpl {
     this._startError = null;
     try {
       const base = await this.knownOptions();
+      // What this start uses. A change made WHILE it runs (relays set during first-run
+      // setup, say) is not in it: it is applied by a restart below, never dropped.
+      const relaysUsed = this.pendingRelays;
+      const noiseUsed = this.pendingNoiseMode;
       const options: PhoneNodeOptions = {
         ...base,
-        relayAddrs: this.pendingRelays ?? base.relayAddrs,
-        ...(this.pendingNoiseMode ? { noiseCryptoMode: this.pendingNoiseMode } : {}),
+        relayAddrs: relaysUsed ?? base.relayAddrs,
+        ...(noiseUsed ? { noiseCryptoMode: noiseUsed } : {}),
       };
       console.info('[CadreService] starting node for party', options.partyId);
       await phone.start(options);
       this.options = phone.options ?? options;
       runner.start(); // idempotent
-      this.pendingRelays = null;
-      this.pendingNoiseMode = null;
+      if (this.pendingRelays === relaysUsed) this.pendingRelays = null;
+      if (this.pendingNoiseMode === noiseUsed) this.pendingNoiseMode = null;
+      const lateChange: Partial<PhoneNodeOptions> = {
+        ...(this.pendingRelays ? { relayAddrs: this.pendingRelays } : {}),
+        ...(this.pendingNoiseMode ? { noiseCryptoMode: this.pendingNoiseMode } : {}),
+      };
+      if (Object.keys(lateChange).length) {
+        const relays = this.pendingRelays;
+        const noise = this.pendingNoiseMode;
+        await this.restartWith(lateChange, 'settings changed while the node was starting');
+        if (this.pendingRelays === relays) this.pendingRelays = null;
+        if (this.pendingNoiseMode === noise) this.pendingNoiseMode = null;
+      }
     } catch (err) {
       this._startError = err instanceof Error ? err.message : String(err);
       console.error('[CadreService] start failed:', this._startError);

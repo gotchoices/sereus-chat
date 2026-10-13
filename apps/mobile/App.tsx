@@ -10,12 +10,14 @@ import { I18nProvider } from './src/i18n';
 import { ThemeProvider, useThemeContext } from './src/theme';
 import { USE_SEREUS } from './src/data/config';
 import { checkDataFormat, type DataFormatCheck } from './src/data/data-format';
-import { startLoopLagMonitor } from './src/diagnostics/loop-lag';
+import { formatLoopLag, startLoopLag } from '@chat/core/diagnostics';
 import { installDevBridge } from './src/diagnostics/dev-bridge';
 import { useT } from './src/i18n';
 import { typography, spacing } from './src/theme';
 
-startLoopLagMonitor();
+// Development builds: one `[perf] loop` line every 30 s, how late timers fire (a blocked
+// JS thread is what made phones spiral). Shared with every app (`@chat/core/diagnostics`).
+if (__DEV__) startLoopLag(r => console.info('[perf] loop', formatLoopLag(r)));
 installDevBridge();
 
 /**
