@@ -11,8 +11,9 @@ So that I can take part in Sereus Chat conversations — with people using the p
    identity and network of its own), starts its node, and drops him at a prompt that says
    `help` (or `?`) lists the commands.
 3. It asks nothing. He sets his name when he likes: `profile set name=Bob`.
-4. `status` tells him he cannot be reached: no relay. He adds one he was given:
-   `relay add /dns4/relay.example/tcp/443/wss/p2p/12D3Koo…`. `status` shows it working.
+4. `status` tells him he cannot be reached: no relay. He adds one by its name:
+   `relay add relay.example`. serchat looks up the rest, says what it found, and waits until
+   the relay accepts him. `status` shows it working.
 5. He quits. Next time, the same identity, strands and relay are there.
 
 ```
@@ -25,7 +26,10 @@ party	ce350720-854d-…
 reachable	no
 relays	0
 strands	0
-serchat> relay add /dns4/relay.example/tcp/443/wss/p2p/12D3KooWMD…
+serchat> relay add relay.example
+relay relay.example: /dns4/relay.example/tcp/4011/ws/p2p/12D3KooWMD…
+  its peer id 12D3KooWMD… was published by DNS
+1	reserved	/dns4/relay.example/tcp/4011/ws/p2p/12D3KooWMD…
 serchat> status
 …
 reachable	yes

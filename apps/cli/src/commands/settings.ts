@@ -1,6 +1,8 @@
 /** This profile and its node: `status`, `profile`, `prefs`, `relay`, `network`. */
 import type { Prefs, Profile } from '@chat/core';
-import { UsageError } from '../session.js';
+import { multiaddr } from '@multiformats/multiaddr';
+import { CliFailure, EXIT, UsageError } from '../session.js';
+import { resolveRelayAddress } from '../relay-address.js';
 import { assignments, need, type Command } from './command.js';
 
 const status: Command = {
@@ -70,29 +72,56 @@ const prefs: Command = {
   },
 };
 
+/** How long `relay add` waits for the relay to grant a reservation before reporting. */
+const RESERVATION_WAIT_MS = 30_000;
+
 const relay: Command = {
   name: 'relay',
-  summary: 'List relays, or add or remove one (restarts the node)',
-  usage: '[add <multiaddr> | remove <multiaddr|row>]',
+  summary: 'List relays, or add one (a host name is enough: relay add relay.sereus.org) or remove one',
+  usage: '[add <host[:port] | multiaddr> | remove <multiaddr|row>]',
   async run(session, args) {
+    const node = session.host.node;
     const saved = session.config.relays;
-    const [action, target] = args;
+    const [action] = args;
     if (action === 'add' || action === 'remove') {
-      const addr = need(relay, args, 1, 'relay address');
+      const given = need(relay, args, 1, action === 'add' ? 'relay (a host name, host:port or multiaddr)' : 'relay');
       let next: string[];
       if (action === 'add') {
-        if (!addr.startsWith('/') || !addr.includes('/p2p/')) throw new UsageError('relay: give a multiaddr ending in /p2p/<peer id>');
-        next = [...new Set([...saved, addr])];
+        const resolved = await resolveRelayAddress(given, async addr => {
+          const control = node.node?.getControlNode();
+          if (!control) throw new Error('the node is not running');
+          const conn = await control.dial(multiaddr(addr), { signal: AbortSignal.timeout(15_000) });
+          return conn.remotePeer.toString();
+        }).catch(err => { throw new CliFailure(`relay: ${(err as Error).message}`, EXIT.retryable); });
+        const peer = resolved.addr.slice(resolved.addr.lastIndexOf('/p2p/') + 5);
+        if (resolved.source !== 'as given') session.out.note(`relay ${given}: ${resolved.addr}\n  its peer id ${peer} was ${resolved.source}`);
+        // The same relay under another name (sereus.org and relay.sereus.org are one machine):
+        // one entry per relay, identified by its peer id.
+        const already = saved.find(a => a.endsWith(`/p2p/${peer}`));
+        if (already) {
+          session.out.note(`relay: already using that relay (${peer}) as ${already}`);
+          next = saved;
+        } else {
+          next = [...saved, resolved.addr];
+        }
       } else {
-        const row = /^\d+$/.test(addr) ? saved[Number(addr) - 1] : addr;
-        if (!row || !saved.includes(row)) throw new UsageError(`relay: no saved relay ${JSON.stringify(target)}`);
-        next = saved.filter(a => a !== row);
+        const target = /^\d+$/.test(given) ? saved[Number(given) - 1] : given;
+        if (!target || !saved.includes(target)) throw new UsageError(`relay: no saved relay ${JSON.stringify(given)}`);
+        next = saved.filter(a => a !== target);
       }
-      session.out.note('restarting the node with the new relays…');
-      session.unwrap(await session.model.prefs.set({ relayAddrs: next }));
-      return;
+      if (next !== saved) {
+        session.out.note('restarting the node with the new relays…');
+        // Wait for the restart (the model's prefs.set does not), then for a reservation.
+        await node.applyRelays(next);
+      }
+      if (next.length) {
+        const deadline = Date.now() + RESERVATION_WAIT_MS;
+        while (Date.now() < deadline && node.relayStatus() !== 'reserved') await new Promise(r => setTimeout(r, 500));
+        if (node.relayStatus() !== 'reserved') session.out.note(`no reservation yet (${node.relayStatus() ?? 'no status'}); it keeps trying — see "relay"`);
+      }
+    } else if (action) {
+      throw new UsageError(`usage: relay ${relay.usage}`);
     }
-    if (action) throw new UsageError(`usage: relay ${relay.usage}`);
     const reach = await session.model.reachability.get();
     session.out.rows(['row', 'status', 'multiaddr'], reach.relays.map((addr, i) => ({
       row: i + 1, status: reach.relayStatus ?? 'none', multiaddr: addr,

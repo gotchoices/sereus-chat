@@ -649,6 +649,16 @@ interactive mode is the way to avoid that.
     `limit` in both the Sereus model and the mock. Shared `pageMessages`, with a
     test; core now has 56 tests.
   - `status` names this node's reachable addresses `address`, not `listen`.
+- Fixed 2026-10-13, from first hands-on use:
+  - **`relay add` takes a host name.** It uses the published `_dnsaddr`
+    address, or WebSocket on 4011 with the peer id learned by connecting.
+    It waits for the restart and the reservation, and refuses the same relay
+    twice.
+  - **Interactive questions.** `join`'s question opened a second reader on the
+    terminal; the answer also ran as a command, and closing that reader paused
+    input, so the next command hung. The prompt now owns its questions (one
+    event-driven reader).
+  - README: a two-terminal walkthrough, captured from a real run.
 - **Deferred (decided 2026-10-13):** attachments; reactions (emoji on a message);
   search (dump with `log -n <many>` and filter with ordinary tools instead).
 - Not done yet: edits and deletes, claiming.

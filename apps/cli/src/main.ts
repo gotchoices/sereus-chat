@@ -136,20 +136,22 @@ async function main(argv: string[]): Promise<number> {
 
   let abort = new AbortController();
   let rl: Interface | undefined;
+  let asker: ((question: string) => Promise<string>) | undefined;
   const ready = boot();
   ready.catch(() => {}); // reported by the first command that waits on it
 
   const session = createSession({
     model, host, out, dirs, config, verbose: g.verbose, interactive, ready,
     signal: () => abort.signal,
-    confirm: question => ask(rl, `${question} [y/N] `).then(a => /^y(es)?$/i.test(a.trim())),
+    // At the prompt, the prompt asks (one reader on the terminal); otherwise a one-off reader.
+    confirm: question => (asker ?? askOnce)(`${question} [y/N] `).then(a => /^y(es)?$/i.test(a.trim())),
   });
 
   let code: number = EXIT.ok;
   try {
     if (interactive) {
       void ready.then(() => out.note('ready. "help" or "?" lists the commands.'), err => out.note(`serchat: the node did not start: ${(err as Error).message}`));
-      rl = await prompt(session, dirs.historyFile, () => abort, next => { abort = next; });
+      rl = await prompt(session, dirs.historyFile, () => abort, next => { abort = next; }, a => { asker = a; });
     } else {
       process.on('SIGINT', () => {
         if (!abort.signal.aborted) abort.abort();
@@ -204,64 +206,104 @@ async function readAll(): Promise<string> {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-/** A question on the terminal; '' when nobody is there to answer. */
-function ask(rl: Interface | undefined, question: string): Promise<string> {
-  if (rl) return new Promise(resolve => rl.question(question, resolve));
+/** A question on the terminal outside the prompt (a one-shot run); '' when nobody can answer. */
+function askOnce(question: string): Promise<string> {
   if (!process.stdin.isTTY) return Promise.resolve('');
   const once = createInterface({ input: process.stdin, output: process.stderr });
   return new Promise(resolve => once.question(question, answer => { once.close(); resolve(answer); }));
 }
 
-/** The interactive prompt. Resolves with its readline interface once the user leaves. */
-async function prompt(
+/**
+ * The interactive prompt. Resolves with its readline interface once the user leaves.
+ *
+ * ONE READER. Lines arrive as events and run in order. While a command asks a question
+ * (`setAsker`), the next line answers it and is not run as a command. A second readline on
+ * the terminal would see every line too, and closing it pauses the shared input.
+ */
+function prompt(
   session: Session,
   historyFile: string,
   currentAbort: () => AbortController,
   setAbort: (next: AbortController) => void,
+  setAsker: (ask: (question: string) => Promise<string>) => void,
 ): Promise<Interface> {
-  const saved = await readFile(historyFile, 'utf8').then(t => t.split('\n').filter(Boolean), () => [] as string[]);
-  const names = commandNames();
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    prompt: 'serchat> ',
-    history: saved.slice(-HISTORY_LINES).reverse(),
-    historySize: HISTORY_LINES,
-    completer: (line: string) => {
-      if (/\s/.test(line)) return [[], line];
-      const hits = names.filter(n => n.startsWith(line));
-      return [hits.length ? hits : names, line];
-    },
-  });
-  let running = false;
-  rl.on('SIGINT', () => {
-    if (running) { currentAbort().abort(); return; }
-    process.stderr.write('\n(quit or Ctrl-D to leave)\n');
-    rl.prompt();
-  });
-  rl.prompt();
-  for await (const line of rl) {
-    const trimmed = line.trim();
-    if (trimmed === 'quit' || trimmed === 'exit') break;
-    if (trimmed) {
-      let commands: string[][];
-      try {
-        commands = splitLine(trimmed);
-      } catch (err) {
-        session.out.note(`serchat: ${(err as Error).message}`);
-        rl.prompt();
-        continue;
-      }
+  return readFile(historyFile, 'utf8').then(t => t.split('\n').filter(Boolean), () => [] as string[]).then(saved => new Promise<Interface>(resolve => {
+    const PROMPT = 'serchat> ';
+    const names = commandNames();
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      prompt: PROMPT,
+      history: saved.slice(-HISTORY_LINES).reverse(),
+      historySize: HISTORY_LINES,
+      completer: (line: string) => {
+        if (/\s/.test(line)) return [[], line];
+        const hits = names.filter(n => n.startsWith(line));
+        return [hits.length ? hits : names, line];
+      },
+    });
+    let answer: ((line: string) => void) | null = null;
+    setAsker(question => new Promise(res => {
+      answer = res;
+      rl.setPrompt(question);
+      rl.prompt();
+    }));
+
+    const queue: string[] = [];
+    let running = false;
+    let closed = false;
+    const drain = async () => {
+      if (running) return;
       running = true;
-      setAbort(new AbortController());
-      await runCommands(session, commands);
+      while (queue.length) {
+        const trimmed = queue.shift()!.trim();
+        if (trimmed === 'quit' || trimmed === 'exit') { rl.close(); break; }
+        if (!trimmed) continue;
+        let commands: string[][];
+        try {
+          commands = splitLine(trimmed);
+        } catch (err) {
+          session.out.note(`serchat: ${(err as Error).message}`);
+          continue;
+        }
+        setAbort(new AbortController());
+        await runCommands(session, commands);
+      }
       running = false;
-    }
+      if (closed) finish();
+      else { rl.setPrompt(PROMPT); rl.prompt(); }
+    };
+
+    rl.on('line', line => {
+      if (answer) {
+        const reply = answer;
+        answer = null;
+        rl.setPrompt(PROMPT);
+        reply(line);
+        return;
+      }
+      queue.push(line);
+      void drain();
+    });
+    rl.on('SIGINT', () => {
+      if (running) { currentAbort().abort(); return; }
+      process.stderr.write('\n(quit or Ctrl-D to leave)\n');
+      rl.prompt();
+    });
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      const history = (rl as unknown as { history: string[] }).history.slice(0, HISTORY_LINES).reverse();
+      void writeFile(historyFile, `${history.join('\n')}\n`, { mode: 0o600 }).catch(() => {}).then(() => resolve(rl));
+    };
+    rl.on('close', () => {
+      closed = true;
+      if (answer) { const reply = answer; answer = null; reply(''); }
+      if (!running) finish();
+    });
     rl.prompt();
-  }
-  const history = (rl as unknown as { history: string[] }).history.slice(0, HISTORY_LINES).reverse();
-  await writeFile(historyFile, `${history.join('\n')}\n`, { mode: 0o600 }).catch(() => {});
-  return rl;
+  }));
 }
 
 main(process.argv.slice(2)).then(

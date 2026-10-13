@@ -106,8 +106,25 @@ Show or change name, email, phone, notes. Key/value.
 ### `prefs [set <key>=<value> ...]`
 Show or change preferences (`notifyDefault`, `language`, …). Key/value.
 
-### `relay` · `relay add <multiaddr>` · `relay remove <multiaddr|row>`
-List: `row  status  multiaddr`. Saved relays apply to every later run; adding restarts the node.
+### `relay` · `relay add <host[:port] | multiaddr>` · `relay remove <multiaddr|row>`
+List: `row  status  multiaddr`. Saved relays apply to every later run; adding or removing
+restarts the node and waits (up to 30 s) for a reservation.
+
+A relay address ends in the **relay's** peer id (`/p2p/12D3…`), which pins the machine. What
+may be typed instead:
+
+| Typed | Becomes |
+|---|---|
+| a full multiaddr ending in `/p2p/…` | itself |
+| `relay.sereus.org` (a host) | its published address (`_dnsaddr.<host>` TXT, WebSocket entry), else `/dns4/<host>/tcp/4011/ws` plus the peer id learned by connecting |
+| `host:port` | `/dns4/<host>/tcp/<port>/ws` plus the learned peer id |
+| `/dnsaddr/<host>` | its published address |
+| a multiaddr without `/p2p/` | itself plus the learned peer id |
+
+A learned peer id trusts whatever answered first; serchat prints how the id was obtained.
+4011 is a Sereus relay's deployed WebSocket port. The same relay under another name (same
+peer id) is not added twice. When nothing answers, serchat says so, and suggests
+`relay.<host>` if that publishes a relay — it never uses it unasked.
 
 ### `strands [-a|--archived] [--all]`
 `row  id  title  members  unread  lastAt  lastFrom  lastText`
