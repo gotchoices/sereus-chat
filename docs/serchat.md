@@ -158,7 +158,8 @@ nothing loads it; the reference apps and Sereus Chat run permissionless schemas
    party writes and reads as the same member; keep the display name in that Member row
    (one per member per strand, the same on all of the member's nodes), with a local copy
    each way — the node's own name before a strand is reachable, the row's name after.
-2. **Leaving a joined strand probably does not leave it** (read from the source, not run).
+2. **Leaving a joined strand does not leave it** — confirmed by the scenario suite
+   (`apps/cli/test/scenarios.test.ts`, the strand is back after a restart).
    `strands.leave` unpublishes a `Strand` row, which a joined strand does not have; the
    party-wide `JoinedStrand` row survives, so the strand is re-offered on restart and stays
    on sibling nodes. The right call is `forgetJoinedStrand` (`docs/strands.md:431`).

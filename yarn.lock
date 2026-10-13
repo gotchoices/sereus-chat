@@ -2385,6 +2385,7 @@ __metadata:
     "@chat/core": "workspace:*"
     "@chat/resources": "workspace:*"
     "@libp2p/circuit-relay-v2": "npm:4.2.14"
+    "@libp2p/identify": "npm:4.1.15"
     "@libp2p/websockets": "npm:10.1.22"
     "@multiformats/multiaddr": "npm:13.0.3"
     "@optimystic/db-p2p": "npm:1.13.0"

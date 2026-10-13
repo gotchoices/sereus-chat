@@ -98,6 +98,13 @@ Output lines are tab-separated (`--json` for JSON), so anything serchat prints c
 filtered with `grep`, `cut` or `awk`. Every command also works without the prompt, at the
 cost of starting the node each time: `serchat -p bob log 1 -n 5`.
 
+## Tests
+
+- `yarn workspace serchat test` — unit tests (`src/`), seconds.
+- `yarn workspace serchat scenarios` — two-person scenarios with real serchat processes
+  and a relay started by the test (`test/`), minutes. A known bug is written as the
+  correct behaviour and marked `it.fails`.
+
 ## How it is built
 
 - `src/host.ts` — the node (cadre-core, shaped like the phone's) with file-backed stores in

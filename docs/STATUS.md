@@ -671,7 +671,7 @@ serchat profile is; and the steps below.
 
 - [x] Offline backup owner key recovery proven in v1.14
       (`test/stack/owner-recovery.mjs`, three runs of three, about 33 s).
-- [ ] 0. **Upgrade to sereus 1.15.0** (optimystic 1.13.0).
+- [x] 0. **Upgrade to sereus 1.15.0** (optimystic 1.13.0). Done 2026-10-13.
       - Why: native Ed25519 on phones (our sereus#33), the ~18 s strand open
         (#34), redial and owed writes (#44), commit durability, `removeMachine` and
         `listMachines`, apps joining an existing cadre, `cadre init`/`code`.
@@ -696,7 +696,7 @@ serchat profile is; and the steps below.
         - Still failing on 1.15: two profiles with `--listen` and no relay; after
           one restarts, its messages do not reach the other within 2 minutes.
           Relayed (the phones' topology) works.
-      - Mobile code done; device check pending:
+      - Mobile, checked on the S7 2026-10-13:
         - the kit's `/polyfills/native-crypto` replaces our local copy (deleted);
         - `LevelDBNative.destroy`;
         - the `removed` status is handled (logged and reported; UI in step 8);
@@ -717,6 +717,55 @@ serchat profile is; and the steps below.
 - [ ] 6. Background mode (local socket; later invocations attach).
 - [ ] 7. Shared serchat config.
 - [ ] 8. The phone takes up what proved out.
+
+## Phase 7c — Tests across the family (planned 2026-10-13)
+
+Most testing is already outside `apps/mobile`: core contract tests with real nodes,
+`test/stack`, `test/devices`. What is missing is automated two-person scenarios and GUI
+tests against a known counterpart. serchat provides both.
+
+- [x] 1. **Baseline:** the S7 on the 1.15 build against serchat, through
+      `relay.sereus.org`, 3 rounds, done 2026-10-13.
+      - The S7 showed the old-data screen; its data was cleared and it was set up
+        new. The kit's native Ed25519 is active (boot table).
+      - Results, with 1.14 in brackets:
+
+        | | 1.15 | 1.14 |
+        |---|---|---|
+        | serchat invites | 13 s | 12 s |
+        | The S7 joins | 35 s | 86 s |
+        | Messages delivered | 6 of 6 | 6 of 6 |
+        | Commit median | 2.8–2.9 s | about 3.2 s |
+        | Delivery median, serchat → S7 | 3.9 s | 5.3 s |
+        | Delivery median, S7 → serchat | 4.8 s | 5.8 s |
+
+- [x] 2. **Scenario suite, serchat processes** (first pass done 2026-10-13):
+      `apps/cli/test/`, `yarn workspace serchat scenarios`, about 4 minutes.
+      - The harness spawns the built serchat per person (temporary home,
+        `--json`, one-shot or background), with a loopback relay started in the
+        test.
+      - Passing: invite/join/talk both ways with the inviter restarted in
+        between; a join while the inviter is offline exits 3 (retryable) and
+        succeeds once the inviter is back.
+      - **Leaving a joined strand does not stick:** the strand is back after
+        Bob's restart. Expected failure (`it.fails`) until Phase 7b step 5. It
+        needs Bob to run past a reconcile pass before leaving, and 40 s after,
+        to show.
+      - Unit tests (`src/`) and scenarios (`test/`) have separate vitest configs.
+- [ ] 2b. More scenarios as features land: cadre operations and recovery
+      (Phase 7b), member identity (one person, two nodes).
+- [ ] 3. **Diagnostics into the core** (Phase 8). Each phone check mirrors a
+      `test/stack` script, and comparing the two is the point. Write each once in
+      `core/diagnostics` with the platform parts passed in:
+      - loop lag and handshake cost: platform-free, they move as they are;
+      - found strand: storage provider passed in;
+      - two-party check: `createExtraNode` on the host.
+      Run them as Node tests, and from the app on Hermes.
+- [ ] 4. **GUI against serchat:** a first Maestro flow. serchat invites; the phone
+      joins and sends through its screens; serchat confirms what arrived. Detox
+      (mock-only, not run since the refactor) is retired, not revived.
+- [ ] 5. **Tidy `test/stack`:** retire scripts the scenario suite covers; keep the
+      raw-stack reproductions.
 
 ## Phase 8 — Diagnostics and the Node harness
 
