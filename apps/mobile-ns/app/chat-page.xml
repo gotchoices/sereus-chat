@@ -1,0 +1,18 @@
+<Page xmlns="http://schemas.nativescript.org/tns.xsd" navigatingTo="onNavigatingTo" navigatedFrom="onNavigatedFrom">
+  <ActionBar title="{{ title }}" />
+  <GridLayout rows="auto, *, auto">
+    <Label row="0" text="{{ notice }}" textWrap="true" padding="8 16" visibility="{{ notice ? 'visible' : 'collapsed' }}" />
+    <ListView row="1" items="{{ messages }}">
+      <ListView.itemTemplate>
+        <StackLayout padding="8 16">
+          <Label text="{{ from }}" fontSize="12" fontWeight="bold" />
+          <Label text="{{ text }}" textWrap="true" />
+        </StackLayout>
+      </ListView.itemTemplate>
+    </ListView>
+    <GridLayout row="2" columns="*, auto" padding="8">
+      <TextField col="0" hint="{{ placeholder }}" text="{{ draft }}" automationText="composer" returnKeyType="send" returnPress="{{ send }}" />
+      <Button col="1" text="Send" tap="{{ send }}" automationText="composer-send" />
+    </GridLayout>
+  </GridLayout>
+</Page>

@@ -103,6 +103,15 @@ export function createSereusModel(host: ChatHost): SereusModel {
     if (!node) throw new ChatFailure('unavailable', 'Cadre is not running.');
     return node;
   };
+  /**
+   * The node, waiting for it to start. For what a link can open in an app that the same
+   * link just launched: the invitation is read and accepted while the node is still
+   * coming up, which must not read as "could not get through".
+   */
+  const startedNode = async () => {
+    await runtime.ensureUp();
+    return requireNode();
+  };
   const requirePeerId = () => {
     const peerId = runtime.peerId;
     if (!peerId) throw new ChatFailure('unavailable', 'Peer ID not available; cadre may not be running');
@@ -365,7 +374,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
    * read.
    */
   async function acceptInvitation(token: string): Promise<{ strandId: string }> {
-    const node = requireNode();
+    const node = await startedNode();
     const invitation = node.decodeInvitation(token);
     const profile = await records.profile();
     // Disclosure: only the display name, in `metadata`, the sanctioned app slot.
@@ -501,7 +510,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
        * in the token either and are reported conservatively. (Story 03 partly unmet.)
        */
       inspect: token => attempt(async (): Promise<InvitationPreview> => {
-        const node = requireNode();
+        const node = await startedNode();
         const unknownState: StrandState = { visibility: 'private', managerCount: 1, settled: false, canIManage: false };
         let expiration: Date;
         try {

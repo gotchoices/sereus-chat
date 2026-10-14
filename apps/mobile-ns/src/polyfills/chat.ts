@@ -16,7 +16,9 @@ if (typeof g.queueMicrotask !== 'function') {
 
 
 /**
- * TextDecoder and views into larger buffers. libp2p's multistream-select decodes
+ * TextDecoder and views into larger buffers. @nativescript/core's TextDecoder decodes
+ * `input.buffer` for a view, ignoring its offset and length (NativeScript/NativeScript#9941,
+ * where we posted the root cause). libp2p's multistream-select decodes
  * protocol names from sub-arrays (views with a non-zero byteOffset into a larger
  * buffer). If the runtime's decoder reads from the start of the underlying buffer instead
  * of the view, every protocol negotiation fails ("did not read multistream-select header",

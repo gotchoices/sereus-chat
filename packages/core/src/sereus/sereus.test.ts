@@ -77,3 +77,21 @@ for (const topology of ['loopback', 'relay-only'] as const) {
     });
   });
 }
+
+// An invitation link that launches the app: the invitation is read and accepted while the
+// node is still starting, which must wait for it, not fail as "could not get through".
+describe('sereus: a link opens a cold app', () => {
+  it('inspects and accepts before the node has started', async () => {
+    const a = await createTestParty('a', { listen: true });
+    const c = await createTestParty('c', { listen: true });
+    try {
+      await a.boot();
+      const invitation = value(await a.model.invitations.create({ grantsInviteRight: false, visibility: 'private' }));
+      expect(c.node.isRunning).toBe(false);
+      expect(value(await c.model.invitations.inspect(invitation.token)).status).toBe('live');
+      expect(value(await c.model.invitations.accept(invitation.token)).strandId).toBeTruthy();
+    } finally {
+      await Promise.allSettled([a.stop(), c.stop()]);
+    }
+  }, 120_000);
+});

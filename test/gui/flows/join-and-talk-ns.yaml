@@ -1,0 +1,26 @@
+# join-and-talk.yaml for the NativeScript app (apps/mobile-ns): the same steps, selected by
+# the words on screen, since NativeScript cannot set Android resource ids. Run by
+# ../phone-joins-serchat.mjs with APP_ID=org.sereus.chat.ns, which supplies:
+#   LINK         chatns://invite/<token>, minted by serchat
+#   PHONE_TEXT   what the phone sends
+#   REPLY_TEXT   what serchat sends back once it has seen PHONE_TEXT
+appId: org.sereus.chat.ns
+---
+- openLink: ${LINK}
+- extendedWaitUntil:
+    visible: "JOIN THIS STRAND"
+    timeout: 90000
+- tapOn: "JOIN THIS STRAND"
+# Joining reaches the other party and copies the conversation; minutes on a slow phone.
+- extendedWaitUntil:
+    visible: "Message"
+    timeout: 300000
+- tapOn: "Message"
+- inputText: ${PHONE_TEXT}
+- tapOn: "SEND"
+- extendedWaitUntil:
+    visible: ${PHONE_TEXT}
+    timeout: 30000
+- extendedWaitUntil:
+    visible: ${REPLY_TEXT}
+    timeout: 180000

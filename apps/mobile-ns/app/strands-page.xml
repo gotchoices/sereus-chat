@@ -1,0 +1,23 @@
+<Page xmlns="http://schemas.nativescript.org/tns.xsd" navigatingTo="onNavigatingTo" navigatedTo="onNavigatedTo">
+  <ActionBar title="Strands">
+    <ActionItem text="Diagnostics" tap="{{ openDiagnostics }}" android.position="popup" />
+  </ActionBar>
+  <GridLayout rows="auto, auto, *">
+    <StackLayout row="0" padding="12 16">
+      <Label text="{{ who }}" fontWeight="bold" />
+      <Label text="{{ reach }}" textWrap="true" />
+    </StackLayout>
+    <GridLayout row="1" columns="*, *" padding="0 12">
+      <Button col="0" text="Name…" tap="{{ setName }}" />
+      <Button col="1" text="Relay…" tap="{{ setRelay }}" />
+    </GridLayout>
+    <ListView row="2" items="{{ strands }}" itemTap="{{ openStrand }}">
+      <ListView.itemTemplate>
+        <StackLayout padding="12 16">
+          <Label text="{{ title }}" fontWeight="bold" />
+          <Label text="{{ preview }}" textWrap="true" />
+        </StackLayout>
+      </ListView.itemTemplate>
+    </ListView>
+  </GridLayout>
+</Page>

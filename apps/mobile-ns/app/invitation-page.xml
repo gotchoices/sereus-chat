@@ -1,0 +1,16 @@
+<Page xmlns="http://schemas.nativescript.org/tns.xsd" navigatingTo="onNavigatingTo">
+  <ActionBar title="Invitation" />
+  <ScrollView>
+    <StackLayout padding="16">
+      <Label text="{{ headline }}" textWrap="true" fontSize="20" fontWeight="bold" />
+      <Label text="{{ status }}" textWrap="true" marginTop="12" />
+      <Label text="{{ history }}" textWrap="true" marginTop="12" />
+      <Label text="{{ problem }}" textWrap="true" color="#c4392f" marginTop="12" />
+      <GridLayout columns="*, *" marginTop="16" visibility="{{ ready ? 'visible' : 'collapsed' }}">
+        <Button col="0" text="{{ declineLabel }}" tap="{{ decline }}" automationText="invite-decline" />
+        <Button col="1" text="{{ acceptLabel }}" tap="{{ accept }}" isEnabled="{{ !busy }}" automationText="invite-accept" />
+      </GridLayout>
+      <ActivityIndicator busy="{{ busy }}" />
+    </StackLayout>
+  </ScrollView>
+</Page>

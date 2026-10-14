@@ -1,0 +1,22 @@
+# Give the NativeScript app (apps/mobile-ns) a name and a relay, through its strand list's
+# setup buttons. Selects by text: NativeScript cannot set Android resource ids.
+#   NAME    the user's name
+#   RELAY   a full relay multiaddr (the app does not resolve names), e.g.
+#           /dns4/relay.sereus.org/tcp/4011/ws/p2p/<peer id>  (`serchat relay` shows it)
+appId: org.sereus.chat.ns
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "NAME…"
+    timeout: 60000
+- tapOn: "NAME…"
+- eraseText
+- inputText: ${NAME}
+- tapOn: "SAVE"
+- tapOn: "RELAY…"
+- eraseText: 200
+- inputText: ${RELAY}
+- tapOn: "USE"
+- extendedWaitUntil:
+    visible: "Reachable.*"
+    timeout: 120000

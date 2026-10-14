@@ -281,12 +281,15 @@ To raise with Sereus (prepared, not posted):
   sequence, so one chat message took ~1 s to commit on macOS between two serchats over a
   loopback relay, against 45 ms with `MemoryRawStorage`. Coalescing a transaction's writes
   (one fsync per commit), or a log-structured store, would fix it. Prepared, not posted.
-- **NativeScript (8.9, Android V8): native `TextDecoder` ignores `byteOffset`.**
+- **NativeScript (8.9, Android V8): `@nativescript/core`'s `TextDecoder` ignores `byteOffset`.**
   `new TextDecoder().decode(new Uint8Array([120,120,104,105]).subarray(2))` does not
   return "hi" (startup self-test on the S7). libp2p's multistream-select decodes protocol names from such views, so
   on NativeScript every stream negotiation fails. Also `queueMicrotask` is missing. Both
-  patched in `apps/mobile-ns/src/polyfills/chat.ts`; for NativeScript (the decoder) and
-  sereus's reference-app-ns (both), prepared, not posted.
+  patched in `apps/mobile-ns/src/polyfills/chat.ts`. The decoder: its `decode()` uses
+  `input.buffer` for views (`packages/core/text/text-common.ts`, still on `main`). **Posted**
+  2026-10-13 as root cause, repro and fix on the open issue NativeScript/NativeScript#9941
+  (https://github.com/NativeScript/NativeScript/issues/9941#issuecomment-6160808544).
+  For sereus's reference-app-ns (both bugs): prepared, not posted.
 - Stale comment: `strand-transport-key.ts:46` says production never writes a
   `MemberPeer` row; the membership reconciler does.
 

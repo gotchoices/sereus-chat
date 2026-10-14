@@ -863,7 +863,7 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         faster durable store, or a storage choice.
       - Tools: `apps/cli/test/relay.mjs` (a loopback relay for hand runs) and
         `--memory-blocks`.
-- [ ] **NativeScript V8 probe** (`apps/mobile-ns`, stage 1, started 2026-10-13).
+- [x] **NativeScript V8 probe** (`apps/mobile-ns`, stage 1, 2026-10-13).
       - Built from sereus's `reference-app-ns`: webpack configuration, polyfills,
         shims, SQLite storage. One diagnostics screen runs `@chat/core/diagnostics`.
         App id `org.sereus.chat.ns`. Maestro flow `test/gui/flows/ns-diagnose.yaml`;
@@ -897,18 +897,57 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
       - Two NativeScript bugs had to be fixed first (`src/polyfills/chat.ts`):
         - **`queueMicrotask` missing** on NativeScript's V8; libp2p's relay code
           calls it.
-        - **NativeScript's native `TextDecoder` ignores a view's `byteOffset`.**
+        - **`@nativescript/core`'s `TextDecoder` ignores a view's `byteOffset`.**
           A self-test decoding `bytes.subarray(2)` fails on the S7. multistream-select decodes protocol names from such views, so
           every protocol negotiation failed ("did not read multistream-select
           header", "na" for an empty protocol): no identify, no relay. Startup
           self-test plus a wrapper that copies offset views. Found with
           `DEBUG=libp2p:*`.
-        - Both are worth reporting: the decoder bug to NativeScript, and both to
-          sereus's reference-app-ns.
+        - The decoder bug was reported on NativeScript#9941 (root cause, repro,
+          fix), 2026-10-13. Both bugs are still to raise with sereus's
+          reference-app-ns.
       - Release builds do not send `console` output to logcat; use debug builds
-        to read results. NativeScript debug builds are signed with
-        `~/.android/debug.keystore`, so switching between release and debug
-        means uninstalling.
+        to read results. Release builds are signed with `~/.android/debug.keystore`
+        too (`apps/mobile-ns/README.md`), so they install over a debug build and
+        keep its data.
+
+- [x] **`apps/mobile-ns` stage 2: the minimal twin** (2026-10-14). Strand list,
+      invitation and chat screens over the core's Sereus model and stores, with the
+      shared strings; Name… and Relay… buttons stand in for the profile and network
+      screens. Links are `chatns://invite/<token>`. Details in `apps/mobile-ns/README.md`.
+      - The GUI test runs both apps: `APP_ID=org.sereus.chat.ns node
+        test/gui/phone-joins-serchat.mjs` picks `flows/join-and-talk-ns.yaml` (selects
+        by on-screen words) and the `chatns` scheme. `flows/ns-setup.yaml` gives the
+        app a name and relay. The driver now timestamps each Maestro step.
+      - Android 8's SQLite (3.19) has no UPSERT, which optimystic's `SqliteKVStore` and
+        `loadOrCreateNSPeerKey` use; the app writes the `kv` table itself
+        (`src/local-kv.ts`). Not reported upstream (old-phone accommodation).
+      - **Core fix, both apps:** opening an invitation link in an app the link had just
+        launched failed at once with "Could not get through just now": `inspect` and
+        `accept` required a running node. They now wait for it to start
+        (`startedNode` in `sereus/model.ts`; test "a link opens a cold app"). Earlier
+        GUI runs passed only because the app was already running.
+- [x] **RN (Hermes) against NativeScript (V8), release builds on the S7**
+      (2026-10-14). Same GUI test against serchat on relay.sereus.org; both apps
+      force-stopped before each run, so each starts cold from the link; runs
+      alternated, two each. Seconds:
+
+      | | RN / Hermes | NS / V8 |
+      |---|---|---|
+      | Link → invitation offers Join | 20.6, 26.4 | 10.6, 11.8 |
+      | Join tapped → conversation open | 60.1, 40.3 | 42.2, 36.7 |
+      | Send tapped → serchat has it | 7.0, 9.8 | 11.6, 9.4 |
+      | Link → serchat has the phone's message | 103.1, 90.0 | 82.5, 76.4 |
+
+      - V8 is about 15–20% faster end to end, and twice as fast to the invitation
+        screen (start-up), but the join itself is close. The 3–42× pure-JS gap and
+        the 2.7× of the two-party diagnostic (development Hermes) do not carry over to
+        a release-build join: it is mostly waiting on the network and the other side,
+        not the phone's CPU.
+      - Caveats: two runs each; storage differs (SQLite against LevelDB); the
+        Maestro steps (typing, taps) add a few seconds to every row alike.
+      - Release installs over `adb` can stop at a Play Protect "Send app for a
+        security check?" prompt on the phone; answer "Don't send".
 
 ## Phase 8 — Diagnostics and the Node harness
 
@@ -957,11 +996,15 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
 
 - [ ] Add the `mobile-ns` target; its spec folder points at the `mobile` stories
       and specs and records only deviations
-- [ ] Scaffold from `sereus/packages/reference-app-ns`; host after its
-      `cadre-phone.ts`, block storage on SQLite (`db-p2p-storage-ns`)
-- [ ] NativeScript `Observable` bridge for core stores
-- [ ] Share the Maestro flows with `apps/mobile` (different app id only)
-- [ ] Rerun the comparison diagnostics: mobile vs mobile-ns vs Node
+- [x] Scaffold from `sereus/packages/reference-app-ns`; host after its
+      `cadre-phone.ts`, block storage on SQLite (`db-p2p-storage-ns`) (Phase 7d,
+      stage 2)
+- [x] NativeScript `Observable` bridge for core stores (each page's view model
+      subscribes; no general bridge yet)
+- [x] Share the Maestro flows with `apps/mobile`: one driver, a flow per app
+      (NativeScript cannot set Android resource ids, so its flow selects by words)
+- [x] Rerun the comparison: release builds, GUI test (Phase 7d). The diagnostics
+      comparison on release builds is still to do.
 
 ## Later — revisit a public API
 

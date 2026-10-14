@@ -4,6 +4,12 @@
 appId: org.sereus.chat.ns
 ---
 - launchApp
+# The diagnostics screen is in the strand list's overflow menu.
+- extendedWaitUntil:
+    visible: "Strands"
+    timeout: 60000
+- tapOn: "More options"
+- tapOn: "Diagnostics"
 - extendedWaitUntil:
     visible: ${CHECK}
     timeout: 60000
