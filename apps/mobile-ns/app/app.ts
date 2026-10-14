@@ -37,7 +37,6 @@ if (Application.android) {
   });
 }
 
-// SQLite opens through the activity (`activity.openOrCreateDatabase`), so the node starts
-// once there is one.
+// The node starts with the application (databases open by full path: src/db-path.ts).
 Application.on(Application.launchEvent, () => { void boot().catch(() => {}); });
 Application.run({ moduleName: 'app-root' });

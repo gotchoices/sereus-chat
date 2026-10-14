@@ -131,6 +131,26 @@ module.exports = (env) => {
 				]);
 		}
 
+		// ── main-event: its browser no-op (chat) ────────────────────────────
+		// main-event's Node `setMaxListeners` calls the `events` package's static
+		// `setMaxListeners` inside try/catch; the bundled `events` (3.3.0) has none, so
+		// every call — libp2p makes one per abort signal — throws and catches a TypeError.
+		// On the S7 that was ~2% of a join. The package maps `events.js` to a no-op
+		// `events.browser.js` in its `browser` field, which (as above) is not applied to
+		// internal relative imports; Metro applies it, so the RN app already has the no-op.
+		// Only this one: other packages' browser maps are not all safe here (libp2p's
+		// browser user-agent reads `navigator.userAgent`).
+		config
+			.plugin('main-event-browser-rewrite')
+			.use(webpackCore.NormalModuleReplacementPlugin, [
+				/^\.\/events\.js$/,
+				(resource) => {
+					if (resource.context && resource.context.includes(`main-event${path.sep}dist${path.sep}src`)) {
+						resource.request = path.resolve(resource.context, 'events.browser.js');
+					}
+				},
+			]);
+
 		// ── node: scheme → bare specifier ───────────────────────────────────
 		// NS sets `externalsPresets.node:false` (built-ins are bundled, not
 		// external), which leaves `node:`-prefixed imports as an unhandled URI

@@ -7,6 +7,8 @@ import { findTarget } from './target.mjs';
 //                                 a device: a phone's title substring, or node:<port> for serchat --bridge
 //   PAIR=1 node devtime.mjs …     A invites B into a new private strand first, and times the join
 //   ARM_WAIT_MS=…                 how long to wait for both strands to be writable (default 5 min)
+//   PROFILE=join node devtime.mjs …  with PAIR=1: B's CPU profile over the join, to join.cpuprofile
+//                                 (V8 inspectors: serchat, NativeScript; not Hermes over Metro)
 //   LOG=out node devtime.mjs …    also write each device's console to out-A.log / out-B.log
 //                                 (host seconds; `#` lines mark each send), as devlog.mjs does
 //
@@ -32,6 +34,10 @@ async function connect(want, logPath) {
       out.write(`${stamp()} ${m.params.type} ${text}\n`);
     }
   };
+  const command = (method, params = {}) => new Promise((res, rej) => {
+    const i = ++id; pending.set(i, m => (m.error ? rej(new Error(JSON.stringify(m.error))) : res(m.result)));
+    ws.send(JSON.stringify({ id: i, method, params }));
+  });
   const evaluate = (expression) => new Promise((res, rej) => {
     const i = ++id; pending.set(i, m => {
       const r = m.result;
@@ -53,7 +59,7 @@ async function connect(want, logPath) {
     }
   };
   const mark = text => out?.write(`${stamp()} # ${text}\n`);
-  return { name: t.title, evaluate, call, mark, close: () => { ws.close(); out?.end(); } };
+  return { name: t.title, evaluate, call, mark, command, close: () => { ws.close(); out?.end(); } };
 }
 
 const LOG = process.env.LOG;
@@ -64,9 +70,20 @@ if (process.env.PAIR === '1') {
   const t0 = Date.now();
   const inv = await a.call('invite');
   console.log(`A invited in ${Date.now() - t0} ms`);
+  const PROFILE = process.env.PROFILE;
+  if (PROFILE) {
+    await b.command('Profiler.enable');
+    await b.command('Profiler.setSamplingInterval', { interval: 1000 });
+    await b.command('Profiler.start');
+  }
   const t1 = Date.now();
   const joined = await b.call('accept', inv.url);
   console.log(`B joined in ${Date.now() - t1} ms`);
+  if (PROFILE) {
+    const { profile } = await b.command('Profiler.stop');
+    (await import('node:fs')).writeFileSync(`${PROFILE}.cpuprofile`, JSON.stringify(profile));
+    console.log(`B's profile over the join: ${PROFILE}.cpuprofile`);
+  }
   shared = { id: joined.strandId ?? inv.strandId, title: '(new)' };
 } else {
   const strandsA = await a.call('strands');

@@ -1070,7 +1070,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@nativescript-community/sqlite@npm:^3.5.9":
+"@nativescript-community/sqlite@npm:3.5.9":
   version: 3.5.9
   resolution: "@nativescript-community/sqlite@npm:3.5.9"
   dependencies:
@@ -1079,6 +1079,18 @@ __metadata:
     "@nano-sql/core": ^2.3.7
     typeorm: ^0.3.17
   checksum: 10c0/2b3da44c18cb6dc6c12ee83c2e18ed2c3bc7e629fa5214cdc276cbd3fab619349cdb994d43b5881c0d9988cdcf5e1ebf804a31249a9210659437735d6f670ff0
+  languageName: node
+  linkType: hard
+
+"@nativescript-community/sqlite@patch:@nativescript-community/sqlite@npm%3A3.5.9#~/.yarn/patches/@nativescript-community-sqlite-npm-3.5.9-3269d0d97e.patch":
+  version: 3.5.9
+  resolution: "@nativescript-community/sqlite@patch:@nativescript-community/sqlite@npm%3A3.5.9#~/.yarn/patches/@nativescript-community-sqlite-npm-3.5.9-3269d0d97e.patch::version=3.5.9&hash=1ea2f9"
+  dependencies:
+    "@nativescript/hook": "npm:~2.0.0"
+  peerDependencies:
+    "@nano-sql/core": ^2.3.7
+    typeorm: ^0.3.17
+  checksum: 10c0/e1fd3ae0f6e528b0bc893044ac9d0ee36f1c10a65da69bae3befa0102208bb76a513b86ac40d8ae2bd2394c5ad53b2ad654d4d89f2ea4381bf98579424596ffb
   languageName: node
   linkType: hard
 
@@ -1215,35 +1227,35 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@optimystic/db-core@npm:1.13.0":
-  version: 1.13.0
-  resolution: "@optimystic/db-core@npm:1.13.0"
+"@optimystic/db-core@npm:1.14.0":
+  version: 1.14.0
+  resolution: "@optimystic/db-core@npm:1.14.0"
   dependencies:
     "@noble/hashes": "npm:^2.0.1"
     debug: "npm:^4.4.3"
     multiformats: "npm:^14.0.5"
     uint8arrays: "npm:^6.1.1"
-  checksum: 10c0/4133fa0a57f98f034246668cf994c8e7f644b9082daf8bd78e4fa926854563cc5c677c121073a9c788a47bddff4a8649aa4b5e59a384273645bee3868b5952de
+  checksum: 10c0/83e269584146d03a2eb1d1c4679f8d255eab20e4635d85ece6d58834a4c78a2a350cacd8fe3b20d3667f0ae5e26c2664bef4c9d0b889025abbc5953c63690905
   languageName: node
   linkType: hard
 
-"@optimystic/db-p2p-storage-fs@npm:1.13.0":
-  version: 1.13.0
-  resolution: "@optimystic/db-p2p-storage-fs@npm:1.13.0"
+"@optimystic/db-p2p-storage-fs@npm:1.14.0":
+  version: 1.14.0
+  resolution: "@optimystic/db-p2p-storage-fs@npm:1.14.0"
   dependencies:
-    "@optimystic/db-core": "npm:^1.13.0"
-    "@optimystic/db-p2p": "npm:^1.13.0"
+    "@optimystic/db-core": "npm:^1.14.0"
+    "@optimystic/db-p2p": "npm:^1.14.0"
     debug: "npm:^4.4.3"
-  checksum: 10c0/18a6858fb5aa8eb1259cf1547dcc598d58c20013e954b7596260241015f0241b1a8ece416ca481b32379f821e16b688b8259781591dcefd142b8ed233157bb58
+  checksum: 10c0/c506761f2af2dec4f1c2af1e52bfd0025bf545f8dcb871d23a1830b5049790a630f3edb488c4bf488c1fe5c256e2975c0c28a1f9151262a60e26f523ac94325a
   languageName: node
   linkType: hard
 
-"@optimystic/db-p2p-storage-ns@npm:1.13.0":
-  version: 1.13.0
-  resolution: "@optimystic/db-p2p-storage-ns@npm:1.13.0"
+"@optimystic/db-p2p-storage-ns@npm:1.14.0":
+  version: 1.14.0
+  resolution: "@optimystic/db-p2p-storage-ns@npm:1.14.0"
   dependencies:
-    "@optimystic/db-core": "npm:^1.13.0"
-    "@optimystic/db-p2p": "npm:^1.13.0"
+    "@optimystic/db-core": "npm:^1.14.0"
+    "@optimystic/db-p2p": "npm:^1.14.0"
     debug: "npm:^4.4.3"
   peerDependencies:
     "@libp2p/crypto": ^5.1.23
@@ -1252,7 +1264,7 @@ __metadata:
   peerDependenciesMeta:
     "@nativescript-community/sqlite":
       optional: false
-  checksum: 10c0/3d82b8ef2a492d12fe22b058c35f30a0bb235a9023210d7b9574adcb220062a80e1ca9b63d0e88b6b2416a99d39bb829798e67e1eed08700a7b0ce6e3ad0a57f
+  checksum: 10c0/ab96a087b94ca0457c6d916b102f2a96bd5d92b2b7dae8bd4db7ef44e3b83d5f468ae62f50419a513951ce146d5d4d87402d0fd08cf0380832cab3a8f9af4c40
   languageName: node
   linkType: hard
 
@@ -1271,9 +1283,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@optimystic/db-p2p@npm:1.13.0":
-  version: 1.13.0
-  resolution: "@optimystic/db-p2p@npm:1.13.0"
+"@optimystic/db-p2p@npm:1.14.0":
+  version: 1.14.0
+  resolution: "@optimystic/db-p2p@npm:1.14.0"
   dependencies:
     "@chainsafe/libp2p-noise": "npm:^17.0.0"
     "@chainsafe/libp2p-yamux": "npm:^8.0.1"
@@ -1292,7 +1304,7 @@ __metadata:
     "@multiformats/multiaddr": "npm:^13.0.1"
     "@noble/curves": "npm:^2.0.1"
     "@noble/hashes": "npm:^2.0.1"
-    "@optimystic/db-core": "npm:^1.13.0"
+    "@optimystic/db-core": "npm:^1.14.0"
     async-mutex: "npm:^0.5.0"
     debug: "npm:^4.4.3"
     it-all: "npm:^3.0.9"
@@ -1304,13 +1316,13 @@ __metadata:
     p2p-fret: "npm:^1.0.2"
     uint8arraylist: "npm:^3.0.2"
     uint8arrays: "npm:^6.1.1"
-  checksum: 10c0/10aa9d411f410578145ced6f688aeb02bff8957469e1737d8be15f01a7ca8ff04cb7ff0c2a1d3e089592e1987e9327b2122dc8cfd052880bc347c6b221efbda6
+  checksum: 10c0/5dda6c66ebba4283f853699e4214e868329a637fd54c1bd2833c88ccf99212cc832fa9ad7dd94a8c338dd6abd0a12149ebcef4ef5ca3699a9f816a716b6cc7ac
   languageName: node
   linkType: hard
 
-"@optimystic/quereus-plugin-crypto@npm:1.13.0":
-  version: 1.13.0
-  resolution: "@optimystic/quereus-plugin-crypto@npm:1.13.0"
+"@optimystic/quereus-plugin-crypto@npm:1.14.0":
+  version: 1.14.0
+  resolution: "@optimystic/quereus-plugin-crypto@npm:1.14.0"
   dependencies:
     "@noble/curves": "npm:^2.0.1"
     "@noble/hashes": "npm:^2.0.1"
@@ -1318,13 +1330,13 @@ __metadata:
     uint8arrays: "npm:^6.1.1"
   peerDependencies:
     "@quereus/quereus": ^4.20.1
-  checksum: 10c0/0e4d9735c2cf1f4c94c101dc22d508fd295c974c55d0f2b980fba1bca7fb433ac4c24c482d8c1a87dca4834b1511364884a23f95e4da1fb46f3b341cbfd623db
+  checksum: 10c0/d63e292de5e2c8f147fb78bc89767d12725781f4ab4681f7260d39a7d72e0e8e8a02b525ed5c58d7435a0852ef9fb1e183ac8e444051048bff200d68158cfb48
   languageName: node
   linkType: hard
 
-"@optimystic/quereus-plugin-optimystic@npm:1.13.0":
-  version: 1.13.0
-  resolution: "@optimystic/quereus-plugin-optimystic@npm:1.13.0"
+"@optimystic/quereus-plugin-optimystic@npm:1.14.0":
+  version: 1.14.0
+  resolution: "@optimystic/quereus-plugin-optimystic@npm:1.14.0"
   dependencies:
     "@chainsafe/libp2p-yamux": "npm:^8.0.1"
     "@libp2p/bootstrap": "npm:^12.0.32"
@@ -1335,14 +1347,14 @@ __metadata:
     "@libp2p/noise": "npm:^1.0.1"
     "@libp2p/tcp": "npm:^11.0.28"
     "@noble/hashes": "npm:^2.0.1"
-    "@optimystic/db-core": "npm:^1.13.0"
-    "@optimystic/db-p2p": "npm:^1.13.0"
+    "@optimystic/db-core": "npm:^1.14.0"
+    "@optimystic/db-p2p": "npm:^1.14.0"
     debug: "npm:^4.4.3"
     libp2p: "npm:^3.3.11"
     uint8arrays: "npm:^6.1.1"
   peerDependencies:
     "@quereus/quereus": ^4.20.1
-  checksum: 10c0/1271bf7f780fd4a622aa6f66b479e650b0366ad76df98ea1cb9786bc55a5134f7c0994ff1e32017118d942be04c31615edbdc877408ad57a063ad4746723e655
+  checksum: 10c0/feb7fcb9e76ff192d1276053339472cf53c24f60f7c2e479fe6861b808033a054182ac36d9ccdc67e6e7aa0ee4351c4950b0e7de86b701ed7738dedf55916475
   languageName: node
   linkType: hard
 
@@ -1628,10 +1640,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@valor/nativescript-websockets@npm:^2.0.3":
+"@valor/nativescript-websockets@npm:2.0.3":
   version: 2.0.3
   resolution: "@valor/nativescript-websockets@npm:2.0.3"
   checksum: 10c0/bea18b5673ab65180e9db731c74e3bd9ba9bc528da766206b1cfc2dc8db3895339b441e2e6db0da48856135ff266090be3f38684a103247e47a27236c3c8a589
+  languageName: node
+  linkType: hard
+
+"@valor/nativescript-websockets@patch:@valor/nativescript-websockets@npm%3A2.0.3#~/.yarn/patches/@valor-nativescript-websockets-npm-2.0.3-1d4fb0b2f4.patch":
+  version: 2.0.3
+  resolution: "@valor/nativescript-websockets@patch:@valor/nativescript-websockets@npm%3A2.0.3#~/.yarn/patches/@valor-nativescript-websockets-npm-2.0.3-1d4fb0b2f4.patch::version=2.0.3&hash=5aeea3"
+  checksum: 10c0/e8f6c5da0855a089c14b757fdebb4b2a4b375332f231c80439ef1571e1f257c05a114f7e296eceef8f2ec57d7c35239f37c97f061f443d61f58d41d8e668ac49
   languageName: node
   linkType: hard
 
@@ -4030,7 +4049,7 @@ __metadata:
     "@libp2p/peer-id": "npm:6.0.15"
     "@libp2p/websockets": "npm:10.1.22"
     "@multiformats/multiaddr": "npm:13.0.3"
-    "@nativescript-community/sqlite": "npm:^3.5.9"
+    "@nativescript-community/sqlite": "patch:@nativescript-community/sqlite@npm%3A3.5.9#~/.yarn/patches/@nativescript-community-sqlite-npm-3.5.9-3269d0d97e.patch"
     "@nativescript/android": "npm:~8.9.2"
     "@nativescript/core": "npm:~8.9.9"
     "@nativescript/types": "npm:~8.9.1"
@@ -4038,14 +4057,14 @@ __metadata:
     "@noble/ciphers": "npm:2.4.0"
     "@noble/curves": "npm:2.4.0"
     "@noble/hashes": "npm:2.2.0"
-    "@optimystic/db-core": "npm:1.13.0"
-    "@optimystic/db-p2p": "npm:1.13.0"
-    "@optimystic/db-p2p-storage-ns": "npm:1.13.0"
+    "@optimystic/db-core": "npm:1.14.0"
+    "@optimystic/db-p2p": "npm:1.14.0"
+    "@optimystic/db-p2p-storage-ns": "npm:1.14.0"
     "@quereus/quereus": "npm:4.20.2"
     "@serfab/cadre-core": "npm:1.15.0"
     "@types/readable-stream": "npm:^4"
     "@ungap/structured-clone": "npm:^1.3.0"
-    "@valor/nativescript-websockets": "npm:^2.0.3"
+    "@valor/nativescript-websockets": "patch:@valor/nativescript-websockets@npm%3A2.0.3#~/.yarn/patches/@valor-nativescript-websockets-npm-2.0.3-1d4fb0b2f4.patch"
     buffer: "npm:^6.0.3"
     esbuild-loader: "npm:^4.3.0"
     event-target-polyfill: "npm:^0.0.4"

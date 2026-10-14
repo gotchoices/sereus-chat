@@ -20,6 +20,7 @@ import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { openOptimysticNSDb, type OptimysticNSDBHandle } from '@optimystic/db-p2p-storage-ns';
 import type { ChatHost, DurableSlot, NodeHost } from '@chat/core/sereus';
+import { dbPath } from './db-path';
 import { LocalKVStore, loadOrCreatePeerKey } from './local-kv';
 import { makeLazyNsStorage } from './ns-storage';
 import { anchorSlotKey, bootstrapPeersSlotKey, enrolledMachinesSlotKey, kvSlot, strandNetworkSlotKey } from './node-local-slots';
@@ -32,7 +33,7 @@ type StartOptions = { partyId: string; relays: string[] };
 type Handler = { event: string; handler: (data: never) => void };
 
 let opened: Promise<{ db: OptimysticNSDBHandle; kv: LocalKVStore }> | null = null;
-const local = () => (opened ??= openOptimysticNSDb(DB_NAME).then(db => ({ db, kv: new LocalKVStore(db) })));
+const local = () => (opened ??= openOptimysticNSDb(dbPath(DB_NAME)).then(db => ({ db, kv: new LocalKVStore(db) })));
 
 function randomUuid(): string {
   const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
