@@ -6,6 +6,7 @@
       <Label text="Relay (two-party)" fontWeight="bold" />
       <TextField text="{{ relay }}" autocapitalizationType="none" autocorrect="false" />
       <Button text="Crypto cost" tap="{{ runCrypto }}" isEnabled="{{ !busy }}" />
+      <Button text="Bridge cost" tap="{{ runBridge }}" isEnabled="{{ !busy }}" />
       <Button text="Found strand" tap="{{ runFound }}" isEnabled="{{ !busy }}" />
       <Button text="Two-party" tap="{{ runTwoParty }}" isEnabled="{{ !busy }}" />
       <Label text="{{ status }}" textWrap="true" marginTop="12" fontWeight="bold" />

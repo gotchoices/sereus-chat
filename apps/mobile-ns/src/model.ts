@@ -4,7 +4,8 @@
  * to core stores over `model`.
  */
 import { createSereusModel } from '@chat/core/sereus';
-import { createDevBridge } from '@chat/core/diagnostics';
+import { createDevBridge, runCryptoCost } from '@chat/core/diagnostics';
+import { runBridgeCost, runSqliteCost } from './bridge-cost';
 import { createTranslator } from '@chat/resources';
 import { chatHost } from './host';
 
@@ -15,7 +16,11 @@ export const t = createTranslator('en');
 declare const __DEV__: boolean;
 // Debug builds: the core's dev bridge, for test/devices tools over the NativeScript
 // inspector (`ns debug android --start`), as serchat's is over Node's.
-if (__DEV__) (globalThis as { __chatDev?: unknown }).__chatDev = createDevBridge(model, chatHost.node);
+if (__DEV__) {
+  (globalThis as { __chatDev?: unknown }).__chatDev = createDevBridge(model, chatHost.node);
+  // The diagnostics screen's benchmarks, callable over the inspector (no UI automation).
+  (globalThis as { __chatDiag?: unknown }).__chatDiag = { crypto: () => runCryptoCost(() => {}), bridge: runBridgeCost, sqlite: runSqliteCost };
+}
 
 let booting: Promise<void> | null = null;
 export function boot(): Promise<void> {

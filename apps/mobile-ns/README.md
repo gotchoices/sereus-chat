@@ -26,8 +26,16 @@ stories 01–04 to join a strand from a link and talk.
 - `src/local-kv.ts`: the `kv` table written with `INSERT OR REPLACE`. optimystic's
   `SqliteKVStore` and `loadOrCreateNSPeerKey` use UPSERT, which needs SQLite 3.24
   (Android 11); the S7 (Android 8) has 3.19.
-- Invitation links are `chatns://invite/<token>` (the RN app owns `chat://`). The node
-  starts on the launch event: the SQLite plugin opens databases through the activity.
+- Invitation links are `chatns://invite/<token>` (the RN app owns `chat://`).
+- SQLite databases open by full path (`src/db-path.ts`); by bare name the plugin needs an
+  activity, which a node started at launch may not have yet.
+- Performance work (docs/STATUS.md, Phase 7d): yarn patches to the WebSocket and SQLite
+  plugins (bulk copies instead of one JS→Java crossing per byte), WebSocket sends joined
+  per turn (`src/polyfills/chat.ts`), and `main-event` redirected to its browser no-op
+  (`webpack.config.js`).
+- Debug builds install the dev bridge (`__chatDev`, for `test/devices` over the inspector:
+  `adb forward tcp:40001 localabstract:org.sereus.chat.ns-inspectorServer`, then
+  `inspector-hold.mjs`) and `__chatDiag` (crypto, bridge and SQLite cost).
 
 The GUI test drives it by on-screen words (NativeScript cannot set Android resource ids):
 

@@ -63,7 +63,10 @@ function createNodeHost(): NodeHost {
   }
 
   async function start(): Promise<void> {
+    const t0 = Date.now();
+    const step = (what: string) => console.log(`[boot] ${what} +${Date.now() - t0} ms`);
     const { db, kv } = await local();
+    step('node-local database open');
     const opts = await startOptions();
     const slot = (key: string) => kvSlot(kv, key);
     const config: CadreNodeConfig = {
@@ -89,9 +92,11 @@ function createNodeHost(): NodeHost {
       enrolledMachines: { store: await PersistentEnrolledMachineStore.open(slot(enrolledMachinesSlotKey(opts.partyId)), opts.partyId) },
       strandNetworkState: { store: await PersistentStrandNetworkStateStore.open(slot(strandNetworkSlotKey(opts.partyId)), opts.partyId) },
     } as CadreNodeConfig;
+    step('stores open');
     const built = new CadreNode(config);
     for (const { event, handler } of handlers) built.on(event as never, handler as never);
     await built.start();
+    step('node started');
     node = built;
     built.getControlNode()?.addEventListener('self:peer:update', () => reachability.forEach(cb => cb()));
     reachability.forEach(cb => cb());
@@ -105,6 +110,7 @@ function createNodeHost(): NodeHost {
       })().catch(err => { console.warn('[host] owner genesis failed:', err); return false; }),
       new Promise<boolean>(resolve => setTimeout(() => resolve(false), OWNER_GENESIS_MS)),
     ]);
+    step(`owner genesis ${owner ? 'done' : 'not done'}`);
   }
 
   const host: NodeHost = {

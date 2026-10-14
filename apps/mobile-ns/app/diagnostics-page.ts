@@ -6,6 +6,7 @@
 import { Observable, type EventData, type Page } from '@nativescript/core';
 import { runCryptoCost, runFoundStrandCheck, runTwoPartyCheck } from '@chat/core/diagnostics';
 import { createExtraNode, foundStrandPlatform } from '../src/platform';
+import { runBridgeCost } from '../src/bridge-cost';
 
 const DEFAULT_RELAY = '/dns4/relay.sereus.org/tcp/4011/ws/p2p/12D3KooWMD7E7UH4rkCqiFE69n7FNqrKo1Xx3yDUU8JvwtaH39bD';
 
@@ -39,6 +40,9 @@ class DiagnosticsModel extends Observable {
   runCrypto = () => this.run('crypto', say => runCryptoCost(say),
     (r: { measurements: Array<{ label: string; msPerOp: number }> }) =>
       r.measurements.map(m => `${m.label} ${m.msPerOp.toFixed(3)} ms`).join('; '));
+
+  runBridge = () => this.run('bridge', async () => runBridgeCost(),
+    (r: Record<string, Record<string, number>>) => `ByteString.of 32 B ${r['32 bytes']['okio.ByteString.of(ArrayBuffer)']} ms, nanoTime ${r.plain['System.nanoTime()']} ms`);
 
   runFound = () => this.run('found', async say => runFoundStrandCheck(await foundStrandPlatform(), { timeoutMs: 120_000, onProgress: say }),
     (r: { converged: boolean; detail: string }) => r.detail);

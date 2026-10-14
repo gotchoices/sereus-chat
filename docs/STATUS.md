@@ -949,6 +949,60 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
       - Release installs over `adb` can stop at a Play Protect "Send app for a
         security check?" prompt on the phone; answer "Don't send".
 
+- [x] **Where the phone's time goes, and what is the phone's fault** (2026-10-14).
+      Optimystic 1.14.0 adopted first (one cluster request fewer per two-member write).
+      Times through relay.sereus.org, one join plus messages, `test/devices/devtime.mjs`:
+
+      | | join | commit |
+      |---|---|---|
+      | Node ↔ Node (memory blocks) | 5.6 s (6.5 s on 1.13) | ~0.3 s (~0.43 s on 1.13) |
+      | serchat ↔ NS app on emulator 5564 (i9) | 7.7 s | ~0.45 s |
+      | serchat ↔ NS app on the S7, before fixes | 28–39 s | — |
+      | same, after fixes | 18–25 s | 1.3–1.9 s (S7's own) |
+
+      - **Hardware explains the rest.** On a quiet Mac the emulator is 4.4–5.6× faster
+        than the S7 at pure JS (x25519, Ed25519, ChaCha20, SHA-256) and 4.6× at SQLite
+        writes (WAL, `synchronous = NORMAL` in effect); the S7 is 2.5–5× slower at joins
+        and commits. Network is not it (same 44 ms ping to the relay). Emulator timings
+        swing 5–8× with the Mac's load (taleus's emulator shares it): compare only
+        quiet-Mac runs. SQLite reads are the one outlier (11×; 4.1 ms per 1 KB read).
+      - **Fixed in `apps/mobile-ns` (software costs, not hardware):**
+        - The WebSocket and SQLite plugins crossed JS→Java once per BYTE (S7: 144–170
+          ms per 16 KB). Bulk copies via yarn patches (`.yarn/patches/`); the WebSocket
+          one also sent wrong bytes for a view into a larger buffer. Filed:
+          valor-software/nativescript-plugins#26. sqlite 4.x (2026-10-14) is native,
+          but `db-p2p-storage-ns` requires `^3.5.0`.
+        - Any JS→Java call carrying bytes costs ~0.3–0.5 ms on the S7 (and the
+          emulator), so the COUNT of WebSocket messages matters: libp2p sends one per
+          chunk (half are ≤16 bytes). Sends in one turn are joined in
+          `src/polyfills/chat.ts`: **62% fewer native sends**, joining and idle.
+        - `main-event`'s Node variant threw and caught a TypeError on every call (~2%
+          of a join): redirected to its browser no-op in `webpack.config.js`.
+        - Receive batching (one posted Runnable per batch) is in the WebSocket patch;
+          no measurable gain.
+        - SQLite opened by full path (`src/db-path.ts`): the node sometimes failed to
+          start, by launch timing, for want of an activity.
+      - **GUI regression after the fixes** (NS debug build, S7, serchat, public relay):
+        PASS; join through the screens 23.4 s, whole run 112 s — against 36.7–42.2 s
+        and 166–171 s for this morning's NS *release* builds.
+      - Filed: gotchoices/Optimystic#38 (move `db-p2p-storage-ns` to sqlite 4.x:
+        native threads, native blobs, no activity needed to open).
+      - **Idle FRET chatter** (gotchoices/Fret#2): one shared strand costs the S7
+        ~66 WebSocket messages a second each way while idle. A local experiment
+        (1.5 s → 15 s after 20 passes, both sides) cut it ~65%; measurement posted on
+        Fret#2. Not kept.
+      - **Every byte between phones flows through the relay**: DCUtR is configured but
+        cannot hole-punch WebSockets, and phones listen nowhere.
+      - Posted: Fret#2 (measurement), sereus#45 (NativeScript findings and per-chunk
+        WebSocket messages, for RN too). libp2p's `sendReset` uses close code 1006,
+        which OkHttp and browsers reject — noted, not posted (libp2p).
+      - Tools: `test/devices/inspector-hold.mjs` (one held inspector session — the NS
+        runtime aborts on the S7 when a session closes), `profile-summary.mjs`,
+        `devtime` `PROFILE=` and `ws://` targets; NS debug builds install the dev
+        bridge and `__chatDiag` (crypto, bridge and SQLite cost), and the diagnostics
+        screen has a Bridge cost button. Maestro's accessibility queries during a busy
+        NativeScript start make Android 17 (emulator) report an ANR; the S7 does not.
+
 ## Phase 8 — Diagnostics and the Node harness
 
 - [x] The dev bridge is in `core/diagnostics` (done with Phase 7a).
