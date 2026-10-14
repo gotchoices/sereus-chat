@@ -7,6 +7,8 @@
  *   crypto      primitive costs (pure JS and WebCrypto Ed25519)
  *   found       found one strand on one node over rn-leveldb
  *   two-party   two relay-only parties in this process (stops the app's node meanwhile)
+ * and `noise([mode])`: the Noise crypto mode (`off` | `symmetric` | `full`), set first when
+ * given — the node rebuilds with it — for A/B runs.
  */
 import { createDevBridge, runCryptoCost } from '@chat/core/diagnostics';
 import { chatModel } from '../data/model';
@@ -14,6 +16,7 @@ import { chatHost } from '../host/chat-host';
 import { USE_SEREUS } from '../data/config';
 import { runFoundStrandCheck } from './found-strand-check';
 import { runTwoPartyCheck } from './two-party-check';
+import { cadreService } from '../host/CadreService';
 
 const DIAGNOSES = {
   crypto: () => runCryptoCost(),
@@ -29,5 +32,9 @@ export function installDevBridge(): void {
     if (!run) throw new Error(`no diagnosis "${String(name)}"; one of ${Object.keys(DIAGNOSES).join(', ')}`);
     return run();
   };
-  (globalThis as unknown as { __chatDev: unknown }).__chatDev = Object.assign(bridge, { diagnose });
+  const noise = async (mode?: Parameters<typeof cadreService.setNoiseCryptoMode>[0]) => {
+    if (mode) await cadreService.setNoiseCryptoMode(mode);
+    return cadreService.noiseCryptoMode;
+  };
+  (globalThis as unknown as { __chatDev: unknown }).__chatDev = Object.assign(bridge, { diagnose, noise });
 }

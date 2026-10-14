@@ -810,6 +810,46 @@ tests against a known counterpart. serchat provides both.
       script's question and what else covers it; scripts are retired when their
       upstream question is settled.
 
+## Phase 7d — Where the time goes (in progress 2026-10-13)
+
+Question: the phones are slow; is it the engine, the build, the hardware or the code?
+
+- [x] **Native x25519** (kit Noise `full` mode): no measurable change on the S7 (join
+      35 → 36 s, delivery within noise). The handshake is not the bottleneck.
+      - Found: `full` mode cannot start with quick-crypto 1.1.7, which returns DER as a
+        bare `ArrayBuffer`. Patched locally for the measurement only, then restored.
+        Noted for upstream in `docs/serchat.md`.
+      - The phone bridge gained `noise([mode])`.
+- [x] **CPU profile of a join** on the S7 (development build, 260 s):
+      - the JS thread is ~89% busy, so a join is CPU-bound there;
+      - ~20% Noise per-frame overhead (cipher objects per frame), 15.8% young GC,
+        ~9% multiaddr and 7% peer-record churn, 2.4% `localeCompare` in libp2p's
+        peer store, ~8% yamux windows, 5.6% `metroRequire`;
+      - none of the app's own code is in the top of the profile.
+      - Details: `docs/serchat.md` (Upstream).
+- [x] **Release build on the S7** (debug-signed release APK, arm64, Hermes bytecode),
+      same GUI test against serchat:
+
+      | | Development | Release |
+      |---|---|---|
+      | Link → serchat sees the phone's message | ~203 s | ~121 s |
+      | Whole run | 246–269 s | 162 s |
+
+      About 40% of the phone's time in a join is development-build overhead. Phone
+      measurements should be taken on release builds from now on (one run so far).
+      - Build: `STORE_FILE_CHAT=$PWD/app/debug.keystore STORE_PASSWORD_CHAT=android
+        KEY_ALIAS_CHAT=androiddebugkey ./gradlew assembleRelease
+        -PreactNativeArchitectures=arm64-v8a`.
+      - Installs over the debug build and keeps the data.
+      - Play Protect asks to upload the app; answer "Don't send".
+      - **The S7 (6a61c968) now runs the release build:** there is no dev bridge, so
+        `devtime` and `devcall` do not work on it until a debug build is reinstalled.
+- [ ] **serchat pair, loopback relay:** commit 1.3–2.3 s with no network and a
+      desktop CPU, so the time is protocol rounds, timers or waits in the stack.
+      Find which, with Node tooling. Before the NativeScript V8 probe.
+- [ ] NativeScript V8 probe (core diagnostics on the S7), if the phone is still
+      CPU-bound after the above.
+
 ## Phase 8 — Diagnostics and the Node harness
 
 - [x] The dev bridge is in `core/diagnostics` (done with Phase 7a).

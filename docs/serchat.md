@@ -252,6 +252,30 @@ To raise with Sereus (prepared, not posted):
   `owner-recovery.mjs` as evidence and the three caveats above.
 - **Owner key separate from node identity** (`feat-owner-keys-only-on-user-devices`):
   would let a backup be a key alone, not an offline node; worth a vote from us.
+- **cadre-rn `noise-crypto` `full` mode cannot start** with react-native-quick-crypto
+  1.1.7: `generateKeyPairSync('x25519', … format: 'der')` returns a bare `ArrayBuffer`
+  where Node returns a `Buffer`, so the kit throws "x25519 keypair did not come back as DER
+  buffers" (and `createPublicKey(…).export({ format: 'der' })` likewise). Normalising
+  with `new Uint8Array(…)` makes it work on an S7 (tested 2026-10-13 with a local patch).
+  The kit's own note says to move the default to `full` once `symmetric` is proven on a
+  device. Possibly also worth a quick-crypto issue, since it departs from Node's API.
+- **Where an S7 spends a join** (Hermes CPU profile, development build, 2026-10-13: the
+  GUI test joining serchat, 260 s, 23,128 samples). The JS thread was busy ~89% of the
+  time, so a join is CPU-bound there. In order:
+  - **~20% Noise frames.** The cipher is native, but the kit builds new quick-crypto
+    cipher objects per frame (`createCipheriv`/`CipherCommon` ~7%, host calls, plus
+    `getCipherInfo`/`createHybridObject`). For the kit: a one-shot AEAD call, or reusing
+    what can be reused, could cut this.
+  - **15.8% young-generation GC:** allocation churn (buffers, address objects).
+  - **~9% multiaddr parse/print, 7.4% peer records (`pbToPeer`), 2.4% `localeCompare`.**
+    libp2p's peer store sorts every peer's protocols and addresses with `localeCompare`
+    on each update (`@libp2p/peer-store` `to-peer-pb.js`, `dedupe-addresses.js`), which
+    on Hermes goes through ICU. A libp2p matter; a note only (we do not post there).
+  - **~8% yamux window updates.**
+  - **5.6% self `metroRequire`**: development-build cost (see the release-build
+    measurement in STATUS).
+  - Not ours: the app's own code does not appear in the top of the profile.
+  - Not the handshake: native x25519 (`full` mode, patched) changed nothing measurable.
 - Stale comment: `strand-transport-key.ts:46` says production never writes a
   `MemberPeer` row; the membership reconciler does.
 
