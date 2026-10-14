@@ -1,0 +1,14 @@
+# Run one of the NativeScript app's diagnostics (apps/mobile-ns) by its button text and
+# wait for it to finish. The result is read from the log: `adb logcat | grep '\[diag\]'`.
+#   CHECK   the button text: "Crypto cost", "Found strand" or "Two-party"
+appId: org.sereus.chat.ns
+---
+- launchApp
+- extendedWaitUntil:
+    visible: ${CHECK}
+    timeout: 60000
+- tapOn: ${CHECK}
+- extendedWaitUntil:
+    visible:
+      text: "^(crypto|found|two-party)(:| failed).*"
+    timeout: 400000

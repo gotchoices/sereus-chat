@@ -1,0 +1,15 @@
+<Page xmlns="http://schemas.nativescript.org/tns.xsd" navigatingTo="onNavigatingTo">
+  <ActionBar title="Sereus Chat NS — diagnostics" />
+  <ScrollView>
+    <StackLayout padding="16">
+      <Label text="The core's checks, run under V8. Results also go to the log as [diag] lines." textWrap="true" marginBottom="8" />
+      <Label text="Relay (two-party)" fontWeight="bold" />
+      <TextField text="{{ relay }}" autocapitalizationType="none" autocorrect="false" />
+      <Button text="Crypto cost" tap="{{ runCrypto }}" isEnabled="{{ !busy }}" />
+      <Button text="Found strand" tap="{{ runFound }}" isEnabled="{{ !busy }}" />
+      <Button text="Two-party" tap="{{ runTwoParty }}" isEnabled="{{ !busy }}" />
+      <Label text="{{ status }}" textWrap="true" marginTop="12" fontWeight="bold" />
+      <Label text="{{ output }}" textWrap="true" fontFamily="monospace" fontSize="12" />
+    </StackLayout>
+  </ScrollView>
+</Page>

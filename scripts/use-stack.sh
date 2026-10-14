@@ -63,6 +63,7 @@ PACKAGES = collections.OrderedDict([
     ('@optimystic/db-p2p',                    ('optimystic/packages/db-p2p',                    '1.13.0', True)),
     ('@optimystic/db-p2p-storage-rn',         ('optimystic/packages/db-p2p-storage-rn',         '1.13.0', True)),
     ('@optimystic/db-p2p-storage-fs',         ('optimystic/packages/db-p2p-storage-fs',         '1.13.0', True)),
+    ('@optimystic/db-p2p-storage-ns',         ('optimystic/packages/db-p2p-storage-ns',         '1.13.0', True)),
     ('@optimystic/quereus-plugin-crypto',     ('optimystic/packages/quereus-plugin-crypto',     '1.13.0', True)),
     ('@optimystic/quereus-plugin-optimystic', ('optimystic/packages/quereus-plugin-optimystic', '1.13.0', True)),
     ('@quereus/quereus',                      ('quereus/packages/quereus',                      '4.20.2', True)),

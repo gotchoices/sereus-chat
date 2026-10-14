@@ -863,8 +863,40 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         faster durable store, or a storage choice.
       - Tools: `apps/cli/test/relay.mjs` (a loopback relay for hand runs) and
         `--memory-blocks`.
-- [ ] NativeScript V8 probe (core diagnostics on the S7), if the phone is still
-      CPU-bound after the above.
+- [ ] **NativeScript V8 probe** (`apps/mobile-ns`, stage 1, started 2026-10-13).
+      - Built from sereus's `reference-app-ns`: webpack configuration, polyfills,
+        shims, SQLite storage. One diagnostics screen runs `@chat/core/diagnostics`.
+        App id `org.sereus.chat.ns`. Maestro flow `test/gui/flows/ns-diagnose.yaml`;
+        results logged as `[diag]`.
+      - **Pure-JS CPU on the S7, V8 against Hermes** (NativeScript debug build
+        against the RN development build):
+
+        | | Hermes | V8 | V8 faster by |
+        |---|---|---|---|
+        | x25519 | 58.5 ms | 18.0 ms | 3.2× |
+        | Ed25519 sign | 42.3 ms | 16.4 ms | 2.6× |
+        | Ed25519 verify | 83.3 ms | 17.6 ms | 4.7× |
+        | ChaCha20 frame | 6.94 ms | 0.71 ms | 9.8× |
+        | SHA-256 frame | 13.7 ms | 0.33 ms | 42× |
+
+      - No WebCrypto Ed25519 under NativeScript, so libp2p signs in pure JS there.
+      - **Found strand:** converged in 7.6 s (node start 13.7 s), against 5.6 s on
+        RN. Not comparable: SQLite here, LevelDB there.
+      - **Two-party: blocked by networking under NativeScript on the 1.15 stack.**
+        1. `queueMicrotask` is missing on NativeScript's V8: added in
+           `src/polyfills/chat.ts` (for reference-app-ns upstream too).
+        2. Then every protocol negotiation fails on the relay connection: identify
+           never completes, and the reservation fails with "could not negotiate
+           /libp2p/circuit/relay/0.2.0/hop". The connection and Noise succeed;
+           the same relay works from Node and RN.
+        Suspects: the NativeScript WebSocket's binary handling, or a polyfilled
+        stream or buffer path. Next: check whether reference-app-ns itself reaches
+        a relay on the 1.15 stack (an upstream question), then debug the
+        negotiation.
+      - Release builds do not send `console` output to logcat; use debug builds
+        to read results. NativeScript debug builds are signed with
+        `~/.android/debug.keystore`, so switching between release and debug
+        means uninstalling.
 
 ## Phase 8 — Diagnostics and the Node harness
 

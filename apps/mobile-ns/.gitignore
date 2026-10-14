@@ -1,0 +1,11 @@
+node_modules/
+platforms/
+hooks/
+*.log
+.nsbuildinfo
+report/
+
+# Maestro e2e artifacts
+maestro/.fixture.log
+maestro/.maestro-junit.xml
+maestro/.maestro/
