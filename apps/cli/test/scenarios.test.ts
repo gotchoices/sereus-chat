@@ -6,8 +6,8 @@
  * A known bug is written as the CORRECT behaviour and marked `it.fails`, naming the step
  * that fixes it; the run then says so when it flips.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { Person, scenarioHome, startRelay, type Row } from './harness.js';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { Person, scenarioHome, startRelay, stopAllBackground, type Row } from './harness.js';
 
 let relay: Awaited<ReturnType<typeof startRelay>>;
 let home: Awaited<ReturnType<typeof scenarioHome>>;
@@ -17,6 +17,8 @@ beforeAll(async () => {
   relay = await startRelay();
   home = await scenarioHome();
 });
+
+afterEach(stopAllBackground);
 
 afterAll(async () => {
   await relay?.stop();

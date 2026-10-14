@@ -276,6 +276,11 @@ To raise with Sereus (prepared, not posted):
     measurement in STATUS).
   - Not ours: the app's own code does not appear in the top of the profile.
   - Not the handshake: native x25519 (`full` mode, patched) changed nothing measurable.
+- **optimystic `db-p2p-storage-fs`: two fsyncs per block write.** Each write is atomic
+  (temp file + fsync + rename + directory fsync); a commit writes several blocks in
+  sequence, so one chat message took ~1 s to commit on macOS between two serchats over a
+  loopback relay, against 45 ms with `MemoryRawStorage`. Coalescing a transaction's writes
+  (one fsync per commit), or a log-structured store, would fix it. Prepared, not posted.
 - Stale comment: `strand-transport-key.ts:46` says production never writes a
   `MemberPeer` row; the membership reconciler does.
 

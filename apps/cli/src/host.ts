@@ -18,6 +18,7 @@ import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-
 import { FileEnrolledMachineStore } from '@serfab/cadre-core/enrolled-machine-store-file';
 import { FileStrandNetworkStateStore } from '@serfab/cadre-core/strand-network-state-file';
 import { FileRawStorage } from '@optimystic/db-p2p-storage-fs';
+import { MemoryRawStorage } from '@optimystic/db-p2p';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { CHAT_SAPP_ID } from '@chat/core';
@@ -58,6 +59,11 @@ export interface HostOptions {
   /** Listen addresses for this run (`--listen`). */
   listen: string[];
   dev: boolean;
+  /**
+   * Measurement only: strand and control blocks in memory, not on disk (`--memory-blocks`).
+   * Nothing survives the process; used to separate storage cost from protocol cost.
+   */
+  memoryBlocks?: boolean;
 }
 
 export interface CliHost extends ChatHost {
@@ -75,6 +81,7 @@ export function createCliHost(opts: HostOptions): CliHost {
   const rebuildHooks = new Set<() => void | Promise<void>>();
   const reachabilityCallbacks = new Set<() => void>();
 
+  const memoryScopes = new Map<string, MemoryRawStorage>();
   const relays = () => [...new Set([...config.relays, ...opts.extraRelays])];
 
   async function build(): Promise<CadreNode> {
@@ -84,7 +91,11 @@ export function createCliHost(opts: HostOptions): CliHost {
       identityKeyId: DEFAULT_IDENTITY_KEY_ID,
       controlNetwork: { partyId, bootstrapNodes: [] },
       profile: 'transaction',
-      storage: { provider: (scope: string) => new FileRawStorage(join(dirs.blocks, scope)) },
+      storage: {
+        provider: opts.memoryBlocks
+          ? (scope: string) => memoryScopes.get(scope) ?? memoryScopes.set(scope, new MemoryRawStorage()).get(scope)!
+          : (scope: string) => new FileRawStorage(join(dirs.blocks, scope)),
+      },
       network: {
         transports: [webSockets(), circuitRelayTransport()] as never,
         listenAddrs: opts.listen,

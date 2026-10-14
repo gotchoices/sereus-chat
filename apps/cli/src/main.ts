@@ -36,6 +36,8 @@ interface Globals {
   waitSeconds: number;
   verbose: boolean;
   script?: string;
+  /** Measurement only: block storage in memory (`--memory-blocks`). */
+  memoryBlocks: boolean;
   /** Inspector port for the development bridge (`--bridge`). */
   bridgePort?: number;
   help: boolean;
@@ -55,13 +57,14 @@ const USAGE = `usage: serchat [options] [command [args] [\\; command ...]]
       --wait <seconds>   one-shot: how long to let strands settle first (default 30)
   -c <commands>          run these ";"-separated commands
       --bridge <port>    development bridge for test/devices tools, on a loopback inspector port
+      --memory-blocks    measurement only: block storage in memory, nothing kept
   -v, --verbose          network-layer log lines on stderr
   -h, --help · --version
 
 With no command: an interactive prompt, or commands from stdin. "help" lists commands.`;
 
 export function parseGlobals(argv: string[]): Globals {
-  const g: Globals = { profile: 'default', json: false, header: false, relays: [], listen: [], waitSeconds: 30, verbose: false, help: false, version: false, rest: [] };
+  const g: Globals = { profile: 'default', memoryBlocks: false, json: false, header: false, relays: [], listen: [], waitSeconds: 30, verbose: false, help: false, version: false, rest: [] };
   let i = 0;
   const value = (flag: string) => {
     const v = argv[++i];
@@ -79,6 +82,7 @@ export function parseGlobals(argv: string[]): Globals {
     else if (a === '--wait') g.waitSeconds = Number(value(a));
     else if (a === '-c') g.script = value(a);
     else if (a === '--bridge') g.bridgePort = Number(value(a));
+    else if (a === '--memory-blocks') g.memoryBlocks = true;
     else if (a === '-v' || a === '--verbose') g.verbose = true;
     else if (a === '-h' || a === '--help') g.help = true;
     else if (a === '--version') g.version = true;
@@ -123,7 +127,8 @@ async function main(argv: string[]): Promise<number> {
   await lockProfile(dirs);
   const out = createOutput({ json: g.json, header: g.header });
   const listen = await Promise.all(g.listen.map(a => (a === DEFAULT_LISTEN ? defaultListenAddress(dirs, config) : a)));
-  const host = createCliHost({ dirs, config, extraRelays: g.relays, listen, dev: g.verbose });
+  const host = createCliHost({ dirs, config, extraRelays: g.relays, listen, dev: g.verbose, memoryBlocks: g.memoryBlocks });
+  if (g.memoryBlocks) out.note('blocks in memory (--memory-blocks): nothing this run stores will survive it');
   const { model, boot } = createSereusModel(host);
   if (g.bridgePort !== undefined) {
     // The same bridge the phone installs, reached over Node's inspector instead of Metro's.

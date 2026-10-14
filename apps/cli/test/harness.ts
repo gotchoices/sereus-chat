@@ -56,6 +56,14 @@ export async function scenarioHome(): Promise<{ dir: string; remove(): Promise<v
   return { dir, remove: () => rm(dir, { recursive: true, force: true }) };
 }
 
+/** Every background command started and not yet stopped, so a failed test cannot leak one. */
+const running = new Set<Background>();
+
+/** Stop whatever a test left running (call from `afterEach`). */
+export async function stopAllBackground(): Promise<void> {
+  await Promise.all([...running].map(b => b.stop()));
+}
+
 /** A running background command (`tail`, `idle`): its rows so far, and a way to stop it. */
 export class Background {
   rows: Row[] = [];
@@ -74,7 +82,8 @@ export class Background {
       }
     });
     child.stderr!.setEncoding('utf8').on('data', (chunk: string) => { this.stderr += chunk; });
-    this.exited = new Promise(resolve => child.on('exit', code => resolve(code ?? -1)));
+    this.exited = new Promise(resolve => child.on('exit', code => { running.delete(this); resolve(code ?? -1); }));
+    running.add(this);
   }
 
   /** Resolve once `test` holds for some row, or fail after `ms`. */
@@ -97,7 +106,7 @@ export class Background {
 
   /** Ctrl-C, and wait for the process to finish its shutdown (it saves state on the way). */
   async stop(): Promise<number> {
-    this.child.kill('SIGINT');
+    if (this.child.exitCode === null) this.child.kill('SIGINT');
     return this.exited;
   }
 }

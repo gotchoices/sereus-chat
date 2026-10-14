@@ -844,9 +844,25 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
       - Play Protect asks to upload the app; answer "Don't send".
       - **The S7 (6a61c968) now runs the release build:** there is no dev bridge, so
         `devtime` and `devcall` do not work on it until a debug build is reinstalled.
-- [ ] **serchat pair, loopback relay:** commit 1.3–2.3 s with no network and a
-      desktop CPU, so the time is protocol rounds, timers or waits in the stack.
-      Find which, with Node tooling. Before the NativeScript V8 probe.
+- [x] **serchat pair, loopback relay** (2026-10-13): where serchat's 1 s per
+      message went. Two serchats in one strand, sends timed through their bridges.
+      - With blocks on disk, commit is ~1,015 ms, all of it inside one SQL insert
+        into optimystic. Delivery is ~755 ms.
+      - Optimystic's debug timeline: ~80 ms steps between local block writes, plus
+        ~570 ms waiting on the peer's own writes.
+      - Cause: `db-p2p-storage-fs` writes each block atomically (write a temp file,
+        fsync, rename, fsync the directory). A commit writes several blocks in
+        sequence on each side; about 80 ms per write on this Mac.
+      - **With blocks in memory** (`serchat --memory-blocks`, measurement only):
+        commit **45 ms**, delivery **≤ 250 ms** (devtime's polling interval),
+        invitation 0.46 s, join **0.9 s**.
+      - So the protocol is fast; serchat's slowness was durable file storage. Phones
+        use LevelDB without fsync, so their time is CPU, as the profile showed.
+      - For optimystic (prepared, not posted): coalesce a transaction's block
+        writes (one fsync per commit, not two per block). For serchat: consider a
+        faster durable store, or a storage choice.
+      - Tools: `apps/cli/test/relay.mjs` (a loopback relay for hand runs) and
+        `--memory-blocks`.
 - [ ] NativeScript V8 probe (core diagnostics on the S7), if the phone is still
       CPU-bound after the above.
 
