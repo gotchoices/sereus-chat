@@ -882,17 +882,29 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
       - No WebCrypto Ed25519 under NativeScript, so libp2p signs in pure JS there.
       - **Found strand:** converged in 7.6 s (node start 13.7 s), against 5.6 s on
         RN. Not comparable: SQLite here, LevelDB there.
-      - **Two-party: blocked by networking under NativeScript on the 1.15 stack.**
-        1. `queueMicrotask` is missing on NativeScript's V8: added in
-           `src/polyfills/chat.ts` (for reference-app-ns upstream too).
-        2. Then every protocol negotiation fails on the relay connection: identify
-           never completes, and the reservation fails with "could not negotiate
-           /libp2p/circuit/relay/0.2.0/hop". The connection and Noise succeed;
-           the same relay works from Node and RN.
-        Suspects: the NativeScript WebSocket's binary handling, or a polyfilled
-        stream or buffer path. Next: check whether reference-app-ns itself reaches
-        a relay on the 1.15 stack (an upstream question), then debug the
-        negotiation.
+      - **Two-party under V8 on the S7: converged in 102 s**, against 278 s under
+        Hermes (the RN development build; release Hermes is ~40% faster, so about
+        170 s). Roughly 1.7–2.7× faster end to end. One run each; storage differs
+        (SQLite here, LevelDB there).
+
+        | Step (s from start) | Hermes | V8 |
+        |---|---|---|
+        | Host reachable | 17.5 | 11.2 |
+        | Strand founded | 72.0 | 30.9 |
+        | Joiner attached | 159.1 | 64.4 |
+        | Converged | 278.1 | 102.1 |
+
+      - Two NativeScript bugs had to be fixed first (`src/polyfills/chat.ts`):
+        - **`queueMicrotask` missing** on NativeScript's V8; libp2p's relay code
+          calls it.
+        - **NativeScript's native `TextDecoder` ignores a view's `byteOffset`.**
+          A self-test decoding `bytes.subarray(2)` fails on the S7. multistream-select decodes protocol names from such views, so
+          every protocol negotiation failed ("did not read multistream-select
+          header", "na" for an empty protocol): no identify, no relay. Startup
+          self-test plus a wrapper that copies offset views. Found with
+          `DEBUG=libp2p:*`.
+        - Both are worth reporting: the decoder bug to NativeScript, and both to
+          sereus's reference-app-ns.
       - Release builds do not send `console` output to logcat; use debug builds
         to read results. NativeScript debug builds are signed with
         `~/.android/debug.keystore`, so switching between release and debug

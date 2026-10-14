@@ -13,3 +13,27 @@ if (typeof g.queueMicrotask !== 'function') {
   };
 }
 
+
+
+/**
+ * TextDecoder and views into larger buffers. libp2p's multistream-select decodes
+ * protocol names from sub-arrays (views with a non-zero byteOffset into a larger
+ * buffer). If the runtime's decoder reads from the start of the underlying buffer instead
+ * of the view, every protocol negotiation fails ("did not read multistream-select header",
+ * "na" for an empty protocol). Checked at startup; copied views are a correct, cheap fix.
+ */
+function textDecoderHonoursOffsets(): boolean {
+  const bytes = new Uint8Array([0x78, 0x78, 0x68, 0x69]); // "xxhi"
+  return new TextDecoder().decode(bytes.subarray(2)) === 'hi';
+}
+const decoderOk = typeof TextDecoder === 'function' && textDecoderHonoursOffsets();
+if (typeof TextDecoder === 'function' && !decoderOk) {
+  const original = TextDecoder.prototype.decode;
+  TextDecoder.prototype.decode = function decode(input?: AllowSharedBufferSource, options?: TextDecodeOptions): string {
+    if (input && ArrayBuffer.isView(input) && (input.byteOffset !== 0 || input.byteLength !== input.buffer.byteLength)) {
+      input = new Uint8Array(input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength));
+    }
+    return original.call(this, input as never, options);
+  };
+}
+console.log(`[polyfill] TextDecoder honours view offsets: ${decoderOk}${decoderOk ? '' : ' — patched to copy views'}`);
