@@ -87,6 +87,7 @@ support is settled, then retired.
 | `two-party-formation.mjs` | Two parties form a strand through a relay (`--host`/`--join` for separate processes) | Core `runTwoPartyCheck` (in process); serchat scenario "invite, join and talk" (chat level) |
 | `restart-reconverge.mjs` | Do two relay-only parties converge after a restart? | serchat scenario "invite, join and talk … the inviter restarts" (chat level) |
 | `offline-inviter-join.mjs` | A join while the inviter is offline | serchat scenario "a join while the inviter is offline" (chat level) |
+| `formation-cost.mjs` | Where founding and joining spend their time, step by step (wall vs CPU; `RELAY_ADDR`, `FOUND_ONLY`, `MESSAGES`, `TRACE_SQL`); the repro in Optimystic#39 | — |
 | `message-latency.mjs` | Where one message's time goes | `test/devices/devtime.mjs` (two devices or serchat) |
 | `owner-recovery.mjs` | Recovery with an offline backup owner key | — (serchat `cadre` commands, Phase 7b) |
 | `slow-peer.mjs`, `contention-repro.sh`, `small-cohort-repro.sh` | Stalled peers, contention, two-machine cohorts | — |

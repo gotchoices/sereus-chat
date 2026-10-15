@@ -1011,6 +1011,19 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         on the S21. Corrections posted on valor-software/nativescript-plugins#26,
         Optimystic#38 and sereus#45. The plugin's receive path (heap buffers) is fine.
         Receive batching was dropped from the WebSocket patch (no measured gain).
+      - **Stack 2026-10-15: optimystic 1.15.0 + p2p-fret 1.1.0** adopted (fret's idle
+        backoff answers Fret#2; core tests 65/65).
+      - **Why founding and joining are slow, on bare cadre-core** (`test/stack/formation-cost.mjs`,
+        Node, two relay-only parties, blocks in memory). Loopback relay → public relay:
+        - `foundStrand` ~200–350 ms → 456–652 ms, mostly CPU (13% `structuredClone` of
+          blocks in optimystic db-core; 41 SQL statements per founding, each prepared
+          afresh); the founder's own writes 3–5 ms (one member).
+        - Joiner: `formStrand` 120 → 190–520 ms; **`addStrand` ~500 ms → 2.35 s**: 16
+          sequential sync requests, every block fetched twice (consult, then
+          `reconcile-block` re-requests the same revision). Filed: **Optimystic#39**.
+        - The joiner's first two writes (~0.5 s and ~1.7 s on the public relay) read
+          sereus's own Member/MemberPeer/Manager tables block by block — sereus#47 /
+          Optimystic#29. Steady writes afterwards: 47 ms loopback, 245 ms public relay.
       - Filed: gotchoices/Optimystic#38 (move `db-p2p-storage-ns` to sqlite 4.x:
         native threads, native blobs, no activity needed to open).
       - **Idle FRET chatter** (gotchoices/Fret#2): one shared strand costs the S7
