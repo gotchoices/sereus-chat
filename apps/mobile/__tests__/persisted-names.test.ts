@@ -24,6 +24,7 @@ describe('persisted names', () => {
       strandSummaries: '@sereus.chat/strandSummaries',
       joinedStrands: '@sereus.chat/joinedStrands',
       outgoingInvitations: '@sereus.chat/outgoingInvitations',
+      preparedStrands: '@sereus.chat/preparedStrands',
       dataFormat: '@sereus.chat/dataFormat',
       themeMode: '@sereus.chat/themeMode',
       draft: '@sereus.chat/draft/S',

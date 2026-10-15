@@ -95,3 +95,31 @@ describe('sereus: a link opens a cold app', () => {
     }
   }, 120_000);
 });
+
+// The invitation screen founds ahead (`invitations.prepare`) while the person chooses terms.
+describe('sereus: a conversation prepared ahead of its invitation', () => {
+  it('is founded in the background, hidden until invited into, then used by the next invitation', async () => {
+    const a = await createTestParty('a', { listen: true });
+    try {
+      await a.boot();
+      await until(() => a.node.getMultiaddrs().length > 0, 'reachable');
+      a.model.invitations.prepare('private');
+      await until(() => a.node.getStrands().size === 1, 'the prepared strand open');
+      const [preparedId] = [...a.node.getStrands().keys()];
+      await until(async () => {
+        const listed = value(await a.model.strands.list());
+        return !listed.some(s => s.id === preparedId);
+      }, 'the prepared strand not listed');
+
+      const invitation = value(await a.model.invitations.create({ grantsInviteRight: false, visibility: 'private' }));
+      expect(invitation.strandId).toBe(preparedId);
+      expect(value(await a.model.strands.list()).some(s => s.id === preparedId)).toBe(true);
+
+      // Taken: the next invitation without one prepared founds as it always has.
+      const next = value(await a.model.invitations.create({ grantsInviteRight: false, visibility: 'private' }));
+      expect(next.strandId).not.toBe(preparedId);
+    } finally {
+      await a.stop();
+    }
+  }, 120_000);
+});

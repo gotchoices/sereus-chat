@@ -8,6 +8,7 @@
  *   send(strandId, text)  → { ms }      the same `send` a composer calls
  *   arm(strandId)         → true        watch it, as a chat view does
  *   seen(text)            → epoch ms when first seen here, or null
+ *   prepare()             → true                start founding a private strand in the background
  *   invite()              → { url, strandId }   a new private strand's invitation
  *   accept(url)           → { strandId }        join through it
  *   traffic(seconds)      → new streams per node, protocol and direction
@@ -24,13 +25,14 @@ import { parseInviteToken } from '../protocol/index.js';
 import type { ChatModel, Result } from '../model/index.js';
 import type { NodeHost } from '../sereus/host.js';
 
-export type DevBridgeMethod = 'strands' | 'send' | 'arm' | 'seen' | 'invite' | 'accept' | 'traffic' | 'relays';
+export type DevBridgeMethod = 'strands' | 'send' | 'arm' | 'seen' | 'prepare' | 'invite' | 'accept' | 'traffic' | 'relays';
 
 export interface DevBridge {
   strands(): Promise<Array<{ id: string; title: string }>>;
   send(strandId: string, text: string): Promise<{ ms: number }>;
   arm(strandId: string): Promise<boolean>;
   seen(text: string): number | null;
+  prepare(): true;
   invite(): Promise<{ url: string; strandId: string | null }>;
   accept(url: string): Promise<{ strandId: string }>;
   traffic(seconds: number): Promise<Record<string, Record<string, number>>>;
@@ -126,6 +128,10 @@ export function createDevBridge(model: ChatModel, host?: NodeHost): DevBridge {
     },
     seen(text) {
       return firstSeen.get(text) ?? null;
+    },
+    prepare() {
+      model.invitations.prepare('private');
+      return true;
     },
     async invite() {
       const inv = value(await model.invitations.create({ visibility: 'private', grantsInviteRight: false }));

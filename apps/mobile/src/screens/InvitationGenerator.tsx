@@ -116,6 +116,13 @@ export default function InvitationGenerator() {
     });
   }, [model, routeToken]);
 
+  // A new conversation is founded while the person is still choosing its terms; the
+  // invitation then takes it (`invitations.prepare`). Re-run if they switch kind.
+  useEffect(() => {
+    if (addingToExisting || foundedStrandId || routeToken) return;
+    model.invitations.prepare(visibility);
+  }, [model, addingToExisting, foundedStrandId, routeToken, visibility]);
+
   // Defaults by strand kind: the choice on a new strand, or the existing strand's own.
   useEffect(() => {
     if (termsTouched || addingToExisting) return;

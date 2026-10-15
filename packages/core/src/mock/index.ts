@@ -152,6 +152,7 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
     },
 
     invitations: {
+      prepare() { /* nothing to prepare: the mock founds instantly */ },
       async create(input) {
         if (isError()) return unavailable('Could not create an invitation');
         if (isUnreachable()) return fail('unreachable', 'There is nowhere for them to answer yet.');

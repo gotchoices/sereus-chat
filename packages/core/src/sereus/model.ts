@@ -11,7 +11,7 @@ import type { StrandInstance } from '@serfab/cadre-core';
 import { buildInviteUrl, CHAT_SAPP_ID } from '../protocol/index.js';
 import type {
   Attachment, ChatModel, Invitation, InvitationPreview, Member, Message, Prefs,
-  SearchBatch, StorageUsage, StrandState, StrandSummary,
+  SearchBatch, StorageUsage, StrandState, StrandSummary, Visibility,
 } from '../model/index.js';
 import { fail, INVITATION_VALIDITY, ok, pageMessages } from '../model/index.js';
 import { attempt, ChatFailure, explainJoinFailure, withTimeout } from './errors.js';
@@ -147,6 +147,60 @@ export function createSereusModel(host: ChatHost): SereusModel {
     return strand;
   }
 
+  /**
+   * CONVERSATIONS FOUNDED AHEAD OF THEIR FIRST INVITATION (`invitations.prepare`). Founding
+   * is the slow part of making an invitation (a strand node, its database, its relay
+   * reservation: ~5 s on a Galaxy S7, ~2.5 s on an S21), and it needs nothing the person
+   * is still choosing except the kind. So the invitation screen starts it on opening, and
+   * `createInvitation` takes the result. At most one per kind, remembered across restarts
+   * (slot `preparedStrands`) and left out of the strand list until it is taken: a spare
+   * that is never used is reused by the next invitation, not left behind as a conversation.
+   *
+   * A WORKAROUND for slow founding in the stack, not a design: when `foundStrand` returns
+   * after the commitment (sereus#49), re-measure and likely remove this, its slot and the
+   * list filter (docs/STATUS.md, "Local workarounds to retire").
+   */
+  const preparedSlot = host.slot('preparedStrands');
+  const preparing = new Map<Visibility, Promise<string | null>>();
+  async function readPrepared(): Promise<Partial<Record<Visibility, string>>> {
+    try { return JSON.parse((await preparedSlot.load()) ?? '{}') as Partial<Record<Visibility, string>>; } catch { return {}; }
+  }
+  function prepareStrand(visibility: Visibility): Promise<string | null> {
+    const running = preparing.get(visibility);
+    if (running) return running;
+    const job = (async () => {
+      const already = (await readPrepared())[visibility];
+      if (already) return already;
+      await runtime.ensureUp();
+      const { instance } = await createChatStrand(requireNode(), newId(), visibility);
+      await runtime.registerSelf(instance);
+      await preparedSlot.save(JSON.stringify({ ...(await readPrepared()), [visibility]: instance.strandId }));
+      return instance.strandId;
+    })()
+      .catch(err => {
+        console.warn('[sereus-model] preparing a conversation failed:', err instanceof Error ? err.message : err);
+        return null;
+      })
+      .finally(() => preparing.delete(visibility));
+    preparing.set(visibility, job);
+    return job;
+  }
+  /**
+   * The prepared conversation of this kind, taken (no longer prepared), or null. Waits for
+   * one still being founded: it started earlier than a fresh one would. One remembered from
+   * before a restart but not open yet stays prepared, for the next time.
+   */
+  async function takePrepared(visibility: Visibility): Promise<StrandInstance | null> {
+    await preparing.get(visibility);
+    const prepared = await readPrepared();
+    const id = prepared[visibility];
+    const strand = id ? host.node.node?.getStrands().get(id) : undefined;
+    if (!id || !strand?.database) return null;
+    delete prepared[visibility];
+    await preparedSlot.save(JSON.stringify(prepared));
+    return strand;
+  }
+
   async function prefs(): Promise<Prefs> {
     return { ...(await records.prefs()), relayAddrs: await host.node.getRelayAddrs() };
   }
@@ -196,7 +250,9 @@ export function createSereusModel(host: ChatHost): SereusModel {
     void runtime.ensureUp().catch(err =>
       console.warn('[sereus-model] cadre bring-up deferred:', err instanceof Error ? err.message : err),
     );
-    const strands = host.node.node?.getStrands() ?? new Map<string, StrandInstance>();
+    // A prepared conversation is not one yet (`prepareStrand`): nobody has been invited.
+    const hidden = new Set(Object.values(await readPrepared()));
+    const strands = new Map([...(host.node.node?.getStrands() ?? new Map<string, StrandInstance>())].filter(([id]) => !hidden.has(id)));
     const prefsById = await strandPrefs.all();
     const cached = await summaries.read();
     const me = runtime.peerId ?? '';
@@ -257,7 +313,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     await summaries.save(listed);
     const open = new Set(listed.map(s => s.id));
     for (const known of Object.values(cached)) {
-      if (open.has(known.id)) continue;
+      if (open.has(known.id) || hidden.has(known.id)) continue;
       listed.push({
         ...known, unreadCount: 0, mentioned: false, draftPreview: null, pending: false, opening: true,
         muted: prefsById[known.id]?.muted ?? 'none', archived: prefsById[known.id]?.archived ?? false,
@@ -325,9 +381,10 @@ export function createSereusModel(host: ChatHost): SereusModel {
     }
     // With a `strandId` the conversation exists and its type was fixed at founding;
     // without one, the Private/Open choice is the point of the screen.
+    const kind = input.visibility ?? 'private';
     const strand = input.strandId
       ? attachedStrand(input.strandId)
-      : (await createChatStrand(node, newId(), input.visibility ?? 'private')).instance;
+      : (await takePrepared(kind)) ?? (await createChatStrand(node, newId(), kind)).instance;
     // THE FOUNDER HAS TO BE A MEMBER OF ITS OWN STRAND, and founding does not make it
     // one. Idempotent, so inviting a second person re-runs it harmlessly.
     await runtime.registerSelf(strand);
@@ -502,6 +559,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       }),
       /** Stops LISTING it; does not withdraw it. */
       cancel: id => attempt(() => outgoing.forget(id)),
+      prepare: visibility => { void prepareStrand(visibility); },
       /**
        * Read an invitation without redeeming it — PURELY LOCAL: the token carries
        * `{ token, sAppId, expiration, bootstrap }` and nothing else, and whether it is

@@ -59,6 +59,13 @@ export function defaultInvitationTerms(visibility: Visibility): { singleUse: boo
 }
 
 export interface InvitationsModel {
+  /**
+   * Start founding a conversation of this kind in the background, for the next `create`
+   * without a `strandId`, while the person is still choosing its terms. At most one is kept
+   * per kind, across restarts, and it is not listed until an invitation into it is made.
+   * Never fails: a failed preparation leaves `create` to found as it always has.
+   */
+  prepare(visibility: Visibility): void;
   /** Fails with `unreachable` when nobody could answer it yet (story 02 Alt A). */
   create(input: CreateInvitationInput): Promise<Result<Invitation>>;
   listOutstanding(): Promise<Result<Invitation[]>>;

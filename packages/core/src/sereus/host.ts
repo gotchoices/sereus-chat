@@ -18,6 +18,7 @@ export type SlotName =
   | 'strandSummaries'
   | 'joinedStrands'
   | 'outgoingInvitations'
+  | 'preparedStrands'
   | 'draft'
   | 'readCursor';
 

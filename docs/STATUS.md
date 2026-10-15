@@ -1024,6 +1024,24 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         - The joiner's first two writes (~0.5 s and ~1.7 s on the public relay) read
           sereus's own Member/MemberPeer/Manager tables block by block — sereus#47 /
           Optimystic#29. Steady writes afterwards: 47 ms loopback, 245 ms public relay.
+      - **Founding ahead of the invitation** (2026-10-15). `invitations.prepare(kind)`
+        founds a conversation in the background (and registers the founder) while the
+        person is on the invitation screen; the next `create` without a strand takes it.
+        At most one per kind, remembered across restarts (slot `preparedStrands`,
+        AsyncStorage key `@sereus.chat/preparedStrands`), hidden from the strand list
+        until invited into, and reused rather than left behind. The RN invitation screen
+        calls it on opening and when the kind changes; the bridge has `prepare`.
+        S7 (NS): invitation for a new conversation **4.0–4.7 s → 0.40–0.43 s** (10 s
+        of "thinking" between). Core test "a conversation prepared ahead of its
+        invitation".
+        **A workaround, not a design:** re-evaluate, and likely remove, once founding is
+        fast in the stack (sereus#49) — see "Local workarounds to retire" below.
+      - Filed: **sereus#49** (let `foundStrand` return after `publishStrand` and bring the
+        strand up in the background — 103 ms of a 751 ms founding is the commitment;
+        and `resolveCohortSeed` awaits a strand-addr RPC to the relay, which the public
+        relay refuses, ~95 ms per founding). Commented on sereus#47 (sereus's own
+        never-written tables — ConsumedInvite, CancelledInvite, Revocation, Manager —
+        consulted during a joiner's first writes).
       - Filed: gotchoices/Optimystic#38 (move `db-p2p-storage-ns` to sqlite 4.x:
         native threads, native blobs, no activity needed to open).
       - **Idle FRET chatter** (gotchoices/Fret#2): one shared strand costs the S7
@@ -1041,6 +1059,31 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         bridge and `__chatDiag` (crypto, bridge and SQLite cost), and the diagnostics
         screen has a Bridge cost button. Maestro's accessibility queries during a busy
         NativeScript start make Android 17 (emulator) report an ANR; the S7 does not.
+
+- [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
+      complexity carried only because of a stack limitation; on each stack release, re-run
+      the measurement named and drop the workaround if the stack now does the job.
+      - **Founding ahead of the invitation** (`invitations.prepare`, the `preparedStrands`
+        slot, the hidden spare in the strand list, the RN invitation screen's call).
+        Waits on sereus#49 (`foundStrand` returning after the commitment). Re-measure:
+        bridge `invite` on a phone, nothing prepared; if a new conversation's invitation
+        is fast enough without it (the S7 took 4.0–4.7 s, 0.4 s prepared), remove the
+        prepare path, its slot and storage key, and the list filter, and simplify
+        `createInvitation` back to founding inline.
+      - **NativeScript SQLite patch** (`apps/mobile-ns/.yarn/patches/@nativescript-community-sqlite-*`).
+        Waits on Optimystic#38 (sqlite 4.x). Remove with the upgrade; also retire
+        `src/local-kv.ts` and `src/db-path.ts` if 4.x opens without an activity and
+        supports UPSERT on the phones we test.
+      - **NativeScript WebSocket patch** (`apps/mobile-ns/.yarn/patches/@valor-nativescript-websockets-*`).
+        Waits on valor-software/nativescript-plugins#26. Remove when a release copies in
+        bulk without a JNI reference per send.
+      - **`main-event` browser rewrite** (`apps/mobile-ns/webpack.config.js`). Remove if
+        reference-app-ns / a shared NativeScript bring-up (sereus#45) applies packages'
+        `browser` maps.
+      - **WebSocket send batching** (`@chat/core/transport`, installed by mobile-ns). Keep
+        unless `@libp2p/websockets` or the sereus kit batches sends itself (sereus#45).
+      - **Opening an invitation link waits for the node** (`startedNode` in
+        `sereus/model.ts`) is a correctness fix, not a workaround: keep.
 
 ## Phase 8 — Diagnostics and the Node harness
 

@@ -16,6 +16,7 @@ export const STORAGE_KEYS = {
   strandSummaries: '@sereus.chat/strandSummaries',
   joinedStrands: '@sereus.chat/joinedStrands',
   outgoingInvitations: '@sereus.chat/outgoingInvitations',
+  preparedStrands: '@sereus.chat/preparedStrands',
   dataFormat: '@sereus.chat/dataFormat',
   themeMode: '@sereus.chat/themeMode',
   draft: (strandId: string) => `@sereus.chat/draft/${strandId}`,
