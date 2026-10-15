@@ -3,6 +3,11 @@
  * call carrying bytes, and copying bytes element by element, at several sizes. The phone's
  * networking crosses for every WebSocket message and every SQLite blob, so this is the
  * per-message tax. Milliseconds per call.
+ *
+ * The `ByteString.of(ArrayBuffer)` and direct-ByteBuffer rows hand Java a new
+ * DirectByteBuffer per call, held by a JNI global reference until V8 collects it: they are
+ * here to measure, not to copy (an app doing that per message hits Android's 51,200-reference
+ * limit and aborts). The reused-buffer row is what the plugin patches do.
  */
 declare const okio: { ByteString: { of(data: unknown): unknown } };
 const fromByteBuffer = (b: unknown) => (ArrayBuffer as unknown as { from(b: unknown): ArrayBuffer }).from(b);
@@ -17,12 +22,15 @@ export function runBridgeCost(): Record<string, Record<string, number>> {
     'System.nanoTime()': time(20000, () => java.lang.System.nanoTime()),
     'new java.lang.Object()': time(5000, () => new java.lang.Object()),
   };
+  const reused = java.nio.ByteBuffer.allocateDirect(65536);
+  const reusedView = new Uint8Array(fromByteBuffer(reused));
   for (const n of [32, 2048, 16384]) {
     const src = new Uint8Array(n);
     for (let i = 0; i < n; i++) src[i] = i & 255;
     const reps = Math.max(20, Math.floor(100000 / n));
     out[`${n} bytes`] = {
       'okio.ByteString.of(ArrayBuffer)': time(reps, () => okio.ByteString.of(src.buffer.slice(0, n))),
+      'okio.ByteString.of(reused direct buffer)': time(reps, () => { reusedView.set(src, 0); reused.clear(); reused.limit(n); return okio.ByteString.of(reused); }),
       'byte[] filled per element': time(reps, () => { const b = Array.create('byte', n); for (let i = 0; i < n; i++) b[i] = src[i]; return b; }),
       'byte[] via direct ByteBuffer': time(reps, () => { const d = java.nio.ByteBuffer.allocateDirect(n); new Uint8Array(fromByteBuffer(d)).set(src); const b = Array.create('byte', n); d.get(b); return b; }),
     };

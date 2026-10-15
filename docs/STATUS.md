@@ -985,6 +985,32 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
       - **GUI regression after the fixes** (NS debug build, S7, serchat, public relay):
         PASS; join through the screens 23.4 s, whole run 112 s — against 36.7–42.2 s
         and 166–171 s for this morning's NS *release* builds.
+      - **The phone founding and inviting** (S7, NS debug; serchat joins): new strand
+        plus invitation 5.0 s (×2); serchat's join 19.4 and 23.6 s; commits 1.4–2.0 s,
+        delivery 2.5–4.0 s.
+      - **RN release, batching A/B (S7): inconclusive.** Joins 69–111 s, slower than
+        the morning's 40–60 s because each GUI run leaves a strand behind and every
+        strand keeps costing traffic and CPU (Fret#2). One baseline run's message
+        never reached serchat (180 s). Batching stays in `@chat/core/transport`
+        (used by mobile-ns); not installed in apps/mobile, whose polyfills are the
+        kit's (suggested on sereus#45).
+      - **Galaxy S21 Ultra** (NS debug build, Wi-Fi, 87–100 ms ping to the relay against
+        44 ms from the Mac and S7; serchat on the Mac). Hardware: JS as fast as the i9
+        emulator (x25519 2.7 ms, Ed25519 sign 1.7 ms), SQLite faster (0.5 ms per 1 KB
+        write), JS→Java crossings ~12× cheaper than the S7 (0.039 ms). Screen on:
+        - new strand + invitation on the S21: 2.2–2.7 s (1.3–1.5 s with the screen off);
+        - S21 joins serchat's strand: 7.0–12.3 s, writable 4.8–11.2 s after that;
+        - serchat joins the S21's strand: 10.1–11.7 s;
+        - commits 0.6–1.4 s (steady ~0.6–0.7 s), delivery 1.0–2.0 s (steady ~1.0–1.25 s).
+      - **JNI global references (fixed):** handing Java a fresh ArrayBuffer per call (the
+        first versions of both plugin patches) creates a DirectByteBuffer held by a
+        global reference until V8 collects it. The S21 aborted after ~15 minutes
+        (`global reference table overflow (max=51200)`, 50,604 DirectByteBuffers);
+        reproduced with 60,000 `okio.ByteString.of(arrayBuffer)` calls. The patches now
+        reuse one direct buffer and one view: no reference per call, and 0.023 ms per send
+        on the S21. Corrections posted on valor-software/nativescript-plugins#26,
+        Optimystic#38 and sereus#45. The plugin's receive path (heap buffers) is fine.
+        Receive batching was dropped from the WebSocket patch (no measured gain).
       - Filed: gotchoices/Optimystic#38 (move `db-p2p-storage-ns` to sqlite 4.x:
         native threads, native blobs, no activity needed to open).
       - **Idle FRET chatter** (gotchoices/Fret#2): one shared strand costs the S7

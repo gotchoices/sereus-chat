@@ -6,6 +6,8 @@
  * as of the 1.15 stack) calls it, and without it no relay reservation is ever made
  * ("queueMicrotask is not defined"). Worth adding to reference-app-ns upstream.
  */
+import { batchWebSocketSends, type WebSocketPrototype } from '@chat/core/transport';
+
 const g = globalThis as { queueMicrotask?: (cb: () => void) => void };
 if (typeof g.queueMicrotask !== 'function') {
   g.queueMicrotask = (cb: () => void) => {
@@ -41,63 +43,11 @@ if (typeof TextDecoder === 'function' && !decoderOk) {
 console.log(`[polyfill] TextDecoder honours view offsets: ${decoderOk}${decoderOk ? '' : ' — patched to copy views'}`);
 
 /**
- * WebSocket sends, batched. libp2p's WebSocket connection sends each chunk of a write as
- * its own message (`sendData` loops `websocket.send(buf)`); about half are ≤16 bytes
- * (length prefixes, frame headers). Each send here crosses from JS into Java, at a fixed
- * cost of about 0.5 ms on the S7 whatever its size. libp2p reads a WebSocket as a byte
- * stream, so message boundaries carry nothing: binary sends made in one turn are joined
- * and sent once, in a microtask, in order. A text send or `close()` sends what is waiting
- * first.
+ * WebSocket sends, batched (`@chat/core/transport`): libp2p sends each chunk of a write as
+ * its own message, and each message crosses into Java here at ~0.5 ms on the S7. Native
+ * sends are counted for test/devices tools (`__wsNative`).
  */
-type Sendable = ArrayBuffer | ArrayBufferView;
-const wsProto = (globalThis as { WebSocket?: { prototype: { send(d: unknown): void; close(...a: unknown[]): void } } }).WebSocket?.prototype;
-// Native sends, counted for test/devices tools (cheap; read as `__wsNative`).
-const wsNative = ((globalThis as { __wsNative?: { sends: number; bytes: number } }).__wsNative = { sends: 0, bytes: 0 });
-/** Off only to measure what batching saves. */
-const BATCH_WS_SENDS = true;
-if (wsProto) {
-  const nativeSend = wsProto.send;
-  const send = function (this: object, d: unknown) {
-    wsNative.sends++;
-    wsNative.bytes += (d as { byteLength?: number })?.byteLength ?? (d as string)?.length ?? 0;
-    return nativeSend.call(this, d);
-  };
-  wsProto.send = send;
-  if (BATCH_WS_SENDS) batchSends(wsProto, send);
-}
 
-function batchSends(wsProto: { send(d: unknown): void; close(...a: unknown[]): void }, send: (this: object, d: unknown) => void) {
-  const close = wsProto.close;
-  const waiting = new WeakMap<object, Uint8Array[]>();
-  const flush = (ws: object) => {
-    const parts = waiting.get(ws);
-    if (!parts) return;
-    waiting.delete(ws);
-    if (parts.length === 1) return send.call(ws, parts[0]);
-    let size = 0;
-    for (const p of parts) size += p.byteLength;
-    const joined = new Uint8Array(size);
-    let at = 0;
-    for (const p of parts) { joined.set(p, at); at += p.byteLength; }
-    send.call(ws, joined);
-  };
-  wsProto.send = function (this: object, data: unknown) {
-    if (!(data instanceof ArrayBuffer || ArrayBuffer.isView(data))) {
-      flush(this);
-      return send.call(this, data);
-    }
-    const d = data as Sendable;
-    // A copy: the caller may reuse its buffer once send() returns.
-    const bytes = d instanceof ArrayBuffer ? new Uint8Array(d.slice(0)) : new Uint8Array(d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength));
-    let parts = waiting.get(this);
-    if (!parts) {
-      waiting.set(this, (parts = []));
-      queueMicrotask(() => flush(this));
-    }
-    parts.push(bytes);
-  };
-  wsProto.close = function (this: object, ...args: unknown[]) {
-    flush(this);
-    return close.apply(this, args);
-  };
-}
+const wsNative = ((globalThis as { __wsNative?: { sends: number; bytes: number } }).__wsNative = { sends: 0, bytes: 0 });
+const wsProto = (globalThis as { WebSocket?: { prototype: WebSocketPrototype } }).WebSocket?.prototype;
+if (wsProto) batchWebSocketSends(wsProto, bytes => { wsNative.sends++; wsNative.bytes += bytes; });

@@ -19,7 +19,11 @@
       "types": "./dist/diagnostics/index.d.ts",
       "default": "./dist/diagnostics/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./transport": {
+      "types": "./dist/transport/index.d.ts",
+      "default": "./dist/transport/index.js"
+    }
   },
   "files": [
     "dist"

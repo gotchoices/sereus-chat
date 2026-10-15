@@ -1,8 +1,32 @@
 diff --git a/bridge.android.js b/bridge.android.js
-index 0ea0a65cdb6f05a0f1a8f46f0c5bf2b347a4bf84..782ae79942ad1cc828b368f48073005ce15cb4bb 100644
+index 0ea0a65cdb6f05a0f1a8f46f0c5bf2b347a4bf84..ae866abec57fc4235e4b5aa3fcabd636b55be2cc 100644
 --- a/bridge.android.js
 +++ b/bridge.android.js
-@@ -92,12 +92,11 @@ export class NativeBridge extends NativeBridgeDefinition {
+@@ -61,6 +61,23 @@ function getDefaultOrigin(uri) {
+         throw new java.lang.IllegalArgumentException('Unable to set ' + uri + ' as default origin header');
+     }
+ }
++// One direct buffer, reused, for bytes going from JS into Java. Passing a JS ArrayBuffer to
++// Java instead hands over a new java.nio.DirectByteBuffer held by a JNI global reference
++// until V8 collects the ArrayBuffer; at a send per message, a fast phone reaches Android's
++// 51,200-reference limit and aborts ("global reference table overflow"). Copying in JS into
++// a view made once, then one bulk transfer on the Java side, creates no reference per call.
++let scratch = null;
++let scratchView = null;
++function scratchFor(size) {
++    if (!scratch || scratch.capacity() < size) {
++        let capacity = 65536;
++        while (capacity < size)
++            capacity *= 2;
++        scratch = java.nio.ByteBuffer.allocateDirect(capacity);
++        scratchView = new Uint8Array(ArrayBuffer.from(scratch));
++    }
++    return scratch;
++}
+ export class NativeBridge extends NativeBridgeDefinition {
+     constructor() {
+         super(...arguments);
+@@ -92,12 +109,15 @@ export class NativeBridge extends NativeBridgeDefinition {
      }
      send(data) {
          if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
@@ -12,47 +36,15 @@ index 0ea0a65cdb6f05a0f1a8f46f0c5bf2b347a4bf84..782ae79942ad1cc828b368f48073005c
 -                byteBuffer[i] = view[i];
 -            }
 -            this.nativeWs.send(okio.ByteString.of(byteBuffer));
-+            // The bytes of THIS view (not its whole buffer from offset 0), handed over in
-+            // one call: an ArrayBuffer marshals to a java.nio.ByteBuffer, which okio copies.
-+            // Copying element by element crosses into Java once per byte.
-+            const bytes = data instanceof ArrayBuffer ? data : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
-+            this.nativeWs.send(okio.ByteString.of(bytes));
++            // The bytes of THIS view (not its whole buffer from offset 0), copied into Java in
++            // bulk (see scratchFor) instead of crossing into Java once per byte. okio copies
++            // them out of the buffer, so it can be reused at once.
++            const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
++            const buffer = scratchFor(bytes.byteLength);
++            scratchView.set(bytes, 0);
++            buffer.clear();
++            buffer.limit(bytes.byteLength);
++            this.nativeWs.send(okio.ByteString.of(buffer));
              return;
          }
          if (typeof data === 'string') {
-@@ -117,9 +116,34 @@ export class NativeBridge extends NativeBridgeDefinition {
-     }
-     onMessage(ws, data) {
-         if (!this.isCorrectThread()) {
--            this.scheduleToThread(() => this.onMessage(ws, data));
-+            // Batched: messages arriving off the start thread are queued, and ONE posted task
-+            // (a Runnable made once) delivers all that arrived before it runs, in order —
-+            // instead of a new Runnable proxy, a post and a second thread check per message.
-+            (this._inbox || (this._inbox = [])).push(data);
-+            if (this._inbox.length === 1 && this.handleThreading && this.handler) {
-+                if (!this._drainInbox) {
-+                    this._drainInbox = new java.lang.Runnable({
-+                        run: () => {
-+                            const inbox = this._inbox;
-+                            this._inbox = [];
-+                            for (const message of inbox)
-+                                this.deliverMessage(message);
-+                        },
-+                    });
-+                }
-+                this.handler.post(this._drainInbox);
-+            }
-+            else if (!(this.handleThreading && this.handler)) {
-+                const inbox = this._inbox;
-+                this._inbox = [];
-+                for (const message of inbox)
-+                    this.deliverMessage(message);
-+            }
-             return;
-         }
-+        this.deliverMessage(data);
-+    }
-+    deliverMessage(data) {
-         if (data instanceof okio.ByteString) {
-             let arrayBuffer;
-             if (fastConversionAvailable) {

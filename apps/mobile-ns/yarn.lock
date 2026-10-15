@@ -1084,13 +1084,13 @@ __metadata:
 
 "@nativescript-community/sqlite@patch:@nativescript-community/sqlite@npm%3A3.5.9#~/.yarn/patches/@nativescript-community-sqlite-npm-3.5.9-3269d0d97e.patch":
   version: 3.5.9
-  resolution: "@nativescript-community/sqlite@patch:@nativescript-community/sqlite@npm%3A3.5.9#~/.yarn/patches/@nativescript-community-sqlite-npm-3.5.9-3269d0d97e.patch::version=3.5.9&hash=1ea2f9"
+  resolution: "@nativescript-community/sqlite@patch:@nativescript-community/sqlite@npm%3A3.5.9#~/.yarn/patches/@nativescript-community-sqlite-npm-3.5.9-3269d0d97e.patch::version=3.5.9&hash=0aec42"
   dependencies:
     "@nativescript/hook": "npm:~2.0.0"
   peerDependencies:
     "@nano-sql/core": ^2.3.7
     typeorm: ^0.3.17
-  checksum: 10c0/e1fd3ae0f6e528b0bc893044ac9d0ee36f1c10a65da69bae3befa0102208bb76a513b86ac40d8ae2bd2394c5ad53b2ad654d4d89f2ea4381bf98579424596ffb
+  checksum: 10c0/739283d99f288cc112885825d45c6f50636dbdf171922e230584265ec2cb3056fa5277eaa14f0004f724f29fdc5599247b4f6a03cebd47158c38ef4a71ba4d1e
   languageName: node
   linkType: hard
 
@@ -1649,8 +1649,8 @@ __metadata:
 
 "@valor/nativescript-websockets@patch:@valor/nativescript-websockets@npm%3A2.0.3#~/.yarn/patches/@valor-nativescript-websockets-npm-2.0.3-1d4fb0b2f4.patch":
   version: 2.0.3
-  resolution: "@valor/nativescript-websockets@patch:@valor/nativescript-websockets@npm%3A2.0.3#~/.yarn/patches/@valor-nativescript-websockets-npm-2.0.3-1d4fb0b2f4.patch::version=2.0.3&hash=5aeea3"
-  checksum: 10c0/e8f6c5da0855a089c14b757fdebb4b2a4b375332f231c80439ef1571e1f257c05a114f7e296eceef8f2ec57d7c35239f37c97f061f443d61f58d41d8e668ac49
+  resolution: "@valor/nativescript-websockets@patch:@valor/nativescript-websockets@npm%3A2.0.3#~/.yarn/patches/@valor-nativescript-websockets-npm-2.0.3-1d4fb0b2f4.patch::version=2.0.3&hash=5cc920"
+  checksum: 10c0/3e89521cc35e75846502ebcb26c36c281776402e769708fc6cc1566fd60289cfa99f06bbd35aae0457b9b7217485fe4ac2535a635653be27dd61ec852233c9b6
   languageName: node
   linkType: hard
 

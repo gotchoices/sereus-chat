@@ -1,39 +1,67 @@
 diff --git a/sqlite.common.js b/sqlite.common.js
-index 2bd0e28c25ca02cfc5c2caf12a1d900997826c20..a6414d8883a9bc2ec8612e55c6d50325c1e7bee6 100644
+index 2bd0e28c25ca02cfc5c2caf12a1d900997826c20..f57436a99d1b02a55024c7418a06768caec6c9de 100644
 --- a/sqlite.common.js
 +++ b/sqlite.common.js
-@@ -4,6 +4,15 @@ export function isNothing(x) {
+@@ -1,9 +1,37 @@
+ export function isNothing(x) {
+     return x === undefined || x === null;
+ }
++// One direct buffer, reused, for bytes crossing between JS and Java. Passing a JS ArrayBuffer to
++// Java instead hands over a new java.nio.DirectByteBuffer held by a JNI global reference
++// until V8 collects the ArrayBuffer; at a call per blob, a fast phone reaches Android's
++// 51,200-reference limit and aborts ("global reference table overflow"). Copying in JS into
++// a view made once, then one bulk transfer on the Java side, creates no reference per call.
++let scratch = null;
++let scratchView = null;
++function scratchFor(size) {
++    if (!scratch || scratch.capacity() < size) {
++        let capacity = 65536;
++        while (capacity < size)
++            capacity *= 2;
++        scratch = java.nio.ByteBuffer.allocateDirect(capacity);
++        scratchView = new Uint8Array(ArrayBuffer.from(scratch));
++    }
++    return scratch;
++}
++export function scratchBuffer(size) {
++    return { buffer: scratchFor(size), view: scratchView };
++}
  export function arrayToNativeByteArray(val) {
      const length = val.length;
      const result = Array.create('byte', length);
-+    if (ArrayBuffer.isView(val) && length >= 96) {
-+        // One bulk copy through a direct buffer instead of crossing into Java once per byte
-+        // (on a Galaxy S7 the bulk path costs ~1.1 ms a call and a byte ~12 µs, so bulk wins
-+        // from ~96 bytes; a 16 KB blob drops from ~170 ms to ~1.4 ms).
-+        const direct = java.nio.ByteBuffer.allocateDirect(length);
-+        new Uint8Array(ArrayBuffer.from(direct)).set(new Uint8Array(val.buffer, val.byteOffset, val.byteLength));
-+        direct.get(result);
++    if (ArrayBuffer.isView(val) && length >= 64) {
++        // One bulk copy (see scratchFor) instead of crossing into Java once per byte.
++        const { buffer, view } = scratchBuffer(length);
++        view.set(new Uint8Array(val.buffer, val.byteOffset, val.byteLength), 0);
++        buffer.clear();
++        buffer.get(result, 0, length);
 +        return result;
 +    }
      for (let i = 0; i < length; i++) {
          result[i] = val[i];
      }
 diff --git a/sqlitedatabase.android.js b/sqlitedatabase.android.js
-index ae4ce5cc84292ad31711c96d24ee9a048cffeb90..aee3193a2465bcacee848556855d79ed0eaaed20 100644
+index ae4ce5cc84292ad31711c96d24ee9a048cffeb90..1a5c9eabb19379fec1cece20ebdcc1af77a166ac 100644
 --- a/sqlitedatabase.android.js
 +++ b/sqlitedatabase.android.js
-@@ -5,8 +5,15 @@ export function byteArrayToBuffer(value) {
+@@ -1,12 +1,20 @@
+-import { paramsToStringArray, throwError } from './sqlite.common';
++import { paramsToStringArray, scratchBuffer, throwError } from './sqlite.common';
+ import { SDK_VERSION } from '@nativescript/core/utils';
+ export function byteArrayToBuffer(value) {
+     if (!value) {
          return null;
      }
      const length = value.length;
 -    const ret = new Uint8Array(length);
      const isString = typeof value === 'string';
-+    if (!isString && length >= 96) {
-+        // One bulk copy through a direct buffer instead of crossing into Java once per byte
-+        // (see arrayToNativeByteArray).
-+        const direct = java.nio.ByteBuffer.allocateDirect(length);
-+        direct.put(value);
-+        return new Uint8Array(ArrayBuffer.from(direct)).slice();
++    if (!isString && length >= 64) {
++        // One bulk copy (see scratchFor in sqlite.common) instead of crossing into Java once
++        // per byte; the copy out is JS's own.
++        const { buffer, view } = scratchBuffer(length);
++        buffer.clear();
++        buffer.put(value, 0, length);
++        return view.slice(0, length);
 +    }
 +    const ret = new Uint8Array(length);
      for (let i = 0; i < length; i++) {
