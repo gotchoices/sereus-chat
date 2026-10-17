@@ -16,6 +16,8 @@
  *   MESSAGES=30 node test/stack/formation-cost.mjs     # then N more steady-state writes, timed
  *   FOUND_ONLY=10 node test/stack/formation-cost.mjs   # one party founds N strands in a row, nothing else
  *   TRACE_SQL=1 FOUND_ONLY=3 node test/stack/formation-cost.mjs  # count the SQL quereus is given per step
+ *   IDLE_S=180 DEBUG='optimystic:fret*' node …          # then sit idle (FRET's backoff, idle traffic)
+ *   SHOW_LIMITS=1 node …                                # list each connection, relayed or direct, and its relay limits
  *
  * Prints one line per step with its duration, and the event loop's own CPU use per
  * step (process.cpuUsage), so "waiting" and "working" can be told apart.
@@ -189,14 +191,37 @@ if (MESSAGES > 0) {
   const cpu0 = process.cpuUsage();
   const wall0 = Date.now();
   for (let i = 0; i < MESSAGES; i++) {
+    if (process.env.DEBUG) process.stderr.write(`\n#### ${new Date().toISOString()} BEGIN message ${i}\n`);
     const t = Date.now();
     await db.exec(`insert into App.Message (Id, MemberId, Content) values ('s${i}', 'b', 'message ${i}')`, undefined, { transaction: true });
     times.push(Date.now() - t);
+    if (process.env.DEBUG) process.stderr.write(`#### ${new Date().toISOString()} END message ${i} ${Date.now() - t} ms\n`);
   }
   const used = process.cpuUsage(cpu0);
   times.sort((x, y) => x - y);
   console.log(`\n${MESSAGES} steady-state writes by the joiner: median ${times[times.length >> 1]} ms, min ${times[0]}, max ${times.at(-1)}; ` +
     `CPU ${Math.round((used.user + used.system) / 1000 / MESSAGES)} ms per write over ${Math.round((Date.now() - wall0) / MESSAGES)} ms wall`);
+}
+
+const IDLE_S = Number(process.env.IDLE_S ?? 0);
+if (IDLE_S > 0) {
+  // Leave everything running and idle, e.g. to watch FRET's maintenance back off.
+  console.log(`\nidle ${IDLE_S} s…`);
+  if (process.env.DEBUG) process.stderr.write(`\n#### ${new Date().toISOString()} BEGIN idle\n`);
+  await new Promise(r => setTimeout(r, IDLE_S * 1000));
+  if (process.env.DEBUG) process.stderr.write(`#### ${new Date().toISOString()} END idle\n`);
+}
+
+if (process.env.SHOW_LIMITS) {
+  // Relayed connections the relay limits (circuit-relay-v2 `limit`: data and/or duration).
+  for (const [who, party] of [['founder', A], ['joiner', B]]) {
+    const nodes = [['control', party.getControlNode()], ...[...party.getStrands()].map(([id, s]) => [id.slice(0, 15), s.libp2pNode])];
+    for (const [label, node] of nodes) {
+      for (const c of node?.getConnections() ?? []) {
+        console.log(`${who} ${label} → ${c.remotePeer.toString().slice(-6)} ${c.remoteAddr.toString().includes('p2p-circuit') ? 'relayed' : 'direct'} limits=${JSON.stringify(c.limits ?? null, (k, v) => typeof v === 'bigint' ? Number(v) : v)}`);
+      }
+    }
+  }
 }
 
 console.log('\nsummary (ms, by step, all runs):');

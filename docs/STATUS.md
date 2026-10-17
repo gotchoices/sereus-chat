@@ -1060,6 +1060,33 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         screen has a Bridge cost button. Maestro's accessibility queries during a busy
         NativeScript start make Android 17 (emulator) report an ANR; the S7 does not.
 
+- [x] **Stack survey 2026-10-16.** Adopted **sereus 1.16.0** (cadre-core, cadre-rn; it
+      moves sereus onto optimystic 1.15 / p2p-fret 1.1, which we already ran, and refuses a
+      non-positive `dialTimeout`; core 66/66). Held libp2p 3.4.0 / `@libp2p/websockets`
+      10.1.23 until sereus moves (no change to one-message-per-chunk).
+      - Maintainer (n8allan) decisions, 2026-10-15: **#49** accepted as an opt-in
+        `foundStrand(…, { background: true })` → `{ strandRow, founded, ready }`, plus
+        skipping a relay after its first strand-addr refusal; **#47** accepted: the founder
+        will create empty collections for every declared table (and `Revocation`,
+        `ConsumedInvite`, `CancelledInvite`) at founding; **#45** accepted after the
+        owner-key work (reference-app-ns gets the `main-event` and SQLite-path fixes; send
+        coalescing planned for the RN kit and the NS app); **#46** versioned control-schema
+        migrations, typed error first — the owner-key release is expected to need one more
+        party recreate (a `DATA_FORMAT` bump here) unless migrations land first; **#48**
+        deadline fixes after #47. No reply yet on Optimystic#38/#39 or
+        nativescript-plugins#26.
+      - Re-tests answered: **Fret#2** (S7, fret 1.1.0: no `neighbors` streams, `ping`
+        24 → 6 a minute, WebSocket messages −63% idle; Node shows no backoff resets);
+        **sereus#34** (38 strand starts: relay first attempts median 1 ms, max 2.0 s — the
+        18 s drive is gone); **Optimystic#29** (a steady write is 3 `cluster` requests on
+        open streams, median 286 ms on the public relay, from 0.6–0.9 s).
+      - New observations, posted: one attach in three over the public relay takes 10–13 s
+        (a 33-block replication push spends ~8 s crossing the relay; two relayed
+        connections between the strand nodes; on Optimystic#39). The main idle cost left
+        is sereus's **revocation enforcer**: every 30 s per party it re-reads Member,
+        MemberPeer and two tree blocks from the other member (4 relayed requests; mentioned
+        on Fret#2 — a candidate sereus issue of its own).
+
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run
       the measurement named and drop the workaround if the stack now does the job.
