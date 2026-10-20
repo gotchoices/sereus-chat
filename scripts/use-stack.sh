@@ -66,9 +66,9 @@ PACKAGES = collections.OrderedDict([
     ('@optimystic/db-p2p-storage-ns',         ('optimystic/packages/db-p2p-storage-ns',         '1.15.0', True)),
     ('@optimystic/quereus-plugin-crypto',     ('optimystic/packages/quereus-plugin-crypto',     '1.15.0', True)),
     ('@optimystic/quereus-plugin-optimystic', ('optimystic/packages/quereus-plugin-optimystic', '1.15.0', True)),
-    ('@quereus/quereus',                      ('quereus/packages/quereus',                      '4.20.2', True)),
-    ('@serfab/cadre-core',                    ('sereus/packages/cadre-core',                    '1.16.0', True)),
-    ('@serfab/cadre-rn',                      ('sereus/packages/cadre-rn',                      '1.16.0', False)),
+    ('@quereus/quereus',                      ('quereus/packages/quereus',                      '4.20.3', True)),
+    ('@serfab/cadre-core',                    ('sereus/packages/cadre-core',                    '1.17.0', True)),
+    ('@serfab/cadre-rn',                      ('sereus/packages/cadre-rn',                      '1.17.0', False)),
     ('p2p-fret',                              ('fret/packages/fret',                            '1.1.0',  True)),
 ])
 SENTINEL = '@serfab/cadre-core'

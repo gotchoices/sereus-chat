@@ -13,6 +13,7 @@ import { createServer, type AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { CadreNode, DEFAULT_IDENTITY_KEY_ID, type CadreNodeConfig } from '@serfab/cadre-core';
 import { FileKeyStore } from '@serfab/cadre-core/key-store-file';
+import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { FileTrustedOwnerStore } from '@serfab/cadre-core/trusted-owner-store-file';
 import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-file';
 import { FileEnrolledMachineStore } from '@serfab/cadre-core/enrolled-machine-store-file';
@@ -82,12 +83,14 @@ export function createCliHost(opts: HostOptions): CliHost {
   const reachabilityCallbacks = new Set<() => void>();
 
   const memoryScopes = new Map<string, MemoryRawStorage>();
+  // The node's identity and, in its own slot, the party's owner key (separate since sereus 1.17).
+  const keyStore = new FileKeyStore(dirs.keys);
   const relays = () => [...new Set([...config.relays, ...opts.extraRelays])];
 
   async function build(): Promise<CadreNode> {
     const { partyId } = config;
     const nodeConfig: CadreNodeConfig = {
-      keyStore: new FileKeyStore(dirs.keys),
+      keyStore,
       identityKeyId: DEFAULT_IDENTITY_KEY_ID,
       controlNetwork: { partyId, bootstrapNodes: [] },
       profile: 'transaction',
@@ -125,17 +128,12 @@ export function createCliHost(opts: HostOptions): CliHost {
     const control = built.getControlNode();
     control?.addEventListener('self:peer:update', () => reachabilityCallbacks.forEach(cb => cb()));
     reachabilityCallbacks.forEach(cb => cb());
-    // Owner genesis, as the phone kit runs it on every start (idempotent): the node must be
-    // an enrolled owner to publish strands and invitations.
-    owner = await Promise.race([
-      (async () => {
-        const key = built.getIdentityOwnerKey();
-        await built.getControlDatabase()!.ensureOwnerKey(key.publicKeyB64);
-        await built.initializeSeedBootstrap(key.privateKeyB64);
-        return true;
-      })().catch(err => { console.warn('[serchat] owner genesis failed:', err); return false; }),
-      new Promise<boolean>(resolve => setTimeout(() => resolve(false), OWNER_GENESIS_MS).unref()),
-    ]);
+    // Owner genesis, as cadre-core's edge node runs it on every start (idempotent, bounded,
+    // fail-soft): the owner slot's key — created on the first start — becomes the founding
+    // owner. The node must be an enrolled owner to publish strands and invitations.
+    const genesis = await runOwnerGenesis(built, { keyStore, label: 'serchat', timeoutMs: OWNER_GENESIS_MS });
+    if (genesis !== 'enrolled') console.warn(`[serchat] owner genesis: ${genesis}`);
+    owner = genesis === 'enrolled';
   }
 
   async function stop(): Promise<void> {
@@ -189,6 +187,7 @@ export function createCliHost(opts: HostOptions): CliHost {
   return {
     node: nodeHost,
     slot: (name, key) => fileSlot(dirs, name, key),
+    ownerKeyStore: keyStore,
     dev: opts.dev,
   };
 }

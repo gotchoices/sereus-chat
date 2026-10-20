@@ -30,7 +30,8 @@ import { identify } from '@libp2p/identify';
 import { circuitRelayServer, circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { generateKeyPair } from '@libp2p/crypto/keys';
 import { MemoryRawStorage } from '@optimystic/db-p2p';
-import { CadreNode, generateStrandMemberKey } from '@serfab/cadre-core';
+import { CadreNode, generateStrandMemberKey, InMemoryKeyStore } from '@serfab/cadre-core';
+import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { Database } from '@quereus/quereus';
@@ -118,10 +119,9 @@ async function makeParty(tag, relayAddr) {
     requireSignedSchemas: false,
   });
   await step(tag, 'node.start()', () => node.start());
-  await step(tag, 'owner genesis (ensureOwnerKey + seed)', async () => {
-    const { privateKeyB64, publicKeyB64 } = node.getIdentityOwnerKey();
-    await node.getControlDatabase().ensureOwnerKey(publicKeyB64);
-    await node.initializeSeedBootstrap(privateKeyB64);
+  await step(tag, 'owner genesis (runOwnerGenesis)', async () => {
+    const result = await runOwnerGenesis(node, { keyStore: new InMemoryKeyStore(), label: tag });
+    if (result !== 'enrolled') throw new Error(`${tag}: owner genesis ${result}`);
   });
   await step(tag, 'reachable (an address to be dialled at)', async () => {
     while (node.getMultiaddrs().length === 0) await new Promise(r => setTimeout(r, 50));
@@ -141,6 +141,12 @@ if (FOUND_ONLY > 0) {
     await step('founder', `foundStrand #${i}`, async () =>
       A.foundStrand({ strandId: `strand-${randomUUID()}`, type: 'c', memberPrivateKey: await generateStrandMemberKey(), sAppConfig: SAPP }));
     dumpSql(`foundStrand #${i}`);
+    // sereus 1.17 (#49): the same, returning once the row is published; then the start.
+    let ready;
+    await step('founder', `foundStrand #${i} background: published`, async () => {
+      ({ ready } = await A.foundStrand({ strandId: `strand-${randomUUID()}`, type: 'c', memberPrivateKey: await generateStrandMemberKey(), sAppConfig: SAPP }, { background: true }));
+    });
+    await step('founder', `foundStrand #${i} background: ready`, () => ready);
   }
   await A.stop();
   await relay?.stop();
@@ -164,7 +170,7 @@ for (let run = 1; run <= RUNS; run++) {
   const code = A.encodeInvitation(invitation);
 
   const formed = await step('joiner', 'formStrand', () => B.formStrand(B.decodeInvitation(code), { metadata: { name: 'B' } }));
-  const row = { Id: formed.strandId, MemberPrivateKey: formed.memberPrivateKey ?? null, Type: 'c', FounderOwnerKey: null };
+  const row = { Id: formed.strandId, MemberPrivateKey: formed.memberPrivateKey ?? null, Type: 'c', FounderOwnerKey: null, FounderPeerId: null };
   await step('joiner', 'addStrand (no first-sync wait)', () => B.addStrand({ strandRow: row, sAppConfig: SAPP, awaitFirstSync: false }));
   const bInst = await step('joiner', 'whenStrandWritable', () => B.whenStrandWritable(formed.strandId, { timeoutMs: 300_000 }));
   const bDb = bInst.database.getDatabase();

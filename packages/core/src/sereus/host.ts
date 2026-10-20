@@ -6,7 +6,7 @@
  * never constructs one. The app also decides where slots live (AsyncStorage, IndexedDB,
  * a file, memory) and pins their persisted names.
  */
-import type { CadreNode, CadreNodeEvents, DurableSlot } from '@serfab/cadre-core';
+import type { CadreNode, CadreNodeEvents, DurableSlot, KeyStore } from '@serfab/cadre-core';
 
 export type { DurableSlot };
 
@@ -64,6 +64,12 @@ export interface ChatHost {
   node: NodeHost;
   /** The slot for one record. `key` names the strand for per-strand records. */
   slot(name: SlotName, key?: string): DurableSlot;
+  /**
+   * Where this device keeps its owner key (cadre-core's owner slot, `DEFAULT_OWNER_KEY_ID`),
+   * which since sereus 1.17 is separate from the machine's identity. Read only to export the
+   * key for backup (`cadre.exportOwnerKey`); absent, there is nothing to export.
+   */
+  ownerKeyStore?: KeyStore;
   /**
    * Diagnostics only: build and start a second, throwaway party's node in this process,
    * relay-only, with storage the host chooses (never the app's own). Checks that need a

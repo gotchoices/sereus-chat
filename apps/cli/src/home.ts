@@ -11,10 +11,11 @@ import { randomUUID } from 'node:crypto';
 
 /**
  * The form of everything a profile stores. Bump it when a stack upgrade or a change here
- * makes older profiles unreadable (sereus 1.15 changed the control schema: parties made
- * with 1.14 do not load). A profile in another form is refused, never misread.
+ * makes older profiles unreadable (sereus 1.17 refuses control stores written by 1.16 or
+ * earlier, and keeps the owner key apart from the identity). A profile in another form is
+ * refused, never misread.
  */
-export const DATA_FORMAT = 'sereus-1.15';
+export const DATA_FORMAT = 'sereus-1.17';
 
 /** What `profile.json` holds: the node's start options, saved across runs. */
 export interface ProfileConfig {

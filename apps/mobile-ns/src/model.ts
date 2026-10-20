@@ -4,6 +4,8 @@
  * to core stores over `model`.
  */
 import { createSereusModel } from '@chat/core/sereus';
+import { CHAT_SAPP_ID, getChatSAppConfig } from '@chat/core';
+import { generateStrandMemberKey } from '@serfab/cadre-core';
 import { createDevBridge, runCryptoCost } from '@chat/core/diagnostics';
 import { runBridgeCost, runSqliteCost } from './bridge-cost';
 import { createTranslator } from '@chat/resources';
@@ -19,7 +21,24 @@ declare const __DEV__: boolean;
 if (__DEV__) {
   (globalThis as { __chatDev?: unknown }).__chatDev = createDevBridge(model, chatHost.node);
   // The diagnostics screen's benchmarks, callable over the inspector (no UI automation).
-  (globalThis as { __chatDiag?: unknown }).__chatDiag = { crypto: () => runCryptoCost(() => {}), bridge: runBridgeCost, sqlite: runSqliteCost };
+  (globalThis as { __chatDiag?: unknown }).__chatDiag = {
+    crypto: () => runCryptoCost(() => {}), bridge: runBridgeCost, sqlite: runSqliteCost,
+    /** An invitation into a new strand, step by step, on bare cadre-core (sereus 1.17 background founding). */
+    async founding() {
+      const node = chatHost.node.node;
+      if (!node) throw new Error('node not running');
+      const t0 = Date.now();
+      const strandId = `diag-${Date.now()}`;
+      const { ready } = await node.foundStrand({ strandId, type: 'c', memberPrivateKey: await generateStrandMemberKey(), sAppConfig: getChatSAppConfig() }, { background: true });
+      const published = Date.now() - t0;
+      const invitation = await node.createOpenInvitation(CHAT_SAPP_ID, 3_600_000);
+      const minted = Date.now() - t0;
+      await node.publishFormationInvite(invitation.token, CHAT_SAPP_ID, { strandId, expiresAtMs: Date.now() + 3_600_000, totalUses: 1 });
+      const invitePublished = Date.now() - t0;
+      await ready;
+      return { published, minted, invitePublished, ready: Date.now() - t0 };
+    },
+  };
 }
 
 let booting: Promise<void> | null = null;

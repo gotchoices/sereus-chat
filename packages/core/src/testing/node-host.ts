@@ -3,7 +3,8 @@
  * node with in-memory block storage and in-memory slots, and an in-process circuit relay
  * for the relay-only topology phones live in.
  */
-import { CadreNode } from '@serfab/cadre-core';
+import { CadreNode, InMemoryKeyStore } from '@serfab/cadre-core';
+import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { MemoryRawStorage } from '@optimystic/db-p2p';
 import { generateKeyPair } from '@libp2p/crypto/keys';
 import { webSockets } from '@libp2p/websockets';
@@ -62,6 +63,8 @@ export async function createTestParty(tag: string, opts: { relayAddr?: string; l
   const scopes = new Map<string, MemoryRawStorage>();
   const partyId = `${tag}-${newId()}`;
   let owned = false;
+  // This party's owner key, apart from the machine's identity (sereus 1.17).
+  const ownerKeyStore = new InMemoryKeyStore();
   const relayAddrs = opts.relayAddr ? [opts.relayAddr] : [];
   const node = new CadreNode({
     privateKey: await generateKeyPair('Ed25519'),
@@ -93,9 +96,8 @@ export async function createTestParty(tag: string, opts: { relayAddr?: string; l
         await node.start();
         // Owner genesis, as the cadre kit runs it: the node must be an enrolled owner to
         // publish strands and invitations.
-        const owner = node.getIdentityOwnerKey();
-        await node.getControlDatabase()!.ensureOwnerKey(owner.publicKeyB64);
-        await node.initializeSeedBootstrap(owner.privateKeyB64);
+        const genesis = await runOwnerGenesis(node, { keyStore: ownerKeyStore, label: tag });
+        if (genesis !== 'enrolled') throw new Error(`${tag}: owner genesis did not enrol (${String(genesis)})`);
         owned = true;
       })();
       return started;
@@ -117,7 +119,7 @@ export async function createTestParty(tag: string, opts: { relayAddr?: string; l
       return () => control.removeEventListener('self:peer:update', callback);
     },
   };
-  const host: ChatHost = { node: nodeHost, slot: memorySlots() };
+  const host: ChatHost = { node: nodeHost, slot: memorySlots(), ownerKeyStore };
   const { model, boot } = createSereusModel(host);
   return { tag, host, node, model, boot, stop: () => node.stop() };
 }

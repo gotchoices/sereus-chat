@@ -1085,14 +1085,56 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         connections between the strand nodes; on Optimystic#39). The main idle cost left
         is sereus's **revocation enforcer**: every 30 s per party it re-reads Member,
         MemberPeer and two tree blocks from the other member (4 relayed requests; mentioned
-        on Fret#2 — a candidate sereus issue of its own).
+        on Fret#2). Reproduced 2026-10-18 (`IDLE_S=120`, 1 and 3 strands: 8 polls and ~33
+        sync requests per strand per 2 min, 83–98% within 2 s of a poll). **Not a new
+        issue:** sereus#50 (filed 10-15) already covers the enforcer among an idle cadre's
+        timers, counted as local block reads; our data adds that on a strand these reads
+        cross the relay to the other member. Commented on sereus#50 (2026-10-18). The
+        copy of `formation-cost.mjs` attached to Optimystic#39 predates `IDLE_S` and
+        `SHOW_LIMITS`.
+
+- [x] **sereus 1.17.0 + quereus 4.20.3 adopted** (2026-10-19). Held: libp2p 3.5.1
+      (sereus still ranges ^3.3.11), sqlite 4.1.0 (Optimystic#38).
+      - **Breaking, handled:** owner keys are separate from the machine identity —
+        `getIdentityOwnerKey` is gone; genesis is `runOwnerGenesis(node, { keyStore })`
+        (`@serfab/cadre-core/edge-node`) in serchat (FileKeyStore owner slot), mobile-ns
+        (`LocalKeyStore` over the SQLite `kv` table), the core's test host and diagnostics;
+        the RN kit does its own. `ChatHost.ownerKeyStore` (optional) backs
+        `cadre.exportOwnerKey`; the status fingerprint reads `getOwnerSigner()`.
+        `StrandRow.FounderPeerId` (null on joined rows). Control stores from ≤1.16 are
+        refused (`ControlStoreIncompatibleError`): **`DATA_FORMAT` → `sereus-1.17`** in
+        serchat and apps/mobile. mobile-ns has no data-format check yet — clear test
+        phones' data (`pm clear`) when installing a 1.17 build.
+      - **Our issues in 1.17:** #49 background founding shipped (opt-in); #47 empty
+        collections at founding shipped; #45 shared edge node (`createEdgeNode`) shipped;
+        #48 deadline ladder; #46 schema versions recorded from now on. Not yet:
+        Optimystic#39 (double fetch; no optimystic release), sereus#50 (idle pollers).
+      - **Measured (Node, public relay):** background founding publishes in 38–45 ms vs
+        556–698 ms foreground; join `addStrand` 2.3–2.5 s (unchanged, #39); the joiner's
+        first writes no longer hit `no-quorum` (#47) but still fetch the strand tables one
+        block at a time (12 and 17 sync requests); steady writes 317 ms median; idle
+        24 polls / 102 sync requests per 3 strands per 2 min (unchanged, #50).
+      - **S7 (NS):** joins 22.8 / 23.5 s (+~11 s to writable), commits 2.4–4.0 s — no
+        better than 1.16. Background founding in the app: invitation ready in 1.9–2.8 s
+        (published ~1.1 s, invite published ~0.7–1.5 s) vs prepared 0.47–0.50 s.
+      - **Background founding NOT adopted (reverted):** with it, serchat's inviter was
+        unreachable to joiners ("Could not reach the person who invited you") in the
+        talk and offline-inviter scenarios; foreground passes. Bare cadre-core
+        (`test/stack/background-founding-double-start.mjs`, `background-founding-restart.mjs`)
+        joins fine with memory or file storage, even with the strand watcher offering
+        the half-started strand and three overlapping `addStrand` calls — so the cause is
+        in our use, not yet isolated; no upstream report until it is. Found on the way:
+        the watcher offers a background-founded strand as `strand:discovered` before
+        `publishStrand` returns (file storage). The prepared path stays (STATUS
+        "Local workarounds to retire": still needed).
 
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run
       the measurement named and drop the workaround if the stack now does the job.
       - **Founding ahead of the invitation** (`invitations.prepare`, the `preparedStrands`
         slot, the hidden spare in the strand list, the RN invitation screen's call).
-        Waits on sereus#49 (`foundStrand` returning after the commitment). Re-measure:
+        Waits on sereus#49 (`foundStrand` returning after the commitment — shipped in 1.17,
+        but not adopted yet: see the 1.17 entry above). Re-measure:
         bridge `invite` on a phone, nothing prepared; if a new conversation's invitation
         is fast enough without it (the S7 took 4.0–4.7 s, 0.4 s prepared), remove the
         prepare path, its slot and storage key, and the list filter, and simplify

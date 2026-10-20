@@ -195,6 +195,8 @@ export type JoinedStrand = {
   MemberPrivateKey: string | null;
   Type: 'c' | 'o';
   FounderOwnerKey: null;
+  /** Null on a consent-seated row, which every joined strand is (sereus 1.17 `StrandRow`). */
+  FounderPeerId: null;
   /** Left with the membership key kept (story 33): never re-attached on its own. */
   Left?: boolean;
 };
@@ -220,6 +222,7 @@ export class JoinedStrands {
         MemberPrivateKey: typeof row.MemberPrivateKey === 'string' ? row.MemberPrivateKey : null,
         Type: row.Type === 'o' ? 'o' as const : 'c' as const,
         FounderOwnerKey: null,
+        FounderPeerId: null,
         Left: row.Left === true,
       }));
   }

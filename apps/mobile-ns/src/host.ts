@@ -15,15 +15,19 @@ import {
   PersistentStrandNetworkStateStore,
   PersistentTrustedOwnerStore,
   type CadreNodeConfig,
+  type KeyStore,
 } from '@serfab/cadre-core';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { openOptimysticNSDb, type OptimysticNSDBHandle } from '@optimystic/db-p2p-storage-ns';
 import type { ChatHost, DurableSlot, NodeHost } from '@chat/core/sereus';
 import { dbPath } from './db-path';
-import { LocalKVStore, loadOrCreatePeerKey } from './local-kv';
+import { LocalKeyStore, LocalKVStore, loadOrCreatePeerKey } from './local-kv';
+import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { makeLazyNsStorage } from './ns-storage';
 import { anchorSlotKey, bootstrapPeersSlotKey, enrolledMachinesSlotKey, kvSlot, strandNetworkSlotKey } from './node-local-slots';
+
+declare const __DEV__: boolean;
 
 const DB_NAME = 'chat-node-local';
 const START_KEY = 'chat:start';
@@ -34,6 +38,14 @@ type Handler = { event: string; handler: (data: never) => void };
 
 let opened: Promise<{ db: OptimysticNSDBHandle; kv: LocalKVStore }> | null = null;
 const local = () => (opened ??= openOptimysticNSDb(dbPath(DB_NAME)).then(db => ({ db, kv: new LocalKVStore(db) })));
+
+/** The party's owner key, in the node-local database (opened on first use). */
+const ownerKeyStore: KeyStore = {
+  get: async keyId => new LocalKeyStore((await local()).db).get(keyId),
+  set: async (keyId, material) => new LocalKeyStore((await local()).db).set(keyId, material),
+  delete: async keyId => new LocalKeyStore((await local()).db).delete(keyId),
+  list: async () => new LocalKeyStore((await local()).db).list(),
+};
 
 function randomUuid(): string {
   const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
@@ -100,16 +112,12 @@ function createNodeHost(): NodeHost {
     node = built;
     built.getControlNode()?.addEventListener('self:peer:update', () => reachability.forEach(cb => cb()));
     reachability.forEach(cb => cb());
-    // Owner genesis, idempotent: the node must be an enrolled owner to publish strands.
-    owner = await Promise.race([
-      (async () => {
-        const key = built.getIdentityOwnerKey();
-        await built.getControlDatabase()!.ensureOwnerKey(key.publicKeyB64);
-        await built.initializeSeedBootstrap(key.privateKeyB64);
-        return true;
-      })().catch(err => { console.warn('[host] owner genesis failed:', err); return false; }),
-      new Promise<boolean>(resolve => setTimeout(() => resolve(false), OWNER_GENESIS_MS)),
-    ]);
+    // Owner genesis as cadre-core's edge node runs it (idempotent, bounded, fail-soft): the
+    // owner slot's key, created on the first start, becomes the founding owner. The node must
+    // be an enrolled owner to publish strands.
+    const genesis = await runOwnerGenesis(built, { keyStore: ownerKeyStore, label: 'phone', timeoutMs: OWNER_GENESIS_MS });
+    if (genesis !== 'enrolled') console.warn(`[host] owner genesis: ${genesis}`);
+    owner = genesis === 'enrolled';
     step(`owner genesis ${owner ? 'done' : 'not done'}`);
   }
 
@@ -166,4 +174,7 @@ function slot(name: string, key?: string): DurableSlot {
 export const chatHost: ChatHost = {
   node: createNodeHost(),
   slot: (name, key) => slot(name, key),
+  ownerKeyStore,
+  // Debug builds: the core's step timings (`[perf]`) in the log.
+  dev: __DEV__,
 };

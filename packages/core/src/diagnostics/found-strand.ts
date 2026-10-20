@@ -10,7 +10,8 @@
  * Isolated: its own party, its own node and storage names; it touches no app data. A slow
  * result on a phone is an upper bound, since the app's own node competes for the CPU.
  */
-import { CadreNode, type CadreNodeConfig, type SAppConfig } from '@serfab/cadre-core';
+import { CadreNode, InMemoryKeyStore, type CadreNodeConfig, type SAppConfig } from '@serfab/cadre-core';
+import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 
 /** One table, three columns — as small as a real schema gets. */
 const SCHEMA = `table Member (
@@ -87,11 +88,9 @@ export async function runFoundStrandCheck(platform: FoundStrandPlatform, opts: F
     await node.start();
     say(`node running, peer ${node.peerId?.toString() ?? '(unknown)'}`);
 
-    const owner = node.getIdentityOwnerKey();
-    const control = node.getControlDatabase();
-    if (!control) throw new Error('no control database after start');
-    await control.ensureOwnerKey(owner.publicKeyB64);
-    await node.initializeSeedBootstrap(owner.privateKeyB64);
+    // Owner genesis as cadre-core's edge node runs it; a throwaway party keeps its key in memory.
+    const genesis = await runOwnerGenesis(node, { keyStore: new InMemoryKeyStore(), label: 'diag' });
+    if (genesis !== 'enrolled') throw new Error(`owner genesis did not enrol (${String(genesis)})`);
     say('owner genesis done');
 
     const strandId = `diag-strand-${id}`;

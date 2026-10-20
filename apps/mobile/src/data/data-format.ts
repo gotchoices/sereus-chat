@@ -38,8 +38,12 @@ import { STORAGE_KEYS, STORAGE_KEY_PREFIX } from './persisted-names';
  *   sereus-1.15  each machine's signed address record carries its node profile, so a
  *                control store made by 1.14 fails its warm start ("parties created with
  *                1.14 or earlier must be recreated"); optimystic 1.13.0.
+ *   sereus-1.17  owner keys are separate from the machine's identity (owner grants), and
+ *                control stores record their schema version: a store written by 1.16 or
+ *                earlier is refused at start (`ControlStoreIncompatibleError`); optimystic
+ *                1.15.0, p2p-fret 1.1.0.
  */
-export const DATA_FORMAT = 'sereus-1.15';
+export const DATA_FORMAT = 'sereus-1.17';
 
 const MARKER_KEY = STORAGE_KEYS.dataFormat;
 const APP_PREFIX = STORAGE_KEY_PREFIX;

@@ -10,6 +10,7 @@
 import { generateKeyPair, privateKeyFromProtobuf, privateKeyToProtobuf } from '@libp2p/crypto/keys';
 import type { PrivateKey } from '@libp2p/interface';
 import type { IKVStore } from '@optimystic/db-p2p';
+import type { KeyId, KeyStore } from '@serfab/cadre-core';
 import type { OptimysticNSDBHandle } from '@optimystic/db-p2p-storage-ns';
 
 export class LocalKVStore implements IKVStore {
@@ -52,4 +53,34 @@ export async function loadOrCreatePeerKey(db: OptimysticNSDBHandle): Promise<Pri
   const key = await generateKeyPair('Ed25519');
   await db.prepare('INSERT OR REPLACE INTO kv (key, s_val, b_val) VALUES (?, NULL, ?)').run(PEER_KEY, privateKeyToProtobuf(key));
   return key;
+}
+
+/**
+ * cadre-core's `KeyStore` over the same `kv` table: key material as bytes (`b_val`) under
+ * `key:<keyId>`. Holds the party's owner key (sereus 1.17 keeps it apart from the machine's
+ * identity; `runOwnerGenesis` creates it in the owner slot on the first start).
+ */
+export class LocalKeyStore implements KeyStore {
+  private static readonly PREFIX = 'key:';
+
+  constructor(private readonly db: OptimysticNSDBHandle) {}
+
+  async get(keyId: KeyId): Promise<Uint8Array | undefined> {
+    const row = await this.db.prepare('SELECT b_val FROM kv WHERE key = ?').get(LocalKeyStore.PREFIX + keyId);
+    return row?.b_val instanceof Uint8Array && row.b_val.length > 0 ? row.b_val : undefined;
+  }
+
+  async set(keyId: KeyId, keyMaterial: Uint8Array): Promise<void> {
+    await this.db.prepare('INSERT OR REPLACE INTO kv (key, s_val, b_val) VALUES (?, NULL, ?)').run(LocalKeyStore.PREFIX + keyId, keyMaterial);
+  }
+
+  async delete(keyId: KeyId): Promise<void> {
+    await this.db.prepare('DELETE FROM kv WHERE key = ?').run(LocalKeyStore.PREFIX + keyId);
+  }
+
+  async list(): Promise<KeyId[]> {
+    const p = LocalKeyStore.PREFIX;
+    const rows = await this.db.prepare('SELECT key FROM kv WHERE key >= ? AND key < ? ORDER BY key ASC').all(p, p + '\u{10FFFF}');
+    return rows.map(row => (row.key as string).slice(p.length) as KeyId);
+  }
 }

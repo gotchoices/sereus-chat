@@ -82,8 +82,8 @@ __metadata:
     "@noble/curves": "npm:2.4.0"
     "@noble/hashes": "npm:2.2.0"
     "@optimystic/db-p2p": "npm:1.15.0"
-    "@quereus/quereus": "npm:4.20.2"
-    "@serfab/cadre-core": "npm:1.16.0"
+    "@quereus/quereus": "npm:4.20.3"
+    "@serfab/cadre-core": "npm:1.17.0"
     "@types/node": "npm:^24.0.0"
     libp2p: "npm:3.3.11"
     typescript: "npm:^5.9.3"
@@ -92,8 +92,8 @@ __metadata:
     "@noble/ciphers": ^2.2.0
     "@noble/curves": ^2.2.0
     "@noble/hashes": ^2.0.0
-    "@quereus/quereus": ^4.20.2
-    "@serfab/cadre-core": ^1.16.0
+    "@quereus/quereus": ^4.20.3
+    "@serfab/cadre-core": ^1.17.0
   languageName: unknown
   linkType: soft
 
@@ -907,9 +907,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@quereus/quereus@npm:4.20.2":
-  version: 4.20.2
-  resolution: "@quereus/quereus@npm:4.20.2"
+"@quereus/quereus@npm:4.20.3":
+  version: 4.20.3
+  resolution: "@quereus/quereus@npm:4.20.3"
   dependencies:
     debug: "npm:^4.4.3"
     fast-json-patch: "npm:^3.1.1"
@@ -917,7 +917,7 @@ __metadata:
     moat-maker: "npm:^2.2.0"
     temporal-polyfill: "npm:^0.3.0"
     uint8arrays: "npm:^6.1.1"
-  checksum: 10c0/a246d4382f32bd741d3b2600fea51d842b44b4d0519e56dd0c293041a921972bb40f493a5a2c1f73ca1c3d8117ff33256135f5d9bf9b0f92c968260b2e775486
+  checksum: 10c0/caf2e4d6ba31dff29fa45fa1d6c48cf7f1702971e27ce9d95db5445f712c5293a46ca937135b7f6a5c8a281c444234765b0fb516ec69d29f3570f3ef509cc8b5
   languageName: node
   linkType: hard
 
@@ -1046,16 +1046,16 @@ __metadata:
     "@optimystic/db-core": "npm:1.15.0"
     "@optimystic/db-p2p": "npm:1.15.0"
     "@optimystic/db-p2p-storage-rn": "npm:1.15.0"
-    "@quereus/quereus": "npm:4.20.2"
-    "@serfab/cadre-core": "npm:1.16.0"
+    "@quereus/quereus": "npm:4.20.3"
+    "@serfab/cadre-core": "npm:1.17.0"
     classic-level: "npm:^3.0.0"
     libp2p: "npm:^3.3.11"
   languageName: unknown
   linkType: soft
 
-"@serfab/cadre-core@npm:1.16.0":
-  version: 1.16.0
-  resolution: "@serfab/cadre-core@npm:1.16.0"
+"@serfab/cadre-core@npm:1.17.0":
+  version: 1.17.0
+  resolution: "@serfab/cadre-core@npm:1.17.0"
   dependencies:
     "@libp2p/circuit-relay-v2": "npm:^4.2.13"
     "@libp2p/crypto": "npm:^5.1.23"
@@ -1065,23 +1065,24 @@ __metadata:
     "@libp2p/tcp": "npm:^11.0.28"
     "@libp2p/websockets": "npm:^10.1.21"
     "@multiformats/multiaddr": "npm:^13.0.3"
+    "@noble/ciphers": "npm:^2.0.1"
     "@noble/hashes": "npm:^2.0.0"
     "@optimystic/db-core": "npm:^1.15.0"
     "@optimystic/db-p2p": "npm:^1.15.0"
     "@optimystic/quereus-plugin-crypto": "npm:^1.15.0"
     "@optimystic/quereus-plugin-optimystic": "npm:^1.15.0"
     "@quereus/quereus": "npm:^4.20.1"
-    "@serfab/quereus-plugin-sereus": "npm:^1.16.0"
+    "@serfab/quereus-plugin-sereus": "npm:^1.17.0"
     debug: "npm:^4.4.3"
     libp2p: "npm:^3.3.11"
     uint8arrays: "npm:^6.1.1"
-  checksum: 10c0/d90e887b2fd87407de3fc3a6b663e6dea2e3c0358195bada848bd9028736a0be594faa95e0545f28aeb024b9ceb7fd9d53660a1952681f96a1833ed0bd219752
+  checksum: 10c0/f15fe1d6d2da089749cc32d4499a0e7547546a69f7f65c55a1c3d362abba3b8b08be4618e00acecb67119efe0c7b8d276b69a6602a019b7046bed3a33188f046
   languageName: node
   linkType: hard
 
-"@serfab/quereus-plugin-sereus@npm:^1.16.0":
-  version: 1.16.0
-  resolution: "@serfab/quereus-plugin-sereus@npm:1.16.0"
+"@serfab/quereus-plugin-sereus@npm:^1.17.0":
+  version: 1.17.0
+  resolution: "@serfab/quereus-plugin-sereus@npm:1.17.0"
   dependencies:
     "@libp2p/circuit-relay-v2": "npm:^4.2.13"
     "@libp2p/interface": "npm:^3.3.0"
@@ -1094,7 +1095,7 @@ __metadata:
     "@optimystic/quereus-plugin-optimystic": "npm:^1.15.0"
     "@quereus/quereus": "npm:^4.20.1"
     debug: "npm:^4.4.3"
-  checksum: 10c0/7f3d6f541675e6abc39f8d6729e771338456f07662a297a0be6efeaab9c16270aa42ccea3a80e8a02629cdc20bc3ef29055faaf1164a4004b3c724457b9562ce
+  checksum: 10c0/c1c5587276c518fd26f0700377eb008e3a07b4f3b63826dfeb41a191ce1818ec1941575a6130ed8824e5e8467c05c0d6b4a030d921327ae9919c431d4e8dc959
   languageName: node
   linkType: hard
 
@@ -2397,8 +2398,8 @@ __metadata:
     "@multiformats/multiaddr": "npm:13.0.3"
     "@optimystic/db-p2p": "npm:1.15.0"
     "@optimystic/db-p2p-storage-fs": "npm:1.15.0"
-    "@quereus/quereus": "npm:4.20.2"
-    "@serfab/cadre-core": "npm:1.16.0"
+    "@quereus/quereus": "npm:4.20.3"
+    "@serfab/cadre-core": "npm:1.17.0"
     "@types/node": "npm:^24.0.0"
     esbuild: "npm:^0.28.2"
     libp2p: "npm:3.3.11"

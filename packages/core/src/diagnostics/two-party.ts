@@ -38,7 +38,8 @@
  * being relay-only is the condition under test.
  */
 
-import { CadreNode, generateStrandMemberKey, type StrandInstance } from '@serfab/cadre-core';
+import { CadreNode, generateStrandMemberKey, InMemoryKeyStore, type StrandInstance } from '@serfab/cadre-core';
+import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { CHAT_SAPP_ID, getChatSAppConfig } from '../protocol/index.js';
 
 import type { CreateExtraNode } from '../sereus/host.js';
@@ -100,11 +101,9 @@ export async function runTwoPartyCheck(platform: TwoPartyPlatform, opts: TwoPart
   const makeParty = async (tag: string): Promise<CadreNode> => {
     const node = await platform.createNode({ tag, partyId: `diag2-${id}-${tag}`, relayAddrs: platform.relayAddrs });
     nodes.push(node);
-    const owner = node.getIdentityOwnerKey();
-    const control = node.getControlDatabase();
-    if (!control) throw new Error(`${tag}: no control database after start`);
-    await control.ensureOwnerKey(owner.publicKeyB64);
-    await node.initializeSeedBootstrap(owner.privateKeyB64);
+    // Owner genesis as cadre-core's edge node runs it; a throwaway party keeps its key in memory.
+    const genesis = await runOwnerGenesis(node, { keyStore: new InMemoryKeyStore(), label: `diag ${tag}` });
+    if (genesis !== 'enrolled') throw new Error(`${tag}: owner genesis did not enrol (${String(genesis)})`);
     say(`${tag}: started, ${node.getMultiaddrs().length} address(es)`);
     return node;
   };
@@ -176,7 +175,7 @@ export async function runTwoPartyCheck(platform: TwoPartyPlatform, opts: TwoPart
     });
     say(result.strandId === strandId ? "joiner: bound to the host's strand" : `!! bound to ${result.strandId}, expected ${strandId} — the invite resolved UNBOUND`);
     const joined = await joiner.addStrand({
-      strandRow: { Id: result.strandId, MemberPrivateKey: result.memberPrivateKey ?? null, Type: 'c', FounderOwnerKey: null },
+      strandRow: { Id: result.strandId, MemberPrivateKey: result.memberPrivateKey ?? null, Type: 'c', FounderOwnerKey: null, FounderPeerId: null },
       sAppConfig: sApp,
       founder: false,
     });

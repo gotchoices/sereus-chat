@@ -7,7 +7,7 @@
  * (`./host.ts`) and returns the model plus `boot`, the start-up sequence the app runs
  * once its data is known to be usable.
  */
-import type { StrandInstance } from '@serfab/cadre-core';
+import { readOwnerPrivateKey, type StrandInstance } from '@serfab/cadre-core';
 import { buildInviteUrl, CHAT_SAPP_ID } from '../protocol/index.js';
 import type {
   Attachment, ChatModel, Invitation, InvitationPreview, Member, Message, Prefs,
@@ -373,6 +373,9 @@ export function createSereusModel(host: ChatHost): SereusModel {
     strandId?: string; visibility?: 'public' | 'private'; grantsInviteRight: boolean;
     singleUse?: boolean; validForMs?: number;
   }): Promise<Invitation> {
+    const t0 = Date.now();
+    let t = t0;
+    const step = (name: string) => { const n = Date.now(); perf('invite', name, n - t, 'ms'); t = n; };
     const node = requireNode();
     // Precondition FIRST: with no dialable address nobody could ever answer. Story 02
     // Alt A presents this as the ordinary starting position, never as a failure.
@@ -382,26 +385,35 @@ export function createSereusModel(host: ChatHost): SereusModel {
     // With a `strandId` the conversation exists and its type was fixed at founding;
     // without one, the Private/Open choice is the point of the screen.
     const kind = input.visibility ?? 'private';
-    const strand = input.strandId
-      ? attachedStrand(input.strandId)
-      : (await takePrepared(kind)) ?? (await createChatStrand(node, newId(), kind)).instance;
+    const picked = input.strandId ? attachedStrand(input.strandId) : await takePrepared(kind);
+    step(picked ? 'strand (existing or prepared)' : 'nothing prepared');
+    // Founded in the FOREGROUND. sereus 1.17's background form (`foundStrand(…, { background:
+    // true })`, sereus#49) left serchat's inviter unreachable to joiners ("could not reach
+    // the person who invited you") in our scenarios, though bare cadre-core joins fine;
+    // cause not isolated yet (docs/STATUS.md). The prepared path covers the latency meanwhile.
+    const strand = picked ?? (await createChatStrand(node, newId(), kind)).instance;
+    step('founded');
     // THE FOUNDER HAS TO BE A MEMBER OF ITS OWN STRAND, and founding does not make it
     // one. Idempotent, so inviting a second person re-runs it harmlessly.
     await runtime.registerSelf(strand);
+    const strandId = strand.strandId;
+    step('registerSelf');
 
     // THE TERMS (story 02). `totalUses` is counted against FormationUsage rows and
     // refused as `token-spent` once reached; absent means unlimited until it expires.
     const singleUse = input.singleUse ?? true;
     const invitation = await node.createOpenInvitation(CHAT_SAPP_ID, input.validForMs ?? INVITE_EXPIRY_MS);
+    step('createOpenInvitation');
     await withTimeout(
       node.publishFormationInvite(invitation.token, CHAT_SAPP_ID, {
         expiresAtMs: invitation.expiration.getTime(),
-        strandId: strand.strandId,
+        strandId,
         ...(singleUse ? { totalUses: 1 } : {}),
       }),
       CONTROL_OP_TIMEOUT_MS,
       'publishFormationInvite',
     );
+    step('publishFormationInvite');
     const token = node.encodeInvitation(invitation);
     const minted: Invitation = {
       // The RAW token, which is unique (the encoded one's prefix is the same for all).
@@ -410,7 +422,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       // The https App Link for the QR too: the person scanning may not have the app.
       url: buildInviteUrl(token),
       qrPayload: buildInviteUrl(token),
-      strandId: strand.strandId,
+      strandId,
       expiresAt: invitation.expiration.toISOString(),
       grantsInviteRight: input.grantsInviteRight,
       singleUse,
@@ -422,6 +434,8 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const membersAtMint = await queryMembers(strand).then(m => m.length).catch(() => 1);
     await outgoing.remember({ ...minted, membersAtMint, createdAt: new Date().toISOString() })
       .catch(err => console.warn('[sereus-model] could not remember invitation:', err));
+    step('remembered');
+    perf('invite', 'total', Date.now() - t0, 'ms');
     return minted;
   }
 
@@ -454,8 +468,8 @@ export function createSereusModel(host: ChatHost): SereusModel {
     // THE HOST STRAND'S TYPE DECIDES THIS: formation returns `memberPrivateKey` only for
     // a closed strand. `FounderOwnerKey: null` is correct for a consent-seated row.
     const joinedRow = memberPrivateKey
-      ? { Id: strandId, MemberPrivateKey: memberPrivateKey, Type: 'c' as const, FounderOwnerKey: null }
-      : { Id: strandId, MemberPrivateKey: null, Type: 'o' as const, FounderOwnerKey: null };
+      ? { Id: strandId, MemberPrivateKey: memberPrivateKey, Type: 'c' as const, FounderOwnerKey: null, FounderPeerId: null }
+      : { Id: strandId, MemberPrivateKey: null, Type: 'o' as const, FounderOwnerKey: null, FounderPeerId: null };
     // REMEMBER FIRST, ATTACH SECOND: `memberPrivateKey` is delivered exactly once.
     await runtime.joined.remember(joinedRow);
 
@@ -690,7 +704,9 @@ export function createSereusModel(host: ChatHost): SereusModel {
         const node = host.node.node;
         const peerId = node?.peerId?.toString() ?? null;
         let fingerprint: string | null = null;
-        try { fingerprint = node ? ownerFingerprint(node.getIdentityOwnerKey().publicKeyB64) : null; } catch { /* no key yet */ }
+        // The owner key this node signs with (sereus 1.17: separate from the machine's identity).
+        const ownerKey = node?.getOwnerSigner()?.publicKey;
+        if (ownerKey) fingerprint = ownerFingerprint(ownerKey);
         const machines: CadreMachine[] = peerId ? [{ peerId, thisDevice: true, addresses: [] }] : [];
         if (node) {
           // Best effort and bounded: the list fills in when the control network answers.
@@ -758,7 +774,12 @@ export function createSereusModel(host: ChatHost): SereusModel {
       removeMachine: peerId => attempt(async () => {
         await withTimeout(requireNode().removePeer(peerId), CONTROL_OP_TIMEOUT_MS, 'removePeer');
       }),
-      exportOwnerKey: () => attempt(async () => requireNode().getIdentityOwnerKey().privateKeyB64),
+      exportOwnerKey: () => attempt(async () => {
+        // The owner key lives in the host's key store (its owner slot), not in the node.
+        const key = host.ownerKeyStore ? await readOwnerPrivateKey(host.ownerKeyStore) : undefined;
+        if (!key) throw new ChatFailure('not-supported', 'This device holds no owner key to export.');
+        return key;
+      }),
     },
 
     changes: {
