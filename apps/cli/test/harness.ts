@@ -22,6 +22,8 @@ import { circuitRelayServer } from '@libp2p/circuit-relay-v2';
 const SERCHAT = fileURLToPath(new URL('../dist/serchat.js', import.meta.url));
 /** One-shot runs give the node this long to reserve its relay and open its strands. */
 const WAIT_SECONDS = Number(process.env.SCENARIO_WAIT_S ?? 45);
+/** Extra serchat options for every run, e.g. `SCENARIO_ARGS='--bg-found -v'`. */
+const EXTRA_ARGS = (process.env.SCENARIO_ARGS ?? '').split(/\s+/).filter(Boolean);
 
 export type Row = Record<string, unknown>;
 
@@ -116,7 +118,7 @@ export class Person {
   constructor(readonly name: string, private readonly home: string) {}
 
   private args(words: string[]): string[] {
-    return [SERCHAT, '--home', this.home, '-p', this.name, '--json', '--wait', String(WAIT_SECONDS), ...words];
+    return [SERCHAT, '--home', this.home, '-p', this.name, '--json', '--wait', String(WAIT_SECONDS), ...EXTRA_ARGS, ...words];
   }
 
   /** Run commands one-shot (`;` separates commands, as on the shell) and parse the rows. */

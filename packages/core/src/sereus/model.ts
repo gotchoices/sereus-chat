@@ -21,7 +21,7 @@ import {
   addReaction, insertAttachments, insertMessage, newId, queryAttachments, queryMembers, queryMessages,
   queryReactions, removeMessage, removeReaction, updateMessage,
 } from './operations.js';
-import { createChatStrand } from './sapp-strands.js';
+import { createChatStrand, foundChatStrandInBackground } from './sapp-strands.js';
 import { classifyClaimFailure, nodeReach, readNodeCode } from './node-code.js';
 import { ownerFingerprint, type CadreMachine, type CadreStatus } from '../model/index.js';
 import { StrandRuntime } from './strands.js';
@@ -50,6 +50,11 @@ export interface SereusModel {
    * usable; also what `strands.retryBoot` runs.
    */
   boot(): Promise<void>;
+  /**
+   * Resolves when work started in the background has settled (with `backgroundFounding`, a
+   * new conversation still starting). A short-lived host awaits it before stopping.
+   */
+  settle(): Promise<void>;
 }
 
 /**
@@ -161,6 +166,8 @@ export function createSereusModel(host: ChatHost): SereusModel {
    * list filter (docs/STATUS.md, "Local workarounds to retire").
    */
   const preparedSlot = host.slot('preparedStrands');
+  /** Work started in the background and not yet settled (`settle`). */
+  const background = new Set<Promise<unknown>>();
   const preparing = new Map<Visibility, Promise<string | null>>();
   async function readPrepared(): Promise<Partial<Record<Visibility, string>>> {
     try { return JSON.parse((await preparedSlot.load()) ?? '{}') as Partial<Record<Visibility, string>>; } catch { return {}; }
@@ -387,17 +394,35 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const kind = input.visibility ?? 'private';
     const picked = input.strandId ? attachedStrand(input.strandId) : await takePrepared(kind);
     step(picked ? 'strand (existing or prepared)' : 'nothing prepared');
-    // Founded in the FOREGROUND. sereus 1.17's background form (`foundStrand(…, { background:
-    // true })`, sereus#49) left serchat's inviter unreachable to joiners ("could not reach
-    // the person who invited you") in our scenarios, though bare cadre-core joins fine;
-    // cause not isolated yet (docs/STATUS.md). The prepared path covers the latency meanwhile.
-    const strand = picked ?? (await createChatStrand(node, newId(), kind)).instance;
-    step('founded');
-    // THE FOUNDER HAS TO BE A MEMBER OF ITS OWN STRAND, and founding does not make it
-    // one. Idempotent, so inviting a second person re-runs it harmlessly.
-    await runtime.registerSelf(strand);
-    const strandId = strand.strandId;
-    step('registerSelf');
+    // A new conversation is founded in the BACKGROUND (sereus 1.17, sereus#49): the
+    // invitation needs only the published row, and nobody can redeem it before the strand
+    // is up (a joiner who does is refused retryably). It is listed as connecting meanwhile,
+    // and the founder registers once it is up. A prepared one, when there is, is faster
+    // still on a slow phone.
+    let strand: StrandInstance | null = picked;
+    let strandId: string;
+    if (!strand && host.backgroundFounding !== false) {
+      const founding = await foundChatStrandInBackground(node, newId(), kind);
+      strandId = founding.strandId;
+      step('founded (published; starting in the background)');
+      await summaries.save([{
+        id: strandId, title: 'Waiting for someone to join', isGroup: false, memberCount: 1, lastMessage: null,
+        avatarUri: null, unreadCount: 0, mentioned: false, muted: 'none', draftPreview: null, archived: false, pending: false,
+      }]);
+      const started = founding.ready
+        .then(instance => runtime.registerSelf(instance))
+        .catch(err => console.warn('[sereus-model] new conversation did not start yet:', err instanceof Error ? err.message : err));
+      background.add(started);
+      void started.finally(() => background.delete(started));
+    } else {
+      strand ??= (await createChatStrand(node, newId(), kind)).instance;
+      step('founded');
+      // THE FOUNDER HAS TO BE A MEMBER OF ITS OWN STRAND, and founding does not make it
+      // one. Idempotent, so inviting a second person re-runs it harmlessly.
+      await runtime.registerSelf(strand);
+      strandId = strand.strandId;
+      step('registerSelf');
+    }
 
     // THE TERMS (story 02). `totalUses` is counted against FormationUsage rows and
     // refused as `token-spent` once reached; absent means unlimited until it expires.
@@ -431,7 +456,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     };
     // Kept so it can be listed and shared again; a failure to remember it must not cost
     // the user the invitation they are looking at.
-    const membersAtMint = await queryMembers(strand).then(m => m.length).catch(() => 1);
+    const membersAtMint = strand ? await queryMembers(strand).then(m => m.length).catch(() => 1) : 1;
     await outgoing.remember({ ...minted, membersAtMint, createdAt: new Date().toISOString() })
       .catch(err => console.warn('[sereus-model] could not remember invitation:', err));
     step('remembered');
@@ -848,6 +873,12 @@ export function createSereusModel(host: ChatHost): SereusModel {
     },
   };
 
-  return { model, boot: () => runtime.boot() };
+  return {
+    model,
+    boot: () => runtime.boot(),
+    async settle() {
+      while (background.size) await Promise.allSettled([...background]);
+    },
+  };
 }
 

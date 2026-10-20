@@ -96,6 +96,30 @@ export async function createChatStrand(
 }
 
 /**
+ * Found a chat strand and return once it is PUBLISHED (sereus 1.17, `foundStrand` with
+ * `{ background: true }`, gotchoices/sereus#49): the row and its membership key exist, which
+ * is all minting an invitation needs, while the strand node starts in `ready`.
+ */
+export async function foundChatStrandInBackground(
+  cadreNode: CadreNode,
+  strandId: string,
+  visibility: Visibility = 'private',
+): Promise<{ strandId: string; ready: Promise<StrandInstance> }> {
+  const closed = visibility === 'private';
+  const { strandRow, ready } = await cadreNode.foundStrand({
+    strandId,
+    type: closed ? 'c' : 'o',
+    ...(closed ? { memberPrivateKey: await generateStrandMemberKey() } : {}),
+    sAppConfig: getChatSAppConfig(),
+  }, { background: true });
+  if (closed && !strandRow.MemberPrivateKey) {
+    throw new Error(`Closed chat strand ${strandId} was founded without a MemberPrivateKey — no invitation into it could ever be read`);
+  }
+  console.info(`[chat-sapp] founded ${closed ? 'closed' : 'open'} strand: ${strandId} (starting in the background)`);
+  return { strandId: strandRow.Id, ready };
+}
+
+/**
  * Join an existing chat strand that surfaced via the control network.
  *
  * No `founder` — a joiner writes no membership rows; it receives them via

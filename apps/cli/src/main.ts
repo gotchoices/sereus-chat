@@ -129,7 +129,8 @@ async function main(argv: string[]): Promise<number> {
   const listen = await Promise.all(g.listen.map(a => (a === DEFAULT_LISTEN ? defaultListenAddress(dirs, config) : a)));
   const host = createCliHost({ dirs, config, extraRelays: g.relays, listen, dev: g.verbose, memoryBlocks: g.memoryBlocks });
   if (g.memoryBlocks) out.note('blocks in memory (--memory-blocks): nothing this run stores will survive it');
-  const { model, boot } = createSereusModel(host);
+  const { model, boot, settle: settleModel } = createSereusModel(host);
+  settleBackground = settleModel;
   if (g.bridgePort !== undefined) {
     // The same bridge the phone installs, reached over Node's inspector instead of Metro's.
     // Loopback only: an inspector runs any code it is sent.
@@ -195,7 +196,15 @@ async function settle(session: Session, ms: number): Promise<void> {
   }
 }
 
+/** The model's background work (a new conversation still starting); awaited before exit. */
+let settleBackground: (() => Promise<void>) | undefined;
+
 async function shutdown(session: Session, code: number): Promise<number> {
+  // A conversation founded for an invitation starts in the background (sereus 1.17): a
+  // one-shot run must not exit with it published but never started. Bounded.
+  if (settleBackground) {
+    await Promise.race([settleBackground().catch(() => {}), new Promise(r => setTimeout(r, 60_000).unref())]);
+  }
   // List once before stopping: the core saves the list it shows, and that saved list is
   // how the next run knows which strands to wait for (see `settle`) — a strand that only
   // arrived through the bridge or a `tail` would otherwise be unknown until rediscovered.

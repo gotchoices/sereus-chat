@@ -1117,24 +1117,33 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
       - **S7 (NS):** joins 22.8 / 23.5 s (+~11 s to writable), commits 2.4–4.0 s — no
         better than 1.16. Background founding in the app: invitation ready in 1.9–2.8 s
         (published ~1.1 s, invite published ~0.7–1.5 s) vs prepared 0.47–0.50 s.
-      - **Background founding NOT adopted (reverted):** with it, serchat's inviter was
-        unreachable to joiners ("Could not reach the person who invited you") in the
-        talk and offline-inviter scenarios; foreground passes. Bare cadre-core
-        (`test/stack/background-founding-double-start.mjs`, `background-founding-restart.mjs`)
-        joins fine with memory or file storage, even with the strand watcher offering
-        the half-started strand and three overlapping `addStrand` calls — so the cause is
-        in our use, not yet isolated; no upstream report until it is. Found on the way:
-        the watcher offers a background-founded strand as `strand:discovered` before
-        `publishStrand` returns (file storage). The prepared path stays (STATUS
-        "Local workarounds to retire": still needed).
+      - **Background founding adopted (default, 2026-10-20).** A new conversation for an
+        invitation is published, the invitation minted at once, and the strand started in
+        the background (`ChatHost.backgroundFounding`, default on; `false` opts out). Two
+        things it needs, both in the core: the new strand is **listed at once** as
+        connecting ("Waiting for someone to join"), or `tail --all` and the list miss it
+        until it opens; and a short-lived host **waits for the start** before stopping
+        (`SereusModel.settle()`, awaited in serchat's shutdown), or a one-shot `invite`
+        leaves the strand published but not started and a prompt joiner is refused.
+        A joiner redeeming before the start finishes is refused retryably (by design).
+        serchat scenarios: 2 pass + the expected fail, 7 consecutive runs of the restart
+        scenario. Harness: `SCENARIO_ARGS='…'` passes extra serchat options to every run.
+      - A first conclusion that background founding left the inviter unreachable was
+        WRONG — my driver ran Bob with `spawnSync`, freezing the in-process relay.
+        `test/stack/background-founding-double-start.mjs` and `…-restart.mjs` show bare
+        cadre-core handles overlapping starts (the watcher offers a background-founded
+        strand as `strand:discovered` before `publishStrand` returns, on file storage) and
+        restarts fine; kept as checks.
+      - S7 (NS): an invitation with nothing prepared is ready in 1.9–2.8 s (was 4.0–4.7 s);
+        prepared, 0.47–0.50 s — so the prepared path stays for now.
 
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run
       the measurement named and drop the workaround if the stack now does the job.
       - **Founding ahead of the invitation** (`invitations.prepare`, the `preparedStrands`
         slot, the hidden spare in the strand list, the RN invitation screen's call).
-        Waits on sereus#49 (`foundStrand` returning after the commitment — shipped in 1.17,
-        but not adopted yet: see the 1.17 entry above). Re-measure:
+        sereus#49 shipped and is adopted (background founding); on the S7 a prepared
+        conversation is still ~4–5× faster (0.5 s against 1.9–2.8 s). Re-measure:
         bridge `invite` on a phone, nothing prepared; if a new conversation's invitation
         is fast enough without it (the S7 took 4.0–4.7 s, 0.4 s prepared), remove the
         prepare path, its slot and storage key, and the list filter, and simplify

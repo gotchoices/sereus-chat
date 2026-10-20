@@ -71,6 +71,13 @@ export interface ChatHost {
    */
   ownerKeyStore?: KeyStore;
   /**
+   * Found an invitation's new conversation with sereus 1.17's background form (sereus#49):
+   * published now, the invitation minted at once, the strand started in the background and
+   * listed as connecting meanwhile. Default on; `false` founds in the foreground. A host
+   * that may stop soon after (serchat's one-shot runs) awaits `SereusModel.settle()` first.
+   */
+  backgroundFounding?: boolean;
+  /**
    * Diagnostics only: build and start a second, throwaway party's node in this process,
    * relay-only, with storage the host chooses (never the app's own). Checks that need a
    * second party (`@chat/core/diagnostics` `runTwoPartyCheck`) use it; without it they

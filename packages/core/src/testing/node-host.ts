@@ -59,7 +59,7 @@ export interface TestParty extends SereusModel {
  * One party: its own node, slots and Sereus model. `relayAddr` set and `listen` false is
  * the phone's topology (no listen address; reachable only through the relay).
  */
-export async function createTestParty(tag: string, opts: { relayAddr?: string; listen?: boolean }): Promise<TestParty> {
+export async function createTestParty(tag: string, opts: { relayAddr?: string; listen?: boolean; backgroundFounding?: boolean }): Promise<TestParty> {
   const scopes = new Map<string, MemoryRawStorage>();
   const partyId = `${tag}-${newId()}`;
   let owned = false;
@@ -119,9 +119,9 @@ export async function createTestParty(tag: string, opts: { relayAddr?: string; l
       return () => control.removeEventListener('self:peer:update', callback);
     },
   };
-  const host: ChatHost = { node: nodeHost, slot: memorySlots(), ownerKeyStore };
-  const { model, boot } = createSereusModel(host);
-  return { tag, host, node, model, boot, stop: () => node.stop() };
+  const host: ChatHost = { node: nodeHost, slot: memorySlots(), ownerKeyStore, backgroundFounding: opts.backgroundFounding };
+  const { model, boot, settle } = createSereusModel(host);
+  return { tag, host, node, model, boot, settle, stop: async () => { await settle(); await node.stop(); } };
 }
 
 /** Wait until `check` holds, polling; throws with `what` after `ms`. */
