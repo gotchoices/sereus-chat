@@ -1,0 +1,22 @@
+# First-run setup of the React Native app (apps/mobile) for the GUI tests: a name on the
+# Profile screen, then a relay through its deep link (`chat://relay?addr=…`).
+#   NAME    the user's name
+#   RELAY   a full relay multiaddr, URL-encoded (`serchat relay` shows the address)
+appId: org.sereus.chat
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "profile-name"
+    timeout: 120000
+- tapOn:
+    id: "profile-name"
+- inputText: ${NAME}
+- hideKeyboard
+- tapOn: "Continue"
+- openLink: chat://relay?addr=${RELAY}
+# Anchored: the screen's title, "Use this relay?", also matches the button's words.
+- extendedWaitUntil:
+    visible: "^Use this relay$"
+    timeout: 60000
+- tapOn: "^Use this relay$"

@@ -275,16 +275,25 @@ export class StrandRuntime {
     await this.ensureUp();
     const node = this.node;
     if (!node) throw new Error('Cadre is not running.');
-    try {
-      await node.stopStrand(strandId);
-    } catch (err) {
-      console.warn('[chat-strand] stopStrand during leave:', strandId, err);
+    const list = await this.joined.read();
+    if (list.some(s => s.Id === strandId)) {
+      // JOINED from another party: its record is the party-wide `JoinedStrand` row, which
+      // `unpublishStrand` cannot remove (that only works on this party's own `Strand` rows),
+      // so the strand was offered again after a restart. `forgetJoinedStrand` removes the
+      // row (with a tombstone, so the party's other machines drop it too) and stops it here.
+      await node.forgetJoinedStrand(strandId);
+    } else {
+      // FOUNDED here: remove this party's `Strand` row.
+      try {
+        await node.stopStrand(strandId);
+      } catch (err) {
+        console.warn('[chat-strand] stopStrand during leave:', strandId, err);
+      }
+      await node.unpublishStrand(strandId);
     }
-    await node.unpublishStrand(strandId);
     await this.summaries.forget(strandId);
     // `keepIdentity` decides whether the membership key survives: kept, a later
     // invitation returns this user AS THEMSELVES.
-    const list = await this.joined.read();
     await this.joined.write(opts.keepIdentity
       ? list.map(s => (s.Id === strandId ? { ...s, Left: true } : s))
       : list.filter(s => s.Id !== strandId));

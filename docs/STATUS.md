@@ -1137,6 +1137,32 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
       - S7 (NS): an invitation with nothing prepared is ready in 1.9–2.8 s (was 4.0–4.7 s);
         prepared, 0.47–0.50 s — so the prepared path stays for now.
 
+- [x] **Fixes before internal testing** (2026-10-20).
+      - **Leaving a joined conversation sticks:** `leave` now calls cadre's
+        `forgetJoinedStrand` for a joined strand (removes the party-wide `JoinedStrand`
+        row, with a tombstone) and `unpublishStrand` only for one founded here. serchat's
+        "a strand Bob left stays left after he restarts" passes — no `it.fails` left.
+      - **A join waits out the inviter's start-up:** with background founding an
+        invitation can be redeemed before its strand runs; `acceptInvitation` retries
+        `formStrand` on `host-strand-unavailable` / `token-unknown` (token unspent) every
+        3 s for up to 60 s, instead of "try again in a moment".
+      - **RN owner-key export:** the RN `chatHost` passes `ownerKeyStore` (the kit's
+        `SecureStoreKeyStore` over the keychain, default options), so
+        `cadre.exportOwnerKey` works again after 1.17.
+      - Core 66/66, serchat unit 14/14, scenarios 3/3.
+      - **RN release smoke test on sereus 1.17 (S7, 2026-10-20): passes.**
+        - Old data is detected and the user told how to clear it (sereus-1.15 → 1.17).
+        - First-run setup through the screens (`test/gui/flows/rn-setup.yaml`: name,
+          then the relay by `chat://relay?addr=…`; the button needs an anchored
+          `^Use this relay$` — the title "Use this relay?" matches too).
+        - Owner-key backup shows a key (`rn-owner-backup.yaml`; never asserts on the
+          key, dismissed at once).
+        - Join and talk against serchat, 2/2 PASS: link → Join 9.7 / 14.7 s; Join →
+          conversation 39.9 / 25.2 s; phone → serchat 1.2 / 15.2 s (fresh data; the
+          earlier 40–110 s joins had a dozen leftover strands).
+        - Making an invitation (`rn-invite.yaml`, `THINK_MS`): tapped after 10 s on the
+          screen 4.5 / 5.8 s; after 1 s 8.3 s, and 33.3 s for the first after a cold start.
+
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run
       the measurement named and drop the workaround if the stack now does the job.

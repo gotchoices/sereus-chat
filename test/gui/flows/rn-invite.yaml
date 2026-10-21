@@ -1,0 +1,20 @@
+# Make an invitation into a new strand in the React Native app, as a person does: open the
+# invitation screen (which starts founding in the background, `invitations.prepare`), spend
+# THINK_MS on it, then make the invitation and wait until it exists.
+#   THINK_MS   how long the person looks at the screen before tapping (e.g. 1000, 10000)
+appId: org.sereus.chat
+---
+- openLink: chat://invite
+- extendedWaitUntil:
+    visible: "Make an invitation"
+    timeout: 30000
+# Thinking time: wait for something that never appears.
+- extendedWaitUntil:
+    visible: "no such text, only waiting"
+    timeout: ${THINK_MS}
+    optional: true
+- tapOn: "Make an invitation"
+- extendedWaitUntil:
+    visible: "Make another invitation"
+    timeout: 120000
+- back

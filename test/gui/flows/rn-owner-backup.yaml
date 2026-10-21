@@ -1,0 +1,19 @@
+# Back up the owner key from the React Native app's cadre manager, and check that a key is
+# shown (sereus 1.17 keeps it apart from the machine identity; see `ChatHost.ownerKeyStore`).
+# Never asserts on the key's text, and dismisses it at once: the key is a secret, and a failure
+# screenshot is only ever taken while the error (not a key) is on screen.
+appId: org.sereus.chat
+---
+- openLink: chat://machines
+- extendedWaitUntil:
+    visible:
+      id: "cadre-owner-backup"
+    timeout: 90000
+- tapOn:
+    id: "cadre-owner-backup"
+- tapOn: "Show"
+- assertNotVisible: "This device holds no owner key to export."
+- extendedWaitUntil:
+    visible: "Done"
+    timeout: 30000
+- tapOn: "Done"

@@ -4,7 +4,7 @@
  * (bundles first). Slow by nature: each step starts a node.
  *
  * A known bug is written as the CORRECT behaviour and marked `it.fails`, naming the step
- * that fixes it; the run then says so when it flips.
+ * that fixes it; the run then says so when it flips. (None at present.)
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { Person, scenarioHome, startRelay, stopAllBackground, type Row } from './harness.js';
@@ -83,9 +83,10 @@ describe('two people through a relay', () => {
     await aliceUp.stop();
   }, 600_000);
 
-  // Phase 7b, step 5: `leave` unpublishes a Strand row a joined strand does not have, so the
-  // party-wide JoinedStrand row survives and the strand is offered again (docs/serchat.md).
-  it.fails('a strand Bob left stays left after he restarts', async () => {
+  // A joined strand's record is the party-wide JoinedStrand row; `leave` removes it with
+  // `forgetJoinedStrand` (it used to call `unpublishStrand`, which leaves that row alone, so
+  // the strand came back after a restart).
+  it('a strand Bob left stays left after he restarts', async () => {
     const [alice, bob] = await twoPeople();
     const aliceUp = alice.start('invite', ';', 'idle');
     const invite = await aliceUp.waitForRow(r => typeof r.url === 'string', 'the invitation');

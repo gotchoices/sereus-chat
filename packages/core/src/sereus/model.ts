@@ -7,7 +7,7 @@
  * (`./host.ts`) and returns the model plus `boot`, the start-up sequence the app runs
  * once its data is known to be usable.
  */
-import { readOwnerPrivateKey, type StrandInstance } from '@serfab/cadre-core';
+import { FormationRejectedError, readOwnerPrivateKey, type StrandInstance } from '@serfab/cadre-core';
 import { buildInviteUrl, CHAT_SAPP_ID } from '../protocol/index.js';
 import type {
   Attachment, ChatModel, Invitation, InvitationPreview, Member, Message, Prefs,
@@ -36,6 +36,9 @@ const CLAIM_TIMEOUT_MS = 150_000;
 const CONTROL_READ_MS = 6000;
 /** How long an invitation stays good when the caller does not say: story 02's private-strand default. */
 const INVITE_EXPIRY_MS = INVITATION_VALIDITY.week;
+/** How long a join keeps asking while the inviter's new conversation is still starting. */
+const JOIN_STARTING_PATIENCE_MS = 60_000;
+const JOIN_STARTING_RETRY_MS = 3000;
 
 /** Node events after which a strand's database may have appeared or been replaced. */
 const STRAND_UP_EVENTS = ['strand:started', 'strand:writable', 'strand:waking'] as const;
@@ -474,13 +477,26 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const invitation = node.decodeInvitation(token);
     const profile = await records.profile();
     // Disclosure: only the display name, in `metadata`, the sanctioned app slot.
-    let result: Awaited<ReturnType<typeof node.formStrand>>;
-    try {
-      result = await node.formStrand(invitation, {
-        ...(profile.name ? { metadata: { name: profile.name } } : {}),
-      });
-    } catch (err) {
-      throw explainJoinFailure(err);
+    let result: Awaited<ReturnType<typeof node.formStrand>> | undefined;
+    // AN INVITATION CAN BE NEWER THAN ITS STRAND: since sereus 1.17 a new conversation is
+    // published and its invitation minted before the strand has started (sereus#49), and
+    // its row may not have reached the inviter's control store yet either. Redeemed in that
+    // window, formation answers `host-strand-unavailable` or `token-unknown`, both leaving
+    // the token unspent, so keep asking for a while rather than tell someone who opened a
+    // fresh link to try again.
+    const deadline = Date.now() + JOIN_STARTING_PATIENCE_MS;
+    for (;;) {
+      try {
+        result = await node.formStrand(invitation, {
+          ...(profile.name ? { metadata: { name: profile.name } } : {}),
+        });
+        break;
+      } catch (err) {
+        const starting = err instanceof FormationRejectedError && (err.code === 'host-strand-unavailable' || err.code === 'token-unknown');
+        if (!starting || Date.now() + JOIN_STARTING_RETRY_MS > deadline) throw explainJoinFailure(err);
+        console.info(`[accept] their side is still starting (${err.code}); asking again`);
+        await new Promise<void>(r => setTimeout(() => r(), JOIN_STARTING_RETRY_MS));
+      }
     }
     const { strandId, memberPrivateKey } = result;
     if (host.dev) {

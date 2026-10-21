@@ -8,6 +8,8 @@ import type { ChatHost, DurableSlot, NodeHost, SlotName } from '@chat/core/sereu
 import { createExtraNode } from './extra-node';
 import { STORAGE_KEYS } from '../data/persisted-names';
 import { cadreService } from './CadreService';
+import { SecureStoreKeyStore } from '@serfab/cadre-rn/key-store';
+import { keychainSecureStore } from './keychain';
 
 function storageKey(name: SlotName, key?: string): string {
   switch (name) {
@@ -47,5 +49,8 @@ export const chatHost: ChatHost = {
   node: nodeHost,
   slot: (name, key) => asyncStorageSlot(storageKey(name, key)),
   createExtraNode,
+  // The party's owner key (separate from the machine identity since sereus 1.17): the same
+  // keychain store, with the same (default) options, the kit's phone node files it under.
+  ownerKeyStore: new SecureStoreKeyStore(keychainSecureStore),
   dev: __DEV__,
 };
