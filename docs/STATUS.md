@@ -1163,6 +1163,38 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         - Making an invitation (`rn-invite.yaml`, `THINK_MS`): tapped after 10 s on the
           screen 4.5 / 5.8 s; after 1 s 8.3 s, and 33.3 s for the first after a cold start.
 
+- [x] **Stack 2026-10-22: sereus 1.18.0, optimystic 1.18.0, p2p-fret 1.2.1** adopted
+      (quereus 4.20.3, libp2p 3.3.11 and NS sqlite 3.5.9 unchanged). Answers **sereus#50**
+      (pollers woken by table changes, idle cadre sends no `sync`) and **Optimystic#39**
+      (closed: one fetch per missing block); partly **sereus#48** (retries back off one
+      link round trip) and the control half of **#47** (control tables created at founding).
+      Still open: Optimystic#29 (a write is ~4 requests per collection), #38, sereus#47
+      (strand side), #48 (deadlines), #49.
+      - **No data wipe:** a 1.17 control store migrates in place on 1.18 (sereus#46);
+        `DATA_FORMAT` stays `sereus-1.17`.
+      - **mobile-ns:** Optimystic 1.18's `IRawStorage` requires `flush`, `whenDurable` and
+        `durability`; `LazyNsRawStorage` forwards them and `close`. **Not yet run on a
+        phone.** The NS block store now bumps a `durability_mark` row with UPSERT
+        (`ON CONFLICT … DO UPDATE`), which Android 8's SQLite rejects — expect the S7 to
+        fail there; a newer Android should not.
+      - Core 66/66, serchat unit 14/14, scenarios 3/3; all apps type-check.
+      - `formation-cost.mjs` (Node, two relay-only parties, 3 strands; now counts the
+        streams opened while idle):
+
+        | | 1.17 loopback | 1.18 loopback | earlier, public relay | 1.18 public relay |
+        |---|---|---|---|---|
+        | `foundStrand` | 0.40–0.45 s | 0.37–0.40 s | 0.46–0.65 s | 0.53–0.75 s |
+        | joiner `addStrand` | 0.53–0.71 s | 0.25–0.35 s | 2.35 s; 1 in 3 took 10–13 s | 1.1–1.3 s (9/9) |
+        | joiner's first Message | 0.83–0.93 s | 0.34–0.39 s | ~1.7 s | 1.0–1.3 s |
+        | steady write, median | 91 ms | 56 ms | 245–286 ms | 251 ms |
+        | streams per idle minute | 270 (108 `sync`/`block-transfer`) | 73, none | — | 61, none |
+
+        Idle traffic left is FRET and libp2p pings only. Founding is unchanged; owner
+        genesis is ~0.13 s slower (control tables created at founding).
+      - **To re-test on a phone:** S7 RN join and invitation times (`phone-joins-serchat.mjs`,
+        `rn-invite.yaml`), and whether the prepared-conversation workaround is still worth
+        keeping (below).
+
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run
       the measurement named and drop the workaround if the stack now does the job.

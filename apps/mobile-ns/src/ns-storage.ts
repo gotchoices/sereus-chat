@@ -13,7 +13,7 @@
  */
 
 import type { ActionId, ActionRev, BlockId, IBlock, Transform } from '@optimystic/db-core';
-import type { BlockMetadata, IRawStorage } from '@optimystic/db-p2p';
+import type { BlockMetadata, FlushOptions, IRawStorage, StoreDurability } from '@optimystic/db-p2p';
 
 /**
  * The commit proof `IRawStorage` stores, derived from the interface rather than imported by
@@ -63,7 +63,7 @@ function openStorage(dbName: string): Promise<SqliteRawStorage> {
 	return opening;
 }
 
-type OptionalMethodForwarded = 'getApproximateBytesUsed' | 'listBlockIds';
+type OptionalMethodForwarded = 'getApproximateBytesUsed' | 'listBlockIds' | 'close';
 /**
  * `getStoreIdentity`: see the accepted tradeoff on `LazyNsRawStorage`. `readCached`: a
  * marker set only by a storage with a read cache beneath it, which `SqliteRawStorage`
@@ -100,6 +100,9 @@ export type UnclassifiedOptionalMember = MustBeNever<
 class LazyNsRawStorage
 	implements IRawStorage, Required<Pick<IRawStorage, OptionalMethodForwarded>>
 {
+	/** `SqliteRawStorage`'s fixed value, stated here because the real storage opens lazily. */
+	readonly durability: StoreDurability = 'power-loss';
+
 	constructor(private readonly dbName: string) {}
 
 	private storage(): Promise<SqliteRawStorage> {
@@ -189,6 +192,22 @@ class LazyNsRawStorage
 
 	async promotePendingTransaction(blockId: BlockId, actionId: ActionId): Promise<void> {
 		return (await this.storage()).promotePendingTransaction(blockId, actionId);
+	}
+
+	async flush(options?: FlushOptions): Promise<void> {
+		return (await this.storage()).flush(options);
+	}
+
+	async whenDurable(): Promise<void> {
+		return (await this.storage()).whenDurable();
+	}
+
+	/** Closes the storage only if it was opened; one never opened holds nothing. */
+	async close(): Promise<void> {
+		const opened = openByDbName.get(this.dbName);
+		if (!opened) return;
+		openByDbName.delete(this.dbName);
+		return (await opened).close();
 	}
 
 	async getApproximateBytesUsed(): Promise<number> {

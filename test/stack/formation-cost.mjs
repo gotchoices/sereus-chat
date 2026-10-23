@@ -213,9 +213,34 @@ const IDLE_S = Number(process.env.IDLE_S ?? 0);
 if (IDLE_S > 0) {
   // Leave everything running and idle, e.g. to watch FRET's maintenance back off.
   console.log(`\nidle ${IDLE_S} s…`);
+  // Count the streams both parties open while idle, by protocol: every stream between
+  // the two has an opener on one side, so outbound alone counts each once.
+  const opened = new Map();
+  let counting = true;
+  const watch = conn => {
+    if (conn.__counted) return;
+    conn.__counted = true;
+    const original = conn.newStream.bind(conn);
+    conn.newStream = (protocols, ...rest) => {
+      if (counting) {
+        const p = [protocols].flat()[0];
+        opened.set(p, (opened.get(p) ?? 0) + 1);
+      }
+      return original(protocols, ...rest);
+    };
+  };
+  const nodesOf = party => [party.getControlNode(), ...[...party.getStrands()].map(([, s]) => s.libp2pNode)].filter(Boolean);
+  for (const node of [...nodesOf(A), ...nodesOf(B)]) {
+    for (const c of node.getConnections()) watch(c);
+    node.addEventListener('connection:open', e => watch(e.detail));
+  }
   if (process.env.DEBUG) process.stderr.write(`\n#### ${new Date().toISOString()} BEGIN idle\n`);
   await new Promise(r => setTimeout(r, IDLE_S * 1000));
   if (process.env.DEBUG) process.stderr.write(`#### ${new Date().toISOString()} END idle\n`);
+  counting = false;
+  const total = [...opened.values()].reduce((a, b) => a + b, 0);
+  console.log(`streams opened while idle, both parties: ${total}`);
+  for (const [p, n] of [...opened].sort((x, y) => y[1] - x[1])) console.log(`  ${String(n).padStart(4)}  ${p}`);
 }
 
 if (process.env.SHOW_LIMITS) {
