@@ -1,11 +1,14 @@
-# Data security: authorship, order and history
+# Data integrity: authorship, order and history
 
-**Status: design. Nothing here is implemented.** This document records why chat needs
-cryptographic protection of its conversation record, the method chosen, what the Sereus stack
-already provides, and how chat gets from today's schema to the new one.
+**Status: proposal for a possible future upgrade. Not adopted, nothing implemented.** Chat is
+informal today: its conversation record makes no claim to be evidence of anything (§5.1). This
+document records what a provable record would protect against, the method that would be used, what
+the Sereus stack already provides, and the work it would take, so the upgrade can be weighed and
+picked up later. Everything below written as what chat "does" describes chat *if* the upgrade is
+adopted.
 
 Related: [app-family.md](app-family.md) (where the code lives),
-`design/specs/domain/schema.md` → *Ordering* (the open question this settles),
+`design/specs/domain/schema.md` → *Ordering* (the open question this would settle),
 [gotchoices/sereus#5](https://github.com/gotchoices/sereus/issues/5) (Sereus's answer on
 ordering).
 
@@ -45,12 +48,12 @@ the data can settle it.
   `deleteMessage` "removes the row" (T5, T7).
 - **Order has no basis.** `schema.md` → *Ordering* records that there is no authority on timing
   and no usable sequence. Sereus confirmed in sereus#5 that commit order exists in storage but is
-  not reachable from SQL, and chat answered that it would take the happened-before route. This
-  document is that route.
+  not reachable from SQL, and chat answered that the happened-before route was the one open to
+  it. This document works out that route.
 - **There is no backup or restore.** The need for one (including across schema versions) is what
   makes T4 urgent: the moment a restore exists, it is an attack surface.
 
-### Goals
+### Goals of the upgrade
 
 1. **Nobody can put words in another member's mouth** (T1, T2, T4 for others' messages), live or
    through a restore.
@@ -164,7 +167,7 @@ the median of members' receive times (Hashgraph) need several honest members to 
   show the latest edit; the original stays provable.
 - A **delete** is a tombstone entry from the target's author. Displays hide the target; the
   record keeps both. (Whether a deleted message's *content* may be purged from storage is a
-  separate privacy decision, see §5.)
+  separate privacy decision, see §5.3 Q3.)
 - **Reactions** and **profile** changes (display name, avatar) are entries too, so they are
   attributable and cannot be forged.
 
@@ -201,7 +204,7 @@ overwrite each other.
 - **Sign with the member key, not a machine key.** On a closed strand each party already has a
   per-strand key: `StrandPartyKey`, published as `Strand.Member.Key`. Using it means one person
   with several machines is one author, and membership checks (§2.3 step 3) can use Sereus's own
-  member records. `Member` in the chat schema becomes keyed by member key, not peer id.
+  member records. `Member` in the chat schema would become keyed by member key, not peer id.
 - **Every machine of the party must be able to sign.** Today the key comes from
   `CadreNode.ensureStrandPartyKey`, which needs an owner signer. A member-signer seam usable on
   any of the party's machines is a Sereus gap (§3).
@@ -241,9 +244,9 @@ message.
 A signed message is **transferable proof**: any member can show anyone, verifiably, that you
 wrote it. Signal and OTR deliberately avoid this by authenticating with shared secrets, so that
 either party could have produced a message. An "unarguable record" and "plausible deniability"
-are opposites. This document assumes chat chooses the record, which suits its purpose of
-communication among trusted peers with a dependable history. That choice should be explicit and
-stated to users.
+are opposites. The upgrade means choosing the record, which would suit communication among
+trusted peers that need a dependable history. Adopting it is that choice, and it should be explicit
+and stated to users (§5.1).
 
 ### 2.14 Optional: outside time anchoring
 
@@ -259,8 +262,8 @@ optional and not required by any goal above.
 Investigated across sereus, optimystic and quereus (source, docs, tickets and issues).
 
 **Verdict: partially.** The stack has the building blocks but no facility that is author-signed,
-hash-linked, tamper-evident and multi-party mergeable at once. Chat builds the entry log in its
-own schema with existing primitives, and asks Sereus for two small seams.
+hash-linked, tamper-evident and multi-party mergeable at once. If adopted, chat would build the
+entry log in its own schema with existing primitives, and ask Sereus for two small seams.
 
 | Mechanism | Author-signed | Hash-linked | Append-only / tamper-evident | Multi-party + offline merge | Status |
 |---|---|---|---|---|---|
@@ -276,7 +279,7 @@ own schema with existing primitives, and asks Sereus for two small seams.
 What this means for chat:
 
 - **Usable today:** the crypto SQL functions, the CHECK-with-`verify` idiom and the insert-only
-  idiom. Chat's entry table is built from these.
+  idiom. Chat's entry table would be built from these.
 - **Writer-side only, for now:** replicas apply committed data without re-running CHECKs, and no
   deployment validates writes at pend. So the reader verification in §2.3 is the actual
   guarantee until Optimystic turns validators on.
@@ -297,9 +300,9 @@ What this means for chat:
 
 ---
 
-## 4. Implementation and migration plan
+## 4. Implementation and migration plan, if adopted
 
-The plan assumes the app-family structure: the protocol in `packages/core/protocol`, the model in
+Not scheduled. The plan assumes the app-family structure: the protocol in `packages/core/protocol`, the model in
 `packages/core/sereus`, stores in `packages/core/stores`. Every app (mobile, mobile-ns, web, cli)
 gets it through the core.
 
@@ -308,9 +311,10 @@ data-format marker, and old strands are left behind.
 
 ### Phase 0: decisions
 
-- [ ] Deniability vs record (§2.13), stated in `design/specs/project.md` and to users
-- [ ] Open-strand authorship until Sereus has member keys there (§2.10)
-- [ ] Whether a deleted message's content may be purged from storage, or only hidden (§5)
+- [ ] Informal or record, and whether the founder chooses per strand (§5.1); deniability
+      follows from it (§2.13). State it in `design/specs/project.md` and to users
+- [ ] The design questions in §5.3, Q1–Q8 at least, since they change the schema
+- [ ] Open-strand authorship until Sereus has member keys there (§5.3 Q12)
 
 ### Phase 1: domain contract
 
@@ -341,7 +345,7 @@ data-format marker, and old strands are left behind.
 
 - [ ] Track local heads and the author's `Seq` per strand (device-local state)
 - [ ] `send`, `edit`, `delete`, `react`, `unreact` and profile updates write signed entries
-- [ ] Re-test send latency on the S7 and the S20 (signing must stay well under the commit time)
+- [ ] Re-test send latency on the S7 and the S21 (signing must stay well under the commit time)
 
 ### Phase 5: read path
 
@@ -372,15 +376,141 @@ data-format marker, and old strands are left behind.
 
 ---
 
-## 5. Open questions
+## 5. Decisions and open questions
 
-1. **Deniability** (§2.13): record or deniability? Everything else assumes record.
-2. **Deleting content:** a tombstone hides a message but keeps its signed content. Purging the
-   content (keeping only the hash) preserves the chain but loses the proof of what was said.
-   Which does a "delete" promise?
-3. **Open strands:** is an app-generated per-party key good enough until Sereus gives open
-   strands member keys?
-4. **Membership check in SQL:** can a chat sApp CHECK reference `Strand.Member`, or does
-   membership verification live only in the reader?
-5. **Attachments:** the entry signs attachment references by hash; do attachment bytes get their
-   own signature, or is the hash in the signed entry enough? (Recommended: the hash is enough.)
+§§2–4 describe chat keeping a provable record, which it does not do today. Adopting the upgrade
+starts by deciding that it should (§5.1), then settling the design questions that change the
+schema (§5.3).
+
+### 5.1 The first decision: informal or record
+
+**Chat is informal today**, and stays so unless this upgrade is adopted.
+
+| | **Informal** | **Record** |
+|---|---|---|
+| Promise to users | A convenient conversation. Not evidence of anything. | Who said what, after seeing what, cannot be forged or quietly changed. |
+| Edits and deletes | Overwrite and remove, as today | New entries; the original stays provable |
+| Deniability (§2.13) | Kept, in practice: nothing is signed | Given up: every message is transferable proof |
+| Cost | None | Signing per send, verification per entry on join and restore, larger strands |
+| Depends on Sereus | Nothing new | A member signer (§5.3 Q1); cohort-wide validators for full enforcement |
+
+**A per-strand choice.** The founder could pick the mode when founding, as part of the strand's
+terms, shown to invitees before they join and fixed for the strand's life. That lets casual
+conversations stay light and deniable while others keep a record. The mode would have to live in
+something invitees can verify (the sApp version or the strand's terms), not in a setting one
+party could flip.
+
+**What "record" still would not give**, even fully built:
+
+- **Real-world identity.** A key proves the same party wrote every entry signed with it, not
+  which person that party is. Tying a key to a person is outside Sereus.
+- **Absolute time**, unless anchored externally (§2.14).
+- **Admissibility.** Whether a court accepts such a record is a legal question. Tamper evidence
+  helps but does not settle it.
+
+So "record" can honestly promise *tamper-evident and attributable within the strand*. It should
+not be presented to users as a *legal record*.
+
+**Impersonation is a problem even in informal mode.** Today any member's node can write a message
+under another member's id (T1). Signed authorship alone (no hash links, edits and deletes still
+allowed) would close that without giving up the informal model's simplicity. It may be worth
+doing regardless of the choice above.
+
+### 5.2 Answers to review notes
+
+**Can any device holding an owner key sign?** Partly.
+- A party may hold several owner keys (one per device through owner grants, or one key imported
+  onto several devices), and any of them can be the signer.
+- Other parties cannot see a party's owner keys, though. Those live in the party's own control
+  database. What other members know is the party's member key (`Strand.Member.Key`). So an owner
+  key must first be introduced into the strand by an entry signed with the member key, binding it
+  to the party.
+- The member key's private half, `StrandPartyKey.PrivateKey`, is a row in the control database,
+  which replicates to every machine of the party. That includes storage-only drones and rented
+  nodes (to confirm with Sereus). So the member key is already usable on any party machine once
+  an owner has created it. Signing with owner keys instead keeps authorship to the devices the user
+  chose. Either way, the member key is the trust root other parties check.
+- Drones need no signing ability. Phone, laptop and desktop each sign if each holds an owner key.
+
+**Is data really deleted under the hood?** Not from storage, but that is no help as evidence.
+- Optimystic keeps every block's forward transforms indefinitely (`optimystic/docs/repository.md`).
+  So a row deleted through SQL still sits in block history on the machines that held the block.
+- Applications cannot reach that history through SQL (sereus#5). It carries no author signature,
+  only machine keys over storage blocks. And it lives only on the machines in that block's cohort,
+  which may all be the deleting party's.
+- So it is recoverable forensically, at best, not provable. It also means a delete in today's
+  chat does not truly erase, which matters for what a delete promises users (Q3).
+
+**Can tables be declared append-only?** Yes, as written; not yet as enforced.
+- Sereus's `InsertOnly check on update, delete (false)` idiom works in the chat schema.
+- Today only the writing machine runs CHECKs. Replicas apply committed data without re-running
+  them, and no deployment validates writes at pend (§3). So a hostile node's `DELETE` still
+  replicates.
+- Until validators run, append-only must also be enforced by each device keeping its own copy of
+  the entries it verified (Q4).
+- A user can still delete their own post under the record model: the delete is an entry that
+  hides the message (§2.6). The open choice is whether its content is also purged (Q3).
+
+### 5.3 Design questions to settle before Phase 1
+
+Each of these changes the schema or the requests to Sereus.
+
+1. **Who signs, and how others verify it.** Options:
+   - the party's member key on every party machine (available today; drones and rented nodes
+     hold it too);
+   - owner keys, each introduced by a member-key-signed `key` entry (limited to the user's chosen
+     devices; adds an entry kind and a revocation path for a lost device).
+
+   Recommended: owner keys introduced by the member key. Either way, ask Sereus to confirm where
+   `StrandPartyKey.PrivateKey` replicates.
+2. **Chains per device, not per author.** Two devices signing with one key (an imported owner key,
+   or the shared member key) both write `Seq` *n* while offline. §2.7 would report that as
+   equivocation by an honest user. The chain should be `(SigningKey, DeviceId, Seq)`, with
+   `DeviceId` in the signed envelope. Equivocation then means two entries with the same triple.
+3. **What a delete promises.**
+   - Hide only: the signed content stays; it can always be proved.
+   - Purge: possible without breaking the chain if the envelope signs `BodyHash` and the body is
+     stored separately. Purging the body then leaves signatures and links checkable, but the
+     content is gone.
+
+   Recommended: sign `BodyHash` either way, so the choice can be per strand or changed later.
+   Attachments follow the same pattern: the hash in the signed entry is enough.
+4. **Protection against deletion before validators run.** A hostile node can delete `Entry` rows
+   from the shared store. Reader checks cannot see a row that is gone, and the newest entries
+   leave no gap behind. Each device should therefore keep an append-only local archive of the
+   entries it has verified. That archive, not the shared tables, is what backups export and what
+   proves a removal.
+5. **Hashing `Parents` and `Body`.** The id hashes the envelope, which includes `Parents`. A CHECK on
+   `Entry` cannot hash rows in a separate `EntryParent` table. So `Parents` goes in `Entry` as one
+   canonically encoded column (sorted), with `EntryParent` only as an index. `Body` needs a
+   canonical encoding too (canonical CBOR or canonical JSON), pinned by the shared test vectors.
+6. **Where derived tables live.** If messages, reactions and members are shared tables, a hostile
+   writer can write fake rows straight into them and bypass the signed entries. They should be
+   device-local or SQL views over verified entries, never shared tables that people write to.
+7. **Membership over time.** "Invalid from the removal onward" (§2.10) has no meaning in a graph
+   without a global order: a removed member can keep signing entries that name old parents.
+   Options:
+   - record membership changes as entries in the graph (as Matrix does);
+   - require each entry to name the current membership epoch;
+   - rely on Sereus cutting off a removed party's access, and state that.
+8. **Validity rules beyond §2.3.**
+   - An author's entry must descend from that device's previous entry, so a chain cannot quietly
+     split.
+   - `ClaimedAt` is clamped to its proven bounds before it breaks ties (§2.4), so an author cannot
+     sort first by claiming an early time.
+   - Goal 2 proves only what an author had *at least* seen. Naming older heads hides awareness and
+     widens the author's time window. The document and UI should say so.
+9. **Cost on join and restore.** Verifying ~10 ms per entry on the S7 makes 1,000 entries take
+   ~10 s, on top of joins already measured at 25–40 s. Extra rows also mean more blocks fetched on
+   attach (Optimystic#39). Before committing, measure: native Ed25519, verifying the newest entries
+   first, and checkpoints a joiner can trust instead of re-verifying all history.
+10. **Late branches in the UI.** A branch written offline sorts by the DAG, so its messages can
+    appear above ones the reader already saw. Decide how the UI marks them.
+11. **Flooding.** A member can fill a strand with entries that fail verification. Readers reject
+    them but still fetch and check them. Decide whether to limit this per author, or accept it until
+    pend validators exist.
+12. **Open strands.** Sereus gives them no member keys. Is an app-generated per-party key, announced
+    in a signed entry, good enough there (trust on first use)? Or does record mode require a closed
+    strand?
+13. **Membership check in SQL.** Can a chat sApp CHECK reference `Strand.Member`, or does membership
+    checking live only in the reader?
