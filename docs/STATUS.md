@@ -1237,6 +1237,14 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
           (Sereus's) the consults run behind the read, so they cost relayed requests, not a
           blocked read; their effect on join time is not measured. File only with a
           measured join-time gain from stamping pushed blocks (e.g. on the S7).
+      - **Optimystic#29 re-measured on 1.18 (2026-10-24, answered).** `message-latency.mjs`
+        (brought up to 1.17's owner genesis; `DEBUG` now marks each write), public relay,
+        12 writes × 2 runs: every write, from the first, is 3 `cluster` requests to the other
+        machine on prepared streams, commit median 243–245 ms (1.15: 286 ms, and a 1.2 s
+        2nd write after joining, now gone). The joiner's own post-join traffic (6 `sync` +
+        6 `cluster` during the host's first write) overlaps write #1 (394 / 589 ms).
+        Said the issue can close from our side; mentioned the pushed-block consults as data
+        for the upstream NOTE, not as a request.
 
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run

@@ -22,7 +22,8 @@
  * RESTART=1 then stops both parties, restarts them over the same storage and
  * identity (as two phones whose apps were closed), and measures ROUNDS more.
  */
-import { CadreNode, ControlFormationUsageRecorder, generateStrandMemberKey, KeyStoreJoinedStrandStore } from '@serfab/cadre-core';
+import { CadreNode, generateStrandMemberKey, KeyStoreJoinedStrandStore } from '@serfab/cadre-core';
+import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { LevelDBRawStorage } from '@optimystic/db-p2p-storage-rn';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
@@ -167,12 +168,10 @@ async function startParty(tag, partyId) {
   });
   autoAttach(node, tag);
   await node.start();
-  const owner = node.getIdentityOwnerKey();
-  await node.getControlDatabase().ensureOwnerKey(owner.publicKeyB64);
-  node.initializeSeedBootstrap(owner.privateKeyB64);
-  node.initializeStrandSolicitation({
-    formationUsageRecorder: new ControlFormationUsageRecorder(node.getControlDatabase()),
-  });
+  // Since sereus 1.17 the owner key is the person's, kept apart from the machine identity:
+  // genesis seats it (first start) or finds it already seated (a restart).
+  const genesis = await runOwnerGenesis(node, { keyStore: new FileKeyStore(join(STORE_ROOT, `${tag}-owner`)), label: tag });
+  if (genesis !== 'enrolled' && genesis !== 'member') throw new Error(`${tag}: owner genesis ${genesis}`);
   return node;
 }
 
@@ -219,6 +218,7 @@ async function oneMessage(from, to, memberId, label) {
     }
     return null;
   })();
+  if (process.env.DEBUG) process.stderr.write(`\n#### ${new Date().toISOString()} BEGIN ${label}\n`);
   try {
     const d = db(from);
     const msg = () => d.exec(
@@ -242,6 +242,7 @@ async function oneMessage(from, to, memberId, label) {
     } else await msg();
     commitMs = Date.now() - s;
   } catch (e) { error = e?.message ?? String(e); }
+  if (process.env.DEBUG) process.stderr.write(`#### ${new Date().toISOString()} END ${label} ${commitMs ?? 'failed'} ms\n`);
   const visibleMs = error ? null : await visibleP;
   const woke = WATCH ? wakes[toTag].slice(wakeMark).map(t => t - s) : [];
   log(`${label}: commit ${commitMs ?? '—'} ms, visible on the other side ${visibleMs ?? 'NEVER'} ms` +
@@ -292,7 +293,7 @@ try {
   const formed = await joiner.formStrand(invitation, { partyId: partyJoiner, purpose: 'latency', metadata: { name: 'Joiner' } });
   log(`JOINER: formed in ${Date.now() - f0} ms`);
   let joinerInst = joiner.getStrand(strandId) ?? await joiner.addStrand({
-    strandRow: { Id: formed.strandId, MemberPrivateKey: formed.memberPrivateKey ?? null, Type: 'c', FounderOwnerKey: null },
+    strandRow: { Id: formed.strandId, MemberPrivateKey: formed.memberPrivateKey ?? null, Type: 'c', FounderOwnerKey: null, FounderPeerId: null },
     sAppConfig: SAPP, founder: false,
   });
   joinerInst = await awaitStrand(joiner, strandId, 'JOINER');
