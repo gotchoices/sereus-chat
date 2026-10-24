@@ -18,6 +18,7 @@
  *   TRACE_SQL=1 FOUND_ONLY=3 node test/stack/formation-cost.mjs  # count the SQL quereus is given per step
  *   IDLE_S=180 DEBUG='optimystic:fret*' node …          # then sit idle (FRET's backoff, idle traffic)
  *   SHOW_LIMITS=1 node …                                # list each connection, relayed or direct, and its relay limits
+ *   OVERLAP=1 node …                                    # blocks a join push delivered vs. the sync requests that follow
  *
  * Prints one line per step with its duration, and the event loop's own CPU use per
  * step (process.cpuUsage), so "waiting" and "working" can be told apart.
@@ -29,7 +30,7 @@ import { yamux } from '@chainsafe/libp2p-yamux';
 import { identify } from '@libp2p/identify';
 import { circuitRelayServer, circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { generateKeyPair } from '@libp2p/crypto/keys';
-import { MemoryRawStorage } from '@optimystic/db-p2p';
+import { BlockTransferService, MemoryRawStorage, SyncService } from '@optimystic/db-p2p';
 import { CadreNode, generateStrandMemberKey, InMemoryKeyStore } from '@serfab/cadre-core';
 import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { randomUUID } from 'node:crypto';
@@ -56,6 +57,46 @@ function dumpSql(label) {
   for (const [k, n] of [...sqlSeen].sort((a, b) => b[1] - a[1]).slice(0, 12)) console.log(`    ${String(n).padStart(4)}× ${k}`);
   sqlSeen.clear();
 }
+// OVERLAP: which blocks a join push delivered, and which blocks the pusher is then asked
+// to check (sync requests, by kind), per strand. Both services run in this process.
+const pushedTo = new Map(); // strand protocol prefix → { at, ids }
+const syncAsked = [];       // { strand, blockId, kind, at, step }
+let currentStep = '';
+if (process.env.OVERLAP) {
+  const strandOf = protocol => String(protocol).replace(/\/db-p2p\/.*$/, '');
+  const origPush = BlockTransferService.prototype.handlePush;
+  BlockTransferService.prototype.handlePush = async function (request, sender) {
+    const response = await origPush.call(this, request, sender);
+    if (request.type === 'push') {
+      const entry = pushedTo.get(strandOf(this.protocol)) ?? { at: Date.now(), ids: new Set(), node: this.registrar };
+      for (const id of Object.keys(response.blocks ?? {})) entry.ids.add(id);
+      pushedTo.set(strandOf(this.protocol), entry);
+    }
+    return response;
+  };
+  for (const [method, kind] of [['answerConsult', 'consult'], ['answerArchive', 'archive']]) {
+    const original = SyncService.prototype[method];
+    SyncService.prototype[method] = function (request, ...rest) {
+      syncAsked.push({ strand: strandOf(this.protocol), blockId: request.blockId, kind, at: Date.now(), step: currentStep, node: this.registrar });
+      return original.call(this, request, ...rest);
+    };
+  }
+}
+function reportOverlap() {
+  if (!process.env.OVERLAP) return;
+  console.log('\nblocks pushed to the joiner, and sync requests the pusher answered afterwards (per strand):');
+  for (const [strand, push] of pushedTo) {
+    // Answered by the pusher, i.e. asked by the joiner: not the joiner's own sync service.
+    const after = syncAsked.filter(s => s.strand === strand && s.at >= push.at && s.node !== push.node);
+    const joinerAnswered = syncAsked.filter(s => s.strand === strand && s.at >= push.at && s.node === push.node).length;
+    const ofPushed = after.filter(s => push.ids.has(s.blockId));
+    const kinds = after.reduce((m, s) => (m[s.kind] = (m[s.kind] ?? 0) + 1, m), {});
+    const within10s = ofPushed.filter(s => s.at - push.at <= 10_000).length;
+    const bySteps = ofPushed.reduce((m, s) => (m[s.step] = (m[s.step] ?? 0) + 1, m), {});
+    console.log(`  ${strand.slice(-36)}: pushed ${push.ids.size}; then ${after.length} sync requests ${JSON.stringify(kinds)}, ` +
+      `${ofPushed.length} for pushed blocks (${new Set(ofPushed.map(s => s.blockId)).size} distinct, ${within10s} within 10 s of the push) by step ${JSON.stringify(bySteps)}; the joiner answered ${joinerAnswered}`);
+  }
+}
 const RUNS = Number(process.env.RUNS ?? 2);
 const SAPP_ID = 'org.example.formation-cost';
 const SAPP = {
@@ -77,6 +118,7 @@ const rows = [];
 /** Time one step: wall clock, and this process's CPU over the same span. */
 async function step(who, what, fn) {
   if (process.env.DEBUG) process.stderr.write(`\n#### ${new Date().toISOString()} BEGIN ${who} ${what}\n`);
+  currentStep = `${who} ${what}`;
   const wall = Date.now();
   const cpu = process.cpuUsage();
   const value = await fn();
@@ -255,6 +297,7 @@ if (process.env.SHOW_LIMITS) {
   }
 }
 
+reportOverlap();
 console.log('\nsummary (ms, by step, all runs):');
 const by = new Map();
 for (const r of rows) {

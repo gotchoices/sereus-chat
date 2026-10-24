@@ -1191,9 +1191,52 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
 
         Idle traffic left is FRET and libp2p pings only. Founding is unchanged; owner
         genesis is ~0.13 s slower (control tables created at founding).
-      - **To re-test on a phone:** S7 RN join and invitation times (`phone-joins-serchat.mjs`,
-        `rn-invite.yaml`), and whether the prepared-conversation workaround is still worth
-        keeping (below).
+      - **Emulator 5564 (Android 17), public relay, against serchat, 2026-10-22:**
+        - RN release: fresh setup (`rn-setup.yaml`) passes; join and talk 2/2 PASS, Join →
+          conversation 7.6 / 7.9 s; invitation 0.2–1.1 s after the tap (prepared).
+        - NS debug: setup passes; join and talk 2/2 PASS, Join → conversation 6.7 / 5.6 s.
+          Optimystic 1.18's NS block store works here (Android 17's SQLite has UPSERT).
+      - Release builds now need the signing variables (`app/build.gradle` reads
+        `STORE_FILE_CHAT`, `STORE_PASSWORD_CHAT`, `KEY_ALIAS_CHAT`). Test builds use the
+        debug key so they install over earlier test builds and keep their data:
+        `STORE_FILE_CHAT=debug.keystore STORE_PASSWORD_CHAT=android KEY_ALIAS_CHAT=androiddebugkey`.
+      - **S7, public relay, against serchat, 2026-10-23:**
+        - **1.17 → 1.18 in place (RN):** installed over 1.17 data, no data-format screen;
+          node up 30 s after launch, all six conversations attached at 58 s.
+        - **RN join and talk** (fresh data): 3/3 PASS once the phone had Wi-Fi again (the
+          first three failures were the phone offline, not the stack). Join → conversation
+          48.6 / 32.5 / 22.0 s, against 39.9 / 25.2 s on 1.17: no gain. Of one 20 s attach:
+          strand node 1.6 s; serchat's catch-up push (48 blocks) lands at 5.4 s; then
+          28 one-block `sync` requests to serchat, ~5 s each in flight; ~25 `cluster`
+          requests for the first writes; open at 19.7 s.
+        - **RN invitation** (`rn-invite.yaml`): 10 s on screen 5.1 s; 1 s 9.4 / 20.4 s
+          (1.17: 4.5–5.8 s and 8.3 s). Founding is unchanged in 1.18, so the
+          prepared-conversation workaround stays.
+        - **NS (debug):** with fresh data, the reply's commit fails `commit-not-durable`
+          (the phone cannot confirm it holds the block). With the one `durability_mark`
+          UPSERT in `db-p2p-storage-ns/dist/src/sqlite-sync.js` rewritten as
+          `INSERT OR REPLACE … COALESCE((SELECT n …), 0) + 1` (test edit, reverted), 2/2
+          PASS: Join → conversation 14.1 / 14.5 s, send ~1.1 s. So Optimystic 1.18's NS store
+          needs SQLite ≥ 3.24 (Android 8 has 3.18). Old-phone only: not an upstream issue
+          (scope rule); a local yarn patch if the NS app is to keep running on the S7.
+      - **Found: pushed blocks are re-checked one by one.** After the join catch-up push
+        delivers every block, the joiner's first reads send one `sync` request per block
+        to the founder (Node, public relay, `formation-cost.mjs` with
+        `DEBUG=optimystic:db-p2p:protocol-client*,optimystic:db-p2p:sync-service*`: 17–20
+        per attach over 3 runs, answered during the first write; the S7 sends 28). The
+        remaining case of Optimystic#43 (closed in 1.17: a commit received as a cohort
+        member counts as checked; a block received by push does not).
+        - Confirmed 2026-10-23 with `OVERLAP=1 formation-cost.mjs` (3 runs loopback, 3 public
+          relay): pushed 42 blocks; then 22–24 (loopback) / 25–27 (public relay) `consult`
+          requests from the joiner to the founder, every one for a block the push had just
+          delivered, all within 10 s; none the other way.
+        - **Not filed: upstream's documented tradeoff.** The `NOTE` on
+          `CoordinatorRepo.noteCohortCommitApplied` (Optimystic v1.18.0) says a pushed replica
+          is deliberately not stamped (a push proves the revision was committed once, not that
+          nothing newer exists), "revisit if pushes dominate a profile". In `lazy` mode
+          (Sereus's) the consults run behind the read, so they cost relayed requests, not a
+          blocked read; their effect on join time is not measured. File only with a
+          measured join-time gain from stamping pushed blocks (e.g. on the S7).
 
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run
