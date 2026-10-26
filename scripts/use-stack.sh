@@ -59,16 +59,16 @@ SER = os.path.dirname(ROOT)  # the ser/ folder holding the clones
 
 # name : (clone path under ser/, exact version, pinned in resolutions)
 PACKAGES = collections.OrderedDict([
-    ('@optimystic/db-core',                   ('optimystic/packages/db-core',                   '1.18.0', True)),
-    ('@optimystic/db-p2p',                    ('optimystic/packages/db-p2p',                    '1.18.0', True)),
-    ('@optimystic/db-p2p-storage-rn',         ('optimystic/packages/db-p2p-storage-rn',         '1.18.0', True)),
-    ('@optimystic/db-p2p-storage-fs',         ('optimystic/packages/db-p2p-storage-fs',         '1.18.0', True)),
-    ('@optimystic/db-p2p-storage-ns',         ('optimystic/packages/db-p2p-storage-ns',         '1.18.0', True)),
-    ('@optimystic/quereus-plugin-crypto',     ('optimystic/packages/quereus-plugin-crypto',     '1.18.0', True)),
-    ('@optimystic/quereus-plugin-optimystic', ('optimystic/packages/quereus-plugin-optimystic', '1.18.0', True)),
+    ('@optimystic/db-core',                   ('optimystic/packages/db-core',                   '1.19.0', True)),
+    ('@optimystic/db-p2p',                    ('optimystic/packages/db-p2p',                    '1.19.0', True)),
+    ('@optimystic/db-p2p-storage-rn',         ('optimystic/packages/db-p2p-storage-rn',         '1.19.0', True)),
+    ('@optimystic/db-p2p-storage-fs',         ('optimystic/packages/db-p2p-storage-fs',         '1.19.0', True)),
+    ('@optimystic/db-p2p-storage-ns',         ('optimystic/packages/db-p2p-storage-ns',         '1.19.0', True)),
+    ('@optimystic/quereus-plugin-crypto',     ('optimystic/packages/quereus-plugin-crypto',     '1.19.0', True)),
+    ('@optimystic/quereus-plugin-optimystic', ('optimystic/packages/quereus-plugin-optimystic', '1.19.0', True)),
     ('@quereus/quereus',                      ('quereus/packages/quereus',                      '4.20.3', True)),
-    ('@serfab/cadre-core',                    ('sereus/packages/cadre-core',                    '1.18.0', True)),
-    ('@serfab/cadre-rn',                      ('sereus/packages/cadre-rn',                      '1.18.0', False)),
+    ('@serfab/cadre-core',                    ('sereus/packages/cadre-core',                    '1.19.0', True)),
+    ('@serfab/cadre-rn',                      ('sereus/packages/cadre-rn',                      '1.19.0', False)),
     ('p2p-fret',                              ('fret/packages/fret',                            '1.2.1',  True)),
 ])
 SENTINEL = '@serfab/cadre-core'

@@ -19,6 +19,7 @@
  *   IDLE_S=180 DEBUG='optimystic:fret*' node …          # then sit idle (FRET's backoff, idle traffic)
  *   SHOW_LIMITS=1 node …                                # list each connection, relayed or direct, and its relay limits
  *   OVERLAP=1 node …                                    # blocks a join push delivered vs. the sync requests that follow
+ *   INDEXES=1 RUNS=1 node …                             # streams per one-row insert into tables with 0..5 indexes (Optimystic#42)
  *
  * Prints one line per step with its duration, and the event loop's own CPU use per
  * step (process.cpuUsage), so "waiting" and "working" can be told apart.
@@ -67,9 +68,10 @@ if (process.env.OVERLAP) {
   const origPush = BlockTransferService.prototype.handlePush;
   BlockTransferService.prototype.handlePush = async function (request, sender) {
     const response = await origPush.call(this, request, sender);
-    if (request.type === 'push') {
+    if (request.type === undefined || request.type === 'push') { // 1.19's service only takes pushes and drops `type`
       const entry = pushedTo.get(strandOf(this.protocol)) ?? { at: Date.now(), ids: new Set(), node: this.registrar };
-      for (const id of Object.keys(response.blocks ?? {})) entry.ids.add(id);
+      // Optimystic 1.19 answers `{ accepted: [ids], missing }`; earlier releases `{ blocks: { id: data } }`.
+      for (const id of response.accepted ?? Object.keys(response.blocks ?? {})) entry.ids.add(id);
       pushedTo.set(strandOf(this.protocol), entry);
     }
     return response;
@@ -99,6 +101,17 @@ function reportOverlap() {
 }
 const RUNS = Number(process.env.RUNS ?? 2);
 const SAPP_ID = 'org.example.formation-cost';
+// INDEXES: tables T0..T5, Tk with k plain indexes, and P with a partial unique index on a
+// column the inserts leave null (Optimystic#42's scenario).
+function indexTables() {
+  const t = [];
+  for (let k = 0; k <= 5; k++) {
+    t.push(`table T${k} (Id text primary key, A text, B text, C text, D text, E text);`);
+    for (let i = 0; i < k; i++) t.push(`index T${k}By${'ABCDE'[i]} on T${k} (${'ABCDE'[i]});`);
+  }
+  t.push('table P (Id text primary key, Ref text null);', 'unique index PByRef on P (Ref) where Ref is not null;');
+  return '\n    ' + t.join('\n    ') + '\n  ';
+}
 const SAPP = {
   id: SAPP_ID,
   version: '0.1.0',
@@ -106,7 +119,7 @@ const SAPP = {
   schema: `
     table Member (Id text primary key, Name text not null) with tags ("optimystic.network_watch" = true);
     table Message (Id text primary key, MemberId text not null, Content text not null) with tags ("optimystic.network_watch" = true);
-  `,
+  ` + (process.env.INDEXES ? indexTables() : ''),
   signature: '',
   latencyHint: 'interactive',
 };
@@ -249,6 +262,44 @@ if (MESSAGES > 0) {
   times.sort((x, y) => x - y);
   console.log(`\n${MESSAGES} steady-state writes by the joiner: median ${times[times.length >> 1]} ms, min ${times[0]}, max ${times.at(-1)}; ` +
     `CPU ${Math.round((used.user + used.system) / 1000 / MESSAGES)} ms per write over ${Math.round((Date.now() - wall0) / MESSAGES)} ms wall`);
+}
+
+if (process.env.INDEXES) {
+  // One-row inserts by the joiner into tables with 0..5 indexes: the streams its strand node
+  // opens to the founder per insert, by protocol (3 inserts each; the median is shown).
+  const [strandId, inst] = [...B.getStrands()].at(-1);
+  const node = inst.libp2pNode;
+  let counts = null;
+  const watchConn = conn => {
+    if (conn.__idxCounted) return;
+    conn.__idxCounted = true;
+    const original = conn.newStream.bind(conn);
+    conn.newStream = (protocols, ...rest) => {
+      if (counts) { const p = String([protocols].flat()[0]).replace(/^.*\/(cluster|db-p2p\/[a-z-]+)\/.*$/, '$1'); counts[p] = (counts[p] ?? 0) + 1; }
+      return original(protocols, ...rest);
+    };
+  };
+  for (const c of node.getConnections()) watchConn(c);
+  node.addEventListener('connection:open', e => watchConn(e.detail));
+  const db = inst.database.getDatabase();
+  console.log(`\none-row inserts by the joiner (strand ${strandId.slice(-8)}), streams to the founder per insert:`);
+  const cases = [0, 1, 2, 3, 4, 5].map(k => [`T${k} (${k} indexes)`, i => `insert into App.T${k} (Id, A, B, C, D, E) values ('r${i}', 'a', 'b', 'c', 'd', 'e')`]);
+  cases.push(['P (partial index, row excluded)', i => `insert into App.P (Id, Ref) values ('r${i}', null)`]);
+  for (const [label, sql] of cases) {
+    const runs = [];
+    for (let i = 0; i < 3; i++) {
+      counts = {};
+      const t = Date.now();
+      await db.exec(sql(i), undefined, { transaction: true });
+      const ms = Date.now() - t;
+      await new Promise(r => setTimeout(r, 300)); // let any follow-up send start
+      runs.push({ ms, ...counts });
+      counts = null;
+    }
+    const med = key => runs.map(r => r[key] ?? 0).sort((a, b) => a - b)[1];
+    const keys = [...new Set(runs.flatMap(r => Object.keys(r)))].filter(k => k !== 'ms');
+    console.log(`  ${label.padEnd(32)} ${keys.map(k => `${k} ${med(k)}`).join(', ') || 'none'}; ${runs.map(r => r.ms).join('/')} ms`);
+  }
 }
 
 const IDLE_S = Number(process.env.IDLE_S ?? 0);

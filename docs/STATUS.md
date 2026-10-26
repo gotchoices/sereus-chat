@@ -1246,6 +1246,32 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         Said the issue can close from our side; mentioned the pushed-block consults as data
         for the upstream NOTE, not as a request.
 
+- [x] **Stack 2026-10-26: sereus 1.19.0, optimystic 1.19.0** (p2p-fret 1.2.1, quereus
+      4.20.3, libp2p 3.3.11, NS sqlite 3.5.9 unchanged). **Every machine must move together:**
+      1.19 ↔ 1.18 block pushes deliver nothing, silently (sereus#52), so testers on a 1.18
+      APK and a 1.19 APK will not join each other properly. 1.18 stores open without
+      migration; `DATA_FORMAT` stays `sereus-1.17`. No chat code changes needed.
+      - Core 66/66, serchat unit 14/14, scenarios 3/3; all apps type-check. NS block store
+        still uses UPSERT (`durability_mark`), so the NS app still fails on Android 8.
+      - **Optimystic#42 fixed** (filed by the Taleus work, not chat; `INDEXES=1 formation-cost.mjs`, new): a one-row insert by
+        the joiner costs 3 `cluster` streams to the founder for 0, 1, 2, 3, 4 and 5 indexes
+        and for the excluded-row partial index (was 4(k+1); 24 for five).
+      - `message-latency.mjs`, public relay: every write 3 `cluster`, commit median 245 ms;
+        the joiner's post-join traffic now overlaps only write #1 (8 `sync` + 4 `cluster`),
+        not #1–#3. Joiner's Member write 446 ms (1.18: 521).
+      - `formation-cost.mjs` loopback (Mac load average 12–24 during these runs, so treat
+        timings as rough): `addStrand` 0.23–0.38 s, joiner's first Message 0.17–0.19 s
+        (1.18: 0.34–0.39), steady writes median 38 ms (56). Pushed-block consults unchanged
+        (24–27 per join; the documented tradeoff). `OVERLAP=1` updated for 1.19's push
+        reply (`accepted` ids, no `type`).
+      - **sereus#51 (cadre-rn's Hermes `TextDecoder` and `structuredClone` stand-ins, from
+        Sereus Health)** reported a write on the S7 going from ~7 s to ~1.5 s. The RN app
+        uses the kit's stand-ins, so the S7 should be re-timed on 1.19 when it is free.
+      - Closed upstream as shipped (already adopted): sereus#45 (`createEdgeNode`; NS could
+        adopt it), #47, #49, #50. Asked of us: Optimystic#38 (test sqlite 4.x with threading
+        on our devices; needs a phone). sereus#48 (re-run the phone arm on 1.19) is the
+        Taleus work's issue; run here in `ser/sereus-wt-119` (v1.19.0, Optimystic from npm).
+
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run
       the measurement named and drop the workaround if the stack now does the job.
