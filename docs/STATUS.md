@@ -1271,6 +1271,12 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         adopt it), #47, #49, #50. Asked of us: Optimystic#38 (test sqlite 4.x with threading
         on our devices; needs a phone). sereus#48 (re-run the phone arm on 1.19) is the
         Taleus work's issue; run here in `ser/sereus-wt-119` (v1.19.0, Optimystic from npm).
+        Phone arm, one run (2026-10-26, Mac load 4–8): seated 331.6 s after joining (1.16:
+        108–110 s); 8 rounds in 1844 s (1.16: 603–1056 s), **all 8 failed** ("Some peers did
+        not complete"); cohort silent 182, stream reset 107, commit retried 39, FRET peer
+        marked dead 27 (728 contact strikes), ping failures 135; strand nodes still connected
+        afterwards; "converged" 307 s later on the one row that committed (Invoice:r4).
+        Loopback control: 8 rounds in 0.8 s, converged at once. Not posted (whose issue).
 
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run
