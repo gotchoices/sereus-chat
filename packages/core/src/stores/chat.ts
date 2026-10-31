@@ -6,7 +6,7 @@
  * row goes and the caller gets the failure (to put the text back in the composer). An
  * edit shows at once too, until the next read confirms it.
  */
-import type { ChatError, ChatModel, Member, Message, Result, SendInput, StrandState } from '../model/index.js';
+import type { ChatError, ChatModel, Deliveries, Member, Message, Outbox, Result, SendInput, StrandState } from '../model/index.js';
 import { ok } from '../model/index.js';
 import { loader, type LoadState, type Loader } from './loader.js';
 import { writable, type Readable } from './store.js';
@@ -24,6 +24,8 @@ export type ChatView = {
   invitationsOut: number;
   /** Known but not open on this device yet (a cold start, a re-attach): not an error. */
   opening: boolean;
+  /** This device's writes here not sent yet, and refused ones. */
+  outbox: Outbox;
 };
 
 export interface ChatStore extends Readable<LoadState<ChatView>> {
@@ -33,9 +35,16 @@ export interface ChatStore extends Readable<LoadState<ChatView>> {
   edit(messageId: string, content: string): Promise<Result<void>>;
   delete(messageId: string): Promise<Result<void>>;
   react(messageId: string, symbol: string): Promise<Result<void>>;
+  /** Withdraw a message still waiting to send (`delivery.discardable`). */
+  discard(messageId: string): Promise<Result<void>>;
+  /** Stop showing a refused write. */
+  dismissFailure(failureId: string): Promise<Result<void>>;
 }
 
-type Stored = Omit<ChatView, 'messages'> & { messages: Message[] };
+const EMPTY_OUTBOX: Outbox = { waiting: 0, waitingForMembers: false, showingSavedCopy: false, failed: [] };
+const NO_DELIVERIES: Deliveries = { messages: {}, reactions: {}, outbox: EMPTY_OUTBOX };
+
+type Stored = Omit<ChatView, 'messages' | 'outbox'> & { messages: Message[] };
 type Local = { pending: Message[]; sent: Message[]; edits: Record<string, string> };
 
 /**
@@ -81,11 +90,25 @@ export function chatStore(model: ChatModel, strandId: string): ChatStore {
 
   const local = writable<Local>({ pending: [], sent: [], edits: {} });
 
+  // Where this device's writes stand, read apart from the messages: marks change several
+  // times per message, and re-reading the list (2.5–4.4 s on the S7) for each would cost
+  // more than the write did. Laid over the last list read.
+  const marks = writable<Deliveries>(NO_DELIVERIES, set => {
+    let alive = true;
+    const read = async () => {
+      const r = await model.messages.deliveries(strandId);
+      if (alive && r.ok) set(r.value);
+    };
+    void read();
+    const stop = model.changes.delivery(strandId, () => { void read(); });
+    return () => { alive = false; stop(); };
+  });
+
   // The view: what was read, with local writes laid over it. Cached on the identity of
   // both inputs, so `get()` returns the same object until either changes.
-  let cache: { s: LoadState<Stored>; l: Local; view: LoadState<ChatView> } | null = null;
-  const compose = (s: LoadState<Stored>, l: Local): LoadState<ChatView> => {
-    if (cache && cache.s === s && cache.l === l) return cache.view;
+  let cache: { s: LoadState<Stored>; l: Local; d: Deliveries; view: LoadState<ChatView> } | null = null;
+  const compose = (s: LoadState<Stored>, l: Local, d: Deliveries): LoadState<ChatView> => {
+    if (cache && cache.s === s && cache.l === l && cache.d === d) return cache.view;
     let view: LoadState<ChatView>;
     if (s.state !== 'ready') {
       view = s as LoadState<ChatView>;
@@ -96,10 +119,10 @@ export function chatStore(model: ChatModel, strandId: string): ChatStore {
         // Sent but not read back yet: shown as stored, so the row does not flicker.
         ...l.sent.filter(m => !ids.has(m.id)),
         ...l.pending,
-      ];
-      view = { ...s, value: { ...s.value, messages } };
+      ].map(m => withMarks(m, d));
+      view = { ...s, value: { ...s.value, messages, outbox: d.outbox } };
     }
-    cache = { s, l, view };
+    cache = { s, l, d, view };
     return view;
   };
 
@@ -115,16 +138,17 @@ export function chatStore(model: ChatModel, strandId: string): ChatStore {
     });
   };
 
-  const view = writable<LoadState<ChatView>>(compose(stored.get(), local.get()), set => {
-    const recompute = () => set(compose(stored.get(), local.get()));
+  const view = writable<LoadState<ChatView>>(compose(stored.get(), local.get(), marks.get()), set => {
+    const recompute = () => set(compose(stored.get(), local.get(), marks.get()));
     const a = stored.subscribe(s => { retire(s); recompute(); });
     const b = local.subscribe(recompute);
-    return () => { a(); b(); };
+    const c = marks.subscribe(recompute);
+    return () => { a(); b(); c(); };
   });
 
   return {
     subscribe: view.subscribe,
-    get: () => compose(stored.get(), local.get()),
+    get: () => compose(stored.get(), local.get(), marks.get()),
     reload: stored.reload,
     refresh: stored.refresh,
 
@@ -138,6 +162,7 @@ export function chatStore(model: ChatModel, strandId: string): ChatStore {
         editedAt: null,
         attachments: input.attachments ?? [],
         reactions: [],
+        delivery: { state: 'saving' },
       };
       local.update(l => ({ ...l, pending: [...l.pending, temp] }));
       const result = await model.messages.send(strandId, input);
@@ -173,5 +198,27 @@ export function chatStore(model: ChatModel, strandId: string): ChatStore {
       if (result.ok) stored.reload();
       return result;
     },
+
+    async discard(messageId) {
+      const result = await model.messages.discard(strandId, messageId);
+      if (result.ok) stored.reload();
+      return result;
+    },
+
+    dismissFailure: failureId => model.messages.dismissFailure(strandId, failureId),
   };
+}
+
+/** The latest marks over a message read earlier: a mark moves on without the list being read again. */
+function withMarks(m: Message, d: Deliveries): Message {
+  const mark = d.messages[m.id];
+  let reactions = m.reactions;
+  if (m.reactions.some(r => d.reactions[`${m.id} ${r.symbol}`] && r.delivery !== d.reactions[`${m.id} ${r.symbol}`])) {
+    reactions = m.reactions.map(r => {
+      const rm = d.reactions[`${m.id} ${r.symbol}`];
+      return rm && r.delivery ? { ...r, delivery: rm } : r;
+    });
+  }
+  if (!mark && reactions === m.reactions) return m;
+  return { ...m, ...(mark ? { delivery: mark } : {}), reactions };
 }

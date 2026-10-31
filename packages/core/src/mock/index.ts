@@ -132,6 +132,13 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       async delete() { return ok(); },
       async react() { return ok(); },
       async unreact() { return ok(); },
+      // The mock has no network: everything it writes is at once where it will stay.
+      async outbox() { return ok({ waiting: 0, waitingForMembers: false, showingSavedCopy: false, failed: [] }); },
+      async deliveries() {
+        return ok({ messages: {}, reactions: {}, outbox: { waiting: 0, waitingForMembers: false, showingSavedCopy: false, failed: [] } });
+      },
+      async dismissFailure() { return ok(); },
+      async discard() { return fail('not-supported', 'Nothing is waiting to send.'); },
       async draft(strandId) { return ok(drafts[strandId] ?? ''); },
       async saveDraft(strandId, text) { drafts[strandId] = text; return ok(); },
       async readCursor(strandId) { return ok(readCursors[strandId] ?? null); },
@@ -292,6 +299,8 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
         strandsListeners.add(onChange);
         return () => { strandsListeners.delete(onChange); };
       },
+      // Nothing the mock writes ever changes where it stands.
+      delivery() { return () => {}; },
       strand(strandId, onChange) {
         let set = strandListeners.get(strandId);
         if (!set) strandListeners.set(strandId, (set = new Set()));

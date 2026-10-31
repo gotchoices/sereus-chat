@@ -1278,6 +1278,73 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         afterwards; "converged" 307 s later on the one row that committed (Invoice:r4).
         Loopback control: 8 rounds in 0.8 s, converged at once. Not posted (whose issue).
 
+- [x] **Asynchronous writes: sereus 1.19.1 / optimystic 1.20.1 / quereus 4.21.1, offline mode**
+      (2026-10-29; plan and rationale in [async-writes.md](async-writes.md)).
+      - **Stack:** pins moved; no data wipe (1.19 stores open on 1.20). Every tester must move
+        together. Errors now classified by name: `BlockUnavailableError` and
+        `PromiseShortfallError` are `unavailable` (the text patterns missed the first),
+        `ValidityRejectedError` is `rejected`, `StrandQueueNotEmptyError` is `unsent-messages`.
+      - **Core:** every write returns its transaction id (`returning StampId() as Tx`), and
+        `sereus/delivery.ts` follows it: `saving → waiting → sending → here → delivered`, or
+        `unconfirmed` / `failed`, from the queue's statuses and the durability reports.
+        Persisted (slot `outbox`). Marks reach the stores on their own signal
+        (`changes.delivery`, `messages.deliveries`), not by re-reading the list.
+        New: `messages.outbox`, `dismissFailure`, `discard`, and
+        `strands.leave({ discardUnsent })`.
+      - **Schema:** `Message.Id` and `Attachment.Id` are tagged `"optimystic.fresh" = true`, and
+        the sApp version is 0.2.0, so an ordinary waiting send is `assured`, not "may not go
+        through" (asserted by the core test).
+        **Cost found:** a tag-only schema change makes an existing strand fail to open while
+        its other member is offline (`PromiseShortfallError`), in both modes:
+        `test/stack/schema-change-offline-peer.mjs` (`CHANGE=none` opens in ~100 ms; `CHANGE=tag`
+        fails at ~5 s). Seen on the S7: three conversations with gone serchat partners
+        dropped out of the list. Filed as **gotchoices/sereus#55** (2026-10-30). Decision:
+        keep the tag and live with it, with no app-side workaround and no app-side migration
+        code. See "Upstream bugs we live with" below.
+      - **serchat:** synchronous by default. `--offline` adds a file journal per strand. A
+        one-shot run waits (≤ 60 s) for queues to drain before exiting. New: a `delivery`
+        column, `outbox <strand>`, `leave --discard`.
+      - **RN:** offline mode by default (`CadreService.sendMode`, key `@sereus.chat/sendMode`).
+        Diagnostics has "Wait for the others on every send", which calls the kit's
+        `setStrandOfflineMode` and is refused while writes are queued.
+        `DurabilityMark` draws the pie, also on your own reaction chips. The conversation
+        has a queue line, not-sent banners with Dismiss, and Withdraw on a waiting message.
+        StrandDetail asks before leaving with unsent messages.
+      - **NativeScript:** no journal upstream, so it stays online. It shows marks from
+        durability reports only (no UI built).
+      - **Tests:**
+        - core 69/69, including `delivery.test.ts` (online and offline, peer gone, leave
+          refused);
+        - serchat unit 14/14;
+        - scenarios 3/3 synchronous and 3/3 with `--offline`;
+        - apps type-check;
+        - mobile jest: the persisted-names pin passes. 6 suites fail the same way without
+          these changes (Detox and keyboard-controller environment).
+      - **S7 (RN release, debug-signed, over 1.18 data):**
+        - it opens;
+        - join and talk with serchat passes: Join → conversation 18.9 s (1.18: 22–48 s),
+          phone → serchat 7 s;
+        - a send with serchat gone shows the quarter pie and "1 waiting to send · waiting
+          for the others · showing saved messages".
+      - **A replicated write lost across a quick restart: our bug, fixed.** A node stopped
+        within a few seconds of taking the other member's write did not have it after
+        restarting, online or offline. Optimystic groups writes in memory and flushes them
+        on a timer, and the code that builds a store must close it. serchat's host never
+        closed its `FileRawStorage` stores or journals; it now does on stop. So does the core
+        test party's journal. The phone kit closes its own. Shown by
+        `test/stack/restart-after-replicated-write.mjs`: lost in 12 of 14 runs with the stores left open,
+        kept in 6 of 6 with the stores closed. Not filed upstream.
+
+- [ ] **Upstream bugs we live with: check on every stack release, nag until fixed.** No
+      app-side workaround for these, by decision. On each release, read the issue and the
+      notes, re-run the repro, and remove the entry once it passes.
+      - **gotchoices/sereus#55**: an app schema change (even one column tag) keeps an existing
+        strand from opening while its other member is offline. Hit by chat's 0.2.0 schema
+        (`"optimystic.fresh"` on `Message.Id`/`Attachment.Id`): after the update, a conversation
+        whose partner is offline is missing until the partner returns. Repro:
+        `CHANGE=tag node test/stack/schema-change-offline-peer.mjs` (fixed when it prints
+        `addStrand OK`). Filed 2026-10-30.
+
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run
       the measurement named and drop the workaround if the stack now does the job.

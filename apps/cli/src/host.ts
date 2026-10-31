@@ -18,7 +18,7 @@ import { FileTrustedOwnerStore } from '@serfab/cadre-core/trusted-owner-store-fi
 import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-file';
 import { FileEnrolledMachineStore } from '@serfab/cadre-core/enrolled-machine-store-file';
 import { FileStrandNetworkStateStore } from '@serfab/cadre-core/strand-network-state-file';
-import { FileRawStorage } from '@optimystic/db-p2p-storage-fs';
+import { FileKVStore, FileRawStorage } from '@optimystic/db-p2p-storage-fs';
 import { MemoryRawStorage } from '@optimystic/db-p2p';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
@@ -65,6 +65,12 @@ export interface HostOptions {
    * Nothing survives the process; used to separate storage cost from protocol cost.
    */
   memoryBlocks?: boolean;
+  /**
+   * Strand offline mode (`--offline`), as the RN app runs it: a write returns once saved in
+   * the strand's journal here and is sent later. Off by default, so a command's timing is the
+   * stack's real cost (docs/async-writes.md §5). Journals live under `<profile>/journal/`.
+   */
+  offline?: boolean;
 }
 
 export interface CliHost extends ChatHost {
@@ -83,6 +89,16 @@ export function createCliHost(opts: HostOptions): CliHost {
   const reachabilityCallbacks = new Set<() => void>();
 
   const memoryScopes = new Map<string, MemoryRawStorage>();
+  const journals = new Map<string, FileKVStore>();
+  /**
+   * Every block store this host built. The one that builds a store closes it (Optimystic
+   * `IRawStorage.close`): writes are grouped in memory and flushed on a timer, so a store left
+   * open loses the last moments' writes, a block just replicated here included, when the
+   * process exits. Measured: a node stopped about 3 s after taking the other member's write
+   * did not have it after a restart (test/stack/offline-restart-hides-peer-rows.mjs, CLOSE=0).
+   */
+  const stores: FileRawStorage[] = [];
+  const track = (store: FileRawStorage) => { stores.push(store); return store; };
   // The node's identity and, in its own slot, the party's owner key (separate since sereus 1.17).
   const keyStore = new FileKeyStore(dirs.keys);
   const relays = () => [...new Set([...config.relays, ...opts.extraRelays])];
@@ -97,7 +113,7 @@ export function createCliHost(opts: HostOptions): CliHost {
       storage: {
         provider: opts.memoryBlocks
           ? (scope: string) => memoryScopes.get(scope) ?? memoryScopes.set(scope, new MemoryRawStorage()).get(scope)!
-          : (scope: string) => new FileRawStorage(join(dirs.blocks, scope)),
+          : (scope: string) => track(new FileRawStorage(join(dirs.blocks, scope))),
       },
       network: {
         transports: [webSockets(), circuitRelayTransport()] as never,
@@ -115,6 +131,15 @@ export function createCliHost(opts: HostOptions): CliHost {
       bootstrapPeers: { store: await FileBootstrapPeerStore.open(dirs.node, partyId) },
       enrolledMachines: { store: await FileEnrolledMachineStore.open(dirs.node, partyId) },
       strandNetworkState: { store: await FileStrandNetworkStateStore.open(dirs.node, partyId) },
+      ...(opts.offline ? {
+        strandOffline: {
+          // One store per strand for the life of the process: a second store over the same
+          // directory would not see the first one's unflushed writes.
+          journal: (scope: string) => journals.get(scope)
+            ?? journals.set(scope, new FileKVStore(join(dirs.root, 'journal', scope))).get(scope)!,
+          initialMode: 'offline' as const,
+        },
+      } : {}),
     };
     const built = new CadreNode(nodeConfig);
     for (const { event, handler } of handlers) built.on(event as never, handler as never);
@@ -142,6 +167,10 @@ export function createCliHost(opts: HostOptions): CliHost {
     starting = null;
     owner = false;
     if (stopping) await stopping.stop();
+    // Flush and release what this host built, now that the node no longer uses it.
+    const closing = [...stores.splice(0), ...journals.values()];
+    journals.clear();
+    await Promise.allSettled(closing.map(store => store.close()));
   }
 
   const nodeHost: CliHost['node'] = {

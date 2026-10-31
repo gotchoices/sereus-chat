@@ -52,7 +52,40 @@
     "placeholder": "Message",
     "replyingTo": "Replying to {{name}}",
     "sending": "Sending…",
-    "unread": "New"
+    "unread": "New",
+    "delivery": {
+      "saving": "Saving",
+      "waiting": "Saved on this phone, waiting to send",
+      "sending": "Sending",
+      "here": "Sent, not yet delivered: only this phone has it",
+      "delivered": "Delivered",
+      "unconfirmed": "Sent, delivery not confirmed",
+      "failed": "Not sent",
+      "mayFail": "It may not go through"
+    },
+    "outbox": {
+      "waiting": "{{n}} waiting to send",
+      "waitingOne": "1 waiting to send",
+      "waitingForMembers": "waiting for the others",
+      "showingSavedCopy": "showing saved messages",
+      "notSent": "Not sent: {{what}}",
+      "reason": {
+        "constraint": "it clashed with someone else's change",
+        "concurrent-modification": "someone else changed it first",
+        "rejected": "the others refused it",
+        "too-large": "it is too large",
+        "expired": "it waited too long",
+        "discarded": "withdrawn"
+      },
+      "dismiss": "Dismiss",
+      "discard": "Withdraw",
+      "alreadySending": "It is already being sent."
+    },
+    "leaveUnsent": {
+      "title": "Messages not sent yet",
+      "body": "{{n}} of your messages here have not been sent. Leaving withdraws them.",
+      "confirm": "Leave anyway"
+    }
   },
   "common": {
     "back": "Back",
@@ -76,6 +109,8 @@
       "owner-not-ready": "This device is still setting up its network. Try again in a moment."
     },
     "not-a-member": "This device could not be added as a member of the conversation.",
+    "unsent-messages": "This device still has messages here it has not sent.",
+    "rejected": "The other members refused this change.",
     "not-supported": "That is not possible yet.",
     "join-inviter-unreachable": "Could not reach the person who invited you. Their app may be closed or offline — try again when they are back.",
     "invitation-spent": "This invitation has already been used or has expired. Ask for a new one.",

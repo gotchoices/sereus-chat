@@ -10,8 +10,9 @@
  * the runtime.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, Switch } from 'react-native';
+import { cadreService, type SendMode } from '../host/CadreService';
 import { runFoundStrandCheck } from '../diagnostics/found-strand-check';
 import type { CheckResult } from '../diagnostics/found-strand-check';
 import { runCryptoCost, runSocketFrameCost } from '@chat/core/diagnostics';
@@ -41,6 +42,20 @@ export default function Diagnostics() {
   const [result, setResult] = useState<CheckResult | null>(null);
   const [twoParty, setTwoParty] = useState<TwoPartyResult | null>(null);
   const scroller = useRef<ScrollView | null>(null);
+
+  // How writes are acknowledged: the one switch for timing the stack on a phone.
+  const [sendMode, setSendModeState] = useState<SendMode>(cadreService.sendMode);
+  const [sendModeError, setSendModeError] = useState<string | null>(null);
+  useEffect(() => { void cadreService.loadSendMode().then(setSendModeState); }, []);
+  const toggleSendMode = useCallback(async (wait: boolean) => {
+    setSendModeError(null);
+    try {
+      await cadreService.setSendMode(wait ? 'online' : 'offline');
+      setSendModeState(cadreService.sendMode);
+    } catch (err) {
+      setSendModeError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
 
   const run = useCallback(async (v: Variant) => {
     setRunning(v.label);
@@ -139,6 +154,22 @@ export default function Diagnostics() {
       contentContainerStyle={styles.content}
       onContentSizeChange={() => scroller.current?.scrollToEnd({ animated: true })}
     >
+      <SectionHeader label="Sending" />
+      <View style={[styles.row, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
+        <View style={styles.flex1}>
+          <Text style={[typography.body, styles.rowTitle, { color: theme.textPrimary }]}>
+            Wait for the others on every send
+          </Text>
+          <Text style={[typography.small, { color: theme.textMuted }]}>
+            {sendMode === 'online'
+              ? 'On: a send returns once the other members take it — the stack’s real cost.'
+              : 'Off (normal): a send returns once saved on this phone and is delivered in the background.'}
+          </Text>
+          {sendModeError ? <Text style={[typography.small, { color: theme.danger }]}>{sendModeError}</Text> : null}
+        </View>
+        <Switch testID="send-mode" value={sendMode === 'online'} onValueChange={v => { void toggleSendMode(v); }} />
+      </View>
+
       <SectionHeader label="Stack checks" />
       <Text style={[typography.small, styles.blurb, { color: theme.textMuted }]}>
         Each runs on its own throwaway node and its own databases, so nothing here touches your

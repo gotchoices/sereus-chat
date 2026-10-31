@@ -25,6 +25,8 @@ describe('persisted names', () => {
       joinedStrands: '@sereus.chat/joinedStrands',
       outgoingInvitations: '@sereus.chat/outgoingInvitations',
       preparedStrands: '@sereus.chat/preparedStrands',
+      outbox: '@sereus.chat/outbox',
+      sendMode: '@sereus.chat/sendMode',
       dataFormat: '@sereus.chat/dataFormat',
       themeMode: '@sereus.chat/themeMode',
       draft: '@sereus.chat/draft/S',

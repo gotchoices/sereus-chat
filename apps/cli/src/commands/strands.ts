@@ -1,11 +1,11 @@
-/** Strands and messages: `strands`, `log`, `tail`, `send`, `members`, `mute`, `archive`, `leave`. */
+/** Strands and messages: `strands`, `log`, `tail`, `send`, `members`, `mute`, `archive`, `leave`, `outbox`. */
 import type { Member, Message, Muted, StrandSummary } from '@chat/core';
 import { UsageError, type Session } from '../session.js';
 import type { Row } from '../output.js';
 import { need, type Command } from './command.js';
 
 export const STRAND_COLUMNS = ['row', 'id', 'title', 'members', 'unread', 'lastAt', 'lastFrom', 'lastText'] as const;
-export const MESSAGE_COLUMNS = ['row', 'strandId', 'messageId', 'time', 'from', 'text', 'replyTo', 'edited', 'attachments'] as const;
+export const MESSAGE_COLUMNS = ['row', 'strandId', 'messageId', 'time', 'from', 'text', 'replyTo', 'edited', 'attachments', 'delivery'] as const;
 
 function strandRow(row: number, s: StrandSummary): Row {
   const opening = s.opening || s.pending;
@@ -57,6 +57,8 @@ function messageRow(row: number | '', strandId: string, m: Message, from: (id: s
     replyTo: m.replyToId,
     edited: m.editedAt,
     attachments: m.attachments.length || '',
+    // Where this device's own write stands (waiting, sending, here, delivered, unconfirmed); '' for others'.
+    delivery: m.delivery ? `${m.delivery.state}${m.delivery.mayFail ? ' (may fail)' : ''}` : '',
   };
 }
 
@@ -209,8 +211,8 @@ const unarchive: Command = {
 const leave: Command = {
   name: 'leave',
   summary: 'Leave a strand; --forget also discards who you were in it',
-  usage: '<strand> [--forget] [--yes]',
-  options: { forget: { type: 'boolean' }, yes: { type: 'boolean', short: 'y' } },
+  usage: '<strand> [--forget] [--yes] [--discard]',
+  options: { forget: { type: 'boolean' }, yes: { type: 'boolean', short: 'y' }, discard: { type: 'boolean' } },
   async run(session, args, values) {
     const strand = await session.strand(need(leave, args, 0, 'strand'));
     const key = values.forget ? 'strand.forgetBody' : 'strand.leaveBody';
@@ -218,7 +220,31 @@ const leave: Command = {
     if (!values.yes && !(await session.confirm(`${values.forget ? 'Forget' : 'Leave'} "${strand.title}"?`))) {
       throw new UsageError('leave: not confirmed (use --yes when nobody is at the terminal)');
     }
-    session.unwrap(await session.model.strands.leave(strand.id, { keepIdentity: !values.forget }));
+    // Messages saved here and not sent yet make the leave fail (`unsent-messages`) unless
+    // --discard withdraws them.
+    session.unwrap(await session.model.strands.leave(strand.id, { keepIdentity: !values.forget, discardUnsent: !!values.discard }));
+  },
+};
+
+const outbox: Command = {
+  name: 'outbox',
+  summary: 'This device\'s writes to a strand not sent yet, and refused ones',
+  usage: '<strand> [--dismiss <id>]',
+  options: { dismiss: { type: 'string' } },
+  async run(session, args, values) {
+    const strand = await session.strand(need(outbox, args, 0, 'strand'));
+    if (typeof values.dismiss === 'string') {
+      session.unwrap(await session.model.messages.dismissFailure(strand.id, values.dismiss));
+      return;
+    }
+    const box = session.unwrap(await session.model.messages.outbox(strand.id));
+    session.out.rows(['strandId', 'waiting', 'waitingForMembers', 'showingSavedCopy', 'failed'],
+      [{ strandId: strand.id, waiting: box.waiting, waitingForMembers: box.waitingForMembers,
+        showingSavedCopy: box.showingSavedCopy, failed: box.failed.length }]);
+    if (box.failed.length) {
+      session.out.rows(['failureId', 'kind', 'messageId', 'reason', 'at', 'preview'],
+        box.failed.map(f => ({ failureId: f.id, kind: f.kind, messageId: f.messageId ?? '', reason: f.reason, at: f.at, preview: f.preview ?? '' })));
+    }
   },
 };
 
@@ -228,4 +254,4 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-export const strandCommands = [strands, log, tail, send, members, mute, archive, unarchive, leave];
+export const strandCommands = [strands, log, tail, send, members, mute, archive, unarchive, leave, outbox];

@@ -6,6 +6,10 @@
 import { CadreNode, InMemoryKeyStore } from '@serfab/cadre-core';
 import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { MemoryRawStorage } from '@optimystic/db-p2p';
+import { FileKVStore } from '@optimystic/db-p2p-storage-fs';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { generateKeyPair } from '@libp2p/crypto/keys';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayServer, circuitRelayTransport } from '@libp2p/circuit-relay-v2';
@@ -59,8 +63,15 @@ export interface TestParty extends SereusModel {
  * One party: its own node, slots and Sereus model. `relayAddr` set and `listen` false is
  * the phone's topology (no listen address; reachable only through the relay).
  */
-export async function createTestParty(tag: string, opts: { relayAddr?: string; listen?: boolean; backgroundFounding?: boolean }): Promise<TestParty> {
+export async function createTestParty(tag: string, opts: {
+  relayAddr?: string; listen?: boolean; backgroundFounding?: boolean;
+  /** Strand offline mode, as the RN app runs it: a write returns once saved here. Journal in a temp directory
+   *  (Optimystic refuses a memory journal: it would not survive a restart). */
+  offline?: boolean;
+}): Promise<TestParty> {
   const scopes = new Map<string, MemoryRawStorage>();
+  const journals = new Map<string, FileKVStore>();
+  const journalRoot = opts.offline ? mkdtempSync(join(tmpdir(), `chat-journal-${tag}-`)) : '';
   const partyId = `${tag}-${newId()}`;
   let owned = false;
   // This party's owner key, apart from the machine's identity (sereus 1.17).
@@ -86,6 +97,16 @@ export async function createTestParty(tag: string, opts: { relayAddr?: string; l
       connectionGater: { denyDialMultiaddr: () => false },
     },
     requireSignedSchemas: false,
+    ...(opts.offline ? {
+      strandOffline: {
+        journal: (scope: string) => {
+          let journal = journals.get(scope);
+          if (!journal) journals.set(scope, (journal = new FileKVStore(join(journalRoot, scope))));
+          return journal;
+        },
+        initialMode: 'offline' as const,
+      },
+    } : {}),
   });
 
   let started: Promise<void> | null = null;
@@ -121,7 +142,13 @@ export async function createTestParty(tag: string, opts: { relayAddr?: string; l
   };
   const host: ChatHost = { node: nodeHost, slot: memorySlots(), ownerKeyStore, backgroundFounding: opts.backgroundFounding };
   const { model, boot, settle } = createSereusModel(host);
-  return { tag, host, node, model, boot, settle, stop: async () => { await settle(); await node.stop(); } };
+  return { tag, host, node, model, boot, settle, stop: async () => {
+    await settle();
+    await node.stop();
+    // The builder of a store closes it (Optimystic `IKVStore`/`IRawStorage`): flushes what it still holds.
+    await Promise.allSettled([...journals.values()].map(j => j.close()));
+    journals.clear();
+  } };
 }
 
 /** Wait until `check` holds, polling; throws with `what` after `ms`. */

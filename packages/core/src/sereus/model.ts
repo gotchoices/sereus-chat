@@ -10,11 +10,11 @@
 import { FormationRejectedError, readOwnerPrivateKey, type StrandInstance } from '@serfab/cadre-core';
 import { buildInviteUrl, CHAT_SAPP_ID } from '../protocol/index.js';
 import type {
-  Attachment, ChatModel, Invitation, InvitationPreview, Member, Message, Prefs,
+  Attachment, ChatModel, Delivery, Invitation, InvitationPreview, Member, Message, Prefs, Reaction,
   SearchBatch, StorageUsage, StrandState, StrandSummary, Visibility,
 } from '../model/index.js';
 import { fail, INVITATION_VALIDITY, ok, pageMessages } from '../model/index.js';
-import { attempt, ChatFailure, explainJoinFailure, withTimeout } from './errors.js';
+import { attempt, ChatFailure, explainJoinFailure, isTransientWriteFailure, withTimeout } from './errors.js';
 import type { ChatHost } from './host.js';
 import { LocalRecords, OutgoingInvitations, StrandPrefsStore, SummaryCache } from './local-state.js';
 import {
@@ -25,6 +25,7 @@ import { createChatStrand, foundChatStrandInBackground } from './sapp-strands.js
 import { classifyClaimFailure, nodeReach, readNodeCode } from './node-code.js';
 import { ownerFingerprint, type CadreMachine, type CadreStatus } from '../model/index.js';
 import { StrandRuntime } from './strands.js';
+import { DeliveryTracker, type WriteTarget } from './delivery.js';
 
 /** How long the strand list waits on one strand's preview or member read before using its cached row. */
 const LIST_READ_MS = 3000;
@@ -72,7 +73,7 @@ async function retryAfterRestart<T>(write: () => Promise<T>, perf: (...a: unknow
     try {
       return await write();
     } catch (e) {
-      const transient = /Failed to get super-majority/i.test(e instanceof Error ? e.message : String(e));
+      const transient = isTransientWriteFailure(e);
       perf('write attempt', i, 'failed:', e instanceof Error ? e.message : String(e));
       if (!transient || i >= attempts) throw e;
       await new Promise<void>(r => setTimeout(r, 3000));
@@ -99,6 +100,10 @@ export function createSereusModel(host: ChatHost): SereusModel {
   const strandPrefs = new StrandPrefsStore(host);
   const summaries = new SummaryCache(host);
   const outgoing = new OutgoingInvitations(host);
+  /** Where each of this device's writes stands (`delivery.ts`). */
+  const delivery = new DeliveryTracker(host, id => host.node.node?.getStrands().get(id));
+  delivery.wire();
+  void delivery.load();
 
   /** Development-build step timings for the message path, tagged `[perf]`. */
   const perf = (...a: unknown[]) => { if (host.dev) console.info('[perf]', ...a); };
@@ -235,13 +240,15 @@ export function createSereusModel(host: ChatHost): SereusModel {
       list.push(toAttachment(a));
       attByMessage.set(a.MessageId, list);
     }
-    const byMessage = new Map<string, Array<{ memberId: string; symbol: string }>>();
+    const me = runtime.peerId;
+    const byMessage = new Map<string, Reaction[]>();
     for (const r of reactions) {
       const list = byMessage.get(r.MessageId) ?? [];
-      list.push({ memberId: r.MemberId, symbol: r.Symbol });
+      const mark = r.MemberId === me ? delivery.reactionDelivery(strandId, r.MessageId, r.Symbol) : undefined;
+      list.push({ memberId: r.MemberId, symbol: r.Symbol, ...(mark ? { delivery: mark } : {}) });
       byMessage.set(r.MessageId, list);
     }
-    // No status is read: none is tracked (design/specs/domain/schema.md).
+    // This device's own writes carry where they stand (`delivery.ts`); nobody else's do.
     return rows.map(r => ({
       id: r.Id,
       memberId: r.MemberId,
@@ -251,7 +258,14 @@ export function createSereusModel(host: ChatHost): SereusModel {
       editedAt: r.EditedAt ?? null,
       attachments: attByMessage.get(r.Id) ?? [],
       reactions: byMessage.get(r.Id) ?? [],
+      ...markOf(strandId, r.Id, r.MemberId === me),
     }));
+  }
+
+  function markOf(strandId: string, messageId: string, mine: boolean): { delivery?: Delivery } {
+    if (!mine) return {};
+    const mark = delivery.messageDelivery(strandId, messageId);
+    return mark ? { delivery: mark } : {};
   }
 
   async function listStrands(): Promise<StrandSummary[]> {
@@ -358,6 +372,8 @@ export function createSereusModel(host: ChatHost): SereusModel {
     }
     const row = await retryAfterRestart(() => insertMessage(strand, peerId, input.content, input.replyToId), perf);
     step('insertMessage');
+    const mark = delivery.record(strandId, row.Tx, { kind: 'send', messageId: row.Id, preview: input.content.slice(0, 40) });
+    perfDelivery(strandId, row.Tx, input.content);
     const saved = await insertAttachments(strand, row.Id, input.attachments ?? []);
     step('insertAttachments');
     perf('send total', Date.now() - t0, 'ms for', input.content.slice(0, 24));
@@ -370,7 +386,34 @@ export function createSereusModel(host: ChatHost): SereusModel {
       editedAt: null,
       attachments: saved.map(toAttachment),
       reactions: [],
+      ...(mark ? { delivery: mark } : {}),
     };
+  }
+
+  /**
+   * Development builds: how long a message really took to reach the others, which an
+   * offline-mode send no longer shows in its own timing (docs/async-writes.md §7).
+   */
+  function perfDelivery(strandId: string, txId: string | undefined, content: string): void {
+    if (!host.dev || !txId) return;
+    const t0 = Date.now();
+    let last: string | undefined;
+    const stop = delivery.onChange(id => {
+      if (id !== strandId) return;
+      const state = delivery.stateOf(txId);
+      if (!state || state === last) { if (!state) stop(); return; }
+      last = state;
+      perf('delivery', state, 'after', Date.now() - t0, 'ms for', content.slice(0, 24));
+      if (state === 'delivered' || state === 'failed' || state === 'unconfirmed') stop();
+    });
+  }
+
+  /** Run a tracked write: its transaction is followed to delivery under `target`. */
+  async function tracked(strandId: string, target: WriteTarget,
+    write: (strand: StrandInstance) => Promise<string | undefined>): Promise<void> {
+    const strand = await strandFor(strandId);
+    const tx = await write(strand);
+    delivery.record(strandId, tx, target);
   }
 
   /**
@@ -558,18 +601,36 @@ export function createSereusModel(host: ChatHost): SereusModel {
           canIManage: true,
         };
       }),
-      leave: (id, opts) => attempt(async () => { await runtime.leave(id, opts); }),
+      leave: (id, opts) => attempt(async () => { await runtime.leave(id, opts); delivery.forgetStrand(id); }),
     },
 
     messages: {
       list: (id, opts) => attempt(async () => pageMessages(await listMessages(id), opts)),
       send: (id, input) => attempt(() => send(id, input)),
-      edit: (id, messageId, content) => attempt(async () => updateMessage(await strandFor(id), messageId, content)),
-      delete: (id, messageId) => attempt(async () => removeMessage(await strandFor(id), messageId)),
-      react: (id, messageId, symbol) =>
-        attempt(async () => addReaction(await strandFor(id), messageId, requirePeerId(), symbol)),
-      unreact: (id, messageId, symbol) =>
-        attempt(async () => removeReaction(await strandFor(id), messageId, requirePeerId(), symbol)),
+      edit: (id, messageId, content) => attempt(() => tracked(id, { kind: 'edit', messageId, preview: content.slice(0, 40) },
+        strand => updateMessage(strand, messageId, content))),
+      delete: (id, messageId) => attempt(() => tracked(id, { kind: 'delete', messageId },
+        strand => removeMessage(strand, messageId))),
+      react: (id, messageId, symbol) => attempt(() => tracked(id, { kind: 'react', messageId, symbol, preview: symbol },
+        strand => addReaction(strand, messageId, requirePeerId(), symbol))),
+      unreact: (id, messageId, symbol) => attempt(() => tracked(id, { kind: 'unreact', messageId, symbol, preview: symbol },
+        strand => removeReaction(strand, messageId, requirePeerId(), symbol))),
+      outbox: id => attempt(async () => { await delivery.load(); return delivery.outbox(id); }),
+      deliveries: id => attempt(async () => { await delivery.load(); return delivery.deliveries(id); }),
+      dismissFailure: (id, failureId) => attempt(async () => { delivery.dismiss(id, failureId); }),
+      discard: (id, messageId) => attempt(async () => {
+        const txId = delivery.waitingWriteOf(id, messageId);
+        const queue = (await strandFor(id)).database?.offline;
+        if (!txId || !queue) throw new ChatFailure('not-supported', 'This message is not waiting to send.');
+        try {
+          await queue.discard(txId);
+        } catch (err) {
+          if (err instanceof Error && err.name === 'EntryNotDiscardableError') {
+            throw new ChatFailure('unavailable', 'This message is already being sent.', { retryable: false, cause: err });
+          }
+          throw err;
+        }
+      }),
       draft: id => attempt(() => records.draft(id)),
       saveDraft: (id, text) => attempt(() => records.saveDraft(id, text)),
       readCursor: id => attempt(() => records.readCursor(id)),
@@ -844,6 +905,10 @@ export function createSereusModel(host: ChatHost): SereusModel {
        * with a new database is re-attached, and a change is reported on re-attach since
        * anything may have arrived meanwhile.
        */
+      delivery(strandId, onChange) {
+        return delivery.onChange(id => { if (id === strandId) onChange(); });
+      },
+
       strand(strandId, onChange) {
         let subs: Array<{ unsubscribe(): void }> = [];
         let attachedTo: unknown = null;

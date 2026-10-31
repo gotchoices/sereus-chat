@@ -8,6 +8,7 @@ import type { ChatHost } from './host.js';
 import { JoinedStrands, LocalRecords, SummaryCache, type JoinedStrand } from './local-state.js';
 import { upsertMember } from './operations.js';
 import { joinChatStrand } from './sapp-strands.js';
+import { ChatFailure } from './errors.js';
 
 export class StrandRuntime {
   readonly joined: JoinedStrands;
@@ -271,17 +272,27 @@ export class StrandRuntime {
    * else. It does NOT erase the local copy — cadre-core has no purge step — so "forget"
    * drops the membership key while the blocks stay on disk.
    */
-  async leave(strandId: string, opts: { keepIdentity: boolean }): Promise<{ purged: boolean }> {
+  async leave(strandId: string, opts: { keepIdentity: boolean; discardUnsent?: boolean }): Promise<{ purged: boolean }> {
     await this.ensureUp();
     const node = this.node;
     if (!node) throw new Error('Cadre is not running.');
+    // Writes saved here and not yet sent (offline mode) were acknowledged to the user, so
+    // the stack refuses the leave rather than drop them silently. Ask first; then
+    // `discardUnsent` withdraws them. Checked before anything stops, since a stopped
+    // strand's queue is read only from what it last listed.
+    const unsent = node.getStrands().get(strandId)?.database?.offline?.queueState().depth ?? 0;
+    if (unsent > 0 && !opts.discardUnsent) {
+      throw new ChatFailure('unsent-messages', `${unsent} message${unsent === 1 ? '' : 's'} here not sent yet.`,
+        { retryable: false });
+    }
+    const leaveOptions = opts.discardUnsent ? { discardQueued: true } : undefined;
     const list = await this.joined.read();
     if (list.some(s => s.Id === strandId)) {
       // JOINED from another party: its record is the party-wide `JoinedStrand` row, which
       // `unpublishStrand` cannot remove (that only works on this party's own `Strand` rows),
       // so the strand was offered again after a restart. `forgetJoinedStrand` removes the
       // row (with a tombstone, so the party's other machines drop it too) and stops it here.
-      await node.forgetJoinedStrand(strandId);
+      await node.forgetJoinedStrand(strandId, leaveOptions);
     } else {
       // FOUNDED here: remove this party's `Strand` row.
       try {
@@ -289,7 +300,7 @@ export class StrandRuntime {
       } catch (err) {
         console.warn('[chat-strand] stopStrand during leave:', strandId, err);
       }
-      await node.unpublishStrand(strandId);
+      await node.unpublishStrand(strandId, leaveOptions);
     }
     await this.summaries.forget(strandId);
     // `keepIdentity` decides whether the membership key survives: kept, a later

@@ -2,6 +2,16 @@
   "chat": {
     "empty": "Di algo: sois solo vosotros dos hasta que se invite a alguien más.",
     "sending": "Enviando…",
-    "connecting": "Conectando con esta conversación…"
+    "connecting": "Conectando con esta conversación…",
+    "delivery": {
+      "saving": "Guardando",
+      "waiting": "Guardado en este teléfono, esperando para enviarse",
+      "sending": "Enviando",
+      "here": "Enviado, aún no entregado: solo lo tiene este teléfono",
+      "delivered": "Entregado",
+      "unconfirmed": "Enviado, entrega sin confirmar",
+      "failed": "No enviado",
+      "mayFail": "Puede que no se envíe"
+    }
   }
 }

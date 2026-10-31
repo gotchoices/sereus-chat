@@ -19,6 +19,8 @@ export type SlotName =
   | 'joinedStrands'
   | 'outgoingInvitations'
   | 'preparedStrands'
+  /** This device's writes still being followed to delivery, and refused ones (`delivery.ts`). */
+  | 'outbox'
   | 'draft'
   | 'readCursor';
 

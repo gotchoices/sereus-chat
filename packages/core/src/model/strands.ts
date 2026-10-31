@@ -82,6 +82,10 @@ export interface StrandsModel {
   /** Device-local (story 33): never reaches the other members. */
   setArchived(strandId: string, archived: boolean): Promise<Result<void>>;
   state(strandId: string): Promise<Result<StrandState>>;
-  /** keepIdentity:false is permanent — a later return is as a new member. */
-  leave(strandId: string, opts: { keepIdentity: boolean }): Promise<Result<void>>;
+  /**
+   * keepIdentity:false is permanent — a later return is as a new member. Fails
+   * `unsent-messages` while this device holds writes here it has not sent; ask, then
+   * leave again with `discardUnsent` to withdraw them.
+   */
+  leave(strandId: string, opts: { keepIdentity: boolean; discardUnsent?: boolean }): Promise<Result<void>>;
 }

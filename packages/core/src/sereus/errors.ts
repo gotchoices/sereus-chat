@@ -29,11 +29,33 @@ export class ChatFailure extends Error {
 /** Errors the stack raises when a peer, the cohort or the network did not answer in time. */
 const UNAVAILABLE = /timed out|super-majority|SyncRetryExhausted|Awaiting.?First.?Sync|not reachable|no peers|database not available|abort/i;
 
+/**
+ * The stack's typed failures, by class name: matched by name, not `instanceof`, so a second
+ * bundled copy of a package still matches. Since Optimystic 1.20 a read nobody answered is a
+ * `BlockUnavailableError` ("Block … is unavailable (peers-unreachable)"), which the text
+ * patterns above never matched, and too few votes is a `PromiseShortfallError`.
+ */
+const UNAVAILABLE_NAMES = new Set([
+  'BlockUnavailableError', 'PromiseShortfallError', 'SyncRetryExhaustedError', 'TransactionExpiredError',
+  'StrandAwaitingFirstSyncError', 'StrandOfflineQueueBusyError',
+]);
+
+/** Whether a failed write is worth sending again unchanged: the cohort or a race, not a verdict. */
+export function isTransientWriteFailure(err: unknown): boolean {
+  const name = err instanceof Error ? err.name : '';
+  if (name === 'PromiseShortfallError' || name === 'BlockUnavailableError') return true;
+  return /Failed to get super-majority/i.test(err instanceof Error ? err.message : String(err));
+}
+
 export function toChatError(err: unknown): ChatError {
   if (err instanceof ChatFailure) return err.chatError;
   const message = err instanceof Error ? err.message : String(err);
   const name = err instanceof Error ? err.name : '';
-  const kind: ChatErrorKind = UNAVAILABLE.test(`${name} ${message}`) ? 'unavailable' : 'unexpected';
+  const kind: ChatErrorKind =
+    name === 'ValidityRejectedError' ? 'rejected'
+    : name === 'StrandQueueNotEmptyError' ? 'unsent-messages'
+    : UNAVAILABLE_NAMES.has(name) || UNAVAILABLE.test(`${name} ${message}`) ? 'unavailable'
+    : 'unexpected';
   return { kind, message, retryable: defaultRetryable(kind), cause: err };
 }
 

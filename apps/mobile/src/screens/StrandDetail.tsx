@@ -136,6 +136,26 @@ export default function StrandDetail() {
     );
   };
 
+  /**
+   * Leave, and if this phone still holds messages here it has not sent (offline mode),
+   * say so and ask before withdrawing them: they were shown as saved.
+   */
+  const leave = (keepIdentity: boolean) => {
+    void model.strands.leave(strandId, { keepIdentity }).then(async r => {
+      if (r.ok) { navigation.popToTop(); return; }
+      if (r.error.kind !== 'unsent-messages') { setError(errorText(r.error)); return; }
+      const box = await model.messages.outbox(strandId);
+      const n = box.ok ? box.value.waiting : 1;
+      Alert.alert(t('chat.leaveUnsent.title'), t('chat.leaveUnsent.body', undefined, { n }), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('chat.leaveUnsent.confirm'), style: 'destructive', onPress: () => {
+          void model.strands.leave(strandId, { keepIdentity, discardUnsent: true })
+            .then(again => (again.ok ? navigation.popToTop() : setError(errorText(again.error))));
+        } },
+      ]);
+    });
+  };
+
   const confirmLeave = () => {
     Alert.alert(
       t('strand.leaveTitle'),
@@ -143,7 +163,7 @@ export default function StrandDetail() {
       [
         { text: t('common.cancel'), style: 'cancel' },
         { text: t('actions.leave'), style: 'destructive',
-          onPress: () => { void model.strands.leave(strandId, { keepIdentity: true }).then(r => (r.ok ? navigation.popToTop() : setError(errorText(r.error)))); } },
+          onPress: () => leave(true) },
       ],
     );
   };
@@ -169,7 +189,7 @@ export default function StrandDetail() {
             [
               { text: t('common.cancel'), style: 'cancel' },
               { text: t('strand.forgetIt'), style: 'destructive',
-                onPress: () => { void model.strands.leave(strandId, { keepIdentity: false }).then(r => (r.ok ? navigation.popToTop() : setError(errorText(r.error)))); } },
+                onPress: () => leave(false) },
             ],
           ) },
       ],

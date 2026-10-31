@@ -24,6 +24,13 @@
 -- built with `strandReactivity` a `Database.watch` on it wakes when another
 -- machine commits; on a node without it the tag only logs a warning and local
 -- wakes continue, so it is safe to ship unconditionally.
+--
+-- FRESH IDS. `Message.Id` and `Attachment.Id` are tagged `"optimystic.fresh" = true`:
+-- the app generates each as a new random UUID, so no other member's write can collide
+-- with one. In offline mode (docs/async-writes.md) that lets the stack judge an ordinary
+-- send `assured` (nobody else's write can make it fail) instead of "may not go through".
+-- A tag only: rows and storage are unchanged. `Member.Id` (a peer id) and `Reaction`'s
+-- composite key are not fresh and stay untagged.
 
 table Member (
     Id text primary key,                -- libp2p Peer ID of the participating member
@@ -32,7 +39,7 @@ table Member (
 ) with tags ("optimystic.network_watch" = true);
 
 table Message (
-    Id text primary key,                -- client-generated UUID
+    Id text primary key with tags ("optimystic.fresh" = true),  -- client-generated UUID
     MemberId text not null,
     Content text not null,
     Timestamp datetime not null,        -- asserted by the sender; not authoritative
@@ -42,7 +49,7 @@ table Message (
 ) with tags ("optimystic.network_watch" = true);
 
 table Attachment (
-    Id text primary key,
+    Id text primary key with tags ("optimystic.fresh" = true),
     MessageId text not null,
     Type text not null,                 -- image | video | file | voice
     Uri text null,                      -- null while not held locally; see `locality` in ops.md

@@ -46,7 +46,8 @@ import { keychainSecureStore } from './keychain';
 // TODO(extraction): the one chat-aware import; becomes host configuration in Phase 5.
 import { CHAT_SAPP_ID } from '@chat/core';
 import { DATA_FORMAT } from '../data/data-format';
-import { NODE_STORAGE_NAMES } from '../data/persisted-names';
+import { NODE_STORAGE_NAMES, STORAGE_KEYS } from '../data/persisted-names';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { OWNER_GENESIS_TIMEOUT_MS } from './async';
 import { STRAND_REACTIVITY } from '../data/config';
 
@@ -55,6 +56,9 @@ type EventHandler<T> = (payload: T) => void;
 /**
  * The app's phone node. One per app: the kit refuses a second over the same storage.
  */
+/** How writes are acknowledged: saved here first (`offline`), or by the other members (`online`). */
+export type SendMode = 'offline' | 'online';
+
 const phone = createPhoneNode({
   secureStore: keychainSecureStore,
   leveldb: {
@@ -153,6 +157,8 @@ class CadreServiceImpl {
   private pendingRelays: string[] | null = null;
   /** Noise mode chosen while the node is not running; the next start uses it. */
   private pendingNoiseMode: NoiseCryptoMode | null = null;
+  /** How writes are acknowledged (see `setSendMode`); read once from storage, then kept here. */
+  private sendModeValue: SendMode | null = null;
   private _startError: string | null = null;
   private _startPromise: Promise<void> | null = null;
 
@@ -268,6 +274,9 @@ class CadreServiceImpl {
         ...base,
         relayAddrs: relaysUsed ?? base.relayAddrs,
         ...(noiseUsed ? { noiseCryptoMode: noiseUsed } : {}),
+        // The app's own setting, not the kit's saved start: a start saved by an earlier
+        // build reads as 'online', and this app defaults to offline mode.
+        strandOfflineMode: await this.loadSendMode(),
       };
       console.info('[CadreService] starting node for party', options.partyId);
       await phone.start(options);
@@ -327,6 +336,44 @@ class CadreServiceImpl {
       return;
     }
     await this.restartWith({ noiseCryptoMode: mode }, `noise crypto mode -> ${mode}`);
+  }
+
+  /**
+   * How writes are acknowledged. `offline` (the default): a send returns once saved on
+   * this phone and is delivered in the background, its progress shown on the message.
+   * `online`: a send waits until the other members take it, which shows the stack's
+   * real cost on a phone (docs/async-writes.md §6). Developer setting only.
+   */
+  async loadSendMode(): Promise<SendMode> {
+    if (this.sendModeValue) return this.sendModeValue;
+    let saved: string | null = null;
+    try { saved = await AsyncStorage.getItem(STORAGE_KEYS.sendMode); } catch { saved = null; }
+    this.sendModeValue = saved === 'online' ? 'online' : 'offline';
+    return this.sendModeValue;
+  }
+
+  get sendMode(): SendMode {
+    return this.sendModeValue ?? 'offline';
+  }
+
+  /**
+   * The one switch between the two modes, applied to every strand at once without a
+   * restart (the kit's `setStrandOfflineMode`) and kept for later starts. Going online
+   * while writes are still queued is refused: each online write would wait behind them,
+   * holding the database, for up to five minutes (sereus strands.md, "Offline mode").
+   */
+  async setSendMode(mode: SendMode): Promise<void> {
+    if (mode === (await this.loadSendMode())) return;
+    const node = phone.node;
+    if (mode === 'online' && node) {
+      let queued = 0;
+      for (const strand of node.getStrands().values()) queued += strand.database?.offline?.queueState().depth ?? 0;
+      if (queued > 0) throw new Error(`${queued} write${queued === 1 ? ' is' : 's are'} still waiting to send. Switch once they have gone.`);
+    }
+    await AsyncStorage.setItem(STORAGE_KEYS.sendMode, mode);
+    this.sendModeValue = mode;
+    if (node?.isRunning) await phone.setStrandOfflineMode(mode);
+    console.info(`[CadreService] send mode -> ${mode}`);
   }
 
   /** What the node is built with, or will be at the next start. */

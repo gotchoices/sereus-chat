@@ -41,6 +41,19 @@ export function newId(): string {
   return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
 }
 
+/**
+ * Run one write statement ending `returning StampId() as Tx`, and return the
+ * transaction's id: what the stack reports its durability and queue status under
+ * (`delivery.ts`). One statement holds Quereus's execution lock for its whole run, so no
+ * other writer's commit is mixed in (sereus strands.md, "A commit's durability").
+ * Undefined when the statement wrote nothing (an `insert or ignore` that ignored).
+ */
+async function writeTx(db: Database, sql: string, params: unknown[]): Promise<string | undefined> {
+  let tx: string | undefined;
+  for await (const row of db.eval(sql, params as never)) tx ??= (row.Tx as string | undefined) ?? undefined;
+  return tx;
+}
+
 function getDb(strand: StrandInstance): Database {
   if (!strand.database) {
     throw new Error(
@@ -88,7 +101,7 @@ export async function upsertMember(
   strand: StrandInstance,
   id: string,
   name: string,
-): Promise<void> {
+): Promise<string | undefined> {
   const db = getDb(strand);
   // READ FIRST, write only what changed. Every send calls this, and each write is
   // a strand commit that the other members must agree to. Writing the row
@@ -100,12 +113,11 @@ export async function upsertMember(
   for await (const row of db.eval('select Name from App.Member where Id = ?', [id])) {
     current = row.Name as string | null;
   }
-  if (current === name) return;
+  if (current === name) return undefined;
   if (current === undefined) {
-    await db.exec('insert or ignore into App.Member (Id, Name) values (?, ?)', [id, name]);
-  } else {
-    await db.exec('update App.Member set Name = ? where Id = ?', [name, id]);
+    return writeTx(db, 'insert or ignore into App.Member (Id, Name) values (?, ?) returning StampId() as Tx', [id, name]);
   }
+  return writeTx(db, 'update App.Member set Name = ? where Id = ? returning StampId() as Tx', [name, id]);
 }
 
 export async function queryMembers(strand: StrandInstance): Promise<ChatMember[]> {
@@ -128,7 +140,7 @@ export async function insertMessage(
   memberId: string,
   content: string,
   replyToId?: string | null,
-): Promise<ChatMessageRow> {
+): Promise<ChatMessageRow & { Tx?: string }> {
   const db = getDb(strand);
   // Quereus DATETIME wants 'YYYY-MM-DD HH:MM:SS', not ISO 8601 with T/Z.
   const now = new Date().toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
@@ -138,13 +150,13 @@ export async function insertMessage(
   // both writers they succeeded (optimystic-concurrent-same-pk-insert-silent-lww).
   const id = newId();
 
-  await db.exec(
+  const tx = await writeTx(db,
     `insert into App.Message (Id, MemberId, Content, Timestamp, ReplyToId)
-     values (?, ?, ?, ?, ?)`,
+     values (?, ?, ?, ?, ?) returning StampId() as Tx`,
     [id, memberId, content, now, replyToId ?? null],
   );
 
-  return { Id: id, MemberId: memberId, Content: content, Timestamp: storedUtcToIso(now), ReplyToId: replyToId ?? null };
+  return { Id: id, MemberId: memberId, Content: content, Timestamp: storedUtcToIso(now), ReplyToId: replyToId ?? null, Tx: tx };
 }
 
 /** Newest last; capped to `limit`. */
@@ -187,36 +199,37 @@ export async function queryMessages(
 
 export async function updateMessage(
   strand: StrandInstance, id: string, content: string,
-): Promise<void> {
+): Promise<string | undefined> {
   const db = getDb(strand);
   const now = new Date().toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
   // In place, no version chain (story 13).
-  await db.exec('update App.Message set Content = ?, EditedAt = ? where Id = ?', [content, now, id]);
+  return writeTx(db, 'update App.Message set Content = ?, EditedAt = ? where Id = ? returning StampId() as Tx', [content, now, id]);
 }
 
-export async function removeMessage(strand: StrandInstance, id: string): Promise<void> {
+/** The message's own delete is the write followed; its reactions and attachments go first, as before. */
+export async function removeMessage(strand: StrandInstance, id: string): Promise<string | undefined> {
   const db = getDb(strand);
   await db.exec('delete from App.Reaction where MessageId = ?', [id]);
   await db.exec('delete from App.Attachment where MessageId = ?', [id]);
-  await db.exec('delete from App.Message where Id = ?', [id]);
+  return writeTx(db, 'delete from App.Message where Id = ? returning StampId() as Tx', [id]);
 }
 
 export async function addReaction(
   strand: StrandInstance, messageId: string, memberId: string, symbol: string,
-): Promise<void> {
+): Promise<string | undefined> {
   const db = getDb(strand);
-  await db.exec(
-    'insert or ignore into App.Reaction (MessageId, MemberId, Symbol) values (?, ?, ?)',
+  return writeTx(db,
+    'insert or ignore into App.Reaction (MessageId, MemberId, Symbol) values (?, ?, ?) returning StampId() as Tx',
     [messageId, memberId, symbol],
   );
 }
 
 export async function removeReaction(
   strand: StrandInstance, messageId: string, memberId: string, symbol: string,
-): Promise<void> {
+): Promise<string | undefined> {
   const db = getDb(strand);
-  await db.exec(
-    'delete from App.Reaction where MessageId = ? and MemberId = ? and Symbol = ?',
+  return writeTx(db,
+    'delete from App.Reaction where MessageId = ? and MemberId = ? and Symbol = ? returning StampId() as Tx',
     [messageId, memberId, symbol],
   );
 }

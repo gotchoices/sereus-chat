@@ -4,10 +4,11 @@
  * ui.md: outgoing = accent / accentText; incoming = surfaceAlt / textPrimary;
  * radius 16; max width ~80%.
  *
- * NO DELIVERY OR READ INDICATOR.  None is tracked anywhere in this app and none
- * may be added: a reply is the only evidence a message was read
- * (design/specs/domain/schema.md, stories 04 and 10).  The status tick this
- * component used to render has been removed deliberately.
+ * NO READ INDICATOR.  None is tracked and none may be added: a reply is the only
+ * evidence a message was read (design/specs/domain/schema.md, stories 04 and 10).
+ * What it does show, on this device's own messages only, is DURABILITY: how safe the
+ * write is, from saved on this phone to held by another machine (`DurabilityMark`,
+ * story 04's "not yet delivered"). Nothing about it is stored in the strand.
  *
  * Sender name appears on incoming messages ONLY in strands of more than two —
  * in a two-party conversation there is no ambiguity to resolve.
@@ -15,7 +16,9 @@
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import type { Delivery } from '@chat/core';
 import { useTheme, typography, spacing, radius } from '../theme';
+import { DurabilityMark } from './DurabilityMark';
 
 export interface ReplyQuote {
   /** null when the original has been removed — say so, do not hide it. */
@@ -39,8 +42,12 @@ export interface MessageBubbleProps {
   status?: string | null;
   /** Dim the bubble while its write is in flight. */
   sending?: boolean;
+  /** This device's own message: how safe its latest write is. Absent for others' messages. */
+  delivery?: Delivery | null;
+  /** The mark's words, for screen readers. */
+  deliveryLabel?: string;
   replyTo?: ReplyQuote | null;
-  reactions?: Array<{ symbol: string; count: number; mine: boolean }>;
+  reactions?: Array<{ symbol: string; count: number; mine: boolean; delivery?: Delivery | null }>;
   attachment?: React.ReactNode;
   onPress?: () => void;
   onLongPress?: () => void;
@@ -57,6 +64,8 @@ export function MessageBubble({
   edited,
   status,
   sending = false,
+  delivery,
+  deliveryLabel,
   replyTo,
   reactions,
   attachment,
@@ -111,7 +120,7 @@ export function MessageBubble({
         {attachment ? <View style={styles.attachment}>{attachment}</View> : null}
         {text ? <Text style={[typography.body, { color: fg }]}>{text}</Text> : null}
 
-        {(timestamp || edited || status) && (
+        {(timestamp || edited || status || delivery) && (
           <View style={styles.metaRow}>
             {timestamp ? (
               <Text style={[typography.small, { color: meta }]}>{timestamp}</Text>
@@ -121,6 +130,12 @@ export function MessageBubble({
             ) : null}
             {status ? (
               <Text style={[typography.small, { color: meta }]} testID="message-status">{status}</Text>
+            ) : null}
+            {delivery ? (
+              <View accessible accessibilityLabel={deliveryLabel} style={styles.mark}>
+                <DurabilityMark delivery={delivery} color={meta} dangerColor={theme.danger}
+                  testID={`delivery-${delivery.state}`} />
+              </View>
             ) : null}
           </View>
         )}
@@ -144,6 +159,9 @@ export function MessageBubble({
                 {r.symbol}
                 {r.count > 1 ? ` ${r.count}` : ''}
               </Text>
+              {r.delivery && r.delivery.state !== 'delivered' ? (
+                <DurabilityMark delivery={r.delivery} color={theme.textMuted} dangerColor={theme.danger} size={9} />
+              ) : null}
             </Pressable>
           ))}
         </View>
@@ -173,9 +191,13 @@ const styles = StyleSheet.create({
   },
   quoteGone: { fontStyle: 'italic' },
   attachment: { marginBottom: 2 },
-  metaRow: { flexDirection: 'row', gap: spacing[1], alignSelf: 'flex-end' },
+  metaRow: { flexDirection: 'row', gap: spacing[1], alignSelf: 'flex-end', alignItems: 'center' },
+  mark: { justifyContent: 'center' },
   reactions: { flexDirection: 'row', gap: 4, marginTop: -6, paddingHorizontal: spacing[1] },
   reaction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: radius.pill,

@@ -1,6 +1,7 @@
 # Asynchronous writes (offline mode) — plan
 
-**Status: plan, nothing built.** Adopts sereus 1.19.1 / optimystic 1.20.1 / quereus 4.21.1 and
+**Status: steps 1–4 built (2026-10-29); spec prose (§4.4) and phone hardening open.** See
+STATUS.md, "Asynchronous writes". Originally: Adopts sereus 1.19.1 / optimystic 1.20.1 / quereus 4.21.1 and
 their strand *offline mode*, so a send returns as soon as the phone has saved it and the
 conversation shows each message's delivery state. Written 2026-10-29 from:
 - sereus `docs/strands.md` (v1.19.1): "A commit's durability" and "Offline mode";

@@ -17,6 +17,9 @@ export const STORAGE_KEYS = {
   joinedStrands: '@sereus.chat/joinedStrands',
   outgoingInvitations: '@sereus.chat/outgoingInvitations',
   preparedStrands: '@sereus.chat/preparedStrands',
+  outbox: '@sereus.chat/outbox',
+  /** Developer setting: how writes are acknowledged (`CadreService.setSendMode`). */
+  sendMode: '@sereus.chat/sendMode',
   dataFormat: '@sereus.chat/dataFormat',
   themeMode: '@sereus.chat/themeMode',
   draft: (strandId: string) => `@sereus.chat/draft/${strandId}`,

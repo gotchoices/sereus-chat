@@ -38,6 +38,8 @@ interface Globals {
   script?: string;
   /** Measurement only: block storage in memory (`--memory-blocks`). */
   memoryBlocks: boolean;
+  /** Strand offline mode (`--offline`). Off: every write waits for the network, as the stack measures. */
+  offline: boolean;
   /** Inspector port for the development bridge (`--bridge`). */
   bridgePort?: number;
   help: boolean;
@@ -58,13 +60,14 @@ const USAGE = `usage: serchat [options] [command [args] [\\; command ...]]
   -c <commands>          run these ";"-separated commands
       --bridge <port>    development bridge for test/devices tools, on a loopback inspector port
       --memory-blocks    measurement only: block storage in memory, nothing kept
+      --offline          strand offline mode, as the phone app: writes return once saved here
   -v, --verbose          network-layer log lines on stderr
   -h, --help · --version
 
 With no command: an interactive prompt, or commands from stdin. "help" lists commands.`;
 
 export function parseGlobals(argv: string[]): Globals {
-  const g: Globals = { profile: 'default', memoryBlocks: false, json: false, header: false, relays: [], listen: [], waitSeconds: 30, verbose: false, help: false, version: false, rest: [] };
+  const g: Globals = { profile: 'default', memoryBlocks: false, offline: false, json: false, header: false, relays: [], listen: [], waitSeconds: 30, verbose: false, help: false, version: false, rest: [] };
   let i = 0;
   const value = (flag: string) => {
     const v = argv[++i];
@@ -83,6 +86,7 @@ export function parseGlobals(argv: string[]): Globals {
     else if (a === '-c') g.script = value(a);
     else if (a === '--bridge') g.bridgePort = Number(value(a));
     else if (a === '--memory-blocks') g.memoryBlocks = true;
+    else if (a === '--offline') g.offline = true;
     else if (a === '-v' || a === '--verbose') g.verbose = true;
     else if (a === '-h' || a === '--help') g.help = true;
     else if (a === '--version') g.version = true;
@@ -127,7 +131,7 @@ async function main(argv: string[]): Promise<number> {
   await lockProfile(dirs);
   const out = createOutput({ json: g.json, header: g.header });
   const listen = await Promise.all(g.listen.map(a => (a === DEFAULT_LISTEN ? defaultListenAddress(dirs, config) : a)));
-  const host = createCliHost({ dirs, config, extraRelays: g.relays, listen, dev: g.verbose, memoryBlocks: g.memoryBlocks });
+  const host = createCliHost({ dirs, config, extraRelays: g.relays, listen, dev: g.verbose, memoryBlocks: g.memoryBlocks, offline: g.offline });
   if (g.memoryBlocks) out.note('blocks in memory (--memory-blocks): nothing this run stores will survive it');
   const { model, boot, settle: settleModel } = createSereusModel(host);
   settleBackground = settleModel;
@@ -204,6 +208,19 @@ async function shutdown(session: Session, code: number): Promise<number> {
   // one-shot run must not exit with it published but never started. Bounded.
   if (settleBackground) {
     await Promise.race([settleBackground().catch(() => {}), new Promise(r => setTimeout(r, 60_000).unref())]);
+  }
+  // Offline mode (`--offline`): a send returned once saved in the strand's journal here.
+  // A one-shot run lets the queue send it before stopping, bounded; anything still queued
+  // stays in the journal and goes out on the next run.
+  const strandsUp = [...(session.host.node.node?.getStrands().values() ?? [])];
+  const queues = strandsUp.map(s => s.database?.offline).filter(q => q && q.queueState().depth > 0);
+  if (queues.length) {
+    await Promise.race([
+      Promise.allSettled(queues.map(q => q!.whenDrained())),
+      new Promise(r => setTimeout(r, 60_000).unref()),
+    ]);
+    const left = queues.reduce((n, q) => n + q!.queueState().depth, 0);
+    if (left) session.out.note(`${left} write${left === 1 ? '' : 's'} saved here, not sent yet: they go out on the next run`);
   }
   // List once before stopping: the core saves the list it shows, and that saved list is
   // how the next run knows which strands to wait for (see `settle`) — a strand that only

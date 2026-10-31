@@ -8,6 +8,8 @@ export interface ChangesModel {
   strands(onChange: () => void): () => void;
   /** This strand's chat tables changed, here or, once applied here, elsewhere. */
   strand(strandId: string, onChange: () => void): () => void;
+  /** Where one of this device's writes to this strand stands changed (`messages.deliveries`). */
+  delivery(strandId: string, onChange: () => void): () => void;
   /** This device's addresses or relay reservation changed. */
   reachability(onChange: () => void): () => void;
   /** The cadre's control network connected or disconnected, or its machines changed. */

@@ -21,13 +21,14 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { chatStore, isSending } from '@chat/core';
 import { useModel, useStore } from '../data/bind';
-import type { Message, Member, StrandState, Attachment } from '@chat/core';
+import type { Message, Member, StrandState, Attachment, Delivery } from '@chat/core';
 import { useErrorText, useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { ActionSheet,
   MessageBubble, EmptyState, Banner, IconButton, Avatar, StrandStatus,
 } from '../components';
 import { useTheme, typography, spacing, radius } from '../theme';
+import { durabilityLabel } from '../components/DurabilityMark';
 
 const EMPTY_MESSAGES: Message[] = [];
 const EMPTY_MEMBERS: Member[] = [];
@@ -124,6 +125,8 @@ export default function ChatInterface() {
   const invitesOut = view.value?.invitationsOut ?? 0;
   /** The strand is known but not open on this device yet (cold start, re-attaching). */
   const opening = view.value?.opening ?? false;
+  /** This device's writes here not sent yet (offline mode), and refused ones. */
+  const outbox = view.value?.outbox ?? null;
   /** False until the first read answers (and the strand is open). Before that, "nothing said yet" would be a guess. */
   const loaded = view.state !== 'loading' && !opening;
   /** Only the user is a member so far: the strand exists, nobody has taken up an invitation yet. */
@@ -227,6 +230,15 @@ export default function ChatInterface() {
               onPress: () => { setEditing(m); setReplyTo(null); setDraft(m.content); } },
             { label: t('actions.delete'), destructive: true,
               onPress: () => { void store.delete(m.id); } },
+            // Saved here and no attempt can have delivered it: it can still be taken back.
+            ...(m.delivery?.discardable
+              ? [{ label: t('chat.outbox.discard'), destructive: true,
+                  onPress: () => {
+                    void store.discard(m.id).then(r => {
+                      if (!r.ok) setActionError(r.error.kind === 'unavailable' ? t('chat.outbox.alreadySending') : errorText(r.error));
+                    });
+                  } }]
+              : []),
           ]
         : [
             { label: t('actions.reply'), onPress: () => setReplyTo(m) },
@@ -254,11 +266,12 @@ export default function ChatInterface() {
     const mine = m.memberId === me?.id;
     const sending = isSending(m);
     const parent = m.replyToId ? shown.find(x => x.id === m.replyToId) : undefined;
-    const grouped = m.reactions.reduce<Record<string, { count: number; mine: boolean }>>((acc, r) => {
+    const grouped = m.reactions.reduce<Record<string, { count: number; mine: boolean; delivery?: Delivery | null }>>((acc, r) => {
       const e = (acc[r.symbol] ||= { count: 0, mine: false });
-      e.count++; if (r.memberId === me?.id) e.mine = true;
+      e.count++; if (r.memberId === me?.id) { e.mine = true; e.delivery = r.delivery ?? null; }
       return acc;
     }, {});
+    const delivery = mine ? m.delivery ?? null : null;
     return (
       <MessageBubble
         testID={`message-${m.id}`}
@@ -268,7 +281,8 @@ export default function ChatInterface() {
         timestamp={item.showMeta ? clock(m.timestamp) : null}
         edited={!!m.editedAt}
         sending={sending}
-        status={sending ? t('chat.sending') : null}
+        delivery={delivery}
+        deliveryLabel={delivery ? durabilityLabel(delivery, t) : undefined}
         replyTo={
           m.replyToId
             ? {
@@ -304,6 +318,25 @@ export default function ChatInterface() {
       ) : null}
 
       {error ? <Banner message={error} action={{ label: t('common.retry'), onPress: load }} /> : null}
+
+      {/* Writes this phone saved and has not sent (offline mode): one quiet line. */}
+      {outbox && outbox.waiting > 0 ? (
+        <Text testID="outbox-waiting" style={[typography.small, styles.outbox, { color: theme.textMuted }]}>
+          {[
+            outbox.waiting === 1 ? t('chat.outbox.waitingOne') : t('chat.outbox.waiting', undefined, { n: outbox.waiting }),
+            outbox.waitingForMembers ? t('chat.outbox.waitingForMembers') : null,
+            outbox.showingSavedCopy ? t('chat.outbox.showingSavedCopy') : null,
+          ].filter(Boolean).join(' · ')}
+        </Text>
+      ) : null}
+
+      {/* Refused by the others: its rows have left this view, so name it until dismissed. */}
+      {outbox?.failed.map(f => (
+        <Banner key={f.id} testID="outbox-failed"
+          message={`${t('chat.outbox.notSent', undefined, { what: f.preview ?? f.kind })} — ${
+            t(`chat.outbox.reason.${f.reason}`, f.reason)}`}
+          action={{ label: t('chat.outbox.dismiss'), onPress: () => { void store.dismissFailure(f.id); } }} />
+      ))}
 
       {/* Nobody but me yet (stories 02 step 9, 30 F). The strand is real and the
           founder may write in it; this says who is not here yet and leads to the
@@ -423,6 +456,7 @@ export default function ChatInterface() {
 const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   container: { flex: 1 },
+  outbox: { textAlign: 'center', paddingVertical: 4 },
   statusStrip: { paddingHorizontal: spacing[3], paddingVertical: spacing[1], borderBottomWidth: StyleSheet.hairlineWidth },
   list: { padding: spacing[2] },
   divider: { textAlign: 'center', paddingVertical: spacing[1] },
