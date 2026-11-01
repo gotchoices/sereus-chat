@@ -714,6 +714,10 @@ serchat profile is; and the steps below.
       Member row.
 - [ ] 5. Core fixes: leaving joined strands (`forgetJoinedStrand`), the
       `joinedStrands` list, `isManager`.
+      - Done: leaving a joined strand sticks across restarts (`forgetJoinedStrand`,
+        2026-10-20; scenario "a strand Bob left stays left after he restarts").
+      - Open: `isManager` is still a placeholder (`isManager: r.Id === me` in
+        `sereus/model.ts`), waiting on readable manager rows.
 - [ ] 6. Background mode (local socket; later invocations attach).
 - [ ] 7. Shared serchat config.
 - [ ] 8. The phone takes up what proved out.
@@ -754,6 +758,9 @@ tests against a known counterpart. serchat provides both.
       - Unit tests (`src/`) and scenarios (`test/`) have separate vitest configs.
 - [ ] 2b. More scenarios as features land: cadre operations and recovery
       (Phase 7b), member identity (one person, two nodes).
+      - Since: "a strand Bob left stays left after he restarts" (2026-10-20); the whole
+        suite also runs in offline mode with `SCENARIO_ARGS=--offline` (2026-10-29).
+        Offline-specific scenarios are on the "Next" list.
 - [x] 3. **Diagnostics into the core** (done 2026-10-13). Each check is written
       once in `@chat/core/diagnostics`, with the platform parts passed in, and runs
       in Node and on the phone:
@@ -1335,6 +1342,49 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         `test/stack/restart-after-replicated-write.mjs`: lost in 12 of 14 runs with the stores left open,
         kept in 6 of 6 with the stores closed. Not filed upstream.
 
+- [ ] **Next (proposed 2026-10-30).** In order:
+  - [ ] **Phone pass on the S7**, RN on 1.20, offline mode, about an hour.
+        - 2026-10-31, done: a waiting message keeps its mark and count across an app restart.
+          This found a tracker bug, fixed in `delivery.ts`: a queue that cannot reach its
+          cohort alternates `submitting` and `queued`, and the forward-only rule had pinned
+          the mark at "sending". The menu on a waiting message showed Edit, Delete and Copy;
+          Withdraw appears only when the queue says no attempt can have landed (`inDoubt`
+          false). Still to do: the rest below. Note that the send-mode switch is on the
+          Diagnostics screen, which is `__DEV__` only, so a release build cannot reach it.
+        Check:
+        - delivery marks survive a restart;
+        - a refused write shows its banner, and Dismiss clears it;
+        - Withdraw on a waiting message;
+        - leaving with unsent messages asks first;
+        - the Diagnostics send-mode switch, both ways, refused while writes are queued;
+        - reaction marks.
+  - [ ] **Time sends on the S7** in both send modes, for sereus#51 (the kit's Hermes
+        `TextDecoder`/`structuredClone`, released in 1.19). Compare with the 1.18 numbers.
+  - [ ] **Re-measure the prepared-conversation workaround** on this stack (see "Local
+        workarounds to retire").
+  - [ ] **One RN run on the S21**: join and invitation times on a current phone.
+  - [ ] **Offline-mode correctness suite**, as serchat scenarios (`SCENARIO_ARGS=--offline`
+        and mixed), doubling as upstream repro material:
+        - both sides write while apart, then reconnect: every message arrives exactly once,
+          in the same order on both sides;
+        - edits, deletes and reactions queued against each other, including a real refusal
+          reaching the not-sent path;
+        - a restart mid-send;
+        - one party offline-mode, the other synchronous;
+        - how often delivery reports end `unconfirmed`, and whether `delivered` is ever
+          wrong.
+  - [ ] **Scaling, CLI to CLI:**
+        - message history at 100 / 1,000 / 5,000. The list query sorts by `Timestamp`
+          with no index (2.5–4.4 s on the S7), so an index may fix it on our side;
+        - strand count from 5 to 30: start-up and idle traffic;
+        - queue drain, 50 queued messages over the public relay.
+  - [ ] **Optimystic 1.21.0** (2026-10-31): standalone and wire-compatible. Its gains are
+        cohort-topic reactivity (off in chat, `STRAND_REACTIVITY = false`), batched
+        renewals, the partial-index fix (chat has none), and a native crypto backend
+        (`setCryptoBackend`) that no sereus package wires yet. **Adopt with the next sereus
+        release**, which will likely require it and wire native crypto. Pins are exact, so it
+        cannot slip in.
+
 - [ ] **Upstream bugs we live with: check on every stack release, nag until fixed.** No
       app-side workaround for these, by decision. On each release, read the issue and the
       notes, re-run the repro, and remove the entry once it passes.
@@ -1406,13 +1456,14 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
 
 ## Phase 10 — Engine probe (decides whether `mobile-ns` is worth building)
 
-- [ ] Build `apps/mobile` against an alternate engine (JSC via
-      `@react-native-community/javascriptcore`, or V8 via `react-native-v8` if it
-      supports the current RN version)
-- [ ] Rerun named RN-only failures and the shared diagnostics on both engines.
-      Note that Hermes against V8 is also no-JIT against JIT: a speed difference
-      alone is not a defect
-- [ ] Record the result here: does each failure follow the engine or not?
+- [x] **Answered by the NativeScript twin instead** (Phase 7d, 2026-10-13/14), not by
+      rebuilding `apps/mobile` on another engine. Pure-JS crypto is 2.6–42× faster on V8.
+      Release builds end to end are only ~15–20% faster, because a join mostly waits on the
+      network and the other side. No failure followed the engine. Details: "NativeScript V8
+      probe" and "RN (Hermes) against NativeScript (V8)" above.
+  - [x] ~~Build `apps/mobile` against an alternate engine (JSC or `react-native-v8`)~~
+  - [x] ~~Rerun named RN-only failures and the shared diagnostics on both engines~~
+  - [x] Record the result here: does each failure follow the engine or not? (No: see above.)
 
 ## Phase 11 — `apps/mobile-ns` (only if Phase 10 points at the runtime)
 

@@ -254,6 +254,7 @@ export class DeliveryTracker {
         t.discardable = status.inDoubt === false;
         this.setState(t, 'waiting');
         return;
+      // `outlook-changed` updates the flag only; the state stays.
       case 'outlook-changed':
         t.mayFail = status.outlook?.kind === 'exposed';
         return;
@@ -281,10 +282,16 @@ export class DeliveryTracker {
     }
   }
 
-  /** Forward only, except to `failed` (handled above). */
+  /**
+   * Forward only, except to `failed` (handled above), and except that `waiting` and
+   * `sending` alternate: a queue that cannot reach its cohort retries (`submitting`) and
+   * backs off (`queued`) in turn, and only the `queued` status says whether the write can
+   * still be withdrawn.
+   */
   private setState(t: Tracked, state: Durability): void {
-    if (rank(state) < rank(t.state) && !(t.state === 'unconfirmed' && state === 'delivered')) return;
-    if (t.state === state) return;
+    const alternating = (t.state === 'sending' && state === 'waiting') || (t.state === 'waiting' && state === 'sending');
+    if (!alternating && rank(state) < rank(t.state) && !(t.state === 'unconfirmed' && state === 'delivered')) return;
+    if (t.state === state) { this.emitIfFlagsChanged(t); return; }
     t.state = state;
     if (state === 'delivered') {
       // Delivered is the normal case: show it briefly, then stop tracking.
@@ -295,6 +302,15 @@ export class DeliveryTracker {
       (timer as { unref?: () => void }).unref?.();
     }
     this.persist();
+    this.emit(t.strandId);
+  }
+
+  /** The state held, but a flag (`mayFail`, `discardable`) may have moved: tell the stores. */
+  private readonly flagsSeen = new Map<string, string>();
+  private emitIfFlagsChanged(t: Tracked): void {
+    const flags = `${t.mayFail ? 1 : 0}${t.discardable ? 1 : 0}`;
+    if (this.flagsSeen.get(t.txId) === flags) return;
+    this.flagsSeen.set(t.txId, flags);
     this.emit(t.strandId);
   }
 

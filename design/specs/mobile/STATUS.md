@@ -202,11 +202,11 @@ their variants. Calls are parked (story 90).
   5–10 min to commit.
 - **Warm messages:** 108 s (S7→emu) and 172–213 s (emu→S7).
 - **Gaps this exposed (not fixed):**
-  - [ ] The sender sees nothing until its own write commits, for minutes. The composer clears and
+  - [x] *(Done 2026-10-31: "Sending" since 2026-10-01; offline mode and delivery marks since 2026-10-29 (docs/STATUS.md).)* The sender sees nothing until its own write commits, for minutes. The composer clears and
         the message is just gone. Show an outgoing message as "sending" at once.
-  - [ ] Right after a cold start, the strand list says "No strands yet" for about 40 s while the
+  - [x] *(Done 2026-10-31: the summary cache shows known strands as "Connecting…" rows (`core/sereus/local-state.ts`).)* Right after a cold start, the strand list says "No strands yet" for about 40 s while the
         node starts. Show a loading state instead.
-  - [ ] Delivery in minutes is too slow for chat. Measure where the time goes (commit vs.
+  - [x] *(Done 2026-10-31: measured at length (docs/STATUS.md Phase 7d); S7 phone → serchat about 7 s on 1.20.)* Delivery in minutes is too slow for chat. Measure where the time goes (commit vs.
         replication to the other phone) before raising it upstream.
 
 ### Message latency diagnosis, 2026-10-01
@@ -244,14 +244,14 @@ their variants. Calls are parked (story 90).
         tables costs nearly as much); read-first 0.8 s.
   - [x] The chat screen showed "Nothing said yet" until its first read returned. It now shows a
         spinner until the first read answers. Not in `screens/chat-interface.md`'s variants.
-  - [ ] "Sending" and "not yet delivered" message states. Stories 04, 10 and 11 amended
+  - [x] *(Done 2026-10-31: built; marks drawn by `DurabilityMark` (2026-10-29). Spec prose still to update, with the user.)* "Sending" and "not yet delivered" message states. Stories 04, 10 and 11 amended
         2026-10-01, with consent, to match sereus 1.9:
         - a write with the others reachable commits only once they agree;
         - with nobody reachable, the first write fails and later ones commit alone (milliseconds).
         - [x] "Sending…" built (2026-10-01): outgoing messages are kept apart from the reloaded
               list, shown dimmed with "Sending…", and replaced when the write returns (draft
               restored on failure). Seen on the S7.
-        - [ ] "Not yet delivered": waiting on gotchoices/Optimystic#26 (filed 2026-10-01).
+        - [x] *(Done 2026-10-31: Optimystic#26 shipped in 1.13; `core/sereus/delivery.ts` follows each write to delivered.)* "Not yet delivered": waiting on gotchoices/Optimystic#26 (filed 2026-10-01).
               Optimystic already computes `WriteDurability` per commit (`local` = nobody else holds
               it, `isFullyDurable` = delivered). `coordinator.commit()` drops it, so the SQL path
               (`db.exec`) never sees it. Asked for: return it, expose it through the plugin and
@@ -260,14 +260,14 @@ their variants. Calls are parked (story 90).
               heuristic was rejected as device-dependent.
         - [ ] `screens/chat-interface.md` doesn't mention either state yet (needs the user's
               consent to edit).
-  - [ ] Re-test on two real phones (S7 + S20), or give the emulator more RAM.
-  - [ ] Reads wait on a slow peer: a local `select` periodically asks the other member for the
+  - [ ] *(Partly, 2026-10-31: re-tested many times on the S7, and the S21 ran NativeScript; no RN S7 + S20 pair yet.)* Re-test on two real phones (S7 + S20), or give the emulator more RAM.
+  - [x] *(Done 2026-10-31: Optimystic#25 closed as completed (2026-10-12).)* Reads wait on a slow peer: a local `select` periodically asks the other member for the
         latest revision (`db-p2p/sync`), and blocks until that dial answers or aborts at 7.0 s.
         - About two slow reads every 30 s; free if the peer is offline; 150–650 ms with a healthy
           peer.
         - Repro: `test/stack/slow-peer.mjs` (PEER_MODE=stall|offline, WRITES=0).
         - Posted as gotchoices/Optimystic#25 (2026-10-01). Revisit when answered.
-  - [ ] Draft for the user's review: `apps/mobile/tmp/cadre-rn-native-digest-issue.md` (the kit's
+  - [x] *(Done 2026-10-31: obsolete: the kit ships native digest and `/polyfills/native-crypto`.)* Draft for the user's review: `apps/mobile/tmp/cadre-rn-native-digest-issue.md` (the kit's
         digest polyfill is pure JS).
 
 ### Where the time goes on 1.14, from debug logs, 2026-10-09 (S7 ↔ emulator 5564, public relay)
@@ -431,7 +431,7 @@ off again).
   anything involving the S7 is slow. Don't use it as a latency benchmark.
 - [ ] Still unexplained: fast phones at about 450 ms per request against Node's 170. Next, count
       round trips per stream open (multistream negotiation, yamux) on RN versus Node.
-- [ ] Upstream candidates (optimystic), to be measured before raising:
+- [ ] *(Partly, 2026-10-31: stream reuse and per-block consults addressed by Optimystic#29 and #25 (both closed).)* Upstream candidates (optimystic), to be measured before raising:
   - reuse streams for cluster requests (a fresh one per request costs 1–2 round trips);
   - fewer round trips per pend and commit;
   - reads that don't consult the peer per block (#25).
@@ -487,10 +487,10 @@ off again).
       `arm`, `seen`, and `start`/`take`, because Hermes ignores `awaitPromise`), installed only in
       `__DEV__`, driven over Metro's inspector by `test/devices/devtime.mjs <devA> <devB> [rounds]`.
       It uses the composer's `send` and the chat screen's `watchStrand` path, with no UI taps.
-  - [ ] Repeat on two real phones (S7 + S21) when the S21 is free.
+  - [ ] *(Partly, 2026-10-31: the S21 ran NativeScript against serchat; an RN run on the S21 is on docs/STATUS.md "Next".)* Repeat on two real phones (S7 + S21) when the S21 is free.
   - [ ] The chat app's footprint on the emulator grew to about 840 MB (it was about 550 MB on
         Oct 1). Check whether it grows over a session (watch subscriptions?) or is the dev build.
-  - [ ] More rounds, and why the first message after a join is slow (94 s). The S7 was freshly
+  - [x] *(Done 2026-10-31: obsolete: the joiner's first message is about 1 s in Node, phone → serchat about 7 s on the S7.)* More rounds, and why the first message after a join is slow (94 s). The S7 was freshly
         booted, and its first send also writes its Member row.
   - Devices used for chat testing: the S7 (USB), the S21 (wireless adb, debug build now
     installed), emulator 5564. Emulator 5566 is the user's taleus emulator; a chat debug build was
@@ -520,7 +520,7 @@ off again).
   `FormationPostApprovalError` now produce plain messages (`explainJoinFailure`).
   - Not seen on a device yet: chat's invitations are multi-use, so re-opening a used one re-joined
     the same strand instead of failing.
-  - [ ] Decide whether invitations should be single-use (story question).
+  - [x] *(Done 2026-10-31: decided: single-use (`totalUses: 1` in `core/sereus/model.ts`).)* Decide whether invitations should be single-use (story question).
 - **Issues closed** (resolved by 1.10/1.11): sereus #25, #13, #17, #4; Optimystic#23.
 
 ### Upgraded to sereus 1.11.0 / optimystic 1.9.0 / libp2p 3.3.11, 2026-10-02
@@ -568,7 +568,7 @@ libp2p 3.3.11 and `@multiformats/multiaddr` 13.0.3 (cadre-core 1.9.0 asks for 12
 
 Parked deliberately (user, 2026-09-30). Each item names what to do when its trigger arrives.
 
-- [ ] **sereus#25: pending join on the invitee's side**
+- [ ] *(Partly, 2026-10-31: sereus#25 closed (`requestJoin`), but chat still uses `formStrand` with a 60 s retry.)* **sereus#25: pending join on the invitee's side**
   (`test/stack/offline-inviter-join.mjs` is the acceptance test: it exits 0 once fixed).
   - Adopt it in place of tapping Join again.
   - Show the invitee's states: received, trying, waiting for them to be online, joined, failed.
@@ -583,7 +583,7 @@ Parked deliberately (user, 2026-09-30). Each item names what to do when its trig
   - Show it on pending invitations and on a strand nobody has joined yet, and keep it as "For Bob —
     joined as Robert" afterwards.
   - Until then, invitations are told apart only by when they were made.
-- [ ] **optimystic `watch()`, fully implemented.** Rethink the whole notification and refresh plan
+- [ ] *(Partly, 2026-10-31: tables tagged `network_watch` and watched since 1.12; push wake (reactivity) still off.)* **optimystic `watch()`, fully implemented.** Rethink the whole notification and refresh plan
   around it:
   - today screens poll (the strand list every 3–10 s, the chat every 10 s), and nothing reacts to a
     change as it happens;
@@ -1745,16 +1745,16 @@ Real progress, and one new blocker.
 - [x] **Device-to-device join over the public relay WORKED for the first time** — S7 joined the
       emulator's strand in 178 s, and the emulator's list showed "S7" by profile name. Every
       previous attempt over sereus.org failed.
-- [ ] **The S7 crashed 11 minutes after joining**: `TypeError: Cannot set property 'exports' of
+- [x] *(Done 2026-10-31: not seen in any S7 session since September; reopen if it recurs.)* **The S7 crashed 11 minutes after joining**: `TypeError: Cannot set property 'exports' of
       undefined`, surfacing in a SHA-256 module. The emulator never hits it (0 occurrences), so it
       is device- or path-specific, and it appears LATE rather than at startup — consistent with a
       lazily-bundled module (Metro serves `lazy=true`). New since the upgrade. **This alone rules
       out a beta build**: a crash eleven minutes in, on the older of our two devices, is exactly
       what a tester would hit and could not diagnose.
-- [ ] **Message delivery device-to-device is still unverified.** The emulator's message committed
+- [x] *(Done 2026-10-31: verified on the S7 against serchat and the emulator many times since.)* **Message delivery device-to-device is still unverified.** The emulator's message committed
       locally (after a delay long enough that the 10 s list poll first overwrote the optimistic
       row) but the S7 had crashed by then, so nothing can be concluded about replication.
-- [ ] After restart the S7 sat on "Looking for your strands…" for 6+ minutes without re-attaching.
+- [x] *(Done 2026-10-31: obsolete: the summary cache and the opening states replaced that screen.)* After restart the S7 sat on "Looking for your strands…" for 6+ minutes without re-attaching.
 
 Next: identify the module behind the `exports` error (Metro interop, almost certainly a
 CommonJS/ESM boundary in a dependency the upgrade moved), then re-run the two-device round trip.
@@ -1853,7 +1853,7 @@ model is built for 4+ and degrades badly below it — not gracefully, but into p
    that knows it has two members could declare it and take the direct-sync path deliberately,
    rather than applying a quorum model it can never satisfy.
 
-- [ ] **`cohort-unreachable` — narrowed further with FULL logging, 2026-09-25/26.** Turning on
+- [x] *(Done 2026-10-31: obsolete: two-device messaging over the public relay works.)* **`cohort-unreachable` — narrowed further with FULL logging, 2026-09-25/26.** Turning on
       `optimystic:*,sereus:cadre:*` and reading the whole trace was the right move; it is safe for
       THIS investigation because the strand is already attached and only a read is being measured
       (it is NOT safe while measuring a join — the flood changes join timing).
@@ -1889,7 +1889,7 @@ model is built for 4+ and degrades badly below it — not gracefully, but into p
       step — and a relay is NOT a cadre machine, so two phones plus a relay is still two machines.
       That gap between what story 42 promises and what the platform needs deserves a decision.
 
-- [ ] ~~**`cohort-unreachable` — NARROWED TO UPSTREAM, 2026-09-25. Not our code.**~~ Earlier pass,
+- [x] *(Done 2026-10-31: superseded (struck through above).)* ~~**`cohort-unreachable` — NARROWED TO UPSTREAM, 2026-09-25. Not our code.**~~ Earlier pass,
       retained for its evidence: Two devices,
       strand joined, both reserved on the public relay, every read of `App.Message` failing. Traced
       with `optimystic:db-p2p:coordinator-repo*,protocol-client*,sync-service*` on BOTH devices at
@@ -1925,7 +1925,7 @@ model is built for 4+ and degrades badly below it — not gracefully, but into p
       Candidate next step: find why the fetch targets the relay rather than the cohort member the
       key-network layer resolved — the two disagree, and that disagreement is the bug.
 
-- [ ] ~~`cohort-unreachable` blocks two-device messaging over the public relay.~~ Superseded by the
+- [x] *(Done 2026-10-31: superseded (struck through above).)* ~~`cohort-unreachable` blocks two-device messaging over the public relay.~~ Superseded by the
       entry above. Original symptom description: With everything
       above correct — DNS right, announce right, both devices reserved, strand joined, titles
       resolving to real names — the conversation still does not work. Both sides show
@@ -2069,18 +2069,18 @@ go. Not changed either way; it needs a decision, and a fair amount of code assum
 
 ### Next — blocked on nothing
 
-- [ ] **Keyboard handling across the app.** `ser/health` uses `react-native-keyboard-controller`'s
+- [ ] *(Partly, 2026-10-31: `react-native-keyboard-controller` used in Profile and ChatInterface, not yet everywhere.)* **Keyboard handling across the app.** `ser/health` uses `react-native-keyboard-controller`'s
       `KeyboardAwareScrollView` with `keyboardShouldPersistTaps="handled"`; chat has the dependency
       nowhere and relies on plain `ScrollView`. Moving Profile's action to the header sidesteps it
       there, but every other screen with an input still has the problem. Adopting health's
       dependency is a native rebuild, so it wants doing deliberately rather than mid-test.
 - [ ] **Header actions on the remaining screens.** Only Profile has been moved. Settings and any
       other screen with a page-level action should follow, so the position is learnable.
-- [ ] **Progress indication beyond the strand list.** `ChatInterface`, `StrandDetail` and
+- [ ] *(Partly, 2026-10-31: ChatInterface and StrandDetail have spinners; Search shows progress.)* **Progress indication beyond the strand list.** `ChatInterface`, `StrandDetail` and
       `SearchInterface` each open on an empty state while their first query runs.
 - [ ] **QR overlay alignment.** With clipping removed the preview renders at its natural size and
       the dashed guide no longer lines up with it. Cosmetic; needs a device to tune.
-- [ ] **Swipe-to-archive** (30), now that archive itself exists.
+- [ ] *(Partly, 2026-10-31: hide and unhide in StrandDetail, archived rows split out in the list; no swipe yet.)* **Swipe-to-archive** (30), now that archive itself exists.
 
 ### Next — needs upstream
 
@@ -2096,7 +2096,7 @@ go. Not changed either way; it needs a decision, and a fair amount of code assum
       step exists, so forgetting discards the membership key but leaves the blocks on disk. Story
       33 promises "discarding what identifies him and what he holds of the strand" — we deliver
       the first half. The confirmation text should not claim the second until upstream can.
-- [ ] **`resignManager`, `removeMember`, `inspectInvitation`, `listOutstandingInvitations`** remain
+- [ ] *(Partly, 2026-10-31: leave works; inspect is local only; listOutstanding lists with use counts; remove and resign still `not-supported`.)* **`resignManager`, `removeMember`, `inspectInvitation`, `listOutstandingInvitations`** remain
       `notImplemented`; cadre-core exposes no membership-revocation surface.
 
 ### Proposals for the human specs (NOT applied — need your consent)
@@ -2116,15 +2116,15 @@ go. Not changed either way; it needs a decision, and a fair amount of code assum
 
 ## To do — behaviour the stories specify but no screen does yet
 
-- [ ] **Edit a message** (13) — long-press offers Reply, React, Delete; no Edit
-- [ ] **Soft vs. hard mute choice** (10, 33) — one undifferentiated "Mute" today
+- [x] *(Done 2026-10-31: Edit is in the message menu (`ChatInterface.tsx`, `store.edit`).)* **Edit a message** (13) — long-press offers Reply, React, Delete; no Edit
+- [x] *(Done 2026-10-31: StrandDetail cycles none → soft → hard.)* **Soft vs. hard mute choice** (10, 33) — one undifferentiated "Mute" today
 - [ ] **Mark unread again** (10)
 - [ ] **Mention picker** (12) — typing `@` does nothing; mentions must resolve to a member
 - [ ] **Open reaction set** (12) — fixed 👍 only
 - [ ] **Promote a member** (05) — StrandDetail can resign but not confer
 - [ ] **Rename a member locally** (31) — offered in the sheet, no handler
 - [ ] **Trim storage** (21, 41) and an editable **storage ceiling** (41)
-- [ ] **Swipe-to-archive** (30) and **archive/unarchive** actions
+- [ ] *(Partly, 2026-10-31: archive and unarchive exist in StrandDetail; no swipe yet.)* **Swipe-to-archive** (30) and **archive/unarchive** actions
 - [ ] **Search filters** — kind, date, sender (32); scope works
 - [ ] MediaViewer **save** is an Alert stub
 
@@ -2144,7 +2144,7 @@ go. Not changed either way; it needs a decision, and a fair amount of code assum
 
 ## To do — assets
 
-- [ ] Brand mark / image asset (empty states and headers use Ionicons only). Logo exploration is
+- [x] *(Done 2026-10-31: the home header shows the logo (`assets/logo.png`); the canonical mark is in `packages/resources/brand`.)* Brand mark / image asset (empty states and headers use Ionicons only). Logo exploration is
       in `docs/`.
 
 ## Deep links for review
@@ -2166,9 +2166,9 @@ quereus 4.3.1 · p2p-fret 0.6.0. Boot behaviour, hazards and upstream questions:
 
 ## Known defects (not stack-related)
 
-- [ ] `npx jest` fails 6/6 suites: bare `preset: 'react-native'` doesn't transform the ESM
+- [ ] *(Partly, 2026-10-31: the persisted-names test passes; 6 suites still fail on the Detox and keyboard-controller environment.)* `npx jest` fails 6/6 suites: bare `preset: 'react-native'` doesn't transform the ESM
       dependency tree
-- [ ] `src/cadre/CadreService.ts` imports `CHAT_SAPP_ID` from the data layer; must become
+- [x] *(Done 2026-10-31: obsolete: the file moved to `src/host/CadreService.ts` and imports from `@chat/core`.)* `src/cadre/CadreService.ts` imports `CHAT_SAPP_ID` from the data layer; must become
       `configure({ sAppId })` before the cadre UI can be extracted
 
 ## Live-backend wiring plan (in progress, 2026-09-03)
@@ -2213,7 +2213,7 @@ runtime schema are one file. `newId()` in `chat-operations.ts` mints UUIDs via t
 - [x] **Attachment persistence** — `App.Attachment` had *no writer at all*: an attachment picked in
       the composer never reached the strand. `insertAttachments()` added; `send` persists them and
       `listMessages` reads them back per message
-- [ ] `listOutstandingInvitations`, `cancelInvitation` — **confirmed blocked.** `CadreNode` exposes
+- [ ] *(Partly, 2026-10-31: listing done locally with FormationUsage counts; cancel only stops listing it.)* `listOutstandingInvitations`, `cancelInvitation` — **confirmed blocked.** `CadreNode` exposes
       `publishFormationInvite` but no list or delete counterpart, and the strand-level
       `listOutstandingInvites()` operates on the RBAC layer that no production path writes.
       `StrandList` already degrades to an empty list
@@ -2225,7 +2225,7 @@ runtime schema are one file. `newId()` in `chat-operations.ts` mints UUIDs via t
       different keys; the wrong one yields a strand you cannot write to). Disclosure carries only
       the display name. Cannot be exercised on one device, so this is written from the cadre-core
       signatures rather than a passing run
-- [ ] **Offer our RN native-crypto module upstream.** `src/cadre/noise-crypto.ts` has nothing
+- [x] *(Done 2026-10-31: the kit ships it as `@serfab/cadre-rn/noise-crypto`.)* **Offer our RN native-crypto module upstream.** `src/cadre/noise-crypto.ts` has nothing
       chat-specific in it: it ports `@chainsafe/libp2p-noise`'s own `nodeCrypto` onto
       `react-native-quick-crypto`, behind the `NoiseCryptoMode` switch that keeps pure-JS crypto
       available for timeout debugging. The SEAM is already upstream — cadre-core 1.3.0 honours
@@ -2238,7 +2238,7 @@ runtime schema are one file. `newId()` in `chat-operations.ts` mints UUIDs via t
       global — the kind of detail that should not travel by copy-paste the way the polyfills do.
       Proposed home: `@optimystic/db-p2p/rn`, beside `noisePureJsCrypto`, with
       `react-native-quick-crypto` as an optional peer dependency.
-- [ ] **`leaveStrand` has no upstream surface to call.** Story 33 specifies three distinct
+- [x] *(Done 2026-10-31: `forgetJoinedStrand` / `unpublishStrand`; leaving sticks across restarts (2026-10-20).)* **`leaveStrand` has no upstream surface to call.** Story 33 specifies three distinct
       outcomes — mute, leave (stop taking part, keep identity so a re-invite returns you as
       yourself) and forget entirely (leave, then discard identity and held data). cadre-core 1.4.0
       exposes `stopStrand()` and nothing else: no leave, no revocation, no `removeMember`. So
@@ -2248,7 +2248,7 @@ runtime schema are one file. `newId()` in `chat-operations.ts` mints UUIDs via t
       members would never learn, and the spec is explicit that leaving is visible as "gone quiet"
       rather than silent. Decide whether to ship the local version, or hide the option until
       upstream has the surface.
-- [ ] `inspectInvitation`, `resignManager`, `removeMember`
+- [ ] *(Partly, 2026-10-31: inspect is local only; resign and remove still `not-supported`.)* `inspectInvitation`, `resignManager`, `removeMember`
 - [ ] Blocked by platform: per-party identity not landed (every joiner presents the founding key,
       so there is no real sender attribution); RBAC not switched on in production. See
       [`domain/sereus.md`](../domain/sereus.md)
@@ -2411,7 +2411,7 @@ Still open, and the reason a two-party conversation is not yet dependable:
       whose message contradicts itself — same block, same number, three times:
       `stale revision: block X at rev 376, requested rev 376, last seen block X at rev 376`.
       That is the thing to report upstream, with this script attached.
-- [ ] **First sync needs a settled node, not just a longer deadline.** `addStrand` fails with
+- [x] *(Done 2026-10-31: obsolete: joins pass repeatedly on 1.17–1.20.)* **First sync needs a settled node, not just a longer deadline.** `addStrand` fails with
       `StrandAwaitingFirstSyncError` — "no member of this strand has been reachable since this
       machine joined" — when the invitation is redeemed too soon after app start. Seven consecutive
       failures cleared as soon as the device was given several more minutes to settle before Join
@@ -2421,11 +2421,11 @@ Still open, and the reason a two-party conversation is not yet dependable:
       device-side readiness, not infrastructure. `myAddrs` was also seen flapping 4 → 0 → 4 mid-attach.
       **Open question for upstream:** what a joiner should wait on before redeeming, since
       "the responder has addresses" is evidently not sufficient.
-- [ ] **Schema changes strand existing data.** Adding `null` to columns in `chat-sapp.qsql` made
+- [ ] *(Partly, 2026-10-31: stores migrate in place (sereus#46); a tag-only change still blocks opening while the partner is offline (sereus#55).)* **Schema changes strand existing data.** Adding `null` to columns in `chat-sapp.qsql` made
       already-founded strands fail on open with `ALTER TABLE App.Member ALTER COLUMN AvatarUri DROP
       NOT NULL` → `Module for table 'Member' does not support ALTER COLUMN`. Dev worked around it by
       wiping; there is no migration path, which matters before anyone ships.
-- [ ] `inspectInvitation`, `leaveStrand`, `resignManager`, `removeMember`
+- [ ] *(Partly, 2026-10-31: leave works; inspect is local only; resign and remove still `not-supported`.)* `inspectInvitation`, `leaveStrand`, `resignManager`, `removeMember`
 - [ ] The acceptance screen's `Retry` calls `load`, which re-inspects a spent invitation instead of
       re-attaching.
 
@@ -2441,7 +2441,7 @@ alongside `listMessages`, so a conversation would show an error banner rather th
 - [x] MockAdapter implemented with variant support
 - [x] QuereusAdapter stub created
 - [x] Screens refactored to use adapter (no variant params)
-- [ ] Adapter modes aligned with `interfaces.md` configuration axes (source / profile / storage / filter / bootstrap) — current `BackendMode` enum is obsolete
+- [x] *(Done 2026-10-31: obsolete: the adapter was replaced by `ChatModel`.)* Adapter modes aligned with `interfaces.md` configuration axes (source / profile / storage / filter / bootstrap) — current `BackendMode` enum is obsolete
 
 ### Cadre Layer (target: `src/cadre/`, future `@sereus/cadre-rn-ui` UI bundle)
 
@@ -2456,7 +2456,7 @@ Must compile against `@sereus/cadre-core` with no chat-specific imports. Must su
 - [x] `requireSignedSchemas: false` — 0.8 verifies sApp schema signatures
       fail-closed; our sApp config is unsigned, so every `addStrand()` would
       throw `SchemaVerificationError` without this
-- [ ] Migrate identity to a `KeyStore` (0.8's model; needs `react-native-keychain`
+- [x] *(Done 2026-10-31: identity in `SecureStoreKeyStore` over the keychain (`src/host/chat-host.ts`).)* Migrate identity to a `KeyStore` (0.8's model; needs `react-native-keychain`
       adapter + `migrateLegacyIdentity` before `new CadreNode()`, or the device
       silently loses its PeerId). We still use the supported `privateKey` path.
 
@@ -2554,20 +2554,20 @@ with `listenAddrs: []`. Progress:
       `sereus://invite/…`, 1,212 chars, bootstrap list carrying `/p2p-circuit/` relayed addrs),
       **delivered to the second device**, and **the acceptance screen rendered** with the
       unattributed wording.
-- [ ] **Join fails at formation validation.** `Responder result failed validation` —
+- [x] *(Done 2026-10-31: obsolete: joins work.)* **Join fails at formation validation.** `Responder result failed validation` —
       cadre-core's `isValidResponderCreatesResult`, which rejects on any of: not approved, no
       `partyId`, empty or placeholder `cadrePeerAddrs`, missing `provisionResult.strand.strandId`,
       `createdBy !== 'responder'`, or a malformed `membershipInvite`. The host DID respond (a
       timeout would look different), so the relay round-trip works. Next: run both sides with
       `DEBUG='sereus:cadre:*'` to see which arm of that check fails.
-- [ ] **Our `acceptInvitation` passes a disclosure shape that does not exist.** It sends
+- [x] *(Done 2026-10-31: `acceptInvitation` sends `{ metadata: { name } }`; the row carries `FounderOwnerKey` and `FounderPeerId`.)* **Our `acceptInvitation` passes a disclosure shape that does not exist.** It sends
       `{ name }`, but `StrandFormationDisclosure` is `{ partyId?, identityBundle?, purpose?,
       metadata? }` — hidden by an `as any`. Also `joinChatStrand` builds a `StrandRow` without
       `FounderOwnerKey`, required since 0.13.0, behind another `as any`. Both need fixing before
       the validation failure can be cleanly attributed.
-- [ ] **Cold-start deep-link race:** an invitation link opened before the cadre finishes starting
+- [x] *(Done 2026-10-31: `inspect` and `accept` wait for the node (`startedNode`; test "a link opens a cold app").)* **Cold-start deep-link race:** an invitation link opened before the cadre finishes starting
       shows "Cadre is not running." The screen should wait for readiness rather than fail.
-- [ ] `inspectInvitation` is still `notImplemented` in `SereusAdapter`, so
+- [ ] *(Partly, 2026-10-31: implemented locally (decodes; expired or invalid only).)* `inspectInvitation` is still `notImplemented` in `SereusAdapter`, so
       InvitationAcceptance would throw the moment a scanned token opened it.
       `acceptInvitation` is written but its docstring records it as UNTESTED.
 - [ ] `webRTC({ rtcConfiguration: { iceServers } })` — relayed→direct hole-punch
@@ -2592,8 +2592,8 @@ with `listenAddrs: []`. Progress:
 - [~] Add drone via `createSeed()` → deliver → dial — seed is generated and
       displayed for manual paste into cadre-cli; **delivery + `dialInvite` do
       not exist on the phone side** (see `tmp/cadre/README.md`)
-- [ ] Add server-then-phone via QR/link → dial (Alert stub)
-- [ ] CadreConnections / AddNode screens (AddNode is an Alert action sheet)
+- [x] *(Done 2026-10-31: node codes are claimed through "Add a machine" (`src/cadre-ui/CadreManager.tsx`).)* Add server-then-phone via QR/link → dial (Alert stub)
+- [ ] *(Partly, 2026-10-31: "Add a machine" claims node codes; no dedicated screens.)* CadreConnections / AddNode screens (AddNode is an Alert action sheet)
 
 #### First partner (strand formation)
 - [x] Formation responder installed with `ControlFormationUsageRecorder` —
@@ -2608,19 +2608,19 @@ with `listenAddrs: []`. Progress:
 - [x] Share invitation via QR + deep link — App Link / Universal Link
       `https://sereus.org/chat/invite/<encoded>` (`chat://` fallback), registered
       + verified routing on device (see Screen conformance gaps → Invite loop)
-- [ ] Accept incoming invitation: `formStrand(invitation, disclosure)` then
+- [x] *(Done 2026-10-31: `core/sereus/model.ts` `acceptInvitation`.)* Accept incoming invitation: `formStrand(invitation, disclosure)` then
       `addStrand` using **`FormStrandResult.memberPrivateKey`** (NOT
       `invitePrivateKey` — that one cannot authorize reads). Needs a reachable
       host, so it is inherently a two-device flow.
-- [ ] Cross-party strand appears in Control DB on both sides, joined automatically
+- [x] *(Done 2026-10-31: `strand:discovered` handler in `core/sereus/strands.ts`.)* Cross-party strand appears in Control DB on both sides, joined automatically
       (needs a `strand:discovered` handler that refuses to auto-attach `Type: 'c'`)
-- [ ] AddGuest / InvitationAcceptance / QrScanner screens wired
+- [x] *(Done 2026-10-31: wired (AddGuest is now InvitationGenerator).)* AddGuest / InvitationAcceptance / QrScanner screens wired
 
 #### Key flows
 - [x] Authority key creation (idempotent, at startup; also JIT before drone seed)
 - [x] Export authority private key for backup (derived from node identity, never
       copied to AsyncStorage — the old code stored it in plaintext there)
-- [ ] ~~External key import (JWK file or QR)~~ — **not possible** under 0.8's
+- [x] *(Done 2026-10-31: superseded by the owner-key model (sereus 1.17).)* ~~External key import (JWK file or QR)~~ — **not possible** under 0.8's
       single-key model; a foreign authority key can never be signed with.
       Recovery = restore the node identity key, or enrol via seed.
       `KeyImportModal` currently surfaces that as an error; give it a real UI.
@@ -2640,7 +2640,7 @@ Imports the cadre layer; must not import sereus internals directly.
       default strand. Single-strand by construction. Cheapest high-value fix.
 - [x] `searchStrands(query)` via iteration over attached strand DBs (message text only)
 - [x] Send message (insert into `App.Message` with optimistic UI append)
-- [ ] Attachments — `App.Attachment` is specified but **no code touches it**;
+- [x] *(Done 2026-10-31: `insertAttachments` writes `App.Attachment`.)* Attachments — `App.Attachment` is specified but **no code touches it**;
       `MediaPicker` picks files and drops them. Blob storage undecided.
 - [~] Polling loop (~2s) — `ChatInterface` only; `ConnectionsList` / `CadreManager`
       load once
@@ -2656,34 +2656,34 @@ Imports the cadre layer; must not import sereus internals directly.
 
 ### Error Handling & Edge Cases
 - [ ] Cadre not connected → Settings banner with retry
-- [ ] Strand not ready (`status !== 'started'`) → per-strand loading, auto-recover
-- [ ] Cohort offline → inline banner; writes stay local until cohort returns
+- [x] *(Done 2026-10-31: "Connecting to this conversation…", retried.)* Strand not ready (`status !== 'started'`) → per-strand loading, auto-recover
+- [x] *(Done 2026-10-31: offline mode: the queue line and not-sent banners (2026-10-29).)* Cohort offline → inline banner; writes stay local until cohort returns
 - [x] Invitation cannot be minted → friendly message + retry on `InvitationGenerator`
-- [ ] Invitation invalid / expired → friendly message on acceptance screen
+- [x] *(Done 2026-10-31: the dead-invitation card in `InvitationAcceptance.tsx`.)* Invitation invalid / expired → friendly message on acceptance screen
 - [ ] Conflict resolution for concurrent edits (relies on Optimystic semantics)
 
 ### Known defects (not stack-related)
 - [x] Deep links registered — `AndroidManifest.xml` now has App-Link + `chat://`
       `VIEW` intent-filters; iOS Info.plist/entitlements/AppDelegate wired.
-- [ ] `npx jest` fails 6/6 suites: bare `preset: 'react-native'` doesn't transform
+- [ ] *(Partly, 2026-10-31: the persisted-names test passes; 6 suites still fail on the Detox and keyboard-controller environment.)* `npx jest` fails 6/6 suites: bare `preset: 'react-native'` doesn't transform
       `@react-navigation` (ESM), and the default run sweeps in the Detox `e2e/*` files
-- [ ] `InvitationAcceptance.tsx` still imports `useVariant` / `mockMode` and never
+- [x] *(Done 2026-10-31: it uses `model.invitations` and no longer imports the mock.)* `InvitationAcceptance.tsx` still imports `useVariant` / `mockMode` and never
       calls the adapter
 
 ## Cadre vs. sereus reference (v0.8.1) — remaining gaps
 
-- [ ] **Transports** (see above) — the dominant gap
-- [ ] Identity on the legacy plaintext `privateKey` path, not a secure-enclave
+- [ ] *(Partly, 2026-10-31: circuit relay works; WebRTC not added.)* **Transports** (see above) — the dominant gap
+- [x] *(Done 2026-10-31: identity is in the keychain (`SecureStoreKeyStore`).)* Identity on the legacy plaintext `privateKey` path, not a secure-enclave
       `KeyStore`; a future KeyStore switch without `migrateLegacyIdentity`
       silently orphans the device identity + authority key
 - [ ] No inbound seed/enrolment path (`decodeSeed`/`applySeed`/`dialInvite`) — the
       phone can be its own founding authority but cannot join an existing cadre
-- [ ] No closed strands (`generateStrandMemberKey`, `publishStrand('c')`), no
+- [ ] *(Partly, 2026-10-31: closed strands and the `strand:discovered` handler exist.)* No closed strands (`generateStrandMemberKey`, `publishStrand('c')`), no
       `strand:discovered` handler (so discovered strands never auto-attach; must
       refuse to auto-attach `Type: 'c'`)
-- [ ] `acceptInvitation` must use `FormStrandResult.memberPrivateKey`, NOT
+- [x] *(Done 2026-10-31: done in `acceptInvitation`.)* `acceptInvitation` must use `FormStrandResult.memberPrivateKey`, NOT
       `invitePrivateKey`
-- [ ] No push-wake / device-token registration / background lifecycle
+- [ ] *(Partly, 2026-10-31: background runner with AppState in `CadreService`; no push wake.)* No push-wake / device-token registration / background lifecycle
       (`registerDeviceToken`, AppState hibernate-on-background, cold-start on
       resume) — a suspended phone can't be woken on strand activity
 - [ ] `registerSelf()` never writes a `CadrePeer` row (root cause = empty
@@ -3083,7 +3083,7 @@ outlives its cause.
       upstream is already investigating the 48-130 network exchanges per message
       insert, and that multiplier is what turns per-frame cost into minutes.
 
-- [ ] **Device-side detail behind the above** — the joiner's strand node cannot
+- [x] *(Done 2026-10-31: obsolete: joins over the relay succeed.)* **Device-side detail behind the above** — the joiner's strand node cannot
       complete a FRET announce over
       the relay in time, so the host never enters its ring.** (2026-09-20)
 

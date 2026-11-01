@@ -66,7 +66,7 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
 - [ ] **20 introduces permission refusal, and nothing else covers it.** Alt D (the phone refuses
       camera or library) is new with this rewrite: no other story, screen spec or consolidation
       handles it, so there is no screen behaviour behind it yet.
-- [ ] **30 depends on read position, which has no home upstream.** "Opening a row lands where the
+- [x] *(Answered 2026-10-31: settled: read position stays device-local (sereus#6 closed 2026-09-11; `readCursor` in the core).)* **30 depends on read position, which has no home upstream.** "Opening a row lands where the
       user left off" rests on [10](10-catching-up.md)'s read boundary, and per-user, party-private
       state is exactly what gotchoices/sereus#6 says there is nowhere to put. Device-local for now;
       revisit if #6 lands.
@@ -74,7 +74,7 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
       partner (and never disclosing it) is provided by sereus, not invented here — and is not
       available yet. The story is written to surface them when they arrive; nothing to build until
       then, but it means 30 cannot be fully satisfied today.
-- [ ] **30 assumes a stable "what was last said" ordering.** Whether per-collection revision order
+- [x] *(Answered 2026-10-31: settled: ordering is the app's job, by the client timestamp with a tie-break (sereus#5 closed).)* **30 assumes a stable "what was last said" ordering.** Whether per-collection revision order
       is available to sApps is gotchoices/sereus#5, still open.
 - [ ] **Human review of all 19.** Nothing has been read and accepted yet.
 
