@@ -83,7 +83,7 @@
     },
     "leaveUnsent": {
       "title": "Messages not sent yet",
-      "body": "{{n}} of your messages here have not been sent. Leaving withdraws them.",
+      "body": "You have unsent messages here ({{n}}). Leaving withdraws them.",
       "confirm": "Leave anyway"
     }
   },

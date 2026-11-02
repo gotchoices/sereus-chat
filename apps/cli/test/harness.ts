@@ -115,10 +115,16 @@ export class Background {
 
 /** One person: a serchat profile in the scenario's home. */
 export class Person {
-  constructor(readonly name: string, private readonly home: string) {}
+  /** `extra`: serchat options for this person only (e.g. `--offline`), after `SCENARIO_ARGS`. */
+  constructor(readonly name: string, private readonly home: string, private readonly extra: string[] = []) {}
 
   private args(words: string[]): string[] {
-    return [SERCHAT, '--home', this.home, '-p', this.name, '--json', '--wait', String(WAIT_SECONDS), ...EXTRA_ARGS, ...words];
+    return [SERCHAT, '--home', this.home, '-p', this.name, '--json', '--wait', String(WAIT_SECONDS), ...EXTRA_ARGS, ...this.extra, ...words];
+  }
+
+  /** The same person run with more options, e.g. `--drain 0` for one run. */
+  with(...extra: string[]): Person {
+    return new Person(this.name, this.home, [...this.extra, ...extra]);
   }
 
   /** Run commands one-shot (`;` separates commands, as on the shell) and parse the rows. */

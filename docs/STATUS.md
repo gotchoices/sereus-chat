@@ -1380,6 +1380,58 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         unchanged. The NativeScript app was uninstalled from emulator 5564 to make room; it was
         test data only.
 
+- [x] **Offline-mode correctness suite and history scaling, CLI to CLI** (2026-11-02, stack 1.20/1.23).
+      - **Suite:** `apps/cli/test/offline.test.ts`, 3/3. serchat gained `edit`, `delete`,
+        `react`, a read-only `sql` for diagnostics, and `--drain <s>`. The harness gained
+        per-person options (`Person.with`).
+        - Both sides write while apart (`--drain 0`), then reconnect: every message arrives
+          exactly once, the same order on both sides, converged within one 20 s window.
+        - Offline-mode Alice and synchronous Bob work together.
+        - Bob deletes a message while Alice, apart, reacts to it: both sides end the same
+          and nothing is reported refused, but the reaction **commits dangling** (its message
+          is gone) on both. That is Optimystic's documented gap (`docs/offline-sync.md`:
+          FOREIGN KEY is not re-judged; backlog
+          `feat-offline-sync-constraint-recheck-before-submit`), not a new bug. Chat
+          ignores orphan reactions.
+        - Running `offline.test.ts` and `scenarios.test.ts` in one vitest run, with the Mac
+          at load 11, hung two of the original scenarios before any message. Each file
+          passes alone (3/3 and 3/3).
+      - **Fixed in chat: same-second messages could show out of order.** `Timestamp` was
+          stored to the second and ties broken by the random id. It now keeps milliseconds
+          (`storedNow()` in `sereus/operations.ts`; Quereus orders fractional datetimes
+          correctly), and the suite asserts send order.
+      - **History scaling** (`test/stack/history-scale.mjs`, founder alone, blocks in memory,
+        Node): the newest-100 list read costs 21 / 97–107 / 440–463 ms at 100 / 1,000 /
+        5,000 messages, the same as `count(*)` (a full scan). An index on `Timestamp`
+        changes nothing.
+        - Cause (`test/stack/optimystic-insert-scale.mjs` and plan checks): **Optimystic
+          tables never use a secondary index for ORDER BY or a range predicate.** The plan is
+          SEQ SCAN + SORT or FILTER. A Quereus memory table with the same index uses an
+          index scan (ASC, 6 ms) or an index seek (range, 6 ms), against 93 / 55 ms on
+          Optimystic at 2,000 rows.
+        - **Diagnosis (Optimystic 1.24.0 source, `getBestAccessPlan` in
+          `quereus-plugin-optimystic/src/optimystic-module.ts`):** a secondary index is
+          considered only once an `=` filter matches its leading column. So an ORDER BY with
+          no equality, and any range (`>`, `<`) on an indexed column, never reaches an index.
+          That holds even for ascending TEXT, which the plugin's own notes call safe to promise.
+          Equality does use the index.
+        - Upstream knows **only part**: backlog `debt-optimystic-true-key-ordering` →
+          `debt-optimystic-pk-range-seek` covers primary-key ranges and value-order key
+          encoding. No ticket covers ordering-only or range access through a secondary index.
+        - Repro: `test/stack/index-ordering-plans.mjs` (memory table vs Optimystic, same index,
+          plans and times). Our need: at 5,000 messages about 2 s per list read on the S7.
+          **Filed as gotchoices/Optimystic#52** (2026-11-02). Live with it until fixed; no
+          app-side workaround.
+        - Optimystic 1.24.0 (npm 2026-11-02, no GitHub release yet) adds a planner cost hint
+          (`costProfile`: `'distributed'` for the network transactor) and needs Quereus 4.24.
+          It does not change index choice. Adopt with the next sereus release.
+        - Smaller, Quereus: a DESC order is not served by reverse index scan even on memory
+          tables (index scan + sort, 65 ms).
+        - Single-insert cost is **not** a size effect: it is high for the first writes after
+          a bulk load and decays (flat 30–60 ms per insert to 10,000 rows when sampled
+          gradually). The profile is block cloning and JSON (`structuredClone` 24%,
+          `canonicalJson`, `decodeJson`). Nothing to file.
+
 - [ ] **Next (proposed 2026-10-30).** In order:
   - [ ] **Phone pass on the S7**, RN on 1.20, offline mode, about an hour.
         - 2026-10-31, done: a waiting message keeps its mark and count across an app restart.
@@ -1387,8 +1439,21 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
           cohort alternates `submitting` and `queued`, and the forward-only rule had pinned
           the mark at "sending". The menu on a waiting message showed Edit, Delete and Copy;
           Withdraw appears only when the queue says no attempt can have landed (`inDoubt`
-          false). Still to do: the rest below. Note that the send-mode switch is on the
-          Diagnostics screen, which is `__DEV__` only, so a release build cannot reach it.
+          false). Note that the send-mode switch is on the Diagnostics screen, which is
+          `__DEV__` only, so a release build cannot reach it.
+        - 2026-11-02 (1.20 / 1.23 release build):
+          - **Leaving with unsent messages asks first.** "Messages not sent yet", with Cancel
+            and Leave anyway. The body's grammar for a count of one is fixed ("You have unsent
+            messages here (n)").
+          - **Reaction marks work.** A 👍 made while serchat was gone shows the quarter pie on
+            its chip, and the line counts it ("2 waiting to send"). Its ring is red ("may not
+            go through"), the stack's verdict for a reaction (composite key, not fresh; a
+            foreign key to a message that could be deleted). Decided (user, 2026-11-02):
+            reactions show plain "waiting", never the red ring (`MessageBubble` passes
+            `mayFail: false` for reaction chips). The core still reports the stack's verdict.
+          - Not covered on a phone: a refused write's banner (covered in Node:
+            `delivery.test.ts`; the offline scenario's conflict produced a dangling row, not a
+            refusal) and the send-mode switch (dev builds only).
         Check:
         - delivery marks survive a restart;
         - a refused write shows its banner, and Dismiss clears it;
@@ -1416,6 +1481,16 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
           with no index (2.5–4.4 s on the S7), so an index may fix it on our side;
         - strand count from 5 to 30: start-up and idle traffic;
         - queue drain, 50 queued messages over the public relay.
+  - [x] **`describeThrown`** (sereus 1.20) replaces `x instanceof Error ? x.message : String(x)`
+        in `sereus/errors.ts`, `strands.ts` and `node-code.ts`, so a thrown non-Error (an RN
+        WebSocket event) no longer reads `[object Object]` (2026-11-02). Core 69/69.
+  - [x] **Strand reactivity: keep it off for now** (2026-11-02, analysis). Push wakes help only a
+        machine that stores none of a table's blocks. In a two-party chat strand both machines
+        hold every block (strand breadth 4 > 2 machines), so each side's own storage applying
+        the other's commit already wakes its `Database.watch`; the scenarios rely on that.
+        Enabling it adds a registration renewal per watched table, and our four tables would
+        need four. Revisit for groups larger than the storage group (about 4 machines), or a
+        party whose phone stores through a drone.
   - [ ] **Optimystic 1.21.0** (2026-10-31): standalone and wire-compatible. Its gains are
         cohort-topic reactivity (off in chat, `STRAND_REACTIVITY = false`), batched
         renewals, the partial-index fix (chat has none), and a native crypto backend
@@ -1430,7 +1505,12 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         other member offline, the strand opens on its old schema (`waiting-for-cohort`, after a
         ~5 s failed apply attempt). The change is applied 14.9 s after the member returns, in
         both modes (`CHANGE=tag RETURN=1 [OFFLINE=1] node test/stack/schema-change-offline-peer.mjs`).
-      - (none open)
+      - **gotchoices/Optimystic#52**: a secondary index is used only for equality, never for
+        ORDER BY or a range. Chat's message list is a full scan plus sort, so it grows with
+        history (about 2 s per read on the S7 at 5,000 messages). Repro:
+        `node test/stack/index-ordering-plans.mjs`. Fixed when the Optimystic rows show
+        INDEXSCAN or INDEXSEEK. Then check `history-scale.mjs` with an index on `(Timestamp, Id)`.
+        Filed 2026-11-02.
 
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run

@@ -54,6 +54,11 @@ async function writeTx(db: Database, sql: string, params: unknown[]): Promise<st
   return tx;
 }
 
+/** Now, in UTC, as this app stores DATETIME: 'YYYY-MM-DD HH:MM:SS.fff'. */
+function storedNow(): string {
+  return new Date().toISOString().replace('T', ' ').replace(/Z$/, '');
+}
+
 function getDb(strand: StrandInstance): Database {
   if (!strand.database) {
     throw new Error(
@@ -142,8 +147,10 @@ export async function insertMessage(
   replyToId?: string | null,
 ): Promise<ChatMessageRow & { Tx?: string }> {
   const db = getDb(strand);
-  // Quereus DATETIME wants 'YYYY-MM-DD HH:MM:SS', not ISO 8601 with T/Z.
-  const now = new Date().toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
+  // Quereus DATETIME wants 'YYYY-MM-DD HH:MM:SS[.fff]', not ISO 8601 with T/Z. The
+  // milliseconds stay: two messages sent in the same second were ordered by their random
+  // ids, so they could show in the wrong order (seen in the offline scenarios).
+  const now = storedNow();
 
   // A client-generated UUID, never max(Id)+1: two members composing at once
   // would compute the same id, and upstream keeps one silently while telling
@@ -201,7 +208,7 @@ export async function updateMessage(
   strand: StrandInstance, id: string, content: string,
 ): Promise<string | undefined> {
   const db = getDb(strand);
-  const now = new Date().toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
+  const now = storedNow();
   // In place, no version chain (story 13).
   return writeTx(db, 'update App.Message set Content = ?, EditedAt = ? where Id = ? returning StampId() as Tx', [content, now, id]);
 }

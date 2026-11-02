@@ -11,8 +11,7 @@
 import {
   FormationPostApprovalError,
   FormationRejectedError,
-  FormationUnreachableError,
-} from '@serfab/cadre-core';
+  FormationUnreachableError, describeThrown } from '@serfab/cadre-core';
 import type { ChatError, ChatErrorKind, Result } from '../model/index.js';
 import { defaultRetryable, ok } from '../model/index.js';
 
@@ -44,12 +43,12 @@ const UNAVAILABLE_NAMES = new Set([
 export function isTransientWriteFailure(err: unknown): boolean {
   const name = err instanceof Error ? err.name : '';
   if (name === 'PromiseShortfallError' || name === 'BlockUnavailableError') return true;
-  return /Failed to get super-majority/i.test(err instanceof Error ? err.message : String(err));
+  return /Failed to get super-majority/i.test(describeThrown(err));
 }
 
 export function toChatError(err: unknown): ChatError {
   if (err instanceof ChatFailure) return err.chatError;
-  const message = err instanceof Error ? err.message : String(err);
+  const message = describeThrown(err);
   const name = err instanceof Error ? err.name : '';
   const kind: ChatErrorKind =
     name === 'ValidityRejectedError' ? 'rejected'

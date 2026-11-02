@@ -160,7 +160,10 @@ export function MessageBubble({
                 {r.count > 1 ? ` ${r.count}` : ''}
               </Text>
               {r.delivery && r.delivery.state !== 'delivered' ? (
-                <DurabilityMark delivery={r.delivery} color={theme.textMuted} dangerColor={theme.danger} size={9} />
+                // Reactions show plain progress, never "may not go through": a reaction to a
+                // message someone may delete is always that risk, however durable (user, 2026-11-02).
+                <DurabilityMark delivery={{ ...r.delivery, mayFail: false }} color={theme.textMuted}
+                  dangerColor={theme.danger} size={9} />
               ) : null}
             </Pressable>
           ))}

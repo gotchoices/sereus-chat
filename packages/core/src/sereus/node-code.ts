@@ -17,8 +17,7 @@ import {
   NODE_CLAIM_PAYLOAD_PREFIX,
   PeerUnreachableError,
   decodeNodeClaimPayload,
-  type NodeClaimPayload,
-} from '@serfab/cadre-core';
+  type NodeClaimPayload, describeThrown } from '@serfab/cadre-core';
 import type { NodeReach } from '../model/index.js';
 
 export { NODE_CODE_SCHEME, isNodeCode, nodeCodeFromUrl } from '../protocol/index.js';
@@ -50,7 +49,7 @@ export function readNodeCode(text: string): NodeCodeReading {
     return { ok: true, payload: decodeNodeClaimPayload(trimmed) };
   } catch (err) {
     // The decoder never echoes the secret, so its message is safe to keep.
-    return { ok: false, problem: 'damaged', detail: err instanceof Error ? err.message : String(err) };
+    return { ok: false, problem: 'damaged', detail: describeThrown(err) };
   }
 }
 
@@ -108,7 +107,7 @@ export type ClaimFailure =
 
 /** Sort an error thrown by `CadreNode.claimNode(payload)` into what to say and whether to keep the code. */
 export function classifyClaimFailure(error: unknown, payload: NodeClaimPayload): ClaimFailure {
-  const detail = error instanceof Error ? error.message : String(error);
+  const detail = describeThrown(error);
   if (error instanceof PeerUnreachableError) {
     return { kind: 'node-unreachable', reach: nodeReach(payload.multiaddrs), retryable: true, detail };
   }

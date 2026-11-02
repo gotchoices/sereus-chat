@@ -3,6 +3,7 @@
  * sweep, strands offered by the control network, remembered joins, self-registration
  * as a Member, and leaving.
  */
+import { describeThrown } from '@serfab/cadre-core';
 import type { CadreNode, StrandInstance, StrandRow } from '@serfab/cadre-core';
 import type { ChatHost } from './host.js';
 import { JoinedStrands, LocalRecords, SummaryCache, type JoinedStrand } from './local-state.js';
@@ -151,7 +152,7 @@ export class StrandRuntime {
     } catch (err) {
       // RECORD, then rethrow: the sweep flag must not stay false and the list claim
       // forever that it is still looking.
-      this.bootFailure = err instanceof Error ? err.message : String(err);
+      this.bootFailure = describeThrown(err);
       this.swept = true;
       throw err;
     }
@@ -228,7 +229,7 @@ export class StrandRuntime {
         await this.registerSelf(instance);
         console.info('[chat-strand] ✓ re-attached joined strand:', row.Id);
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = describeThrown(err);
         const awaitingSync = err instanceof Error && err.name === 'StrandAwaitingFirstSyncError';
         console[awaitingSync ? 'info' : 'warn'](
           `[chat-strand] ${awaitingSync ? 'joined strand launched, awaiting first sync' : 'could not re-attach joined strand'}: ${row.Id} — ${message}`,

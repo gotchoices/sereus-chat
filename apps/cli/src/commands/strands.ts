@@ -1,4 +1,4 @@
-/** Strands and messages: `strands`, `log`, `tail`, `send`, `members`, `mute`, `archive`, `leave`, `outbox`. */
+/** Strands and messages: `strands`, `log`, `tail`, `send`, `members`, `mute`, `archive`, `leave`, `outbox`, `edit`, `delete`, `react`. */
 import type { Member, Message, Muted, StrandSummary } from '@chat/core';
 import { UsageError, type Session } from '../session.js';
 import type { Row } from '../output.js';
@@ -226,6 +226,63 @@ const leave: Command = {
   },
 };
 
+const edit: Command = {
+  name: 'edit',
+  summary: 'Change the text of your own message, in place',
+  usage: '<strand> <message> <text...>',
+  async run(session, args) {
+    const strand = await session.strand(need(edit, args, 0, 'strand'));
+    const message = await session.message(strand.id, need(edit, args, 1, 'message'));
+    const content = args.slice(2).join(' ');
+    if (!content) throw new UsageError(`edit: missing text\nusage: edit ${edit.usage}`);
+    session.unwrap(await session.model.messages.edit(strand.id, message.id, content));
+  },
+};
+
+const del: Command = {
+  name: 'delete',
+  summary: 'Delete your own message, with its reactions and attachments',
+  usage: '<strand> <message>',
+  async run(session, args) {
+    const strand = await session.strand(need(del, args, 0, 'strand'));
+    const message = await session.message(strand.id, need(del, args, 1, 'message'));
+    session.unwrap(await session.model.messages.delete(strand.id, message.id));
+  },
+};
+
+const react: Command = {
+  name: 'react',
+  summary: 'React to a message with a symbol; --off takes your reaction back',
+  usage: '<strand> <message> <symbol> [--off]',
+  options: { off: { type: 'boolean' } },
+  async run(session, args, values) {
+    const strand = await session.strand(need(react, args, 0, 'strand'));
+    const message = await session.message(strand.id, need(react, args, 1, 'message'));
+    const symbol = need(react, args, 2, 'symbol');
+    session.unwrap(await (values.off
+      ? session.model.messages.unreact(strand.id, message.id, symbol)
+      : session.model.messages.react(strand.id, message.id, symbol)));
+  },
+};
+
+const sql: Command = {
+  name: 'sql',
+  summary: 'Diagnostics: run a read-only SELECT on a strand\'s database (tables are App.*)',
+  usage: '<strand> <select...>',
+  async run(session, args) {
+    const strand = await session.strand(need(sql, args, 0, 'strand'));
+    const query = args.slice(1).join(' ').trim();
+    if (!/^select\b/i.test(query)) throw new UsageError('sql: only a SELECT is allowed');
+    const instance = session.host.node.node?.getStrands().get(strand.id);
+    const db = instance?.database?.getDatabase();
+    if (!db) throw new UsageError(`sql: strand ${strand.id} is not open here`);
+    const rows: Record<string, unknown>[] = [];
+    for await (const row of db.eval(query)) rows.push({ ...row });
+    const columns = rows.length ? Object.keys(rows[0]) : [];
+    session.out.rows(columns as never, rows as never);
+  },
+};
+
 const outbox: Command = {
   name: 'outbox',
   summary: 'This device\'s writes to a strand not sent yet, and refused ones',
@@ -254,4 +311,4 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-export const strandCommands = [strands, log, tail, send, members, mute, archive, unarchive, leave, outbox];
+export const strandCommands = [strands, log, tail, send, edit, del, react, members, mute, archive, unarchive, leave, outbox, sql];

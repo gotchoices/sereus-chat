@@ -40,6 +40,8 @@ interface Globals {
   memoryBlocks: boolean;
   /** Strand offline mode (`--offline`). Off: every write waits for the network, as the stack measures. */
   offline: boolean;
+  /** One-shot exit: the most seconds to wait for offline queues to send (`--drain`). */
+  drainSeconds: number;
   /** Inspector port for the development bridge (`--bridge`). */
   bridgePort?: number;
   help: boolean;
@@ -61,13 +63,14 @@ const USAGE = `usage: serchat [options] [command [args] [\\; command ...]]
       --bridge <port>    development bridge for test/devices tools, on a loopback inspector port
       --memory-blocks    measurement only: block storage in memory, nothing kept
       --offline          strand offline mode, as the phone app: writes return once saved here
+      --drain <seconds>  one-shot, offline mode: how long to let queued writes go out first (default 60)
   -v, --verbose          network-layer log lines on stderr
   -h, --help · --version
 
 With no command: an interactive prompt, or commands from stdin. "help" lists commands.`;
 
 export function parseGlobals(argv: string[]): Globals {
-  const g: Globals = { profile: 'default', memoryBlocks: false, offline: false, json: false, header: false, relays: [], listen: [], waitSeconds: 30, verbose: false, help: false, version: false, rest: [] };
+  const g: Globals = { profile: 'default', memoryBlocks: false, offline: false, drainSeconds: 60, json: false, header: false, relays: [], listen: [], waitSeconds: 30, verbose: false, help: false, version: false, rest: [] };
   let i = 0;
   const value = (flag: string) => {
     const v = argv[++i];
@@ -87,6 +90,7 @@ export function parseGlobals(argv: string[]): Globals {
     else if (a === '--bridge') g.bridgePort = Number(value(a));
     else if (a === '--memory-blocks') g.memoryBlocks = true;
     else if (a === '--offline') g.offline = true;
+    else if (a === '--drain') g.drainSeconds = Number(value(a));
     else if (a === '-v' || a === '--verbose') g.verbose = true;
     else if (a === '-h' || a === '--help') g.help = true;
     else if (a === '--version') g.version = true;
@@ -96,6 +100,7 @@ export function parseGlobals(argv: string[]): Globals {
   }
   g.rest = argv.slice(i);
   if (!Number.isFinite(g.waitSeconds) || g.waitSeconds < 0) throw new Error('--wait takes seconds');
+  if (!Number.isFinite(g.drainSeconds) || g.drainSeconds < 0) throw new Error('--drain takes seconds');
   if (g.bridgePort !== undefined && !(Number.isInteger(g.bridgePort) && g.bridgePort > 0 && g.bridgePort < 65536)) throw new Error('--bridge takes a port');
   return g;
 }
@@ -135,6 +140,7 @@ async function main(argv: string[]): Promise<number> {
   if (g.memoryBlocks) out.note('blocks in memory (--memory-blocks): nothing this run stores will survive it');
   const { model, boot, settle: settleModel } = createSereusModel(host);
   settleBackground = settleModel;
+  drainSeconds = g.drainSeconds;
   if (g.bridgePort !== undefined) {
     // The same bridge the phone installs, reached over Node's inspector instead of Metro's.
     // Loopback only: an inspector runs any code it is sent.
@@ -202,6 +208,8 @@ async function settle(session: Session, ms: number): Promise<void> {
 
 /** The model's background work (a new conversation still starting); awaited before exit. */
 let settleBackground: (() => Promise<void>) | undefined;
+/** `--drain`, for `shutdown`. */
+let drainSeconds = 60;
 
 async function shutdown(session: Session, code: number): Promise<number> {
   // A conversation founded for an invitation starts in the background (sereus 1.17): a
@@ -217,7 +225,7 @@ async function shutdown(session: Session, code: number): Promise<number> {
   if (queues.length) {
     await Promise.race([
       Promise.allSettled(queues.map(q => q!.whenDrained())),
-      new Promise(r => setTimeout(r, 60_000).unref()),
+      new Promise(r => setTimeout(r, drainSeconds * 1000).unref()),
     ]);
     const left = queues.reduce((n, q) => n + q!.queueState().depth, 0);
     if (left) session.out.note(`${left} write${left === 1 ? '' : 's'} saved here, not sent yet: they go out on the next run`);
