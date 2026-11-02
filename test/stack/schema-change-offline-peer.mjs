@@ -76,7 +76,8 @@ async function party(tag, partyId) {
 
 const aParty = `a-${randomUUID()}`;
 let A = await party('a', aParty);
-const B = await party('b', `b-${randomUUID()}`);
+const bParty = `b-${randomUUID()}`;
+const B = await party('b', bParty);
 
 const strandId = `strand-${randomUUID()}`;
 const founded = await A.foundStrand({ strandId, type: 'c', memberPrivateKey: await generateStrandMemberKey(), sAppConfig: V1 });
@@ -84,7 +85,8 @@ await founded.instance.database.getDatabase().exec(`insert into App.Message (Id,
 const invitation = await A.createOpenInvitation(SAPP_ID, 3_600_000);
 await A.publishFormationInvite(invitation.token, SAPP_ID, { strandId, expiresAtMs: Date.now() + 3_600_000, totalUses: 1 });
 const formed = await B.formStrand(B.decodeInvitation(A.encodeInvitation(invitation)), { metadata: { name: 'B' } });
-await B.addStrand({ strandRow: { Id: formed.strandId, MemberPrivateKey: formed.memberPrivateKey ?? null, Type: 'c', FounderOwnerKey: null, FounderPeerId: null },
+const bRow = { Id: formed.strandId, MemberPrivateKey: formed.memberPrivateKey ?? null, Type: 'c', FounderOwnerKey: null, FounderPeerId: null };
+await B.addStrand({ strandRow: bRow,
   sAppConfig: V1, awaitFirstSync: false });
 const bInst = await B.whenStrandWritable(formed.strandId, { timeoutMs: 300_000 });
 await bInst.database.getDatabase().exec(`insert into App.Message (Id, Content) values ('b1', 'from b')`);
@@ -127,6 +129,19 @@ if (outcome.ok) {
   try { for await (const r of db.getDatabase().eval('select Id from App.Message')) { rows++; ids.push(r.Id); } } catch (e) { log('read failed:', e.message); }
   log('rows:', ids.join(', '));
   log(`A reads ${rows} rows; app schema state: ${db?.appSchemaState?.() ?? '?'}`);
+  // RETURN=1: B comes back (upgraded too). The deferred apply should land once A's strand
+  // node connects to it (sereus 1.20: `strand:app-schema-applied`).
+  if (process.env.RETURN === '1') {
+    const applied = new Promise(r => A.on('strand:app-schema-applied', ({ strandId: id }) => { if (id === strandId) r(Date.now()); }));
+    const t = Date.now();
+    const B2 = await party('b', bParty);
+    await B2.addStrand({ strandRow: bRow, sAppConfig: V2, awaitFirstSync: false });
+    log('B is back');
+    const at = await Promise.race([applied, new Promise(r => setTimeout(() => r(null), 360_000))]);
+    log(at ? `schema applied on A ${((at - t) / 1000).toFixed(1)} s after B returned; state: ${db?.appSchemaState?.()}`
+      : `schema NOT applied within 360 s; state: ${db?.appSchemaState?.()}`);
+    await B2.stop();
+  }
   for (const wait of [5, 30]) {
     await new Promise(r => setTimeout(r, wait * 1000));
     const again = [];

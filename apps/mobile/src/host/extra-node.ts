@@ -17,17 +17,20 @@ import type { FoundStrandPlatform } from '@chat/core/diagnostics';
 
 export const createExtraNode: CreateExtraNode = async ({ tag, partyId, relayAddrs }) => {
   const prefix = `diag2-${Math.random().toString(36).slice(2, 10)}-${tag}`;
+  const stores = new Map<string, LevelDBRawStorage>();
   const config = {
     privateKey: await generateKeyPair('Ed25519'),
     controlNetwork: { partyId, bootstrapNodes: [] },
     profile: 'transaction',
     strandFilter: { mode: 'all' },
     storage: {
-      provider: (scope: string) => new LevelDBRawStorage(openOptimysticRNDb({
+      // One storage per scope, as the kit keeps (Optimystic 1.23): the storage claims its
+      // handle for its read cache, so a second one over the same database is refused.
+      provider: (scope: string) => stores.get(scope) ?? stores.set(scope, new LevelDBRawStorage(openOptimysticRNDb({
         openFn: (n: string, createIfMissing: boolean, errorIfExists: boolean) => new LevelDB(n, createIfMissing, errorIfExists),
         WriteBatch: LevelDBWriteBatch,
         name: `${prefix}-${scope}`,
-      })),
+      }))).get(scope)!,
     },
     network: {
       transports: [webSockets(), circuitRelayTransport()],
@@ -63,6 +66,7 @@ export const createExtraNode: CreateExtraNode = async ({ tag, partyId, relayAddr
 export async function foundStrandPlatform(): Promise<FoundStrandPlatform> {
   const id = Math.random().toString(36).slice(2, 10);
   const dbs = new Map<string, ReturnType<typeof openOptimysticRNDb>>();
+  const stores = new Map<string, LevelDBRawStorage>();
   const openDb = (name: string) => {
     let db = dbs.get(name);
     if (!db) {
@@ -76,10 +80,12 @@ export async function foundStrandPlatform(): Promise<FoundStrandPlatform> {
     return db;
   };
   return {
-    storage: (scope: string) => new LevelDBRawStorage(openDb(scope)),
+    // One storage per scope (see `createExtraNode`).
+    storage: (scope: string) => stores.get(scope) ?? stores.set(scope, new LevelDBRawStorage(openDb(scope))).get(scope)!,
     transports: [webSockets()] as never,
     privateKey: await generateKeyPair('Ed25519'),
     cleanup: () => {
+      for (const store of stores.values()) void store.close().catch(() => { /* best effort */ });
       for (const db of dbs.values()) {
         try { (db as unknown as { close?: () => void }).close?.(); } catch { /* best effort */ }
       }

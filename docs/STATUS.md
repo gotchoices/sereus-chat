@@ -1342,6 +1342,44 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         `test/stack/restart-after-replicated-write.mjs`: lost in 12 of 14 runs with the stores left open,
         kept in 6 of 6 with the stores closed. Not filed upstream.
 
+- [x] **Stack 2026-11-02: sereus 1.20.0, optimystic 1.23.0, quereus 4.24.0, p2p-fret 1.3.0**
+      (libp2p 3.3.11 unchanged). No chat code change, no data wipe: the new log, journal and
+      sync fields are optional, and older data reads.
+      - Sereus API changes that chat does not touch:
+        - app-schema state `'waiting-for-cohort'`;
+        - `strand:app-schema-deferred.waitingFor`;
+        - app-schema listeners moved to their own type;
+        - `registerSelfUnlessCouldFork()`.
+        `describeThrown()` is new and optional, and could improve chat's error text.
+      - Optimystic changes chat does not touch: `merge.filterConflict` and `txsig:v3`.
+        Phone storage keeps its own read cache, one `LevelDBRawStorage` per scope in the kit;
+        check our diagnostics extra node (`src/host/extra-node.ts`).
+      - Wins expected on phones: no JS text decoder on stored reads (Optimystic#51), and
+        peer-store rewrites at most once a minute (#40). Slow links: fret derives its deadlines
+        from `linkRoundTripMs` (7 s instead of 2 s), the sereus#48 diagnosis. Offline mode:
+        inserts into indexed tables no longer fail behind queued ones (#50). Reactivity is now
+        cheap when idle (#48, #49), which may make `STRAND_REACTIVITY` worth turning on.
+      - Native crypto (`setCryptoBackend`, Optimystic 1.21) is still not wired by sereus.
+        NativeScript storage still asks for sqlite `^3.5.0`, so our 4.1.0 resolution stays.
+      - Core 69/69, serchat unit 14/14, scenarios 3/3 synchronous and 3/3 `--offline`; all
+        four apps type-check.
+      - **sereus#55 verified fixed and closed** (see "Upstream bugs we live with").
+      - Diagnostics extra node and found-strand platform now keep one `LevelDBRawStorage` per
+        scope and close them on cleanup (`src/host/extra-node.ts`), as the 1.23 storage
+        requires.
+      - **Phones, RN release, offline mode, public relay, against serchat** (2026-11-02):
+
+        | | 1.19.1 / 1.20.1 | 1.20.0 / 1.23.0 |
+        |---|---|---|
+        | S7: Join → conversation | 18.9 s | 17.4, 20.7 s |
+        | S7: send tapped → serchat has it | ~7 s | 3.4, 3.4 s |
+        | Emulator 5564: Join → conversation | 7.6, 7.9 s | 7.9, 34.3 s (second run slow, Mac load) |
+        | Emulator: send → serchat | ~3 s | 4.1, 4.0 s |
+
+        Delivery from the S7 roughly halved, in line with Optimystic#51 and #40. Joins
+        unchanged. The NativeScript app was uninstalled from emulator 5564 to make room; it was
+        test data only.
+
 - [ ] **Next (proposed 2026-10-30).** In order:
   - [ ] **Phone pass on the S7**, RN on 1.20, offline mode, about an hour.
         - 2026-10-31, done: a waiting message keeps its mark and count across an app restart.
@@ -1388,12 +1426,11 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
 - [ ] **Upstream bugs we live with: check on every stack release, nag until fixed.** No
       app-side workaround for these, by decision. On each release, read the issue and the
       notes, re-run the repro, and remove the entry once it passes.
-      - **gotchoices/sereus#55**: an app schema change (even one column tag) keeps an existing
-        strand from opening while its other member is offline. Hit by chat's 0.2.0 schema
-        (`"optimystic.fresh"` on `Message.Id`/`Attachment.Id`): after the update, a conversation
-        whose partner is offline is missing until the partner returns. Repro:
-        `CHANGE=tag node test/stack/schema-change-offline-peer.mjs` (fixed when it prints
-        `addStrand OK`). Filed 2026-10-30.
+      - ~~**gotchoices/sereus#55**~~ **fixed in sereus 1.20.0, closed 2026-11-02.** With the
+        other member offline, the strand opens on its old schema (`waiting-for-cohort`, after a
+        ~5 s failed apply attempt). The change is applied 14.9 s after the member returns, in
+        both modes (`CHANGE=tag RETURN=1 [OFFLINE=1] node test/stack/schema-change-offline-peer.mjs`).
+      - (none open)
 
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run
@@ -1406,13 +1443,30 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         is fast enough without it (the S7 took 4.0–4.7 s, 0.4 s prepared), remove the
         prepare path, its slot and storage key, and the list filter, and simplify
         `createInvitation` back to founding inline.
-      - **NativeScript SQLite patch** (`apps/mobile-ns/.yarn/patches/@nativescript-community-sqlite-*`).
-        Waits on Optimystic#38 (sqlite 4.x). Remove with the upgrade; also retire
-        `src/local-kv.ts` and `src/db-path.ts` if 4.x opens without an activity and
-        supports UPSERT on the phones we test.
+      - **NativeScript SQLite 4.x (Optimystic#38): device test done, app moved** (2026-11-01).
+        `apps/mobile-ns` now runs `@nativescript-community/sqlite` 4.1.0 through a
+        resolution, outside `db-p2p-storage-ns`'s `^3.5.0` peer range. The 3.5.9 yarn patch is
+        deleted. On the S7 (Android 8, NativeScript 8.9 over the JNI bridge), with the
+        "SQLite 4 check" (`src/sqlite4-check.ts`):
+        - the bundled SQLite is 3.50.1, so the block store's UPSERT works on Android 8;
+        - 10 of 10 markers survived 5 app kills, both autocommit and synced;
+        - reads during a write work, and see the uncommitted rows, as on 3.x;
+        - the block store works end to end;
+        - the app boots on databases written by 3.x.
+        The storage wrapper needed no code change. Results posted on Optimystic#38. Remove the
+        resolution once storage-ns accepts 4.x. Maybe retire `src/local-kv.ts` and
+        `src/db-path.ts` then: 4.x opens a bare name in the databases folder. Not yet run: a
+        long app session on 4.x with network traffic.
       - **NativeScript WebSocket patch** (`apps/mobile-ns/.yarn/patches/@valor-nativescript-websockets-*`).
         Waits on valor-software/nativescript-plugins#26. Remove when a release copies in
-        bulk without a JNI reference per send.
+        bulk without a JNI reference per send. No upstream reply since filing (2026-10-15),
+        and the repository is updated a few times a year: expect to keep the patch.
+      - **NativeScript `TextDecoder` view fix** (`apps/mobile-ns/src/polyfills/chat.ts`).
+        NativeScript#9941 was fixed by PR #11578 (merged 2026-10-28), shipped only in
+        `@nativescript/core` 9.1.4-next and 9.2.0-alpha as of 2026-11-01. The app is on
+        ~8.9.9. The polyfill checks the runtime's decoder at start-up and installs itself only
+        when the decoder ignores a view's offset, so it goes quiet once the fix arrives. Delete
+        the code then.
       - **`main-event` browser rewrite** (`apps/mobile-ns/webpack.config.js`). Remove if
         reference-app-ns / a shared NativeScript bring-up (sereus#45) applies packages'
         `browser` maps.

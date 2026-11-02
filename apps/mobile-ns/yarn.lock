@@ -1070,27 +1070,57 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@nativescript-community/sqlite@npm:3.5.9":
-  version: 3.5.9
-  resolution: "@nativescript-community/sqlite@npm:3.5.9"
+"@nativescript-community/sqlite-bridge@npm:^4.1.0":
+  version: 4.1.1
+  resolution: "@nativescript-community/sqlite-bridge@npm:4.1.1"
   dependencies:
-    "@nativescript/hook": "npm:~2.0.0"
-  peerDependencies:
-    "@nano-sql/core": ^2.3.7
-    typeorm: ^0.3.17
-  checksum: 10c0/2b3da44c18cb6dc6c12ee83c2e18ed2c3bc7e629fa5214cdc276cbd3fab619349cdb994d43b5881c0d9988cdcf5e1ebf804a31249a9210659437735d6f670ff0
+    "@nativescript-community/sqlite-core": "npm:^4.1.1"
+  checksum: 10c0/319919d7cf9479a4bbd6a31a605dcc2ae36d5cac6b82d71d3aa8595288b96cfca67e9c5ba950f87b43b9b1250812203425ff62ae0f9cd26dd0b93be521ed51a7
   languageName: node
   linkType: hard
 
-"@nativescript-community/sqlite@patch:@nativescript-community/sqlite@npm%3A3.5.9#~/.yarn/patches/@nativescript-community-sqlite-npm-3.5.9-3269d0d97e.patch":
-  version: 3.5.9
-  resolution: "@nativescript-community/sqlite@patch:@nativescript-community/sqlite@npm%3A3.5.9#~/.yarn/patches/@nativescript-community-sqlite-npm-3.5.9-3269d0d97e.patch::version=3.5.9&hash=0aec42"
+"@nativescript-community/sqlite-core@npm:^4.1.0, @nativescript-community/sqlite-core@npm:^4.1.1":
+  version: 4.1.1
+  resolution: "@nativescript-community/sqlite-core@npm:4.1.1"
   dependencies:
     "@nativescript/hook": "npm:~2.0.0"
   peerDependencies:
     "@nano-sql/core": ^2.3.7
     typeorm: ^0.3.17
-  checksum: 10c0/739283d99f288cc112885825d45c6f50636dbdf171922e230584265ec2cb3056fa5277eaa14f0004f724f29fdc5599247b4f6a03cebd47158c38ef4a71ba4d1e
+  checksum: 10c0/1c06afef0e7d66b4153fb41d142a377a6b6a8d5f84ce0f67cf683db43c0ce28750f8338218670e8204c7799a25d6c60cbcadb9875e662fe661c70943bba749d6
+  languageName: node
+  linkType: hard
+
+"@nativescript-community/sqlite-default-engine@npm:^4.1.0":
+  version: 4.1.1
+  resolution: "@nativescript-community/sqlite-default-engine@npm:4.1.1"
+  peerDependencies:
+    "@nativescript-community/sqlite-core": ^4.0.0
+    "@nativescript/core": "*"
+  checksum: 10c0/51015b995c6bb7c4ea2824d46e72fd447361cf8f625446b762ef84117ad80a16223462bf48391fef4bb4c625f0edc5a15c3494c7937b8379190ad6a089f5a9e9
+  languageName: node
+  linkType: hard
+
+"@nativescript-community/sqlite-napi@npm:^4.1.0":
+  version: 4.1.1
+  resolution: "@nativescript-community/sqlite-napi@npm:4.1.1"
+  dependencies:
+    "@nativescript-community/sqlite-core": "npm:^4.1.1"
+  checksum: 10c0/1034a53eaee4bb3ce598d7a28034e1102d671f7014b52476db3ef1e61c896fa558f0e4250249a119dad1632ffe9d17a18c2e00ae1833072fdb3ab7cb1ffab3d0
+  languageName: node
+  linkType: hard
+
+"@nativescript-community/sqlite@npm:4.1.0":
+  version: 4.1.0
+  resolution: "@nativescript-community/sqlite@npm:4.1.0"
+  dependencies:
+    "@nativescript-community/sqlite-bridge": "npm:^4.1.0"
+    "@nativescript-community/sqlite-core": "npm:^4.1.0"
+    "@nativescript-community/sqlite-default-engine": "npm:^4.1.0"
+    "@nativescript-community/sqlite-napi": "npm:^4.1.0"
+  peerDependencies:
+    "@nativescript/core": "*"
+  checksum: 10c0/82090fe9444f8235290771c2bc451a88302ae50c2d33fd76b6bcc4983593620ebb55644294ab26f138a4e3134a0d44774dbd0887038cc36d5235902734ed37cd
   languageName: node
   linkType: hard
 
@@ -1227,35 +1257,35 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@optimystic/db-core@npm:1.20.1":
-  version: 1.20.1
-  resolution: "@optimystic/db-core@npm:1.20.1"
+"@optimystic/db-core@npm:1.23.0":
+  version: 1.23.0
+  resolution: "@optimystic/db-core@npm:1.23.0"
   dependencies:
     "@noble/hashes": "npm:^2.0.1"
     debug: "npm:^4.4.3"
     multiformats: "npm:^14.0.5"
     uint8arrays: "npm:^6.1.1"
-  checksum: 10c0/c548c919d898cc7ec6c4df669cb73313219b2165db3b8a28b600cd531fa94d52814146ed81fbf4a73244adc85ead1a860c8191c8badbe567882ce89ed16ec5af
+  checksum: 10c0/0b62785047bcbed6d1bed83634a9997267e082bb04b54139902eb30923dfefe7d05b026f78d7c7610b3c2e3439b5de9da638772380b6a59219177aa682e4865b
   languageName: node
   linkType: hard
 
-"@optimystic/db-p2p-storage-fs@npm:1.20.1":
-  version: 1.20.1
-  resolution: "@optimystic/db-p2p-storage-fs@npm:1.20.1"
+"@optimystic/db-p2p-storage-fs@npm:1.23.0":
+  version: 1.23.0
+  resolution: "@optimystic/db-p2p-storage-fs@npm:1.23.0"
   dependencies:
-    "@optimystic/db-core": "npm:^1.20.1"
-    "@optimystic/db-p2p": "npm:^1.20.1"
+    "@optimystic/db-core": "npm:^1.23.0"
+    "@optimystic/db-p2p": "npm:^1.23.0"
     debug: "npm:^4.4.3"
-  checksum: 10c0/c3074fc61c83cdb29e99a6b694183403a29f6e21376d86f20d02f5e30222453dd8300fe4ce32e38ef7881eaf2f6a6012c2103d6a5f7b494371a45d18db86b9fe
+  checksum: 10c0/909df4677b2d7db2638b2efe2e7b46873b02fe0402e2913932e8c2b5b4e4c4578347de81c302fba84e66771dcca9713f9cbebec28cc2fdaccc1e1891f87bf313
   languageName: node
   linkType: hard
 
-"@optimystic/db-p2p-storage-ns@npm:1.20.1":
-  version: 1.20.1
-  resolution: "@optimystic/db-p2p-storage-ns@npm:1.20.1"
+"@optimystic/db-p2p-storage-ns@npm:1.23.0":
+  version: 1.23.0
+  resolution: "@optimystic/db-p2p-storage-ns@npm:1.23.0"
   dependencies:
-    "@optimystic/db-core": "npm:^1.20.1"
-    "@optimystic/db-p2p": "npm:^1.20.1"
+    "@optimystic/db-core": "npm:^1.23.0"
+    "@optimystic/db-p2p": "npm:^1.23.0"
     debug: "npm:^4.4.3"
   peerDependencies:
     "@libp2p/crypto": ^5.1.23
@@ -1264,28 +1294,28 @@ __metadata:
   peerDependenciesMeta:
     "@nativescript-community/sqlite":
       optional: false
-  checksum: 10c0/6820bb2ac78b0bfb43486bd7e1c487fef215e69f55c96bc0c86ee5eb33ffd16b0c0461c30bbb1e807fecb4f4a2a197e83ac34500fbecc0d0796aac98aeeab5f7
+  checksum: 10c0/5a7e11a1313a928efbb2e650b0e9297d39e194034b84310577876d891af7ff375d9fe2d4d9789a8e2f196c35599847d493f9cc328feffe63736cd9eefb11ceec
   languageName: node
   linkType: hard
 
-"@optimystic/db-p2p-storage-web@npm:^1.20.1":
-  version: 1.20.1
-  resolution: "@optimystic/db-p2p-storage-web@npm:1.20.1"
+"@optimystic/db-p2p-storage-web@npm:^1.23.0":
+  version: 1.23.0
+  resolution: "@optimystic/db-p2p-storage-web@npm:1.23.0"
   dependencies:
-    "@optimystic/db-core": "npm:^1.20.1"
-    "@optimystic/db-p2p": "npm:^1.20.1"
+    "@optimystic/db-core": "npm:^1.23.0"
+    "@optimystic/db-p2p": "npm:^1.23.0"
     debug: "npm:^4.4.3"
     idb: "npm:^8.0.3"
   peerDependencies:
     "@libp2p/crypto": ^5.1.23
     "@libp2p/interface": ^3.3.0
-  checksum: 10c0/7cebcb4f857142e0f677e538c8067d0ed10d3eab600360b0fd8b0d7288754c8eb3ba37667140e18a196872103e5786075b895b5e2a08196735f55011bc8556b1
+  checksum: 10c0/3f3ad48a4a34c892d0baf5214353ccbe3a7c40b56fce7452e787ae2a58168ac0db516d2cb40cb845923cac9937d3d9d47b548c7c6849b53389abdd3366c8268e
   languageName: node
   linkType: hard
 
-"@optimystic/db-p2p@npm:1.20.1":
-  version: 1.20.1
-  resolution: "@optimystic/db-p2p@npm:1.20.1"
+"@optimystic/db-p2p@npm:1.23.0":
+  version: 1.23.0
+  resolution: "@optimystic/db-p2p@npm:1.23.0"
   dependencies:
     "@chainsafe/libp2p-noise": "npm:^17.0.0"
     "@chainsafe/libp2p-yamux": "npm:^8.0.1"
@@ -1304,7 +1334,7 @@ __metadata:
     "@multiformats/multiaddr": "npm:^13.0.1"
     "@noble/curves": "npm:^2.0.1"
     "@noble/hashes": "npm:^2.0.1"
-    "@optimystic/db-core": "npm:^1.20.1"
+    "@optimystic/db-core": "npm:^1.23.0"
     async-mutex: "npm:^0.5.0"
     debug: "npm:^4.4.3"
     it-all: "npm:^3.0.9"
@@ -1313,30 +1343,30 @@ __metadata:
     it-pushable: "npm:^3.2.3"
     libp2p: "npm:^3.3.11"
     multiformats: "npm:^14.0.5"
-    p2p-fret: "npm:^1.2.1"
+    p2p-fret: "npm:^1.3.0"
     uint8arraylist: "npm:^3.0.2"
     uint8arrays: "npm:^6.1.1"
-  checksum: 10c0/739e5b03fa78c3b5745a9b15eec72a24e3bafb2f4cffd2e698eef3aad80cd40796291612f8f062793999f5fc6d67c901e4a902d63a22ce459712f34ce76c5d2c
+  checksum: 10c0/7435d7a409abd0e70aaaafce3438a4d6c31c845d68518cc6aaf312bddc6cf150c485140a8982e24b65b83b883390a9a6d2ee5c95a6464499bb6695a15f0878e5
   languageName: node
   linkType: hard
 
-"@optimystic/quereus-plugin-crypto@npm:1.20.1":
-  version: 1.20.1
-  resolution: "@optimystic/quereus-plugin-crypto@npm:1.20.1"
+"@optimystic/quereus-plugin-crypto@npm:1.23.0":
+  version: 1.23.0
+  resolution: "@optimystic/quereus-plugin-crypto@npm:1.23.0"
   dependencies:
     "@noble/curves": "npm:^2.0.1"
     "@noble/hashes": "npm:^2.0.1"
     multiformats: "npm:^14.0.5"
     uint8arrays: "npm:^6.1.1"
   peerDependencies:
-    "@quereus/quereus": ^4.21.0
-  checksum: 10c0/2fd3cd4bf04b4f71581b01a76700a7107fdba634899ca7daf7a237d2c5b247220f161f4a6e1c4e43c283f7403e09387c2feb656e818a15cee83806b9e480a3fe
+    "@quereus/quereus": ^4.22.0
+  checksum: 10c0/bc36f712d908d03f106dd70fa5658f0994dea5e3d469964bd9f53e13471f8f931c3637e10774d8417ded763cac31c9cc7a6aed9850dd901e929e08bb97508479
   languageName: node
   linkType: hard
 
-"@optimystic/quereus-plugin-optimystic@npm:1.20.1":
-  version: 1.20.1
-  resolution: "@optimystic/quereus-plugin-optimystic@npm:1.20.1"
+"@optimystic/quereus-plugin-optimystic@npm:1.23.0":
+  version: 1.23.0
+  resolution: "@optimystic/quereus-plugin-optimystic@npm:1.23.0"
   dependencies:
     "@chainsafe/libp2p-yamux": "npm:^8.0.1"
     "@libp2p/bootstrap": "npm:^12.0.32"
@@ -1347,14 +1377,14 @@ __metadata:
     "@libp2p/noise": "npm:^1.0.1"
     "@libp2p/tcp": "npm:^11.0.28"
     "@noble/hashes": "npm:^2.0.1"
-    "@optimystic/db-core": "npm:^1.20.1"
-    "@optimystic/db-p2p": "npm:^1.20.1"
+    "@optimystic/db-core": "npm:^1.23.0"
+    "@optimystic/db-p2p": "npm:^1.23.0"
     debug: "npm:^4.4.3"
     libp2p: "npm:^3.3.11"
     uint8arrays: "npm:^6.1.1"
   peerDependencies:
-    "@quereus/quereus": ^4.21.1
-  checksum: 10c0/d8769498fa5424481fd81ee2871bae14f8c9ad9bce73b373b27d09fccffe6fc082967e0583a95b4cc27a74b172124193ccbabd48fc92655b457ac7ab1ae6bb36
+    "@quereus/quereus": ^4.22.0
+  checksum: 10c0/023bc24df57ec06cacd61602eeaee7c6429657765c498bc08451bc4421b681ee2f7468eaf41996a7600df634c1d3ee316a5680adeaad6f35c714d3c549178e1c
   languageName: node
   linkType: hard
 
@@ -1535,9 +1565,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@quereus/quereus@npm:4.21.1":
-  version: 4.21.1
-  resolution: "@quereus/quereus@npm:4.21.1"
+"@quereus/quereus@npm:4.24.0":
+  version: 4.24.0
+  resolution: "@quereus/quereus@npm:4.24.0"
   dependencies:
     debug: "npm:^4.4.3"
     fast-json-patch: "npm:^3.1.1"
@@ -1545,13 +1575,13 @@ __metadata:
     moat-maker: "npm:^2.2.0"
     temporal-polyfill: "npm:^0.3.0"
     uint8arrays: "npm:^6.1.1"
-  checksum: 10c0/8eafbfda1a79bcf620c7f458551d5ad991f501724750216db365e85f0e3f20cf32553382cb7e88bd27b4a0368f7b03ca860d93e062b88da92e6d119fbd11d525
+  checksum: 10c0/ad0d6bcc43cc92026dc873b7b0da0a9991eb4fd9ce8047576fc557b3464feb69a6796d3aa9a7562ff8dee464830cae216c96b8479ae3018193fe39c3ced7ed79
   languageName: node
   linkType: hard
 
-"@serfab/cadre-core@npm:1.19.1":
-  version: 1.19.1
-  resolution: "@serfab/cadre-core@npm:1.19.1"
+"@serfab/cadre-core@npm:1.20.0":
+  version: 1.20.0
+  resolution: "@serfab/cadre-core@npm:1.20.0"
   dependencies:
     "@libp2p/circuit-relay-v2": "npm:^4.2.13"
     "@libp2p/crypto": "npm:^5.1.23"
@@ -1563,35 +1593,35 @@ __metadata:
     "@multiformats/multiaddr": "npm:^13.0.3"
     "@noble/ciphers": "npm:^2.0.1"
     "@noble/hashes": "npm:^2.0.0"
-    "@optimystic/db-core": "npm:^1.20.1"
-    "@optimystic/db-p2p": "npm:^1.20.1"
-    "@optimystic/quereus-plugin-crypto": "npm:^1.20.1"
-    "@optimystic/quereus-plugin-optimystic": "npm:^1.20.1"
-    "@quereus/quereus": "npm:^4.21.1"
-    "@serfab/quereus-plugin-sereus": "npm:^1.19.1"
+    "@optimystic/db-core": "npm:^1.23.0"
+    "@optimystic/db-p2p": "npm:^1.23.0"
+    "@optimystic/quereus-plugin-crypto": "npm:^1.23.0"
+    "@optimystic/quereus-plugin-optimystic": "npm:^1.23.0"
+    "@quereus/quereus": "npm:^4.23.0"
+    "@serfab/quereus-plugin-sereus": "npm:^1.20.0"
     debug: "npm:^4.4.3"
     libp2p: "npm:^3.3.11"
     uint8arrays: "npm:^6.1.1"
-  checksum: 10c0/527e9c5249707fc75f813edfc1be2ae2d89932d06a4e4cfdeec07e4405f48c19121e424064c8afcde5e5deddf6d706f33da3971b33d9e769b7a3fe1641c4ada9
+  checksum: 10c0/0bddb16c2ae232527801f9eb76e267c31aa5bb157a2ecb9ef2ad2ba337c196500e473dd647880a27f0dec1fda3ad915ff07d72b3ba31df1e8a093a9d89c20773
   languageName: node
   linkType: hard
 
-"@serfab/quereus-plugin-sereus@npm:^1.19.1":
-  version: 1.19.1
-  resolution: "@serfab/quereus-plugin-sereus@npm:1.19.1"
+"@serfab/quereus-plugin-sereus@npm:^1.20.0":
+  version: 1.20.0
+  resolution: "@serfab/quereus-plugin-sereus@npm:1.20.0"
   dependencies:
     "@libp2p/circuit-relay-v2": "npm:^4.2.13"
     "@libp2p/interface": "npm:^3.3.0"
     "@libp2p/websockets": "npm:^10.1.21"
-    "@optimystic/db-core": "npm:^1.20.1"
-    "@optimystic/db-p2p": "npm:^1.20.1"
-    "@optimystic/db-p2p-storage-fs": "npm:^1.20.1"
-    "@optimystic/db-p2p-storage-web": "npm:^1.20.1"
-    "@optimystic/quereus-plugin-crypto": "npm:^1.20.1"
-    "@optimystic/quereus-plugin-optimystic": "npm:^1.20.1"
-    "@quereus/quereus": "npm:^4.21.1"
+    "@optimystic/db-core": "npm:^1.23.0"
+    "@optimystic/db-p2p": "npm:^1.23.0"
+    "@optimystic/db-p2p-storage-fs": "npm:^1.23.0"
+    "@optimystic/db-p2p-storage-web": "npm:^1.23.0"
+    "@optimystic/quereus-plugin-crypto": "npm:^1.23.0"
+    "@optimystic/quereus-plugin-optimystic": "npm:^1.23.0"
+    "@quereus/quereus": "npm:^4.23.0"
     debug: "npm:^4.4.3"
-  checksum: 10c0/c273f6e1b04e46d1b24f99824e44b8f598d14893664fb99c9bc56ac2eb7c59301d0987948f30db8083c384853630d81ce657173e41337dc1c965021e4e7acaa4
+  checksum: 10c0/51eaad98a5ab45a4a1fe95904ad7ffed86a92d6fc960d1b5c0d42e76889fafab783cb01d5ad899559d872a9a950fceb604ed38033677dfb53744cc7e98413bf0
   languageName: node
   linkType: hard
 
@@ -4050,7 +4080,7 @@ __metadata:
     "@libp2p/peer-id": "npm:6.0.15"
     "@libp2p/websockets": "npm:10.1.22"
     "@multiformats/multiaddr": "npm:13.0.3"
-    "@nativescript-community/sqlite": "patch:@nativescript-community/sqlite@npm%3A3.5.9#~/.yarn/patches/@nativescript-community-sqlite-npm-3.5.9-3269d0d97e.patch"
+    "@nativescript-community/sqlite": "npm:4.1.0"
     "@nativescript/android": "npm:~8.9.2"
     "@nativescript/core": "npm:~8.9.9"
     "@nativescript/types": "npm:~8.9.1"
@@ -4058,11 +4088,11 @@ __metadata:
     "@noble/ciphers": "npm:2.4.0"
     "@noble/curves": "npm:2.4.0"
     "@noble/hashes": "npm:2.2.0"
-    "@optimystic/db-core": "npm:1.20.1"
-    "@optimystic/db-p2p": "npm:1.20.1"
-    "@optimystic/db-p2p-storage-ns": "npm:1.20.1"
-    "@quereus/quereus": "npm:4.21.1"
-    "@serfab/cadre-core": "npm:1.19.1"
+    "@optimystic/db-core": "npm:1.23.0"
+    "@optimystic/db-p2p": "npm:1.23.0"
+    "@optimystic/db-p2p-storage-ns": "npm:1.23.0"
+    "@quereus/quereus": "npm:4.24.0"
+    "@serfab/cadre-core": "npm:1.20.0"
     "@types/readable-stream": "npm:^4"
     "@ungap/structured-clone": "npm:^1.3.0"
     "@valor/nativescript-websockets": "patch:@valor/nativescript-websockets@npm%3A2.0.3#~/.yarn/patches/@valor-nativescript-websockets-npm-2.0.3-1d4fb0b2f4.patch"
@@ -4070,7 +4100,7 @@ __metadata:
     esbuild-loader: "npm:^4.3.0"
     event-target-polyfill: "npm:^0.0.4"
     libp2p: "npm:3.3.11"
-    p2p-fret: "npm:1.2.1"
+    p2p-fret: "npm:1.3.0"
     readable-stream: "npm:^4.7.0"
     typescript: "npm:~5.9.3"
     util: "npm:^0.12.5"
@@ -4338,9 +4368,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"p2p-fret@npm:1.2.1":
-  version: 1.2.1
-  resolution: "p2p-fret@npm:1.2.1"
+"p2p-fret@npm:1.3.0":
+  version: 1.3.0
+  resolution: "p2p-fret@npm:1.3.0"
   dependencies:
     "@libp2p/logger": "npm:^6.2.13"
     "@libp2p/peer-record": "npm:^9.0.16"
@@ -4357,7 +4387,7 @@ __metadata:
     "@libp2p/interface": ^3.3.0
     "@libp2p/peer-id": ^6.0.15
     libp2p: ^3.3.11
-  checksum: 10c0/3768606382dcebb0ace1e5f86dff579b80a9a6816be9b4751252f8af5b38b758e54470a57ebf19913b4ae6920b96ed47b1cdb4d0afdef20ad4523abe595ee95a
+  checksum: 10c0/7026587c5827da1de6d96f0eeaf64281c83d3b31f82fd156410e23e49f211e71d43ab79f927edbe0ef43e89f18efbb144ece0c610eb8bff600b627640a254eac
   languageName: node
   linkType: hard
 

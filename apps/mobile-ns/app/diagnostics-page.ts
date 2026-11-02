@@ -7,6 +7,7 @@ import { Observable, type EventData, type Page } from '@nativescript/core';
 import { runCryptoCost, runFoundStrandCheck, runTwoPartyCheck } from '@chat/core/diagnostics';
 import { createExtraNode, foundStrandPlatform } from '../src/platform';
 import { runBridgeCost } from '../src/bridge-cost';
+import { runSqlite4Check } from '../src/sqlite4-check';
 
 const DEFAULT_RELAY = '/dns4/relay.sereus.org/tcp/4011/ws/p2p/12D3KooWMD7E7UH4rkCqiFE69n7FNqrKo1Xx3yDUU8JvwtaH39bD';
 
@@ -43,6 +44,10 @@ class DiagnosticsModel extends Observable {
 
   runBridge = () => this.run('bridge', async () => runBridgeCost(),
     (r: Record<string, Record<string, number>>) => `ByteString.of 32 B ${r['32 bytes']['okio.ByteString.of(ArrayBuffer)']} ms, nanoTime ${r.plain['System.nanoTime()']} ms`);
+
+  runSqlite4 = () => this.run('sqlite4', say => runSqlite4Check(say),
+    (r: { sqliteVersion: string; upsert: string; markersWritten: number[] }) =>
+      `SQLite ${r.sqliteVersion}, upsert ${r.upsert}, markers ${r.markersWritten.join('+')} written`);
 
   runFound = () => this.run('found', async say => runFoundStrandCheck(await foundStrandPlatform(), { timeoutMs: 120_000, onProgress: say }),
     (r: { converged: boolean; detail: string }) => r.detail);
