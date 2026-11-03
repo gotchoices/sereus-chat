@@ -88,4 +88,10 @@ export interface ChatHost {
   createExtraNode?: CreateExtraNode;
   /** Development build: step timings and narrated joins in the log. */
   dev?: boolean;
+  /**
+   * Run the party's PRIVATE strand (`protocol/private-sapp.ts`): found it on first start,
+   * attach it on later ones. MEASUREMENT STAGE, default off. Off, a private strand founded
+   * earlier is left unattached (never attached as a chat strand).
+   */
+  privateStrand?: boolean;
 }

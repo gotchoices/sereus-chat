@@ -276,7 +276,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     );
     // A prepared conversation is not one yet (`prepareStrand`): nobody has been invited.
     const hidden = new Set(Object.values(await readPrepared()));
-    const strands = new Map([...(host.node.node?.getStrands() ?? new Map<string, StrandInstance>())].filter(([id]) => !hidden.has(id)));
+    const strands = new Map([...runtime.chatStrands()].filter(([id]) => !hidden.has(id)));
     const prefsById = await strandPrefs.all();
     const cached = await summaries.read();
     const me = runtime.peerId ?? '';
@@ -715,7 +715,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       storageUsage: () => attempt(async (): Promise<StorageUsage> => {
         // Attachment byte sizes are what can be accounted for; block storage is not exposed.
         const byStrand: StorageUsage['byStrand'] = [];
-        for (const [id, strand] of host.node.node?.getStrands() ?? []) {
+        for (const [id, strand] of runtime.chatStrands()) {
           if (!strand.database) continue;
           try {
             const rows = await queryAttachments(strand);
@@ -738,7 +738,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       async *run(query, opts) {
         void runtime.ensureUp().catch(() => {});
         const q = query.trim().toLowerCase();
-        const entries = [...(host.node.node?.getStrands() ?? [])].filter(([id]) => !opts?.strandId || id === opts.strandId);
+        const entries = [...runtime.chatStrands()].filter(([id]) => !opts?.strandId || id === opts.strandId);
         const total = entries.length;
         let searched = 0;
         let skipped = 0;
@@ -966,6 +966,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     boot: () => runtime.boot(),
     async settle() {
       while (background.size) await Promise.allSettled([...background]);
+      await runtime.privateSettled();
     },
   };
 }

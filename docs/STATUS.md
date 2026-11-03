@@ -1466,6 +1466,49 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
   - [x] *(Done 2026-11-02: kept; see "Local workarounds to retire".)* **Re-measure the
         prepared-conversation workaround** on this stack (see "Local workarounds to retire").
   - [ ] **One RN run on the S21**: join and invitation times on a current phone.
+  - [ ] *(Step 1 done 2026-11-02: built and measured, off by default.)* **The party's private
+        strand**, the sereus#24 suggestion: one closed strand per party that nobody is invited
+        into, for data that only this person's own machines may see (invitation labels, private
+        nicknames, read position). `packages/core/src/protocol/private-sapp.ts` (its own sApp,
+        `org.sereus.chat.private`, a `Label` table) and `StrandRuntime.ensurePrivate`.
+        - **Recognized by its id**, derived from the party id
+          (`strand-` + sha256(sApp id + party id)[0..32]). The control `Strand` row does not say
+          which sApp a strand runs, so every machine of the party has to find it some other way.
+          The id is predictable to anyone who knows the party id: that exposes its network name,
+          not its content.
+        - **Never a conversation:** discovery hands it to `ensurePrivate`, never to the chat
+          attach. `chatStrands()` leaves it out of the list, storage usage, search and the
+          profile-name sync.
+        - **Needs `strandFilter: { mode: 'all' }`:** an sApp filter stops it once its sApp is
+          known.
+        - **The switches:** `ChatHost.privateStrand`, RN `PRIVATE_STRAND` (`data/config.ts`),
+          serchat `--private-strand`, test-host `privateStrand`. Core test
+          `sereus/private-strand.test.ts`.
+        - **S7, RN release, 11 chat strands, offline mode; 5 idle minutes after a 3-minute
+          settle:**
+
+          | | Off (4 runs) | On (3 runs) |
+          |---|---|---|
+          | Last chat strand open | 40.7–44.8 s | 40.7–42.3 s |
+          | Idle CPU | 102–141 s | 133–140 s |
+          | Received / sent | 274–463 / 221–410 KB | 470–487 / 381–442 KB |
+          | Memory (PSS) | 219–234 MB | 231–234 MB |
+
+          No difference above run-to-run noise. Expected: one strand in twelve is ~8%, and the
+          noise is wider than that.
+        - **Its own timings:** founded in 36 s on the first start, and up 34–35 s after node
+          start on every start after that (alongside the chat strands). A label write takes
+          38–85 ms, a count read 76–500 ms. It also comes up and takes writes with **no network
+          at all** (two runs while the S7 was off Wi-Fi).
+        - **Serchat:** founded in 1.2 s, re-attached in 0.2 s, write 51 ms, read 3 ms.
+        - **For a real use:** keep a local copy of what it holds. Otherwise labels appear ~45 s
+          into a cold start on the S7.
+        - **Next:**
+          - wire the first use: the invitation's "who is this for?" label (sereus#24);
+          - then private nicknames and read position;
+          - a second machine of the party, from the CLI, once cadre-core can add one there
+            (Phase 7b on the phone);
+          - Optimystic#54 applies to its founding too.
   - [x] *(Done 2026-11-02: `apps/cli/test/offline.test.ts`, 3/3; see "Offline-mode correctness suite and history scaling".)* **Offline-mode correctness suite**, as serchat scenarios (`SCENARIO_ARGS=--offline`
         and mixed), doubling as upstream repro material:
         - both sides write while apart, then reconnect: every message arrives exactly once,
@@ -1511,6 +1554,14 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         `node test/stack/index-ordering-plans.mjs`. Fixed when the Optimystic rows show
         INDEXSCAN or INDEXSEEK. Then check `history-scale.mjs` with an index on `(Timestamp, Id)`.
         Filed 2026-11-02.
+      - **gotchoices/Optimystic#54**: a founding cut off by the process exiting before `stop()`
+        finishes leaves a pending record on the strand's `optimystic/schema`. Nothing clears it,
+        so every later `foundStrand` fails with "exhausted 10 retries" and the strand is lost.
+        On a phone that's the app being closed while a conversation (or the private strand) is
+        being founded. Found when a serchat one-shot exited mid-founding. serchat now waits for
+        that work before stopping, which is ordinary shutdown hygiene, not a workaround. Repro:
+        `STOP_AT=app-schema EXIT_AFTER_MS=500 node test/stack/interrupted-founding.mjs`. Fixed
+        when that resumes. Filed 2026-11-02.
 
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run

@@ -38,3 +38,11 @@ export const USE_SEREUS = true;
  * Re-measure before turning it on.
  */
 export const STRAND_REACTIVITY = false;
+
+/**
+ * Run the party's private strand (`@chat/core` `protocol/private-sapp.ts`): one closed strand
+ * only this person's own machines are in. MEASUREMENT STAGE (2026-11-02): nothing uses it yet;
+ * on, it is founded or attached at start and one label is written and read, timed in the log
+ * (`[private-strand]`). Off, a private strand founded earlier is left unattached.
+ */
+export const PRIVATE_STRAND = false;

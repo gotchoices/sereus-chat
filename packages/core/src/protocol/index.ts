@@ -3,3 +3,4 @@
 export * from './sapp.js';
 export * from './invite-link.js';
 export * from './node-code-text.js';
+export * from './private-sapp.js';
