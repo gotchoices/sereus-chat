@@ -69,15 +69,15 @@ export default function StrandDetail() {
 
   const memberActions = (m: Member) => {
     if (m.isMe) return;
-    // Exactly two options.  There is deliberately NO "message" action: no
-    // private conversation with this person exists, and none can be started
-    // from here — they are a member of this strand, not an address.
+    // There is deliberately NO "message" action: no private conversation with
+    // this person exists, and none can be started from here — they are a member
+    // of this strand, not an address.  No "rename" either: private nicknames are
+    // sereus's to provide (roadmap); until then everyone sees the same name (story 31).
     Alert.alert(m.name, undefined, [
       {
         text: t('strand.startStrand'),
         onPress: () => navigation.navigate('InvitationGenerator'),
       },
-      { text: t('strand.rename') },
       ...(state?.canIManage
         ? [{
             text: t('strand.remove'),

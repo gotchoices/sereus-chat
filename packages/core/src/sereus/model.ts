@@ -515,7 +515,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
    * the invitation's key — a different key, and the wrong one yields a strand nobody can
    * read.
    */
-  async function acceptInvitation(token: string): Promise<{ strandId: string }> {
+  async function acceptInvitation(token: string): Promise<{ strandId: string; opening?: boolean }> {
     const node = await startedNode();
     const invitation = node.decodeInvitation(token);
     const profile = await records.profile();
@@ -570,6 +570,13 @@ export function createSereusModel(host: ChatHost): SereusModel {
       // In App.Member before the join is declared done.
       await runtime.registerSelf(instance);
       if (host.dev) console.info(`[accept] ✓ attached in ${Date.now() - t0}ms`);
+    } catch (err) {
+      // The join itself worked: the token is spent and the strand is remembered, so
+      // failing here would offer a retry that cannot succeed. Report it opening; the
+      // remembered join is attached again in the background and at the next start.
+      console.warn('[accept] joined, but not open here yet:', strandId, err instanceof Error ? err.message : err);
+      void runtime.attachJoined().catch(() => { /* retried at the next start */ });
+      return { strandId, opening: true };
     } finally {
       if (tick) clearInterval(tick);
     }

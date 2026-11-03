@@ -31,16 +31,19 @@ export default function InvitationAcceptance() {
   const [preview, setPreview] = useState<InvitationPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Which action the banner's Retry repeats: the one that failed. */
+  const [failed, setFailed] = useState<'inspect' | 'accept'>('inspect');
 
   const load = useCallback(async () => {
     try { setPreview(orThrow(await model.invitations.inspect(token))); setError(null); }
-    catch (e: any) { setError(errorText(e, 'That invitation could not be read')); }
+    catch (e: any) { setFailed('inspect'); setError(errorText(e, 'That invitation could not be read')); }
   }, [model, token, errorText]);
 
   useEffect(() => { void load(); }, [load, rev]);
 
   const accept = async () => {
     setBusy(true);
+    setError(null);
     try {
       const { strandId } = orThrow(await model.invitations.accept(token));
       navigation.replace('ChatInterface', { strandId });
@@ -49,6 +52,9 @@ export default function InvitationAcceptance() {
       // protocol, and the surfaced message ("Responder result failed validation")
       // names a verdict, not a site. The stack is what makes it actionable.
       if (__DEV__) console.warn('[accept] failed:', e?.name, e?.message, '\nstack:', e?.stack);
+      // `accept` fails only before the join is made, with the token still usable, so
+      // Retry repeats the accept (it used to re-read the invitation).
+      setFailed('accept');
       setError(errorText(e, 'That invitation could not be used'));
     } finally { setBusy(false); }
   };
@@ -68,7 +74,10 @@ export default function InvitationAcceptance() {
 
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.content}>
-      {error ? <Banner message={error} action={{ label: t('common.retry'), onPress: load }} /> : null}
+      {error ? (
+        <Banner message={error}
+          action={{ label: t('common.retry'), onPress: () => { void (failed === 'accept' ? accept() : load()); } }} />
+      ) : null}
 
       {dead ? (
         // Not the user's mistake, and no retry that could not work.

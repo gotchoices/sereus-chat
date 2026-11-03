@@ -120,8 +120,9 @@ No delete-strand call exists in `ops.md` and none may be added.
 
 ## Member row
 
-- Tap → sheet with *Start a strand with them* (→ InvitationGenerator, new strand) and *Rename for
-  myself* (local); a manager also gets *Remove from this strand*, confirmed.
+- Tap → sheet with *Start a strand with them* (→ InvitationGenerator, new strand); a manager also
+  gets *Remove from this strand*, confirmed. No *Rename for myself*: private nicknames are sereus
+  roadmap, and story 31 says that until then everyone sees the same display name.
 - **No message action.** The absence is deliberate and load-bearing; a developer adding one would
   break the model, so it is worth a comment in the code.
 

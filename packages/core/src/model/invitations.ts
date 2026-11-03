@@ -73,5 +73,11 @@ export interface InvitationsModel {
   cancel(id: string): Promise<Result<void>>;
   /** Read an invitation without redeeming it. */
   inspect(token: string): Promise<Result<InvitationPreview>>;
-  accept(token: string): Promise<Result<{ strandId: string }>>;
+  /**
+   * Join through an invitation. Fails only BEFORE the join is made (the token then stays
+   * usable, so trying again is right). Once formation has admitted this device, the
+   * strand is this user's: `opening` says it is still being opened here, which the
+   * conversation shows as connecting, rather than failing a join that worked.
+   */
+  accept(token: string): Promise<Result<{ strandId: string; opening?: boolean }>>;
 }

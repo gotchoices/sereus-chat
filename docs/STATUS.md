@@ -1433,7 +1433,7 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
           `canonicalJson`, `decodeJson`). Nothing to file.
 
 - [ ] **Next (proposed 2026-10-30).** In order:
-  - [ ] **Phone pass on the S7**, RN on 1.20, offline mode, about an hour.
+  - [x] *(Done 2026-11-02, apart from the refused-write banner, covered in Node, and the dev-only send-mode switch.)* **Phone pass on the S7**, RN on 1.20, offline mode, about an hour.
         - 2026-10-31, done: a waiting message keeps its mark and count across an app restart.
           This found a tracker bug, fixed in `delivery.ts`: a queue that cannot reach its
           cohort alternates `submitting` and `queued`, and the forward-only rule had pinned
@@ -1463,10 +1463,10 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         - reaction marks.
   - [ ] **Time sends on the S7** in both send modes, for sereus#51 (the kit's Hermes
         `TextDecoder`/`structuredClone`, released in 1.19). Compare with the 1.18 numbers.
-  - [ ] **Re-measure the prepared-conversation workaround** on this stack (see "Local
-        workarounds to retire").
+  - [x] *(Done 2026-11-02: kept; see "Local workarounds to retire".)* **Re-measure the
+        prepared-conversation workaround** on this stack (see "Local workarounds to retire").
   - [ ] **One RN run on the S21**: join and invitation times on a current phone.
-  - [ ] **Offline-mode correctness suite**, as serchat scenarios (`SCENARIO_ARGS=--offline`
+  - [x] *(Done 2026-11-02: `apps/cli/test/offline.test.ts`, 3/3; see "Offline-mode correctness suite and history scaling".)* **Offline-mode correctness suite**, as serchat scenarios (`SCENARIO_ARGS=--offline`
         and mixed), doubling as upstream repro material:
         - both sides write while apart, then reconnect: every message arrives exactly once,
           in the same order on both sides;
@@ -1476,7 +1476,7 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         - one party offline-mode, the other synchronous;
         - how often delivery reports end `unconfirmed`, and whether `delivered` is ever
           wrong.
-  - [ ] **Scaling, CLI to CLI:**
+  - [x] *(History size done 2026-11-02: Optimystic#52. Strand count and queue drain not measured; low priority.)* **Scaling, CLI to CLI:**
         - message history at 100 / 1,000 / 5,000. The list query sorts by `Timestamp`
           with no index (2.5–4.4 s on the S7), so an index may fix it on our side;
         - strand count from 5 to 30: start-up and idle traffic;
@@ -1491,7 +1491,7 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         Enabling it adds a registration renewal per watched table, and our four tables would
         need four. Revisit for groups larger than the storage group (about 4 machines), or a
         party whose phone stores through a drone.
-  - [ ] **Optimystic 1.21.0** (2026-10-31): standalone and wire-compatible. Its gains are
+  - [x] *(Adopted with sereus 1.20.0 / optimystic 1.23.0, 2026-11-02.)* **Optimystic 1.21.0** (2026-10-31): standalone and wire-compatible. Its gains are
         cohort-topic reactivity (off in chat, `STRAND_REACTIVITY = false`), batched
         renewals, the partial-index fix (chat has none), and a native crypto backend
         (`setCryptoBackend`) that no sereus package wires yet. **Adopt with the next sereus
@@ -1523,6 +1523,13 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         is fast enough without it (the S7 took 4.0–4.7 s, 0.4 s prepared), remove the
         prepare path, its slot and storage key, and the list filter, and simplify
         `createInvitation` back to founding inline.
+        **Re-measured 2026-11-02 (sereus 1.20.0, S7, RN release, offline mode): kept.**
+        Prepared, 0.45 / 0.49 / 0.92 s from the tap to the invitation; nothing prepared,
+        3.4 / 3.5 / 3.7 s. Unprepared, the time goes to `createOpenInvitation` (~2.4 s),
+        which runs while the background start of the new strand holds the JS thread.
+        Founding's own publish is ~0.57 s, so the background start is the cost now.
+        Measured with a throwaway build: invite steps logged in release, prepare only for
+        Private.
       - **NativeScript SQLite 4.x (Optimystic#38): device test done, app moved** (2026-11-01).
         `apps/mobile-ns` now runs `@nativescript-community/sqlite` 4.1.0 through a
         resolution, outside `db-p2p-storage-ns`'s `^3.5.0` peer range. The 3.5.9 yarn patch is

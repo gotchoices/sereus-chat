@@ -2122,7 +2122,7 @@ go. Not changed either way; it needs a decision, and a fair amount of code assum
 - [ ] **Mention picker** (12) — typing `@` does nothing; mentions must resolve to a member
 - [ ] **Open reaction set** (12) — fixed 👍 only
 - [ ] **Promote a member** (05) — StrandDetail can resign but not confer
-- [ ] **Rename a member locally** (31) — offered in the sheet, no handler
+- [x] *(Done, 2026-11-02: the option is removed, not wired. Story 31 says private nicknames are sereus roadmap and everyone sees the same name until then; it returns when sereus carries nicknames.)* **Rename a member locally** (31) — offered in the sheet, no handler
 - [ ] **Trim storage** (21, 41) and an editable **storage ceiling** (41)
 - [ ] *(Partly, 2026-10-31: archive and unarchive exist in StrandDetail; no swipe yet.)* **Swipe-to-archive** (30) and **archive/unarchive** actions
 - [ ] **Search filters** — kind, date, sender (32); scope works
@@ -2426,7 +2426,7 @@ Still open, and the reason a two-party conversation is not yet dependable:
       NOT NULL` → `Module for table 'Member' does not support ALTER COLUMN`. Dev worked around it by
       wiping; there is no migration path, which matters before anyone ships.
 - [ ] *(Partly, 2026-10-31: leave works; inspect is local only; resign and remove still `not-supported`.)* `inspectInvitation`, `leaveStrand`, `resignManager`, `removeMember`
-- [ ] The acceptance screen's `Retry` calls `load`, which re-inspects a spent invitation instead of
+- [x] *(Done, 2026-11-02.)* The acceptance screen's `Retry` calls `load`, which re-inspects a spent invitation instead of
       re-attaching.
 
 ### Switching over
@@ -3172,7 +3172,7 @@ outlives its cause.
       data layer does not keep. Tied to the strand-type fix above: the type has to be
       decided where the strand is created, not where an invitation is minted.
 
-- [ ] **Ours: `Retry` on the acceptance screen retries the wrong thing.**
+- [x] *(Done, 2026-11-02: Retry repeats the action that failed; a join that formed but isn't open yet goes to the conversation, which finishes opening in the background.)* **Ours: `Retry` on the acceptance screen retries the wrong thing.**
       `StrandAwaitingFirstSyncError` is explicitly retryable — the strand stays
       launched and wants another `addStrand`. Our banner's Retry calls `load`, which
       re-inspects the INVITATION, whose token is already spent. So the one action we

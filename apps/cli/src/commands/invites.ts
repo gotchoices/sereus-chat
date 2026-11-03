@@ -92,7 +92,8 @@ const join: Command = {
     if (!values.yes && !(await session.confirm(session.t('accept.accept') + '?'))) {
       throw new UsageError('join: not confirmed (use --yes when nobody is at the terminal)');
     }
-    const { strandId } = session.unwrap(await session.model.invitations.accept(token));
+    const { strandId, opening } = session.unwrap(await session.model.invitations.accept(token));
+    if (opening) session.out.note(`joined ${strandId}; it is not open here yet and is still being opened`);
     session.out.rows(['strandId'], [{ strandId }]);
   },
 };
