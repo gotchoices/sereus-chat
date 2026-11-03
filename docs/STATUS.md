@@ -1342,6 +1342,41 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         `test/stack/restart-after-replicated-write.mjs`: lost in 12 of 14 runs with the stores left open,
         kept in 6 of 6 with the stores closed. Not filed upstream.
 
+- [x] **Stack 2026-11-03: sereus 1.21.0, optimystic 1.25.0, quereus 4.25.0** (p2p-fret 1.3.0,
+      libp2p 3.3.11 unchanged). No chat code change, no data wipe: 1.20 data opens on 1.21,
+      on the S21 and the S7. Sereus requires optimystic 1.25 and quereus 4.25.
+      - **What changed upstream:**
+        - sereus#55 follow-up: `appSchemaState()` reads `'waiting-for-cohort'` until the
+          change is saved;
+        - a dropped relay dial no longer fails a node's start;
+        - strand tables are priced as `distributed`, so plans can change;
+        - `apply schema` refuses a primary-key change;
+        - the transaction engine id is now `quereus@4.25.0`, which matters only to machines
+          that re-check transactions (sereus doesn't configure that).
+      - **Checks:**
+        - core 71/71; CLI scenarios 3/3, offline 3/3 (converged in one 20 s window);
+        - the #55 repro, tag change in both modes: opens `waiting-for-cohort`, applied 15 s
+          after the member returns;
+        - **history scaling:** newest 100 messages in 7 / 35 / 150 ms at 100 / 1,000 / 5,000
+          messages (1.20: 21 / ~100 / ~450 ms), about 3× faster. Still a full scan
+          (Optimystic#52 is open).
+      - **S21, RN release, over its 1.20 data:**
+        - join and talk 2/2: Join → conversation 7.1 / 8.5 s, phone → serchat 3.3 / 3.2 s;
+        - invitation 3.3 / 3.2 s. Unchanged from 1.20.
+      - **S7, RN release, 13+ conversations:** join and talk passes on both builds; 1.21 is
+        no slower.
+
+        | | 1.21 | 1.20, same data |
+        |---|---|---|
+        | Join → conversation | 37.7 / 31.4 s | 37.5 / 46.5 s |
+        | Phone → serchat | 8.4 / 10.7 s | 13.1 / 16.5 s |
+
+        Its earlier 17–21 s came with fewer conversations on the phone.
+      - **Build gotcha:** after a stack change, `assembleRelease` reused the old JS bundle
+        (Gradle doesn't track `node_modules`). Delete `app/build/generated/assets` (and
+        `…/res/createBundleReleaseJsAndAssets`) before building, and check the bundle's md5
+        changed.
+
 - [x] **Stack 2026-11-02: sereus 1.20.0, optimystic 1.23.0, quereus 4.24.0, p2p-fret 1.3.0**
       (libp2p 3.3.11 unchanged). No chat code change, no data wipe: the new log, journal and
       sync fields are optional, and older data reads.
@@ -1465,9 +1500,18 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         `TextDecoder`/`structuredClone`, released in 1.19). Compare with the 1.18 numbers.
   - [x] *(Done 2026-11-02: kept; see "Local workarounds to retire".)* **Re-measure the
         prepared-conversation workaround** on this stack (see "Local workarounds to retire").
-  - [ ] **One RN run on the S21**: join and invitation times on a current phone.
-  - [ ] *(Step 1 done 2026-11-02: built and measured, off by default.)* **The party's private
-        strand**, the sereus#24 suggestion: one closed strand per party that nobody is invited
+  - [x] *(Done 2026-11-03: a spare S21+ `RFCR10M17LY`, Android 15, RN release, sereus 1.20.0, fresh data, public relay.)* **One RN run on the S21**: join and invitation times on a current phone.
+        - Setup (`rn-setup.yaml`) passes once a Samsung "Circle to Search" tip is dismissed.
+          The tip takes window focus and hides the app from Maestro.
+        - Join and talk with serchat (`phone-joins-serchat.mjs RFCR10M17LY`): 2/2 PASS.
+          Join → conversation 8.2 / 6.5 s (S7: 17.4 / 20.7 s); phone → serchat 2.4 / 2.6 s
+          (S7: 3.4 s); serchat's reply commits in ~0.6 s.
+        - Invitation (`rn-invite.yaml`, tap → invitation shown): 3.2 / 3.8 s after 10 s on the
+          screen, 3.2 / 3.4 s after 1 s. On the S21, preparing ahead matters little.
+  - [ ] *(PARKED 2026-11-03, pending upstream: Nate is reconsidering sereus-side support for
+        per-strand labels and per-user private notes (sereus#24). The code is in `96ff5c6`, off by
+        default. If sereus provides it, revert this and use that instead. Step 1 done 2026-11-02.)*
+        **The party's private strand**, the sereus#24 suggestion: one closed strand per party that nobody is invited
         into, for data that only this person's own machines may see (invitation labels, private
         nicknames, read position). `packages/core/src/protocol/private-sapp.ts` (its own sApp,
         `org.sereus.chat.private`, a `Label` table) and `StrandRuntime.ensurePrivate`.
