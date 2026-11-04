@@ -62,6 +62,28 @@ export function describeChatModelContract(name: string, setup: () => Promise<Con
       expect(members.filter(m => m.isMe)).toHaveLength(1);
     });
 
+    it('gives a member a private name of the user\'s own, offers it again, and removes it', async () => {
+      const members = value(await model.members.list(strandId));
+      const other = members.find(m => !m.isMe) ?? members[0];
+      let signalled = 0;
+      const unsubscribe = model.changes.strand(strandId, () => { signalled++; });
+      value(await model.members.setNickname(strandId, other.id, '  the roofer '));
+      const named = value(await model.members.list(strandId)).find(m => m.id === other.id)!;
+      expect(named.name).toBe('the roofer');
+      expect(named.nickname).toBe('the roofer');
+      expect(named.ownName).toBe(other.ownName);
+      expect(value(await model.members.nicknames())).toContain('the roofer');
+      expect(signalled).toBeGreaterThan(0);
+      value(await model.members.setNickname(strandId, other.id, 'Dad'));
+      expect(value(await model.members.list(strandId)).find(m => m.id === other.id)!.name).toBe('Dad');
+      value(await model.members.setNickname(strandId, other.id, null));
+      const cleared = value(await model.members.list(strandId)).find(m => m.id === other.id)!;
+      expect(cleared.name).toBe(other.ownName);
+      expect(cleared.nickname ?? null).toBeNull();
+      expect(value(await model.members.nicknames())).not.toContain('Dad');
+      unsubscribe();
+    });
+
     it('returns a sent message, newest last, and signals the strand', async () => {
       let signalled = 0;
       const unsubscribe = model.changes.strand(strandId, () => { signalled++; });

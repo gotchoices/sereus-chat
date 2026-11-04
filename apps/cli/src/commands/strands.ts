@@ -169,8 +169,35 @@ const members: Command = {
   async run(session, args) {
     const strand = await session.strand(need(members, args, 0, 'strand'));
     const list = session.unwrap(await session.model.members.list(strand.id));
-    session.out.rows(['row', 'memberId', 'name', 'manager', 'me'],
-      list.map((m, i) => ({ row: i + 1, memberId: m.id, name: m.name, manager: m.isManager, me: m.isMe })));
+    session.out.rows(['row', 'memberId', 'name', 'ownName', 'manager', 'me'],
+      list.map((m, i) => ({ row: i + 1, memberId: m.id, name: m.name, ownName: m.ownName, manager: m.isManager, me: m.isMe })));
+  },
+};
+
+const nickname: Command = {
+  name: 'nickname',
+  summary: 'Give a member a private name of your own (only your machines hold it); --clear removes it',
+  usage: '<strand> <member row|id> [name...] [--clear]',
+  options: { clear: { type: 'boolean' } },
+  async run(session, args, values) {
+    const strand = await session.strand(need(nickname, args, 0, 'strand'));
+    const which = need(nickname, args, 1, 'member');
+    const list = session.unwrap(await session.model.members.list(strand.id));
+    const member = /^\d+$/.test(which) ? list[Number(which) - 1] : list.find(m => m.id === which || m.id.startsWith(which));
+    if (!member) throw new UsageError(`nickname: no member "${which}" in strand ${strand.id} (see "members")`);
+    const name = args.slice(2).join(' ').trim();
+    if (!values.clear && !name) throw new UsageError('nickname: give a name, or --clear');
+    session.unwrap(await session.model.members.setNickname(strand.id, member.id, values.clear ? null : name));
+  },
+};
+
+const nicknames: Command = {
+  name: 'nicknames',
+  summary: 'List the private names you have given anyone',
+  usage: '',
+  async run(session) {
+    const names = session.unwrap(await session.model.members.nicknames());
+    session.out.rows(['row', 'name'], names.map((name, i) => ({ row: i + 1, name })));
   },
 };
 
@@ -311,4 +338,4 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-export const strandCommands = [strands, log, tail, send, edit, del, react, members, mute, archive, unarchive, leave, outbox, sql];
+export const strandCommands = [strands, log, tail, send, edit, del, react, members, nickname, nicknames, mute, archive, unarchive, leave, outbox, sql];

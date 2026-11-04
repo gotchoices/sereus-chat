@@ -7,7 +7,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ChatHost, DurableSlot, NodeHost, SlotName } from '@chat/core/sereus';
 import { createExtraNode } from './extra-node';
 import { STORAGE_KEYS } from '../data/persisted-names';
-import { PRIVATE_STRAND } from '../data/config';
 import { cadreService } from './CadreService';
 import { SecureStoreKeyStore } from '@serfab/cadre-rn/key-store';
 import { keychainSecureStore } from './keychain';
@@ -54,5 +53,4 @@ export const chatHost: ChatHost = {
   // keychain store, with the same (default) options, the kit's phone node files it under.
   ownerKeyStore: new SecureStoreKeyStore(keychainSecureStore),
   dev: __DEV__,
-  privateStrand: PRIVATE_STRAND,
 };

@@ -17,6 +17,8 @@ export type { EmptyStateProps } from './EmptyState';
 export { Banner } from './Banner';
 export type { BannerProps } from './Banner';
 export { ActionSheet } from './ActionSheet';
+export { NicknameSheet } from './NicknameSheet';
+export type { NicknameSheetProps } from './NicknameSheet';
 export type { ActionSheetProps, ActionSheetOption } from './ActionSheet';
 export { IconButton } from './IconButton';
 export type { IconButtonProps } from './IconButton';

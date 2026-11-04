@@ -120,9 +120,13 @@ No delete-strand call exists in `ops.md` and none may be added.
 
 ## Member row
 
-- Tap → sheet with *Start a strand with them* (→ InvitationGenerator, new strand); a manager also
-  gets *Remove from this strand*, confirmed. No *Rename for myself*: private nicknames are sereus
-  roadmap, and story 31 says that until then everyone sees the same display name.
+- Tap → an action sheet (not `Alert.alert`, which drops a fourth button on Android) with *Start a
+  strand with them* (→ InvitationGenerator, new strand) and *Give them a name of your own* (*Change
+  your name for them* once given); a manager also gets *Remove from this strand*, confirmed.
+- The name sheet (`NicknameSheet`): a field, the names already used (tap one to give it again), Save,
+  and *Use their own name* to remove it. It says the name is never sent to them or anyone else.
+- A named member's row reads the private name, with "calls themselves <their name>" under it.
+  Private names reach only the user's own machines (`@chat/core` `sereus/private-store.ts`).
 - **No message action.** The absence is deliberate and load-bearing; a developer adding one would
   break the model, so it is worth a comment in the code.
 

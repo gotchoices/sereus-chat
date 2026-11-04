@@ -13,7 +13,8 @@ import type { StrandState, Member, Attachment, Invitation } from '@chat/core';
 import { useModel } from '../data/bind';
 import { useErrorText, useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
-import { Avatar, ListRow, Banner, SectionHeader, StrandStatus } from '../components';
+import { ActionSheet, Avatar, ListRow, Banner, NicknameSheet, SectionHeader, StrandStatus } from '../components';
+import type { ActionSheetOption } from '../components';
 import { useTheme, typography, spacing } from '../theme';
 
 export default function StrandDetail() {
@@ -41,6 +42,10 @@ export default function StrandDetail() {
   /** Device-local, per story 33 — neither reaches the other members. */
   const [muted, setMuted] = useState<'none' | 'soft' | 'hard'>('none');
   const [archived, setArchived] = useState(false);
+  /** The member whose menu is open, and the member being given a name of the user's own. */
+  const [menuFor, setMenuFor] = useState<Member | null>(null);
+  const [namingFor, setNamingFor] = useState<Member | null>(null);
+  const [usedNames, setUsedNames] = useState<string[]>([]);
 
   const model = useModel();
   const load = useCallback(async () => {
@@ -67,26 +72,30 @@ export default function StrandDetail() {
 
   useEffect(() => { void load(); }, [load, rev]);
 
+  // There is deliberately NO "message" action: no private conversation with this
+  // person exists, and none can be started from here — they are a member of this
+  // strand, not an address. An ActionSheet, not `Alert.alert`: Android drops a
+  // dialog's fourth button, and a manager's menu has four.
   const memberActions = (m: Member) => {
     if (m.isMe) return;
-    // There is deliberately NO "message" action: no private conversation with
-    // this person exists, and none can be started from here — they are a member
-    // of this strand, not an address.  No "rename" either: private nicknames are
-    // sereus's to provide (roadmap); until then everyone sees the same name (story 31).
-    Alert.alert(m.name, undefined, [
-      {
-        text: t('strand.startStrand'),
-        onPress: () => navigation.navigate('InvitationGenerator'),
+    setMenuFor(m);
+  };
+  const memberOptions = (m: Member): ActionSheetOption[] => [
+    { label: t('strand.startStrand'), onPress: () => navigation.navigate('InvitationGenerator') },
+    {
+      label: t(m.nickname ? 'strand.nicknameChange' : 'strand.nickname'),
+      testID: 'member-nickname',
+      onPress: () => {
+        void model.members.nicknames().then(r => setUsedNames(r.ok ? r.value : []));
+        setNamingFor(m);
       },
-      ...(state?.canIManage
-        ? [{
-            text: t('strand.remove'),
-            style: 'destructive' as const,
-            onPress: () => confirmRemove(m),
-          }]
-        : []),
-      { text: t('common.cancel'), style: 'cancel' as const },
-    ]);
+    },
+    ...(state?.canIManage
+      ? [{ label: t('strand.remove'), destructive: true, onPress: () => confirmRemove(m) }]
+      : []),
+  ];
+  const saveNickname = (m: Member, name: string | null) => {
+    void model.members.setNickname(strandId, m.id, name).then(r => (r.ok ? load() : setError(errorText(r.error))));
   };
 
   const confirmRemove = (m: Member) => {
@@ -197,6 +206,7 @@ export default function StrandDetail() {
   };
 
   return (
+    <>
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.content}>
       {error ? <Banner message={error} action={{ label: t('common.retry'), onPress: load }} /> : null}
 
@@ -214,6 +224,7 @@ export default function StrandDetail() {
             testID={`member-${m.id}`}
             title={m.name}
             subtitle={[m.isMe ? t('strand.you') : null,
+                       m.nickname ? t('strand.nicknameOwn', undefined, { name: m.ownName }) : null,
                        m.isManager ? t('strand.manager') : null]
               .filter(Boolean).join(' · ') || undefined}
             leading={<Avatar name={m.name} uri={m.avatarUri} size="sm" />}
@@ -320,7 +331,36 @@ export default function StrandDetail() {
       <Text style={[typography.small, styles.note, { color: theme.textMuted }]}>
         {t('strand.noDelete')}
       </Text>
+
     </ScrollView>
+
+    {/* Outside the ScrollView: inside it, a tap with the keyboard up only dismisses the keyboard
+        (the ScrollView's default), so the name sheet's Save took two taps (seen on the S7). */}
+    <ActionSheet
+      visible={menuFor !== null}
+      title={menuFor?.name}
+      options={menuFor ? memberOptions(menuFor) : []}
+      cancelLabel={t('common.cancel')}
+      onDismiss={() => setMenuFor(null)}
+      testID="member-menu"
+    />
+    <NicknameSheet
+      visible={namingFor !== null}
+      current={namingFor?.nickname ?? null}
+      used={usedNames}
+      labels={{
+        title: t('strand.nicknameTitle', undefined, { name: namingFor?.ownName ?? '' }),
+        note: t('strand.nicknameNote', undefined, { name: namingFor?.ownName ?? '' }),
+        placeholder: t('strand.nicknamePlaceholder'),
+        used: t('strand.nicknameUsed'),
+        save: t('strand.nicknameSave'),
+        remove: t('strand.nicknameRemove'),
+        cancel: t('common.cancel'),
+      }}
+      onSave={name => { if (namingFor) saveNickname(namingFor, name); }}
+      onDismiss={() => setNamingFor(null)}
+    />
+    </>
   );
 }
 

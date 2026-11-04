@@ -3,15 +3,13 @@
  * sweep, strands offered by the control network, remembered joins, self-registration
  * as a Member, and leaving.
  */
-import { describeThrown, generateStrandMemberKey } from '@serfab/cadre-core';
+import { describeThrown } from '@serfab/cadre-core';
 import type { CadreNode, StrandInstance, StrandRow } from '@serfab/cadre-core';
 import type { ChatHost } from './host.js';
 import { JoinedStrands, LocalRecords, SummaryCache, type JoinedStrand } from './local-state.js';
 import { upsertMember } from './operations.js';
 import { joinChatStrand } from './sapp-strands.js';
 import { ChatFailure } from './errors.js';
-import { getPrivateSAppConfig, privateStrandId } from '../protocol/private-sapp.js';
-import { CHAT_SAPP_ID } from '../protocol/sapp.js';
 
 export class StrandRuntime {
   readonly joined: JoinedStrands;
@@ -43,8 +41,6 @@ export class StrandRuntime {
    */
   private readonly attaching = new Set<string>();
   private discoveryWired = false;
-  /** The private strand coming up (`ensurePrivate`), so founding and discovery never overlap. */
-  private privateUp: Promise<StrandInstance | null> | null = null;
 
   constructor(private readonly host: ChatHost) {
     this.joined = new JoinedStrands(host);
@@ -88,86 +84,7 @@ export class StrandRuntime {
   async boot(): Promise<void> {
     await this.watchDiscovered();
     await this.ensureUp();
-    // Beside the chat strands, never ahead of them: nothing on screen waits for it.
-    void this.ensurePrivate().catch(() => { /* logged there; tried again at the next start */ });
     await this.attachJoined();
-  }
-
-  // ── The private strand ─────────────────────────────────────────────────────────
-
-  /** This party's private strand id (`protocol/private-sapp.ts`), once the node is up. */
-  privateStrandId(): string | null {
-    const node = this.node;
-    return node ? privateStrandId(node.partyId) : null;
-  }
-
-  /** The running strands that are conversations: all but the private strand. */
-  chatStrands(): Map<string, StrandInstance> {
-    const node = this.node;
-    if (!node) return new Map();
-    const privateId = this.privateStrandId();
-    return new Map([...node.getStrands()].filter(([id]) => id !== privateId));
-  }
-
-  /**
-   * Bring the private strand up, when the host runs it: founded on the party's first start,
-   * attached on later ones. ONE PATH for both: `foundStrand` adopts a row already published
-   * (here, or by a sibling that won the race) and founds only iff the row names this
-   * machine, so discovery hands the strand here rather than attaching it itself.
-   * MEASUREMENT STAGE: timings are logged, and one label is written and read back.
-   */
-  ensurePrivate(): Promise<StrandInstance | null> {
-    if (!this.host.privateStrand) return Promise.resolve(null);
-    this.privateUp ??= (async () => {
-      await this.ensureUp();
-      const node = this.node;
-      if (!node) return null;
-      const id = privateStrandId(node.partyId);
-      const t0 = Date.now();
-      try {
-        const running = node.getStrands().get(id);
-        const { instance, founded } = running
-          ? { instance: running, founded: false }
-          : await node.foundStrand({
-            strandId: id,
-            type: 'c',
-            memberPrivateKey: await generateStrandMemberKey(),
-            sAppConfig: getPrivateSAppConfig(),
-          });
-        console.info(`[private-strand] up in ${Date.now() - t0} ms (${running ? 'already running' : founded ? 'founded' : 'attached'}): ${id}`);
-        await this.measurePrivate(instance);
-        return instance;
-      } catch (err) {
-        console.warn(`[private-strand] not up after ${Date.now() - t0} ms: ${describeThrown(err)}`);
-        throw err;
-      } finally {
-        this.privateUp = null;
-      }
-    })();
-    return this.privateUp;
-  }
-
-  /** Resolves once the private strand is no longer coming up (a short-lived host waits on it). */
-  async privateSettled(): Promise<void> {
-    await this.privateUp?.catch(() => {});
-  }
-
-  /** MEASUREMENT STAGE: one label written and read back, timed. */
-  private async measurePrivate(strand: StrandInstance): Promise<void> {
-    const db = strand.database?.getDatabase();
-    if (!db) return;
-    try {
-      let t = Date.now();
-      await db.exec('insert into App.Label (Key, Text, UpdatedAt) values (?, ?, ?)',
-        [`measure-${Date.now()}`, 'measured', new Date().toISOString()]);
-      const wrote = Date.now() - t;
-      t = Date.now();
-      let n = 0;
-      for await (const row of db.eval('select count(*) as N from App.Label')) n = Number(row.N);
-      console.info(`[private-strand] label write ${wrote} ms, count read ${Date.now() - t} ms (${n} labels)`);
-    } catch (err) {
-      console.warn('[private-strand] label write/read failed:', describeThrown(err));
-    }
   }
 
   // ── Self-registration ──────────────────────────────────────────────────────────
@@ -198,7 +115,7 @@ export class StrandRuntime {
     const peerId = this.peerId;
     if (!node || !peerId) return;
     const name = await this.displayName(peerId);
-    for (const strand of this.chatStrands().values()) {
+    for (const strand of node.getStrands().values()) {
       if (!strand.database) continue;
       try {
         await upsertMember(strand, peerId, name);
@@ -275,11 +192,6 @@ export class StrandRuntime {
     const node = this.node;
     if (!node) return;
     if (this.attaching.has(strandId) || node.getStrands().has(strandId)) return;
-    // Not a conversation: never attach it with the chat sApp. Run, it comes up its own way.
-    if (strandId === this.privateStrandId()) { void this.ensurePrivate().catch(() => {}); return; }
-    // Nor another sApp's strand, once its own header has said so (the filter is 'all' then).
-    const sAppId = node.getSAppId(strandId);
-    if (sAppId !== undefined && sAppId !== CHAT_SAPP_ID) return;
     this.attaching.add(strandId);
     try {
       // `deriveFounder`: a row from the CONTROL NETWORK carries a real founder key, and a

@@ -40,8 +40,6 @@ interface Globals {
   memoryBlocks: boolean;
   /** Strand offline mode (`--offline`). Off: every write waits for the network, as the stack measures. */
   offline: boolean;
-  /** Run the party's private strand (`--private-strand`). Measurement stage. */
-  privateStrand: boolean;
   /** One-shot exit: the most seconds to wait for offline queues to send (`--drain`). */
   drainSeconds: number;
   /** Inspector port for the development bridge (`--bridge`). */
@@ -66,14 +64,13 @@ const USAGE = `usage: serchat [options] [command [args] [\\; command ...]]
       --memory-blocks    measurement only: block storage in memory, nothing kept
       --offline          strand offline mode, as the phone app: writes return once saved here
       --drain <seconds>  one-shot, offline mode: how long to let queued writes go out first (default 60)
-      --private-strand   measurement: also run this party's private strand
   -v, --verbose          network-layer log lines on stderr
   -h, --help · --version
 
 With no command: an interactive prompt, or commands from stdin. "help" lists commands.`;
 
 export function parseGlobals(argv: string[]): Globals {
-  const g: Globals = { profile: 'default', memoryBlocks: false, offline: false, privateStrand: false, drainSeconds: 60, json: false, header: false, relays: [], listen: [], waitSeconds: 30, verbose: false, help: false, version: false, rest: [] };
+  const g: Globals = { profile: 'default', memoryBlocks: false, offline: false, drainSeconds: 60, json: false, header: false, relays: [], listen: [], waitSeconds: 30, verbose: false, help: false, version: false, rest: [] };
   let i = 0;
   const value = (flag: string) => {
     const v = argv[++i];
@@ -93,7 +90,6 @@ export function parseGlobals(argv: string[]): Globals {
     else if (a === '--bridge') g.bridgePort = Number(value(a));
     else if (a === '--memory-blocks') g.memoryBlocks = true;
     else if (a === '--offline') g.offline = true;
-    else if (a === '--private-strand') g.privateStrand = true;
     else if (a === '--drain') g.drainSeconds = Number(value(a));
     else if (a === '-v' || a === '--verbose') g.verbose = true;
     else if (a === '-h' || a === '--help') g.help = true;
@@ -140,7 +136,7 @@ async function main(argv: string[]): Promise<number> {
   await lockProfile(dirs);
   const out = createOutput({ json: g.json, header: g.header });
   const listen = await Promise.all(g.listen.map(a => (a === DEFAULT_LISTEN ? defaultListenAddress(dirs, config) : a)));
-  const host = createCliHost({ dirs, config, extraRelays: g.relays, listen, dev: g.verbose, memoryBlocks: g.memoryBlocks, offline: g.offline, privateStrand: g.privateStrand });
+  const host = createCliHost({ dirs, config, extraRelays: g.relays, listen, dev: g.verbose, memoryBlocks: g.memoryBlocks, offline: g.offline });
   if (g.memoryBlocks) out.note('blocks in memory (--memory-blocks): nothing this run stores will survive it');
   const { model, boot, settle: settleModel } = createSereusModel(host);
   settleBackground = settleModel;

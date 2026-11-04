@@ -49,7 +49,7 @@ import { DATA_FORMAT } from '../data/data-format';
 import { NODE_STORAGE_NAMES, STORAGE_KEYS } from '../data/persisted-names';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { OWNER_GENESIS_TIMEOUT_MS } from './async';
-import { PRIVATE_STRAND, STRAND_REACTIVITY } from '../data/config';
+import { STRAND_REACTIVITY } from '../data/config';
 
 type EventHandler<T> = (payload: T) => void;
 
@@ -79,9 +79,9 @@ const phone = createPhoneNode({
   // Wi-Fi). The pinned `/p2p/<peerId>` decides which machine answers, not the gater.
   configure: config => ({
     ...config,
-    // Only strands tagged with our sApp; the kit admits every strand the control network
-    // lists. Not with the private strand: an sApp filter stops it once its sApp is known.
-    strandFilter: PRIVATE_STRAND ? { mode: 'all' } : { mode: 'sAppId', sAppId: CHAT_SAPP_ID },
+    // Only strands tagged with our sApp. The kit admits every strand the control
+    // network lists.
+    strandFilter: { mode: 'sAppId', sAppId: CHAT_SAPP_ID },
     // Our sApp config carries `signature: ''` and its `id` is a name, not an author
     // key, so it cannot be verified and fail-closed checking would refuse every
     // strand. Turn back on once the schema is signed.

@@ -57,6 +57,8 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
   let sent: Record<string, Message[]> = {};
   let drafts: Record<string, string> = {};
   let readCursors: Record<string, string> = {};
+  /** The user's private names: `strandId\nmemberId` → name. */
+  const nicknames = new Map<string, string>();
   let prefs: Prefs = { ...data<Prefs>('Prefs', 'happy') };
   let profile: Profile = { ...data<Profile>('Profile', 'happy') };
 
@@ -78,6 +80,7 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       sent = {};
       drafts = {};
       readCursors = {};
+      nicknames.clear();
       prefs = { ...data<Prefs>('Prefs', 'happy') };
       profile = { ...data<Profile>('Profile', 'happy') };
       notifyAll();
@@ -150,12 +153,23 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
         if (isError()) return unavailable('Could not load members');
         if (isEmpty()) return ok(data<Member[]>('Members', 'empty'));
         // Membership is per strand, so a two-party strand really is two people.
-        const all = data<Array<Member & { strands?: string[] }>>('Members', 'happy');
+        const all = data<Array<Omit<Member, 'ownName'> & { ownName?: string; strands?: string[] }>>('Members', 'happy');
         const mine = all.filter(m => !m.strands || m.strands.includes(strandId));
-        return ok((mine.length ? mine : all.filter(m => m.isMe)).map(({ strands: _strands, ...m }) => m));
+        return ok((mine.length ? mine : all.filter(m => m.isMe)).map(({ strands: _strands, ...m }) => {
+          const nickname = nicknames.get(`${strandId}\n${m.id}`) ?? null;
+          const ownName = m.ownName ?? m.name;
+          return { ...m, ownName, nickname, name: nickname ?? ownName };
+        }));
       },
       async remove() { return ok(); },
       async resignManager() { return ok(); },
+      async setNickname(strandId, memberId, name) {
+        const k = `${strandId}\n${memberId}`;
+        if (name?.trim()) nicknames.set(k, name.trim()); else nicknames.delete(k);
+        notifyAll();
+        return ok();
+      },
+      async nicknames() { return ok([...new Set(nicknames.values())].sort()); },
     },
 
     invitations: {

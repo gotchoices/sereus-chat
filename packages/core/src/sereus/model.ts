@@ -26,6 +26,7 @@ import { classifyClaimFailure, nodeReach, readNodeCode } from './node-code.js';
 import { ownerFingerprint, type CadreMachine, type CadreStatus } from '../model/index.js';
 import { StrandRuntime } from './strands.js';
 import { DeliveryTracker, type WriteTarget } from './delivery.js';
+import { PrivateStore } from './private-store.js';
 
 /** How long the strand list waits on one strand's preview or member read before using its cached row. */
 const LIST_READ_MS = 3000;
@@ -97,6 +98,21 @@ function toAttachment(a: {
 export function createSereusModel(host: ChatHost): SereusModel {
   const runtime = new StrandRuntime(host);
   const records = new LocalRecords(host);
+  const privateStore = new PrivateStore(host.node);
+  /**
+   * The user's private names, or none if they cannot be read now: a name list always renders,
+   * falling back to what members call themselves.
+   */
+  async function nicknamesOrNone(): Promise<Map<string, string>> {
+    try { return await privateStore.nicknames(); } catch (err) {
+      console.warn('[sereus-model] private names unavailable:', err instanceof Error ? err.message : err);
+      return new Map();
+    }
+  }
+  /** Told when a nickname is set or removed here, so lists that show names re-read them. */
+  const nicknameListeners = new Set<() => void>();
+  const onNickname = (listener: () => void) => { nicknameListeners.add(listener); return () => { nicknameListeners.delete(listener); }; };
+  const nicknameIn = (all: Map<string, string>, strandId: string, memberId: string) => all.get(`${strandId}\n${memberId}`);
   const strandPrefs = new StrandPrefsStore(host);
   const summaries = new SummaryCache(host);
   const outgoing = new OutgoingInvitations(host);
@@ -276,10 +292,11 @@ export function createSereusModel(host: ChatHost): SereusModel {
     );
     // A prepared conversation is not one yet (`prepareStrand`): nobody has been invited.
     const hidden = new Set(Object.values(await readPrepared()));
-    const strands = new Map([...runtime.chatStrands()].filter(([id]) => !hidden.has(id)));
+    const strands = new Map([...(host.node.node?.getStrands() ?? new Map<string, StrandInstance>())].filter(([id]) => !hidden.has(id)));
     const prefsById = await strandPrefs.all();
     const cached = await summaries.read();
     const me = runtime.peerId ?? '';
+    const nicknames = await nicknamesOrNone();
 
     // EACH STRAND READ IN PARALLEL, AND BOUNDED. A read can wait on a slow member
     // (Optimystic#25); on the S7 one took 61 s. Past LIST_READ_MS a strand's row falls
@@ -315,7 +332,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       let title: string, isGroup: boolean, memberCount: number;
       if (members) {
         const others = members.filter(m => m.Id !== me);
-        const nameOf = (m: { Id: string; Name?: string }) => m.Name?.trim() || m.Id.slice(0, 8);
+        const nameOf = (m: { Id: string; Name?: string }) => nicknameIn(nicknames, id, m.Id) || m.Name?.trim() || m.Id.slice(0, 8);
         // Until the other side's Member row arrives there is nothing truthful to call it
         // (story 30, path F).
         title = others.length === 0 ? 'Waiting for someone to join'
@@ -648,9 +665,12 @@ export function createSereusModel(host: ChatHost): SereusModel {
       list: id => attempt(async (): Promise<Member[]> => {
         const strand = await strandFor(id);
         const me = runtime.peerId ?? '';
+        const nicknames = await nicknamesOrNone();
         return (await queryMembers(strand)).map(r => ({
           id: r.Id,
-          name: r.Name,
+          name: nicknameIn(nicknames, id, r.Id) || r.Name,
+          ownName: r.Name,
+          nickname: nicknameIn(nicknames, id, r.Id) ?? null,
           avatarUri: r.AvatarUri ?? null,
           isManager: r.Id === me, // not readable yet; see strands.state
           isMe: r.Id === me,
@@ -658,6 +678,11 @@ export function createSereusModel(host: ChatHost): SereusModel {
       }),
       remove: async () => fail('not-supported', 'Removing a member is not supported yet.'),
       resignManager: async () => fail('not-supported', 'Resigning as manager is not supported yet.'),
+      setNickname: (strandId, memberId, name) => attempt(async () => {
+        await privateStore.setNickname(strandId, memberId, name);
+        for (const listener of [...nicknameListeners]) listener();
+      }),
+      nicknames: () => attempt(() => privateStore.names()),
     },
 
     invitations: {
@@ -715,7 +740,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       storageUsage: () => attempt(async (): Promise<StorageUsage> => {
         // Attachment byte sizes are what can be accounted for; block storage is not exposed.
         const byStrand: StorageUsage['byStrand'] = [];
-        for (const [id, strand] of runtime.chatStrands()) {
+        for (const [id, strand] of host.node.node?.getStrands() ?? []) {
           if (!strand.database) continue;
           try {
             const rows = await queryAttachments(strand);
@@ -738,8 +763,9 @@ export function createSereusModel(host: ChatHost): SereusModel {
       async *run(query, opts) {
         void runtime.ensureUp().catch(() => {});
         const q = query.trim().toLowerCase();
-        const entries = [...runtime.chatStrands()].filter(([id]) => !opts?.strandId || id === opts.strandId);
+        const entries = [...(host.node.node?.getStrands() ?? [])].filter(([id]) => !opts?.strandId || id === opts.strandId);
         const total = entries.length;
+        const nicknames = await nicknamesOrNone();
         let searched = 0;
         let skipped = 0;
         for (const [id, strand] of entries) {
@@ -757,7 +783,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
                   strandId: id,
                   strandTitle: `Strand ${id.slice(0, 8)}`,
                   messageId: m.Id,
-                  senderName: m.MemberName ?? m.MemberId.slice(0, 12),
+                  senderName: nicknameIn(nicknames, id, m.MemberId) || m.MemberName || m.MemberId.slice(0, 12),
                   snippet: m.Content,
                   matchRange: [at, at + q.length] as [number, number],
                   timestamp: m.Timestamp,
@@ -902,7 +928,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       reachability: onChange => host.node.onReachabilityChange(onChange),
       strands(onChange) {
         const events = [...STRAND_UP_EVENTS, ...STRAND_DOWN_EVENTS, 'strand:discovered'] as const;
-        const unsubscribe = events.map(event => host.node.on(event, () => onChange()));
+        const unsubscribe = [...events.map(event => host.node.on(event, () => onChange())), onNickname(onChange)];
         return () => unsubscribe.forEach(u => u());
       },
       /**
@@ -952,6 +978,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
           ...STRAND_DOWN_EVENTS.map(event => host.node.on(event, ({ strandId: id }) => {
             if (id === strandId) detach();
           })),
+          onNickname(onChange),
         ];
         return () => {
           detach();
@@ -966,7 +993,6 @@ export function createSereusModel(host: ChatHost): SereusModel {
     boot: () => runtime.boot(),
     async settle() {
       while (background.size) await Promise.allSettled([...background]);
-      await runtime.privateSettled();
     },
   };
 }

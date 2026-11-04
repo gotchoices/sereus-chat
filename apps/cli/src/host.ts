@@ -71,8 +71,6 @@ export interface HostOptions {
    * stack's real cost (docs/async-writes.md §5). Journals live under `<profile>/journal/`.
    */
   offline?: boolean;
-  /** Run the party's private strand (`--private-strand`; `ChatHost.privateStrand`). Measurement stage. */
-  privateStrand?: boolean;
 }
 
 export interface CliHost extends ChatHost {
@@ -126,9 +124,7 @@ export function createCliHost(opts: HostOptions): CliHost {
         // peer id decide who answers (as the phone kit allows).
         connectionGater: { denyDialMultiaddr: () => false },
       },
-      // Chat strands only, unless this party runs its private strand too: an sApp filter
-      // stops a strand once its sApp is known not to match.
-      strandFilter: opts.privateStrand ? { mode: 'all' } : { mode: 'sAppId', sAppId: CHAT_SAPP_ID },
+      strandFilter: { mode: 'sAppId', sAppId: CHAT_SAPP_ID },
       hibernation: { enabled: false },
       requireSignedSchemas: false,
       trustedOwners: { store: await FileTrustedOwnerStore.open(dirs.node, partyId) },
@@ -222,7 +218,6 @@ export function createCliHost(opts: HostOptions): CliHost {
     slot: (name, key) => fileSlot(dirs, name, key),
     ownerKeyStore: keyStore,
     dev: opts.dev,
-    privateStrand: opts.privateStrand,
   };
 }
 

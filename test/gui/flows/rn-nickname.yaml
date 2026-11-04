@@ -1,0 +1,47 @@
+# Give a strand's other member a private name in the React Native app (story 30), check it shows,
+# then take it away. The strand must have another member whose own name is OWN_NAME.
+#   STRAND    the strand id
+#   OWN_NAME  what the other member calls themselves (e.g. Serchat)
+#   NICKNAME  the private name to give them
+appId: org.sereus.chat
+---
+# The conversation, then its details through the header (the deep link lands on the conversation).
+- openLink: chat://strand/${STRAND}
+- extendedWaitUntil:
+    visible: ".*strand details"
+    timeout: 120000
+- tapOn: ".*strand details"
+# Members are listed me first: the other member is the second row.
+- extendedWaitUntil:
+    visible:
+      id: "member-.*"
+      index: 1
+    timeout: 120000
+- tapOn:
+    id: "member-.*"
+    index: 1
+- tapOn:
+    id: "member-nickname"
+# Tap the field before typing: Maestro can type before the autofocus lands and lose a letter.
+- tapOn:
+    id: "nickname-input"
+- eraseText: 100
+- inputText: ${NICKNAME}
+- tapOn:
+    id: "nickname-save"
+- extendedWaitUntil:
+    visible: "^${NICKNAME}$"
+    timeout: 60000
+- assertVisible: "calls themselves ${OWN_NAME}"
+# Take it away again: back to their own name.
+- tapOn:
+    id: "member-.*"
+    index: 1
+- tapOn:
+    id: "member-nickname"
+- tapOn:
+    id: "nickname-remove"
+- extendedWaitUntil:
+    visible: "^${OWN_NAME}$"
+    timeout: 60000
+- back

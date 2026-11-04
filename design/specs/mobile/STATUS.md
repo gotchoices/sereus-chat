@@ -2084,7 +2084,7 @@ go. Not changed either way; it needs a decision, and a fair amount of code assum
 
 ### Next — needs upstream
 
-- [ ] **Per-strand peer nicknames.** `30-my-strands.md` says private names for partners are
+- [x] *(Done 2026-11-03 without upstream: chat keeps them itself in its own schema in the control database; sereus will provide no cross-strand identity, so the user names each member and reusing a name is their own filing.)* **Per-strand peer nicknames.** `30-my-strands.md` says private names for partners are
       "provided by sereus and surfaced here rather than invented", and anticipates sereus grouping
       a user's strands across sApps by that name. **Sereus has no such surface today** — cadre-core
       1.4.0 has no nickname, alias or label on `StrandRow` or `CadrePeerRow` (the "Label" in
@@ -2122,7 +2122,7 @@ go. Not changed either way; it needs a decision, and a fair amount of code assum
 - [ ] **Mention picker** (12) — typing `@` does nothing; mentions must resolve to a member
 - [ ] **Open reaction set** (12) — fixed 👍 only
 - [ ] **Promote a member** (05) — StrandDetail can resign but not confer
-- [x] *(Done, 2026-11-02: the option is removed, not wired. Story 31 says private nicknames are sereus roadmap and everyone sees the same name until then; it returns when sereus carries nicknames.)* **Rename a member locally** (31) — offered in the sheet, no handler
+- [x] *(Done, 2026-11-03: wired. Private names live in chat's own schema in the party's control database (`sereus/private-store.ts`), keyed by strand and member; the member sheet offers them, with the names already used to choose again. Removed 2026-11-02 while sereus was expected to provide nicknames; it won't.)* **Rename a member locally** (31) — offered in the sheet, no handler
 - [ ] **Trim storage** (21, 41) and an editable **storage ceiling** (41)
 - [ ] *(Partly, 2026-10-31: archive and unarchive exist in StrandDetail; no swipe yet.)* **Swipe-to-archive** (30) and **archive/unarchive** actions
 - [ ] **Search filters** — kind, date, sender (32); scope works

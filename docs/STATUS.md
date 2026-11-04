@@ -1508,9 +1508,55 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
           (S7: 3.4 s); serchat's reply commits in ~0.6 s.
         - Invitation (`rn-invite.yaml`, tap → invitation shown): 3.2 / 3.8 s after 10 s on the
           screen, 3.2 / 3.4 s after 1 s. On the S21, preparing ahead matters little.
-  - [ ] *(PARKED 2026-11-03, pending upstream: Nate is reconsidering sereus-side support for
-        per-strand labels and per-user private notes (sereus#24). The code is in `96ff5c6`, off by
-        default. If sereus provides it, revert this and use that instead. Step 1 done 2026-11-02.)*
+  - [x] **Private names (story 30), in chat's own schema in the control database** (2026-11-03).
+        - **Store:** `private_org_sereus_chat.Nickname(StrandId, MemberId, Name)`, in
+          `packages/core/src/sereus/private-store.ts`. Keyed by strand and member, so it doesn't
+          matter how members are identified. The user names each member; reusing a name is
+          their own filing (sereus will provide no cross-strand identity).
+        - **API:** `members.setNickname` / `members.nicknames`; `Member.ownName` and `.nickname`.
+          Names show in the member list, sender names, reply headers, strand-list titles and
+          search.
+        - **RN:** the member menu is now an `ActionSheet` (Android drops a fourth `Alert`
+          button). `NicknameSheet` offers the names already used.
+        - **Found on the S7 and fixed:**
+          - Save sat under the keyboard (an Android `Modal` isn't resized): the sheet is now
+            top-anchored, with the buttons under the field;
+          - the keyboard autocorrected "Roofer" to "Roger": autocorrect is off;
+          - Save took two taps because the sheets were inside the `ScrollView`: they're outside
+            it now.
+        - **CLI:** `nickname <strand> <member> <name>|--clear`, `nicknames`; `members` shows
+          `ownName`.
+        - **Tests:**
+          - core contract (mock, loopback, relay-only), plus a sereus check that the strand
+            title is the nickname on the namer's side only (74/74);
+          - CLI scenario `test/nickname.test.ts`: survives restarts, never reaches the strand's
+            data;
+          - Maestro `test/gui/flows/rn-nickname.yaml` (`STRAND`, `OWN_NAME`, `NICKNAME`): 2/2 on
+            the S7.
+        - **S7 timings:** schema apply 270 ms; a nickname write 184–312 ms, a clear 249 ms.
+        - **Not yet:**
+          - a change made on a sibling machine shows only at the next re-read (no watch on the
+            control tables);
+          - "rename everywhere this name is used" waits on the story-30 decision;
+          - strand notes ("what this is for, who I invited") would be a second table here.
+  - [x] *(SUPERSEDED 2026-11-03 by app tables in the control database, below. The private-strand
+        code from `96ff5c6` is reverted; `test/stack/interrupted-founding.mjs` stays.)*
+        **Alternative tested 2026-11-03 (Nate's suggestion): app tables in the control
+        database.** `node test/stack/control-db-app-tables.mjs`: all steps pass, twice.
+        - **Where:** a `declare schema ChatPrivate { table Note … }`, written through
+          `ControlDatabase.execWrite`, which serializes with cadre's own control writes.
+        - **Results:**
+          - apply 0.18 s, write ~55 ms, read 3 ms;
+          - survives a restart, and is back in the catalog before the app re-declares it;
+          - the app's re-apply at start is a no-op, and `CadreControl` stays intact;
+          - a second machine of the party reads A's row once it applies `ChatPrivate`
+            itself (without that, "Table not found"), and a row it writes reaches A.
+        - **Must not go inside `CadreControl`:** every start's `apply schema CadreControl` drops
+          tables it doesn't declare (Quereus `schema-differ`, orphan drops).
+        - **Not a supported API yet:** it relies on `getDatabase()` ("advanced queries"),
+          `execWrite` and the control database's default vtab. Ask upstream to bless it before
+          building on it.
+        - **If blessed, it beats the private strand:** no extra strand, open at start-up.
         **The party's private strand**, the sereus#24 suggestion: one closed strand per party that nobody is invited
         into, for data that only this person's own machines may see (invitation labels, private
         nicknames, read position). `packages/core/src/protocol/private-sapp.ts` (its own sApp,

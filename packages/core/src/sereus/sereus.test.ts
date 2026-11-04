@@ -75,6 +75,17 @@ for (const topology of ['loopback', 'relay-only'] as const) {
         expect(members.filter(m => m.isMe)).toHaveLength(1);
       }
     });
+
+    it("titles the strand by the user's private name for the other member, on that side only", async () => {
+      const { a, b, strandId } = parties;
+      const other = value(await b.model.members.list(strandId)).find(m => !m.isMe)!;
+      value(await b.model.members.setNickname(strandId, other.id, 'Dad'));
+      const titleOn = async (p: TestParty) => value(await p.model.strands.list()).find(s => s.id === strandId)?.title;
+      expect(await titleOn(b)).toBe('Dad');
+      expect(await titleOn(a)).not.toBe('Dad');
+      value(await b.model.members.setNickname(strandId, other.id, null));
+      expect(await titleOn(b)).toBe(other.ownName);
+    });
   });
 }
 

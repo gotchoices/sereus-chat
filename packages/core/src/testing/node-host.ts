@@ -68,8 +68,6 @@ export async function createTestParty(tag: string, opts: {
   /** Strand offline mode, as the RN app runs it: a write returns once saved here. Journal in a temp directory
    *  (Optimystic refuses a memory journal: it would not survive a restart). */
   offline?: boolean;
-  /** Run the party's private strand (`ChatHost.privateStrand`). */
-  privateStrand?: boolean;
 }): Promise<TestParty> {
   const scopes = new Map<string, MemoryRawStorage>();
   const journals = new Map<string, FileKVStore>();
@@ -83,7 +81,7 @@ export async function createTestParty(tag: string, opts: {
     privateKey: await generateKeyPair('Ed25519'),
     controlNetwork: { partyId, bootstrapNodes: [] },
     profile: 'transaction',
-    strandFilter: opts.privateStrand ? { mode: 'all' } : { mode: 'sAppId', sAppId: CHAT_SAPP_ID },
+    strandFilter: { mode: 'sAppId', sAppId: CHAT_SAPP_ID },
     storage: {
       provider: (scope: string) => {
         let storage = scopes.get(scope);
@@ -142,7 +140,7 @@ export async function createTestParty(tag: string, opts: {
       return () => control.removeEventListener('self:peer:update', callback);
     },
   };
-  const host: ChatHost = { node: nodeHost, slot: memorySlots(), ownerKeyStore, backgroundFounding: opts.backgroundFounding, privateStrand: opts.privateStrand };
+  const host: ChatHost = { node: nodeHost, slot: memorySlots(), ownerKeyStore, backgroundFounding: opts.backgroundFounding };
   const { model, boot, settle } = createSereusModel(host);
   return { tag, host, node, model, boot, settle, stop: async () => {
     await settle();
