@@ -84,8 +84,12 @@ upstream except where marked.
   can — so a strand in that state still shows that it can grow.
 - Resignation removes the *role*, not the person: a resigned manager stays an ordinary member. There
   is no recorded notion of anyone being gone, temporarily or permanently.
-- Private nicknames for strand partners are provided by sereus; the named partner need not know.
-  Grouping a user's strands across sApps by that private name is intended but not yet available.
+- Sereus provides no identity for a person across strands: each strand carries its own member
+  identities. Private names for strand partners are chat's own (2026-11-03): kept in chat's own
+  schema (`private_org_sereus_chat`) in the party's control database, which reaches only the
+  user's machines, keyed by strand and member. The user names each member; the same name in two
+  strands is the user's own filing. App tables in the control database are done with upstream's
+  agreement (sereus#24), in a schema of the app's own, never inside `CadreControl`.
 - So a permanently two-party strand is made, not declared: create, invite one non-manager, resign.
   Inviting three and then resigning fixes the strand at four. Resignation can happen before or
   after an invitation is taken up.
@@ -118,7 +122,9 @@ so the stories that depend on them **stand as written**:
 - **Zero managers as a deliberate, verifiable state.** The settled strand survives, and with it
   theory.md's central claim, [02](../../stories/mobile/02-start-a-strand.md) Alt A, [05](../../stories/mobile/05-add-someone-to-a-strand.md)
   Alt D, and the three-state indicator in §E.
-- **Private nicknames**, and eventually cross-sApp grouping by screen name (§C.10).
+- ~~**Private nicknames**, and eventually cross-sApp grouping by screen name (§C.10).~~ Withdrawn
+  2026-11-03: sereus will not identify people across strands; chat keeps private names itself
+  (above).
 
 The finding below is recorded as it was found, against today's source.
 
@@ -175,12 +181,10 @@ as though this were all operative and will mislead anyone who reads it alone.
   admit-and-promote in one transaction. Story [02](../../stories/mobile/02-start-a-strand.md) step 3 and
   [05](../../stories/mobile/05-add-someone-to-a-strand.md) need rewording — the *effect* is reachable, the mechanism is
   not what we wrote.
-- ~~Private nicknames are not in sereus~~ — **confirmed as roadmap**; not in the current source.
-  §C.10 stands.
-- **There is no home for private per-user state.** Read position ([10](../../stories/mobile/10-catching-up.md)) would be
-  public in an sApp table, and the control DB — which has exactly the right replication, party-wide
-  and private — has a **fixed, closed schema with no app-extension table**. Story 10's "the same
-  wherever I'm looking from" has nowhere to live.
+- Private nicknames are not in sereus, and will not be (2026-11-03); chat keeps them (above).
+- ~~**There is no home for private per-user state.**~~ Resolved 2026-11-03: an app may keep its own
+  tables in the control database, in a schema of its own (tested in
+  `test/stack/control-db-app-tables.mjs`). Read position ([10](../../stories/mobile/10-catching-up.md)) can live there; not built yet.
 
 ### Hazards a chat app inherits
 
@@ -203,8 +207,8 @@ as though this were all operative and will mislead anyone who reads it alone.
 
 ## Open questions for sereus
 
-Narrowed twice: first by the source review, then by confirming that leaderless strands and private
-nicknames are both coming. What remains are things nothing in the source or the roadmap yet covers.
+Narrowed twice: first by the source review, then by confirming that leaderless strands are coming
+(private nicknames, once expected from sereus, are chat's own since 2026-11-03). What remains are things nothing in the source or the roadmap yet covers.
 
 **Filed upstream 2026-09-01** — `gotchoices/sereus` issues
 [#3](https://github.com/gotchoices/sereus/issues/3) (MinOneManager local-count floor now that

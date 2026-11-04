@@ -103,6 +103,7 @@ people; the rest cannot. Tom joined last month. Susan is a member with a request
 - [ ] A member's entry shows only what that member has disclosed, and offers no way to reach them
       elsewhere
 - [ ] Tapping a member offers neither a private conversation nor a direct invitation; neither exists
+- [ ] Tapping a member lets the user give them a private name, which reaches nobody else
 - [ ] A member holding the ability may give it up, is told it is permanent, and it is
 - [ ] Giving it up changes what the strand is, visibly, for every member at once
 - [ ] Asking another member to give up the ability is an ordinary message and nothing more: no
@@ -131,5 +132,4 @@ one participant's private account of who did what would be unverifiable by anyon
 drift between members, which is worse than not having it. If some detail turns out to be genuinely
 needed, that is an issue to raise upstream rather than something to reconstruct here.
 
-Private nicknames for members are roadmap rather than present ([sereus.md](../../specs/domain/sereus.md)); until they exist,
-everyone sees the same display name.
+Tapping a member also lets him give them a private name of his own ([30](30-my-strands.md)).
