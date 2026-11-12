@@ -56,7 +56,8 @@ try {
   const setUp = spawnSync(process.execPath, serchat('--wait', '30', 'profile', 'set', 'name=Serchat', ';', 'relay', 'add', RELAY), { encoding: 'utf8' });
   if (setUp.status !== 0) throw new Error(`serchat setup failed:\n${setUp.stderr}`);
 
-  idle = spawn(process.execPath, serchat('--bridge', String(PORT), 'idle'), { stdio: ['ignore', 'ignore', 'pipe'] });
+  // -v: the stack's log on stderr, so a failed `arm` reports why ("[dev-bridge] arm: …").
+  idle = spawn(process.execPath, serchat('-v', '--bridge', String(PORT), 'idle'), { stdio: ['ignore', 'ignore', 'pipe'] });
   let notes = '';
   idle.stderr.setEncoding('utf8').on('data', d => { notes += d; });
   while (!notes.includes('idle;')) {
@@ -66,12 +67,15 @@ try {
   const other = await connectBridge(`node:${PORT}`);
 
   const { url, strandId } = await other.call('invite');
-  // The invitation's strand is founded in the background (sereus#49): it can take a few
-  // seconds to open, and `arm` reads it before watching. Wait for it rather than fail.
+  // `arm` reads the new strand before watching it. Twice on 1.22 that read failed right after
+  // `invite` (2026-11-07), not reproduced since: retry, and report each failure's reason.
   let armed = false;
   for (const deadline = Date.now() + 60_000; !armed && Date.now() < deadline;) {
     armed = await other.call('arm', strandId);
-    if (!armed) await new Promise(r => setTimeout(r, 1000));
+    if (!armed) {
+      log(`serchat could not read its new strand yet: ${(notes.match(/\[dev-bridge\] arm: [^\n]*/g) ?? ['(no reason logged)']).pop()}`);
+      await new Promise(r => setTimeout(r, 1000));
+    }
   }
   if (!armed) throw new Error('serchat could not watch its own strand within 60 s');
   const token = url.slice(url.indexOf('#') + 1);

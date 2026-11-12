@@ -121,7 +121,10 @@ export function createDevBridge(model: ChatModel, host?: NodeHost): DevBridge {
       if (armed.has(strandId)) return true;
       // Armed only once the strand can be read: the watch itself subscribes even before a
       // strand opens, so it says nothing about whether the strand is up.
-      try { await record(strandId); } catch { return false; }
+      try { await record(strandId); } catch (err) {
+        console.warn('[dev-bridge] arm: cannot read', strandId, '-', err instanceof Error ? err.message : err);
+        return false;
+      }
       const unwatch = model.changes.strand(strandId, () => { void record(strandId).catch(() => {}); });
       armed.set(strandId, unwatch);
       return true;

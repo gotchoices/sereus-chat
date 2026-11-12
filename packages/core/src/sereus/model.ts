@@ -159,6 +159,10 @@ export function createSereusModel(host: ChatHost): SereusModel {
   async function strandFor(strandId: string): Promise<StrandInstance> {
     if (!strandId) throw new ChatFailure('not-attached', 'No strand was named.');
     const node = requireNode();
+    const pending = opening.get(strandId);
+    if (pending && !node.getStrands().get(strandId)?.database) {
+      await withTimeout(pending, OPENING_WAIT_MS, 'opening the conversation').catch(() => { /* reported below */ });
+    }
     const strand = node.getStrands().get(strandId);
     if (!strand) throw new ChatFailure('not-attached', `Strand ${strandId} is not attached on this device.`);
     // Hibernating, or already being woken (`starting` with no database yet — the app's
@@ -192,6 +196,20 @@ export function createSereusModel(host: ChatHost): SereusModel {
   const preparedSlot = host.slot('preparedStrands');
   /** Work started in the background and not yet settled (`settle`). */
   const background = new Set<Promise<unknown>>();
+  /**
+   * Strands this device started bringing up in the background and that may not be running
+   * yet: a new conversation founded for an invitation, a join that formed but did not open.
+   * `strandFor` WAITS on these rather than failing: the app started the work, so asking for
+   * the strand meanwhile (opening the new conversation, sending into it) is not an error.
+   */
+  const opening = new Map<string, Promise<unknown>>();
+  function trackOpening(strandId: string, work: Promise<unknown>): void {
+    const settled = work.then(() => {}, () => {});
+    opening.set(strandId, settled);
+    void settled.finally(() => { if (opening.get(strandId) === settled) opening.delete(strandId); });
+  }
+  /** How long `strandFor` waits for a strand still being brought up before reporting it unopened. */
+  const OPENING_WAIT_MS = 120_000;
   const preparing = new Map<Visibility, Promise<string | null>>();
   async function readPrepared(): Promise<Partial<Record<Visibility, string>>> {
     try { return JSON.parse((await preparedSlot.load()) ?? '{}') as Partial<Record<Visibility, string>>; } catch { return {}; }
@@ -477,6 +495,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
         .catch(err => console.warn('[sereus-model] new conversation did not start yet:', err instanceof Error ? err.message : err));
       background.add(started);
       void started.finally(() => background.delete(started));
+      trackOpening(strandId, started);
     } else {
       strand ??= (await createChatStrand(node, newId(), kind)).instance;
       step('founded');
@@ -592,7 +611,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       // failing here would offer a retry that cannot succeed. Report it opening; the
       // remembered join is attached again in the background and at the next start.
       console.warn('[accept] joined, but not open here yet:', strandId, err instanceof Error ? err.message : err);
-      void runtime.attachJoined().catch(() => { /* retried at the next start */ });
+      trackOpening(strandId, runtime.attachJoined());
       return { strandId, opening: true };
     } finally {
       if (tick) clearInterval(tick);

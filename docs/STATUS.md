@@ -1342,6 +1342,24 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         `test/stack/restart-after-replicated-write.mjs`: lost in 12 of 14 runs with the stores left open,
         kept in 6 of 6 with the stores closed. Not filed upstream.
 
+- [x] **Follow-ups on 1.22** (2026-11-11).
+      - **Background work is waited for, not failed:** `strandFor` waits up to 120 s for a strand
+        this device is still bringing up (a conversation founded for an invitation, a join that
+        formed but didn't open). Test `sereus/opening.test.ts` (passes on the old code too: in
+        Node the strand registers at once).
+        - The two "serchat could not watch its own strand" GUI failures are **not explained**: 8
+          probe runs of the old code over the public relay all armed, in 0.75–6.5 s.
+        - The dev bridge's `arm` now logs why a read failed, and the GUI harness runs serchat
+          `-v` and prints it, so a recurrence names its cause.
+      - **sereus#57 verified fixed on 1.22:** 1 launch attempt in 90 s, typed
+        `AppSchemaRefusedError` from `foundStrand`. Closing it on GitHub is left to the user
+        (the tool was not permitted to post).
+      - **NativeScript on 1.22 (S7, debug, fresh data):**
+        - setup passes;
+        - join and talk 2/2 (reply commits 2.0 / 2.9 s);
+        - SQLite 4 check: 3.50.1, WAL, upsert ok, 2,003 concurrent reads, 0 errors;
+        - the sqlite resolution override is gone, and the plugin still resolves to 4.1.0.
+
 - [x] **Lenses: two app versions on one strand** (2026-11-11; Quereus `docs/lens.md`,
       `docs/migration.md`). The intended model: each app version has its own logical schema +
       lens, local and never synced, over a shared **basis** (in a strand, the `App` schema). The
