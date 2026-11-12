@@ -13,7 +13,7 @@ import type { StrandState, Member, Attachment, Invitation } from '@chat/core';
 import { useModel } from '../data/bind';
 import { useErrorText, useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
-import { ActionSheet, Avatar, ListRow, Banner, NicknameSheet, SectionHeader, StrandStatus } from '../components';
+import { ActionSheet, Avatar, ListRow, Banner, PrivateTextSheet, SectionHeader, StrandStatus } from '../components';
 import type { ActionSheetOption } from '../components';
 import { useTheme, typography, spacing } from '../theme';
 
@@ -46,6 +46,11 @@ export default function StrandDetail() {
   const [menuFor, setMenuFor] = useState<Member | null>(null);
   const [namingFor, setNamingFor] = useState<Member | null>(null);
   const [usedNames, setUsedNames] = useState<string[]>([]);
+  /** Other members carrying the name being changed (story 30: "change it for all of them"). */
+  const [othersNamed, setOthersNamed] = useState(0);
+  /** The user's private note on this strand, and whether its editor is open. */
+  const [note, setNote] = useState<string | null>(null);
+  const [editingNote, setEditingNote] = useState(false);
 
   const model = useModel();
   const load = useCallback(async () => {
@@ -68,6 +73,7 @@ export default function StrandDetail() {
     void model.strands.settings(strandId).then(r => {
       if (r.ok) { setMuted(r.value.muted); setArchived(r.value.archived); }
     });
+    void model.strands.note(strandId).then(r => { if (r.ok) setNote(r.value); });
   }, [model, strandId]);
 
   useEffect(() => { void load(); }, [load, rev]);
@@ -87,6 +93,8 @@ export default function StrandDetail() {
       testID: 'member-nickname',
       onPress: () => {
         void model.members.nicknames().then(r => setUsedNames(r.ok ? r.value : []));
+        setOthersNamed(0);
+        if (m.nickname) void model.members.nicknameUses(m.nickname).then(r => setOthersNamed(r.ok ? Math.max(0, r.value - 1) : 0));
         setNamingFor(m);
       },
     },
@@ -94,8 +102,11 @@ export default function StrandDetail() {
       ? [{ label: t('strand.remove'), destructive: true, onPress: () => confirmRemove(m) }]
       : []),
   ];
-  const saveNickname = (m: Member, name: string | null) => {
-    void model.members.setNickname(strandId, m.id, name).then(r => (r.ok ? load() : setError(errorText(r.error))));
+  const saveNickname = (m: Member, name: string | null, everywhere: boolean) => {
+    void model.members.setNickname(strandId, m.id, name, { everywhere }).then(r => (r.ok ? load() : setError(errorText(r.error))));
+  };
+  const saveNote = (text: string | null) => {
+    void model.strands.setNote(strandId, text).then(r => (r.ok ? setNote(text?.trim() || null) : setError(errorText(r.error))));
   };
 
   const confirmRemove = (m: Member) => {
@@ -215,6 +226,14 @@ export default function StrandDetail() {
         // Reading a strand's state and members can take tens of seconds on a slow
         // phone while it syncs; bare headings with nothing under them read as empty.
         : !error ? <ActivityIndicator style={styles.loading} color={theme.textMuted} /> : null}
+
+      <SectionHeader label={t('strand.noteSection')} />
+      <ListRow
+        testID="strand-note"
+        title={note ?? t('strand.noteAdd')}
+        subtitle={t('strand.noteOnlyYou')}
+        onPress={() => setEditingNote(true)}
+      />
 
       <SectionHeader label={t('strand.members')} />
       <View style={styles.rows}>
@@ -344,10 +363,13 @@ export default function StrandDetail() {
       onDismiss={() => setMenuFor(null)}
       testID="member-menu"
     />
-    <NicknameSheet
+    <PrivateTextSheet
       visible={namingFor !== null}
       current={namingFor?.nickname ?? null}
       used={usedNames}
+      everywhere={namingFor?.nickname && othersNamed > 0
+        ? { label: t('strand.nicknameEverywhere', undefined, { n: othersNamed, name: namingFor.nickname }) }
+        : undefined}
       labels={{
         title: t('strand.nicknameTitle', undefined, { name: namingFor?.ownName ?? '' }),
         note: t('strand.nicknameNote', undefined, { name: namingFor?.ownName ?? '' }),
@@ -357,8 +379,25 @@ export default function StrandDetail() {
         remove: t('strand.nicknameRemove'),
         cancel: t('common.cancel'),
       }}
-      onSave={name => { if (namingFor) saveNickname(namingFor, name); }}
+      onSave={(name, opts) => { if (namingFor) saveNickname(namingFor, name, opts.everywhere); }}
       onDismiss={() => setNamingFor(null)}
+    />
+    <PrivateTextSheet
+      visible={editingNote}
+      current={note}
+      multiline
+      maxLength={500}
+      labels={{
+        title: t('strand.noteTitle'),
+        note: t('strand.noteNote'),
+        placeholder: t('strand.notePlaceholder'),
+        used: '',
+        save: t('strand.nicknameSave'),
+        remove: t('strand.noteRemove'),
+        cancel: t('common.cancel'),
+      }}
+      onSave={text => saveNote(text)}
+      onDismiss={() => setEditingNote(false)}
     />
     </>
   );

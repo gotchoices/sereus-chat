@@ -10,7 +10,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Switch, StyleSheet, Share, Alert, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, ScrollView, Pressable, Switch, StyleSheet, Share, Alert, Linking, ActivityIndicator } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
@@ -51,6 +51,8 @@ export default function InvitationGenerator() {
   // them, a later change of strand kind no longer resets them.
   const [singleUse, setSingleUse] = useState(true);
   const [validity, setValidity] = useState<InvitationValidity>('week');
+  /** The user's own note on the new strand (who it is for): private, never in the invitation. */
+  const [note, setNote] = useState('');
   const [termsTouched, setTermsTouched] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
@@ -160,6 +162,8 @@ export default function InvitationGenerator() {
         grantsInviteRight,
         singleUse,
         validForMs: INVITATION_VALIDITY[validity],
+        // Only for a strand this invitation founds: an existing strand's note is edited on its page.
+        ...(!addingToExisting && !foundedStrandId && note.trim() ? { note: note.trim() } : {}),
       });
     setLoading(false);
     if (result.ok) {
@@ -179,7 +183,7 @@ export default function InvitationGenerator() {
     // possibly work).  It gets its own state, below.
     if (result.error.kind === 'unreachable') { setUnreachable(true); setError(null); }
     else setError(errorText(result.error));
-  }, [loading, model, strandId, addingToExisting, visibility, grantsInviteRight, singleUse, validity, refresh, errorText]);
+  }, [loading, model, strandId, addingToExisting, foundedStrandId, note, visibility, grantsInviteRight, singleUse, validity, refresh, errorText]);
 
   // What goes in the message. A bare 600-character link says nothing about what
   // it is to somebody who has never heard of the app.
@@ -199,7 +203,9 @@ export default function InvitationGenerator() {
     );
 
   return (
-    <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.content}>
+    // `handled`: with the note field focused, the first tap on "Make an invitation" must make
+    // it, not merely close the keyboard.
+    <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {error ? <Banner message={error} action={{ label: t('common.retry'), onPress: generate }} /> : null}
 
       {/* Story 02 Alt A — not reachable yet. Deliberately NOT the error Banner:
@@ -395,6 +401,23 @@ export default function InvitationGenerator() {
           variant="info"
           message={t('invite.anyoneAndRights')}
         />
+      ) : null}
+
+      {!addingToExisting && !foundedStrandId ? (
+        <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}>
+          <Text style={[typography.small, { color: theme.textPrimary }]}>{t('invite.noteLabel')}</Text>
+          <TextInput
+            testID="invite-note"
+            value={note}
+            onChangeText={setNote}
+            placeholder={t('invite.notePlaceholder')}
+            placeholderTextColor={theme.textMuted}
+            maxLength={500}
+            autoCorrect={false}
+            style={[typography.body, { color: theme.textPrimary }]}
+          />
+          <Text style={[typography.small, { color: theme.textMuted }]}>{t('invite.noteHint')}</Text>
+        </View>
       ) : null}
 
       <View style={styles.actions}>

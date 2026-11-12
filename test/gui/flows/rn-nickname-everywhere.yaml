@@ -1,0 +1,110 @@
+# Private names across two strands (story 30): give the other member of STRAND1 a name, give
+# the other member of STRAND2 the same name by choosing it again, then rename it in STRAND2
+# with "also change it for everyone else", see STRAND1 follow, and remove it everywhere.
+#   STRAND1, STRAND2  strand ids, each with one other member whose own name is OWN_NAME
+#   NAME1, NAME2      the private name, and what it is renamed to (no regex characters)
+appId: org.sereus.chat
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Strands"
+    timeout: 120000
+# STRAND1: a new name.
+- openLink: chat://strand/${STRAND1}
+- extendedWaitUntil:
+    visible: ".*strand details"
+    timeout: 120000
+- tapOn: ".*strand details"
+- extendedWaitUntil:
+    visible:
+      id: "member-.*"
+      index: 1
+    timeout: 120000
+- tapOn:
+    id: "member-.*"
+    index: 1
+- tapOn:
+    id: "member-nickname"
+- tapOn:
+    id: "private-text-input"
+- inputText: ${NAME1}
+- tapOn:
+    id: "private-text-save"
+- extendedWaitUntil:
+    visible: "^${NAME1}$"
+    timeout: 30000
+- back
+- back
+# STRAND2: the same name, chosen again.
+- openLink: chat://strand/${STRAND2}
+- extendedWaitUntil:
+    visible: ".*strand details"
+    timeout: 120000
+- tapOn: ".*strand details"
+- extendedWaitUntil:
+    visible:
+      id: "member-.*"
+      index: 1
+    timeout: 120000
+- tapOn:
+    id: "member-.*"
+    index: 1
+- tapOn:
+    id: "member-nickname"
+- tapOn:
+    id: "private-text-used-${NAME1}"
+- extendedWaitUntil:
+    visible: "^${NAME1}$"
+    timeout: 30000
+# Rename it here, everywhere.
+- tapOn:
+    id: "member-.*"
+    index: 1
+- tapOn:
+    id: "member-nickname"
+- tapOn:
+    id: "private-text-input"
+- eraseText: 40
+- inputText: ${NAME2}
+- tapOn:
+    id: "private-text-everywhere"
+- tapOn:
+    id: "private-text-save"
+- extendedWaitUntil:
+    visible: "^${NAME2}$"
+    timeout: 30000
+- back
+- back
+# STRAND1 followed.
+- openLink: chat://strand/${STRAND1}
+- extendedWaitUntil:
+    visible: ".*strand details"
+    timeout: 120000
+- tapOn: ".*strand details"
+- extendedWaitUntil:
+    visible: "^${NAME2}$"
+    timeout: 60000
+# Remove it everywhere: both members are back to their own name.
+- tapOn:
+    id: "member-.*"
+    index: 1
+- tapOn:
+    id: "member-nickname"
+- tapOn:
+    id: "private-text-everywhere"
+- tapOn:
+    id: "private-text-remove"
+- extendedWaitUntil:
+    visible: "^${OWN_NAME}$"
+    timeout: 30000
+- back
+- back
+- openLink: chat://strand/${STRAND2}
+- extendedWaitUntil:
+    visible: ".*strand details"
+    timeout: 120000
+- tapOn: ".*strand details"
+- extendedWaitUntil:
+    visible: "^${OWN_NAME}$"
+    timeout: 60000

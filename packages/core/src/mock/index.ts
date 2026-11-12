@@ -59,6 +59,8 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
   let readCursors: Record<string, string> = {};
   /** The user's private names: `strandId\nmemberId` → name. */
   const nicknames = new Map<string, string>();
+  /** The user's private strand notes: strandId → text. */
+  const notes = new Map<string, string>();
   let prefs: Prefs = { ...data<Prefs>('Prefs', 'happy') };
   let profile: Profile = { ...data<Profile>('Profile', 'happy') };
 
@@ -81,6 +83,7 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       drafts = {};
       readCursors = {};
       nicknames.clear();
+      notes.clear();
       prefs = { ...data<Prefs>('Prefs', 'happy') };
       profile = { ...data<Profile>('Profile', 'happy') };
       notifyAll();
@@ -91,7 +94,7 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
     strands: {
       async list() {
         if (isError()) return unavailable((data<{ error?: string }>('Strands', 'error')).error ?? 'Could not reach your strands right now');
-        return ok(data<StrandSummary[]>('Strands'));
+        return ok(data<StrandSummary[]>('Strands').map(s => ({ ...s, note: notes.get(s.id) ?? s.note ?? null })));
       },
       // The mock answers from memory: there is never a start-up to wait for, or to fail.
       async settling() { return false; },
@@ -100,6 +103,12 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       async settings(strandId) {
         const listed = data<StrandSummary[]>('Strands').find(s => s.id === strandId);
         return ok({ muted: listed?.muted ?? 'none', archived: listed?.archived ?? false });
+      },
+      async note(strandId) { return ok(notes.get(strandId) ?? null); },
+      async setNote(strandId, text) {
+        if (text?.trim()) notes.set(strandId, text.trim()); else notes.delete(strandId);
+        notifyAll();
+        return ok();
       },
       async setMuted() { return ok(); },
       async setArchived() { return ok(); },
@@ -163,13 +172,18 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       },
       async remove() { return ok(); },
       async resignManager() { return ok(); },
-      async setNickname(strandId, memberId, name) {
+      async setNickname(strandId, memberId, name, opts) {
         const k = `${strandId}\n${memberId}`;
-        if (name?.trim()) nicknames.set(k, name.trim()); else nicknames.delete(k);
+        const previous = nicknames.get(k);
+        const next = name?.trim() || null;
+        if (opts?.everywhere && previous !== undefined) {
+          for (const [key, v] of [...nicknames]) if (v === previous) { if (next) nicknames.set(key, next); else nicknames.delete(key); }
+        } else if (next) nicknames.set(k, next); else nicknames.delete(k);
         notifyAll();
         return ok();
       },
       async nicknames() { return ok([...new Set(nicknames.values())].sort()); },
+      async nicknameUses(name) { return ok([...nicknames.values()].filter(v => v === name).length); },
     },
 
     invitations: {
@@ -179,6 +193,7 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
         if (isUnreachable()) return fail('unreachable', 'There is nowhere for them to answer yet.');
         const token = `tok-${Math.abs(Date.now() % 1e8)}`;
         const singleUse = input.singleUse ?? true;
+        if (input.note?.trim() && input.strandId) notes.set(input.strandId, input.note.trim());
         const invitation: Invitation = {
           id: `i-${token}`,
           token,

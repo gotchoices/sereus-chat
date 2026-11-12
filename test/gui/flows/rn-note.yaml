@@ -1,0 +1,63 @@
+# The user's private note on a strand in the React Native app: written with a new strand's
+# invitation, shown on the waiting strand's row in the list, then changed on the strand's page.
+#   NOTE    the note written with the invitation (no regex characters)
+#   NOTE2   what it is changed to
+appId: org.sereus.chat
+---
+# Start from a fresh launch, so nothing a previous run left open (a sheet) is underneath.
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Strands"
+    timeout: 120000
+- openLink: chat://invite
+- extendedWaitUntil:
+    visible: "Make an invitation"
+    timeout: 60000
+# The field sits below the terms; scroll to it.
+- scrollUntilVisible:
+    element:
+      id: "invite-note"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "invite-note"
+- inputText: ${NOTE}
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Make an invitation"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Make an invitation"
+- extendedWaitUntil:
+    visible: "Make another invitation"
+    timeout: 120000
+- back
+# The waiting strand's row carries the note.
+- extendedWaitUntil:
+    visible: ".*${NOTE}.*"
+    timeout: 60000
+- tapOn: ".*${NOTE}.*"
+- extendedWaitUntil:
+    visible: ".*strand details"
+    timeout: 60000
+- tapOn: ".*strand details"
+- extendedWaitUntil:
+    visible: "^${NOTE}$"
+    timeout: 60000
+- tapOn:
+    id: "strand-note"
+- tapOn:
+    id: "private-text-input"
+- eraseText: 80
+- inputText: ${NOTE2}
+- tapOn:
+    id: "private-text-save"
+- extendedWaitUntil:
+    visible: "^${NOTE2}$"
+    timeout: 30000
+- back
+- back
+- extendedWaitUntil:
+    visible: ".*${NOTE2}.*"
+    timeout: 60000

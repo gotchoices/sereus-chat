@@ -37,6 +37,11 @@ export type CreateInvitationInput = {
   singleUse?: boolean;
   /** How long it stays good, ms. Default one week. */
   validForMs?: number;
+  /**
+   * A private note for the user, kept on the strand the invitation is into: who it is for, what
+   * the strand is for. Never part of the invitation; no one else sees it.
+   */
+  note?: string;
 };
 
 /** How long an invitation stays good: the choices the generator offers (story 02). */

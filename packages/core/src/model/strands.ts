@@ -28,6 +28,11 @@ export type StrandSummary = {
    * connecting.
    */
   opening?: boolean;
+  /**
+   * The user's private note on this strand: what it is for, who they invited. Only the user's
+   * own machines hold it; no other member ever sees it.
+   */
+  note?: string | null;
 };
 
 /**
@@ -77,6 +82,10 @@ export interface StrandsModel {
   retryBoot(): Promise<Result<void>>;
   /** Device-local (story 33). */
   settings(strandId: string): Promise<Result<StrandSettings>>;
+  /** The user's private note on a strand, or null. */
+  note(strandId: string): Promise<Result<string | null>>;
+  /** Set (or, with null or blank, remove) the user's private note on a strand. Reaches nobody else. */
+  setNote(strandId: string, text: string | null): Promise<Result<void>>;
   /** Device-local (story 33): never reaches the other members. */
   setMuted(strandId: string, muted: Muted): Promise<Result<void>>;
   /** Device-local (story 33): never reaches the other members. */

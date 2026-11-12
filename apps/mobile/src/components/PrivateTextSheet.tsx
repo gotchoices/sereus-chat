@@ -1,9 +1,11 @@
 /**
- * NicknameSheet — give a member a private name of the user's own (story 30), or take it away.
+ * PrivateTextSheet — edit a piece of text only the user's own machines hold: a member's
+ * private name (story 30) or the user's note on a strand. Saving with nothing removes it.
  *
- * The names already in use are offered to choose again: giving two members of different
- * strands the same name is how the user files them together, by their own judgment. The app
- * never decides two members are the same person.
+ * For names, the names already in use are offered to choose again: giving two members of
+ * different strands the same name is how the user files them together, by their own judgment
+ * (the app never decides two members are the same person). `everywhere` offers to change a
+ * name on every member that carries it.
  *
  * Near the TOP of the screen, with the buttons straight under the field, so the keyboard never
  * covers them: an Android `Modal` is not resized for the keyboard, and on the S7 a centred sheet,
@@ -11,31 +13,37 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Modal, View, Text, TextInput, Pressable, ScrollView, StyleSheet, Switch } from 'react-native';
 import { useTheme, typography, spacing, radius } from '../theme';
 
-export interface NicknameSheetProps {
+export interface PrivateTextSheetProps {
   visible: boolean;
-  /** The user's current name for them, if any. */
+  /** The current text, if any. */
   current: string | null;
-  /** Names the user has given anyone, to choose again. */
-  used: string[];
+  /** Earlier values to choose again (names the user has given anyone); none for a note. */
+  used?: string[];
+  /** A note is longer and wraps; a name is one line. */
+  multiline?: boolean;
+  maxLength?: number;
+  /** Offer "change it for all N" (a name other members also carry). */
+  everywhere?: { label: string };
   labels: {
     title: string; note: string; placeholder: string; used: string;
     save: string; remove: string; cancel: string;
   };
-  onSave: (name: string | null) => void;
+  onSave: (text: string | null, opts: { everywhere: boolean }) => void;
   onDismiss: () => void;
 }
 
-export function NicknameSheet({ visible, current, used, labels, onSave, onDismiss }: NicknameSheetProps) {
+export function PrivateTextSheet({ visible, current, used = [], multiline = false, maxLength = 100, everywhere, labels, onSave, onDismiss }: PrivateTextSheetProps) {
   const theme = useTheme();
   const [text, setText] = useState(current ?? '');
-  useEffect(() => { if (visible) setText(current ?? ''); }, [visible, current]);
+  const [all, setAll] = useState(false);
+  useEffect(() => { if (visible) { setText(current ?? ''); setAll(false); } }, [visible, current]);
   const trimmed = text.trim();
   const choices = used.filter(n => n !== trimmed);
 
-  const finish = (name: string | null) => { onDismiss(); onSave(name); };
+  const finish = (value: string | null) => { onDismiss(); onSave(value, { everywhere: all && !!everywhere }); };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
@@ -44,7 +52,7 @@ export function NicknameSheet({ visible, current, used, labels, onSave, onDismis
           <Text style={[typography.body, styles.title, { color: theme.textPrimary }]}>{labels.title}</Text>
           <Text style={[typography.small, { color: theme.textMuted }]}>{labels.note}</Text>
           <TextInput
-            testID="nickname-input"
+            testID="private-text-input"
             value={text}
             onChangeText={setText}
             placeholder={labels.placeholder}
@@ -54,22 +62,29 @@ export function NicknameSheet({ visible, current, used, labels, onSave, onDismis
             autoCorrect={false}
             spellCheck={false}
             autoCapitalize="words"
-            maxLength={100}
-            returnKeyType="done"
-            onSubmitEditing={() => { if (trimmed) finish(trimmed); }}
-            style={[typography.body, styles.input, { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}
+            maxLength={maxLength}
+            multiline={multiline}
+            returnKeyType={multiline ? 'default' : 'done'}
+            onSubmitEditing={() => { if (!multiline && trimmed) finish(trimmed); }}
+            style={[typography.body, styles.input, multiline && styles.multiline, { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}
           />
+          {everywhere ? (
+            <View style={styles.everywhere}>
+              <Text style={[typography.small, styles.everywhereText, { color: theme.textPrimary }]}>{everywhere.label}</Text>
+              <Switch testID="private-text-everywhere" value={all} onValueChange={setAll} />
+            </View>
+          ) : null}
           <View style={styles.buttons}>
             {current ? (
-              <Pressable testID="nickname-remove" accessibilityRole="button" onPress={() => finish(null)} style={styles.button}>
+              <Pressable testID="private-text-remove" accessibilityRole="button" onPress={() => finish(null)} style={styles.button}>
                 <Text style={[typography.body, { color: theme.textMuted }]}>{labels.remove}</Text>
               </Pressable>
             ) : <View />}
             <View style={styles.right}>
-              <Pressable testID="nickname-cancel" accessibilityRole="button" onPress={onDismiss} style={styles.button}>
+              <Pressable testID="private-text-cancel" accessibilityRole="button" onPress={onDismiss} style={styles.button}>
                 <Text style={[typography.body, { color: theme.textPrimary }]}>{labels.cancel}</Text>
               </Pressable>
-              <Pressable testID="nickname-save" accessibilityRole="button" disabled={!trimmed || trimmed === current}
+              <Pressable testID="private-text-save" accessibilityRole="button" disabled={!trimmed || trimmed === current}
                 onPress={() => finish(trimmed)} style={styles.button}>
                 <Text style={[typography.body, styles.save, { color: !trimmed || trimmed === current ? theme.textMuted : theme.accent }]}>
                   {labels.save}
@@ -82,7 +97,7 @@ export function NicknameSheet({ visible, current, used, labels, onSave, onDismis
               <Text style={[typography.small, { color: theme.textMuted }]}>{labels.used}</Text>
               <ScrollView horizontal keyboardShouldPersistTaps="handled" contentContainerStyle={styles.chips}>
                 {choices.map(n => (
-                  <Pressable key={n} testID={`nickname-used-${n}`} accessibilityRole="button" accessibilityLabel={n}
+                  <Pressable key={n} testID={`private-text-used-${n}`} accessibilityRole="button" accessibilityLabel={n}
                     onPress={() => finish(n)}
                     style={({ pressed }) => [styles.chip, { borderColor: theme.border }, pressed && { backgroundColor: theme.surfaceAlt }]}>
                     <Text style={[typography.small, { color: theme.textPrimary }]}>{n}</Text>
@@ -108,4 +123,7 @@ const styles = StyleSheet.create({
   right: { flexDirection: 'row', gap: spacing[2] },
   button: { paddingVertical: spacing[1], paddingHorizontal: spacing[1] },
   save: { fontWeight: '600' },
+  multiline: { minHeight: 88, textAlignVertical: 'top' },
+  everywhere: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  everywhereText: { flex: 1 },
 });

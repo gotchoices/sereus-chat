@@ -84,6 +84,26 @@ export function describeChatModelContract(name: string, setup: () => Promise<Con
       unsubscribe();
     });
 
+    it('renames a private name everywhere it was given, or only for one member', async () => {
+      const members = value(await model.members.list(strandId));
+      const other = members.find(m => !m.isMe) ?? members[0];
+      value(await model.members.setNickname(strandId, other.id, 'Roofer'));
+      expect(value(await model.members.nicknameUses('Roofer'))).toBeGreaterThanOrEqual(1);
+      value(await model.members.setNickname(strandId, other.id, 'Roofer Joe', { everywhere: true }));
+      expect(value(await model.members.nicknameUses('Roofer'))).toBe(0);
+      expect(value(await model.members.list(strandId)).find(m => m.id === other.id)!.name).toBe('Roofer Joe');
+      value(await model.members.setNickname(strandId, other.id, null, { everywhere: true }));
+      expect(value(await model.members.nicknameUses('Roofer Joe'))).toBe(0);
+    });
+
+    it('keeps a private note on a strand, shows it in the list, and removes it', async () => {
+      value(await model.strands.setNote(strandId, '  for Bob, about the lease '));
+      expect(value(await model.strands.note(strandId))).toBe('for Bob, about the lease');
+      expect(value(await model.strands.list()).find(s => s.id === strandId)?.note).toBe('for Bob, about the lease');
+      value(await model.strands.setNote(strandId, null));
+      expect(value(await model.strands.note(strandId))).toBeNull();
+    });
+
     it('returns a sent message, newest last, and signals the strand', async () => {
       let signalled = 0;
       const unsubscribe = model.changes.strand(strandId, () => { signalled++; });

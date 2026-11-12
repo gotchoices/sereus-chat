@@ -55,6 +55,9 @@ for (const offline of [false, true]) {
           const m = value(await a.model.messages.list(strandId)).find(x => x.id === sent.id);
           return m?.reactions.find(r => r.symbol === '👍')?.delivery?.state === 'delivered';
         }, 'the reaction delivered');
+        // The outbox counts from the queue's own events, which can trail the delivery marks by a
+        // moment (seen under a parallel full run): wait for it to empty rather than assert at once.
+        await until(async () => value(await a.model.messages.outbox(strandId)).waiting === 0, 'the outbox empty');
         expect(value(await a.model.messages.outbox(strandId))).toMatchObject({ waiting: 0, failed: [] });
       } finally {
         await Promise.allSettled([a.stop(), b.stop()]);

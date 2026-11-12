@@ -270,7 +270,8 @@ export default function StrandList() {
               // Known from the last list, not open yet: say so instead of guessing.
               ? (s.lastMessage ? `${connecting} · ${preview}` : connecting)
               : awaiting
-              ? (s.lastMessage || s.draftPreview ? `${preview} · ${invitesOutText(out)}` : invitesOutText(out))
+              // The user's own note (who it is for) says which waiting strand this is.
+              ? [s.note, s.lastMessage || s.draftPreview ? preview : null, invitesOutText(out)].filter(Boolean).join(' · ')
               : out > 0 ? `${preview} · ${invitesOutText(out)}` : preview;
             return (
               <ListRow

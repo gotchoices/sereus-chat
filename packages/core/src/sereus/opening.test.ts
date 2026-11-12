@@ -18,7 +18,7 @@ describe('a conversation still starting in the background', () => {
   it('can be read and written straight after its invitation is made', async () => {
     const created = await party.model.invitations.create({ grantsInviteRight: false, visibility: 'private' });
     if (!created.ok) throw new Error(created.error.message);
-    const strandId = created.value.strandId;
+    const strandId = created.value.strandId!;
     // Immediately, with no wait for the background start.
     const listed = await party.model.messages.list(strandId);
     expect(listed.ok ? 'ok' : `${listed.error.kind}: ${listed.error.message}`).toBe('ok');

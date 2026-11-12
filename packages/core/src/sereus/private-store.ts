@@ -13,6 +13,12 @@
  * NICKNAMES (story 30): the user's own name for a member of a strand, keyed by strand and member,
  * so it holds however members are identified. The app never decides that two members are the
  * same person: giving the same name in two strands is the user's own filing.
+ *
+ * STRAND NOTES: the user's own note on a strand (what it is for, who they invited), so a strand
+ * nobody has joined yet is not a row of identical "Waiting for someone to join".
+ *
+ * The schema only ever GROWS (Quereus migration.md: a shared basis is additive), so a machine
+ * on an older build keeps working beside a newer one.
  */
 import type { CadreNode } from '@serfab/cadre-core';
 import type { NodeHost } from './host.js';
@@ -25,7 +31,12 @@ const SCHEMA_DDL = `declare schema ${PRIVATE_SCHEMA} {
     MemberId text not null,
     Name text not null check (length(Name) between 1 and 100),
     primary key (StrandId, MemberId)
-  )
+  );
+  table StrandNote (
+    StrandId text primary key,
+    Text text not null check (length(Text) between 1 and 500),
+    UpdatedAt text not null
+  );
 };
 apply schema ${PRIVATE_SCHEMA};`;
 
@@ -76,12 +87,31 @@ export class PrivateStore {
     return [...new Set((await this.nicknames()).values())].sort((a, b) => a.localeCompare(b));
   }
 
-  /** Give a member a name, or (`null`) remove it. */
-  async setNickname(strandId: string, memberId: string, name: string | null): Promise<void> {
+  /** How many members carry this name. */
+  async nicknameUses(name: string): Promise<number> {
+    let n = 0;
+    for (const v of (await this.nicknames()).values()) if (v === name) n++;
+    return n;
+  }
+
+  /**
+   * Give a member a name, or (`null`) remove it. `everywhere`: the member's CURRENT name is
+   * changed (or removed) on every member that carries it, not only this one (story 30).
+   */
+  async setNickname(strandId: string, memberId: string, name: string | null, everywhere = false): Promise<void> {
     const node = await this.ready();
     const control = node.getControlDatabase()!;
     const trimmed = name?.trim() ?? '';
     const t0 = Date.now();
+    const previous = everywhere ? (await this.nicknames()).get(key(strandId, memberId)) : undefined;
+    if (previous !== undefined) {
+      await control.execWrite(trimmed
+        ? `update ${PRIVATE_SCHEMA}.Nickname set Name = ? where Name = ?`
+        : `delete from ${PRIVATE_SCHEMA}.Nickname where Name = ?`,
+        trimmed ? [trimmed, previous] : [previous], 'rename nickname everywhere');
+      console.info(`[private-store] nickname "${previous}" ${trimmed ? 'renamed' : 'cleared'} everywhere in ${Date.now() - t0} ms`);
+      return;
+    }
     if (trimmed) {
       await control.execWrite(`insert or replace into ${PRIVATE_SCHEMA}.Nickname (StrandId, MemberId, Name) values (?, ?, ?)`,
         [strandId, memberId, trimmed], 'set nickname');
@@ -91,5 +121,28 @@ export class PrivateStore {
     }
     // A control-database write, which every machine of the party takes part in: timed for the log.
     console.info(`[private-store] nickname ${trimmed ? 'set' : 'cleared'} in ${Date.now() - t0} ms`);
+  }
+
+  /** Every strand note: strandId → text. */
+  async notes(): Promise<Map<string, string>> {
+    const node = await this.ready();
+    const out = new Map<string, string>();
+    for await (const r of node.getControlDatabase()!.getDatabase().eval(`select StrandId, Text from ${PRIVATE_SCHEMA}.StrandNote`)) {
+      out.set(r.StrandId as string, r.Text as string);
+    }
+    return out;
+  }
+
+  /** Set a strand's note, or (`null` or blank) remove it. */
+  async setNote(strandId: string, text: string | null): Promise<void> {
+    const node = await this.ready();
+    const control = node.getControlDatabase()!;
+    const trimmed = text?.trim() ?? '';
+    if (trimmed) {
+      await control.execWrite(`insert or replace into ${PRIVATE_SCHEMA}.StrandNote (StrandId, Text, UpdatedAt) values (?, ?, ?)`,
+        [strandId, trimmed.slice(0, 500), new Date().toISOString()], 'set strand note');
+    } else {
+      await control.execWrite(`delete from ${PRIVATE_SCHEMA}.StrandNote where StrandId = ?`, [strandId], 'clear strand note');
+    }
   }
 }

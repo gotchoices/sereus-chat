@@ -16,7 +16,7 @@ const INVITE_COLUMNS = ['id', 'url', 'expiresAt'] as const;
 const invite: Command = {
   name: 'invite',
   summary: 'Make an invitation (to a new strand unless --strand); "invite cancel <id>" withdraws one',
-  usage: '[--strand <strand>] [--public] [--manager] [--multi] [--valid day|week|month] [-o <file>] | cancel <id|row>',
+  usage: '[--strand <strand>] [--public] [--manager] [--multi] [--valid day|week|month] [--note <text>] [-o <file>] | cancel <id|row>',
   options: {
     strand: { type: 'string' },
     public: { type: 'boolean' },
@@ -24,6 +24,8 @@ const invite: Command = {
     multi: { type: 'boolean' },
     valid: { type: 'string' },
     out: { type: 'string', short: 'o' },
+    // A private note on the new strand for yourself (who it is for); never part of the invitation.
+    note: { type: 'string' },
   },
   async run(session, args, values) {
     if (args[0] === 'cancel') {
@@ -45,6 +47,7 @@ const invite: Command = {
       grantsInviteRight: !!values.manager,
       singleUse: values.multi ? false : terms.singleUse,
       validForMs: INVITATION_VALIDITY[validity],
+      ...(typeof values.note === 'string' ? { note: values.note } : {}),
     }));
     // The link alone, for a QR tool or another program. Owner-only: whoever has it can use it.
     if (typeof values.out === 'string') await writeFile(values.out, `${made.url}\n`, { mode: 0o600 });

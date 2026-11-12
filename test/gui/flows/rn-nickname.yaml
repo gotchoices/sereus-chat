@@ -24,11 +24,11 @@ appId: org.sereus.chat
     id: "member-nickname"
 # Tap the field before typing: Maestro can type before the autofocus lands and lose a letter.
 - tapOn:
-    id: "nickname-input"
+    id: "private-text-input"
 - eraseText: 100
 - inputText: ${NICKNAME}
 - tapOn:
-    id: "nickname-save"
+    id: "private-text-save"
 - extendedWaitUntil:
     visible: "^${NICKNAME}$"
     timeout: 60000
@@ -40,7 +40,7 @@ appId: org.sereus.chat
 - tapOn:
     id: "member-nickname"
 - tapOn:
-    id: "nickname-remove"
+    id: "private-text-remove"
 - extendedWaitUntil:
     visible: "^${OWN_NAME}$"
     timeout: 60000

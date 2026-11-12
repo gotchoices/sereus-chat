@@ -4,7 +4,7 @@ import { UsageError, type Session } from '../session.js';
 import type { Row } from '../output.js';
 import { need, type Command } from './command.js';
 
-export const STRAND_COLUMNS = ['row', 'id', 'title', 'members', 'unread', 'lastAt', 'lastFrom', 'lastText'] as const;
+export const STRAND_COLUMNS = ['row', 'id', 'title', 'members', 'unread', 'lastAt', 'lastFrom', 'lastText', 'note'] as const;
 export const MESSAGE_COLUMNS = ['row', 'strandId', 'messageId', 'time', 'from', 'text', 'replyTo', 'edited', 'attachments', 'delivery'] as const;
 
 function strandRow(row: number, s: StrandSummary): Row {
@@ -18,6 +18,7 @@ function strandRow(row: number, s: StrandSummary): Row {
     lastAt: opening ? '' : s.lastMessage?.timestamp,
     lastFrom: s.lastMessage?.senderName,
     lastText: opening ? '(opening)' : s.lastMessage?.previewText,
+    note: s.note ?? undefined,
   };
 }
 
@@ -177,8 +178,9 @@ const members: Command = {
 const nickname: Command = {
   name: 'nickname',
   summary: 'Give a member a private name of your own (only your machines hold it); --clear removes it',
-  usage: '<strand> <member row|id> [name...] [--clear]',
-  options: { clear: { type: 'boolean' } },
+  usage: '<strand> <member row|id> [name...] [--clear] [--everywhere]',
+  // --everywhere: change (or with --clear, remove) the member's current name on every member carrying it.
+  options: { clear: { type: 'boolean' }, everywhere: { type: 'boolean' } },
   async run(session, args, values) {
     const strand = await session.strand(need(nickname, args, 0, 'strand'));
     const which = need(nickname, args, 1, 'member');
@@ -187,7 +189,21 @@ const nickname: Command = {
     if (!member) throw new UsageError(`nickname: no member "${which}" in strand ${strand.id} (see "members")`);
     const name = args.slice(2).join(' ').trim();
     if (!values.clear && !name) throw new UsageError('nickname: give a name, or --clear');
-    session.unwrap(await session.model.members.setNickname(strand.id, member.id, values.clear ? null : name));
+    session.unwrap(await session.model.members.setNickname(strand.id, member.id, values.clear ? null : name, { everywhere: !!values.everywhere }));
+  },
+};
+
+const note: Command = {
+  name: 'note',
+  summary: 'Your private note on a strand (who it is for); only your machines hold it. No text shows it; --clear removes it',
+  usage: '<strand> [text...] [--clear]',
+  options: { clear: { type: 'boolean' } },
+  async run(session, args, values) {
+    const strand = await session.strand(need(note, args, 0, 'strand'));
+    const text = args.slice(1).join(' ').trim();
+    if (values.clear || text) session.unwrap(await session.model.strands.setNote(strand.id, values.clear ? null : text));
+    const current = session.unwrap(await session.model.strands.note(strand.id));
+    session.out.rows(['strandId', 'note'], [{ strandId: strand.id, note: current ?? '' }]);
   },
 };
 
@@ -338,4 +354,4 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-export const strandCommands = [strands, log, tail, send, edit, del, react, members, nickname, nicknames, mute, archive, unarchive, leave, outbox, sql];
+export const strandCommands = [strands, log, tail, send, edit, del, react, members, nickname, nicknames, note, mute, archive, unarchive, leave, outbox, sql];

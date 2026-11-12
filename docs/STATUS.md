@@ -1342,6 +1342,49 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         `test/stack/restart-after-replicated-write.mjs`: lost in 12 of 14 runs with the stores left open,
         kept in 6 of 6 with the stores closed. Not filed upstream.
 
+- [x] **Strand notes and "rename everywhere"** (2026-11-11).
+      - **Notes:** `private_org_sereus_chat.StrandNote (StrandId, Text, UpdatedAt)` beside
+        `Nickname`. The schema only grows, so older machines keep working.
+        - API: `strands.note` / `setNote`, `StrandSummary.note`, and
+          `invitations.create({ note })`, which saves the note on the strand it founds and never
+          puts it in the invitation.
+        - RN:
+          - an optional "A note for yourself" field on the invitation screen (new strands only);
+          - a waiting strand's row shows the note;
+          - "Your note" on the strand's page, edited in `PrivateTextSheet` (multiline,
+            500 characters).
+        - CLI: `invite --note`, `note <strand> [text]|--clear`, and a `note` column in `strands`.
+      - **Rename everywhere (story 30):** `setNickname(…, { everywhere })` renames or removes
+        the member's current name on every member carrying it; `members.nicknameUses(name)`
+        counts them. The sheet offers "Also change it for everyone else you call X (n more)".
+        CLI: `nickname … --everywhere`.
+      - `NicknameSheet` became `PrivateTextSheet` (names and notes; test ids `private-text-*`).
+        The invitation screen's `ScrollView` uses `keyboardShouldPersistTaps="handled"`, so
+        "Make an invitation" works with the note field focused.
+      - **Tests:**
+        - core contract: notes, and rename everywhere, on the mock and two real nodes (81/81, 3
+          runs);
+        - CLI `test/nickname.test.ts`: Alice's note shows on her side only, never at Bob's or in
+          the strand's data;
+        - emulator 5564, RN release x86_64, fresh data:
+          - `rn-note.yaml` passes (written with the invitation → on the list row → edited on
+            the page → back on the list);
+          - `rn-nickname-everywhere.yaml` passes (name in strand 1, chosen again in strand 2,
+            renamed everywhere, strand 1 follows, removed everywhere);
+          - `rn-nickname.yaml` passes;
+          - join and talk 2/2.
+        - Private-store timings on the emulator: 20–104 ms.
+      - **Found and fixed:** `delivery.test.ts` flaked in parallel full runs, 1 in 2 even before
+        these changes. The outbox count trails the delivery marks by a moment, so the test now
+        waits for it to empty.
+      - **Test gotchas:**
+        - `adb install` once reported Success and didn't replace the app (check
+          `lastUpdateTime`);
+        - Maestro's `eraseText 500` kills its device server on the emulator (use ~80);
+        - flows now `stopApp`/`launchApp` first, so a dead run's open sheet doesn't leak into
+          the next.
+      - **Story wording:** proposed to the user, not applied (stories 02 and 30).
+
 - [x] **Follow-ups on 1.22** (2026-11-11).
       - **Background work is waited for, not failed:** `strandFor` waits up to 120 s for a strand
         this device is still bringing up (a conversation founded for an invitation, a join that

@@ -22,7 +22,12 @@ export interface MembersModel {
    * only the user's own machines. The app never decides two members are the same person: using
    * one name in several strands is the user's own filing.
    */
-  setNickname(strandId: string, memberId: string, name: string | null): Promise<Result<void>>;
+  setNickname(strandId: string, memberId: string, name: string | null, opts?: { everywhere?: boolean }): Promise<Result<void>>;
   /** The private names in use, for choosing one again. */
   nicknames(): Promise<Result<string[]>>;
+  /**
+   * How many members (in any strand) the user has given this name. With `everywhere`,
+   * `setNickname` renames all of them, not only the one member (story 30).
+   */
+  nicknameUses(name: string): Promise<Result<number>>;
 }

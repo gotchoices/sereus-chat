@@ -109,9 +109,16 @@ export function createSereusModel(host: ChatHost): SereusModel {
       return new Map();
     }
   }
-  /** Told when a nickname is set or removed here, so lists that show names re-read them. */
-  const nicknameListeners = new Set<() => void>();
-  const onNickname = (listener: () => void) => { nicknameListeners.add(listener); return () => { nicknameListeners.delete(listener); }; };
+  /** Told when a nickname or strand note changes here, so lists that show them re-read. */
+  const privateListeners = new Set<() => void>();
+  const onPrivate = (listener: () => void) => { privateListeners.add(listener); return () => { privateListeners.delete(listener); }; };
+  /** The user's private strand notes, or none if they cannot be read now (lists still render). */
+  async function notesOrNone(): Promise<Map<string, string>> {
+    try { return await privateStore.notes(); } catch (err) {
+      console.warn('[sereus-model] strand notes unavailable:', err instanceof Error ? err.message : err);
+      return new Map();
+    }
+  }
   const nicknameIn = (all: Map<string, string>, strandId: string, memberId: string) => all.get(`${strandId}\n${memberId}`);
   const strandPrefs = new StrandPrefsStore(host);
   const summaries = new SummaryCache(host);
@@ -314,7 +321,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const prefsById = await strandPrefs.all();
     const cached = await summaries.read();
     const me = runtime.peerId ?? '';
-    const nicknames = await nicknamesOrNone();
+    const [nicknames, notes] = await Promise.all([nicknamesOrNone(), notesOrNone()]);
 
     // EACH STRAND READ IN PARALLEL, AND BOUNDED. A read can wait on a slow member
     // (Optimystic#25); on the S7 one took 61 s. Past LIST_READ_MS a strand's row falls
@@ -363,7 +370,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
         isGroup = last?.isGroup ?? false;
         memberCount = last?.memberCount ?? 1;
       }
-      return { id, title, isGroup, memberCount, lastMessage: preview, ...local };
+      return { id, title, isGroup, memberCount, lastMessage: preview, ...local, note: notes.get(id) ?? null };
     }));
     const listed = rows.filter((r): r is StrandSummary => r !== null);
 
@@ -375,6 +382,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       if (open.has(known.id) || hidden.has(known.id)) continue;
       listed.push({
         ...known, unreadCount: 0, mentioned: false, draftPreview: null, pending: false, opening: true,
+        note: notes.get(known.id) ?? null,
         muted: prefsById[known.id]?.muted ?? 'none', archived: prefsById[known.id]?.archived ?? false,
       });
     }
@@ -459,7 +467,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
    */
   async function createInvitation(input: {
     strandId?: string; visibility?: 'public' | 'private'; grantsInviteRight: boolean;
-    singleUse?: boolean; validForMs?: number;
+    singleUse?: boolean; validForMs?: number; note?: string;
   }): Promise<Invitation> {
     const t0 = Date.now();
     let t = t0;
@@ -521,6 +529,12 @@ export function createSereusModel(host: ChatHost): SereusModel {
       'publishFormationInvite',
     );
     step('publishFormationInvite');
+    // The user's own note on the strand (who it is for): kept privately, never in the invitation.
+    // A failure to keep it must not cost the user the invitation.
+    if (input.note?.trim()) {
+      await privateStore.setNote(strandId, input.note).catch(err =>
+        console.warn('[sereus-model] could not keep the strand note:', err instanceof Error ? err.message : err));
+    }
     const token = node.encodeInvitation(invitation);
     const minted: Invitation = {
       // The RAW token, which is unique (the encoded one's prefix is the same for all).
@@ -631,6 +645,11 @@ export function createSereusModel(host: ChatHost): SereusModel {
       async bootError() { return runtime.bootError(); },
       retryBoot: () => attempt(() => runtime.boot()),
       settings: id => attempt(() => strandPrefs.get(id)),
+      note: id => attempt(async () => (await privateStore.notes()).get(id) ?? null),
+      setNote: (id, text) => attempt(async () => {
+        await privateStore.setNote(id, text);
+        for (const listener of [...privateListeners]) listener();
+      }),
       setMuted: (id, muted) => attempt(() => strandPrefs.patch(id, { muted })),
       setArchived: (id, archived) => attempt(() => strandPrefs.patch(id, { archived })),
       state: id => attempt(async (): Promise<StrandState> => {
@@ -697,11 +716,12 @@ export function createSereusModel(host: ChatHost): SereusModel {
       }),
       remove: async () => fail('not-supported', 'Removing a member is not supported yet.'),
       resignManager: async () => fail('not-supported', 'Resigning as manager is not supported yet.'),
-      setNickname: (strandId, memberId, name) => attempt(async () => {
-        await privateStore.setNickname(strandId, memberId, name);
-        for (const listener of [...nicknameListeners]) listener();
+      setNickname: (strandId, memberId, name, opts) => attempt(async () => {
+        await privateStore.setNickname(strandId, memberId, name, opts?.everywhere ?? false);
+        for (const listener of [...privateListeners]) listener();
       }),
       nicknames: () => attempt(() => privateStore.names()),
+      nicknameUses: name => attempt(() => privateStore.nicknameUses(name)),
     },
 
     invitations: {
@@ -947,7 +967,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       reachability: onChange => host.node.onReachabilityChange(onChange),
       strands(onChange) {
         const events = [...STRAND_UP_EVENTS, ...STRAND_DOWN_EVENTS, 'strand:discovered'] as const;
-        const unsubscribe = [...events.map(event => host.node.on(event, () => onChange())), onNickname(onChange)];
+        const unsubscribe = [...events.map(event => host.node.on(event, () => onChange())), onPrivate(onChange)];
         return () => unsubscribe.forEach(u => u());
       },
       /**
@@ -997,7 +1017,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
           ...STRAND_DOWN_EVENTS.map(event => host.node.on(event, ({ strandId: id }) => {
             if (id === strandId) detach();
           })),
-          onNickname(onChange),
+          onPrivate(onChange),
         ];
         return () => {
           detach();
