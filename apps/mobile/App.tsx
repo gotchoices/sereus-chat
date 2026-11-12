@@ -35,7 +35,7 @@ function IncompatibleData({ found, expected }: { found: string; expected: string
       </Text>
       <Text style={[typography.body, styles.para, { color: theme.textMuted }]}>
         {t('app.incompatibleBody',
-          'It was saved by {{found}}, and this version ({{expected}}) cannot use it: the network software underneath changed in a way that cannot be carried over. Your conversations on this phone cannot be reached with it.')
+          'It was saved by {{found}}, and this version ({{expected}}) cannot use it: the network software underneath, or how conversations are stored, changed in a way that is not carried over. Your conversations on this phone cannot be reached with it.')
           .replace('{{found}}', found).replace('{{expected}}', expected)}
       </Text>
       <Text style={[typography.body, styles.para, { color: theme.textPrimary }]}>

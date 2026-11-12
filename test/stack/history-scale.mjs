@@ -48,13 +48,15 @@ const time = async (fn, reps = 5) => {
   ms.sort((a, b) => a - b);
   return ms[Math.floor(ms.length / 2)];
 };
+// The app's read since chat 0.3.0: the messages alone, then the (small) Member table.
+const APP_LIST = async limit => { await drain('select Id, Name from App.Member'); return drain('select Id, MemberId, Content, Timestamp, ReplyToId, EditedAt from App.Message order by Timestamp desc, Id desc limit ?', [limit]); };
 const drain = async (sql, params) => { let n = 0; for await (const _ of db.eval(sql, params)) n++; return n; };
 const LIST = `select M.Id, M.MemberId, M.Content, M.Timestamp, M.ReplyToId, M.EditedAt, Mem.Name as MemberName
   from App.Message M left join App.Member Mem on Mem.Id = M.MemberId
   order by M.Timestamp desc, M.Id desc limit ?`;
 
 console.log(`schema: chat ${sApp.version}${INDEX ? ' + index on Message(Timestamp)' : ''}`);
-console.log('messages | newest 100 (ms) | newest 100, no join (ms) | count(*) (ms) | all reactions (ms) | one more insert (ms) | insert, bare table (ms)');
+console.log('messages | app read: newest 100 + members (ms) | newest 100, joined (ms) | newest 100, no join (ms) | count(*) (ms) | all reactions (ms) | one more insert (ms) | insert, bare table (ms)');
 await db.exec(`create table if not exists App.Bare (Id text primary key, V text not null)`).catch(() => {});
 let have = 0;
 for (const size of SIZES) {
@@ -70,6 +72,7 @@ for (const size of SIZES) {
   }
   // SETTLE_S: let the storage finish with the bulk insert before measuring (default 10 s).
   await new Promise(r => setTimeout(r, Number(process.env.SETTLE_S ?? 10) * 1000));
+  const appList = await time(() => APP_LIST(100));
   const list = await time(() => drain(LIST, [100]));
   const reactions = await time(() => drain('select MessageId, MemberId, Symbol from App.Reaction'));
   const noJoin = await time(() => drain('select Id, MemberId, Content, Timestamp from App.Message order by Timestamp desc, Id desc limit 100'));
@@ -100,7 +103,7 @@ for (const size of SIZES) {
   }
   const bareInsert = await time(() => db.exec('insert into App.Bare (Id, V) values (?, ?)', [randomUUID(), 'one more']), 3);
   const f = (x, w) => x.toFixed(1).padStart(w);
-  console.log(`${String(size).padStart(8)} | ${f(list, 15)} | ${f(noJoin, 25)} | ${f(count, 13)} | ${f(reactions, 18)} | ${f(insert, 20)} | ${f(bareInsert, 24)}`);
+  console.log(`${String(size).padStart(8)} | ${f(appList, 36)} | ${f(list, 24)} | ${f(noJoin, 25)} | ${f(count, 13)} | ${f(reactions, 18)} | ${f(insert, 20)} | ${f(bareInsert, 24)}`);
 }
 await node.stop();
 process.exit(0);

@@ -66,7 +66,14 @@ try {
   const other = await connectBridge(`node:${PORT}`);
 
   const { url, strandId } = await other.call('invite');
-  if (!(await other.call('arm', strandId))) throw new Error('serchat could not watch its own strand');
+  // The invitation's strand is founded in the background (sereus#49): it can take a few
+  // seconds to open, and `arm` reads it before watching. Wait for it rather than fail.
+  let armed = false;
+  for (const deadline = Date.now() + 60_000; !armed && Date.now() < deadline;) {
+    armed = await other.call('arm', strandId);
+    if (!armed) await new Promise(r => setTimeout(r, 1000));
+  }
+  if (!armed) throw new Error('serchat could not watch its own strand within 60 s');
   const token = url.slice(url.indexOf('#') + 1);
   log(`serchat invited (strand ${strandId.slice(0, 8)}); handing the link to the phone`);
 

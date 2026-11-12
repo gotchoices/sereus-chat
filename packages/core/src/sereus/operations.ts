@@ -177,12 +177,16 @@ export async function queryMessages(
   // limit returned the OLDEST ones instead: the strand list's one-row preview
   // showed a conversation's first message forever, and a conversation past 100
   // messages stopped showing anything new.
+  // NO JOIN, and the member names read separately: Optimystic walks `MessageByTime` backwards
+  // and stops after `limit` rows only for a single-table query (1.26: "joins are unchanged").
+  // With the Member join the read still scanned and sorted the whole conversation (5,000
+  // messages: 105 ms against 23 ms in Node, test/stack/history-scale.mjs). Member is small.
+  const names = new Map<string, string>();
+  for await (const m of db.eval('select Id, Name from App.Member')) names.set(m.Id as string, m.Name as string);
   for await (const row of db.eval(
-    `select M.Id, M.MemberId, M.Content, M.Timestamp, M.ReplyToId, M.EditedAt,
-            Mem.Name as MemberName
-     from App.Message M
-     left join App.Member Mem on Mem.Id = M.MemberId
-     order by M.Timestamp desc, M.Id desc
+    `select Id, MemberId, Content, Timestamp, ReplyToId, EditedAt
+     from App.Message
+     order by Timestamp desc, Id desc
      limit ?`,
     [limit],
   )) {
@@ -193,7 +197,7 @@ export async function queryMessages(
       Timestamp: storedUtcToIso(row.Timestamp as string),
       ReplyToId: (row.ReplyToId as string) ?? null,
       EditedAt: storedUtcToIso((row.EditedAt as string) ?? null),
-      MemberName: (row.MemberName as string) ?? undefined,
+      MemberName: names.get(row.MemberId as string),
     });
   }
   return out.reverse();

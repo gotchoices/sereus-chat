@@ -3,7 +3,8 @@
  *
  * Two parties on loopback, file storage. A founds a closed strand with schema v1, B joins and
  * writes, then B stops for good and A restarts with the strand's schema either unchanged
- * (`CHANGE=none`, the control) or with one column tag added (`CHANGE=tag`:
+ * (`CHANGE=none`, the control), with one index added (`CHANGE=index`, as chat 0.3.0 adds
+ * `MessageByTime`), or with one column tag added (`CHANGE=tag`:
  * `Id text primary key with tags ("optimystic.fresh" = true)`, rows unchanged). Prints
  * whether A's `addStrand` of the discovered strand succeeds.
  *
@@ -33,7 +34,9 @@ const schema = tagged => `
     with tags ("optimystic.network_watch" = true);
 `;
 const V1 = { id: SAPP_ID, version: '1.0.0', schema: schema(false), signature: '', latencyHint: 'interactive' };
-const V2 = CHANGE === 'tag' ? { ...V1, version: '1.1.0', schema: schema(true) } : V1;
+const V2 = CHANGE === 'tag' ? { ...V1, version: '1.1.0', schema: schema(true) }
+  : CHANGE === 'index' ? { ...V1, version: '1.1.0', schema: `${schema(false)}\n  index MessageByContent on Message (Content);` }
+  : V1;
 
 const root = mkdtempSync(join(tmpdir(), 'schema-change-'));
 const t0 = Date.now();
@@ -96,7 +99,7 @@ for (;;) {
   if (n >= 2) break;
   await new Promise(r => setTimeout(r, 200));
 }
-log('both parties hold both rows; B stops for good, A restarts with', CHANGE === 'tag' ? 'one column tag added (v1.1.0)' : 'the same schema (v1.0.0)', OFFLINE ? '[offline mode]' : '');
+log('both parties hold both rows; B stops for good, A restarts with', CHANGE === 'tag' ? 'one column tag added (v1.1.0)' : CHANGE === 'index' ? 'one index added (v1.1.0)' : 'the same schema (v1.0.0)', OFFLINE ? '[offline mode]' : '');
 await B.stop();
 {
   await new Promise(r => setTimeout(r, 3000));
@@ -135,11 +138,31 @@ if (outcome.ok) {
     const applied = new Promise(r => A.on('strand:app-schema-applied', ({ strandId: id }) => { if (id === strandId) r(Date.now()); }));
     const t = Date.now();
     const B2 = await party('b', bParty);
-    await B2.addStrand({ strandRow: bRow, sAppConfig: V2, awaitFirstSync: false });
+    // B_OLD=1: B comes back still running the OLD schema (an app that has not upgraded).
+    await B2.addStrand({ strandRow: bRow, sAppConfig: process.env.B_OLD === '1' ? V1 : V2, awaitFirstSync: false });
     log('B is back');
     const at = await Promise.race([applied, new Promise(r => setTimeout(() => r(null), 360_000))]);
     log(at ? `schema applied on A ${((at - t) / 1000).toFixed(1)} s after B returned; state: ${db?.appSchemaState?.()}`
       : `schema NOT applied within 360 s; state: ${db?.appSchemaState?.()}`);
+    if (process.env.B_OLD === '1') {
+      // What each side now runs: does the old app's apply take the new index away, and does
+      // the old app keep writing?
+      await new Promise(r => setTimeout(r, 20_000));
+      const bDb = B2.getStrands().get(strandId)?.database;
+      const plan = async (d) => { const ops = []; try { for await (const r of d.getDatabase().eval("select * from query_plan('select Id from App.Message order by Content desc limit 1')")) ops.push(r.op); } catch (e) { ops.push(`plan failed: ${e.message}`); } return ops.filter(o => /SCAN|SEEK|SORT|failed/.test(o)).join(' '); };
+      log(`old B: state ${bDb?.appSchemaState?.() ?? '?'}, plan ${bDb ? await plan(bDb) : '(no database)'}`);
+      try { await bDb.getDatabase().exec("insert into App.Message (Id, Content) values ('b2', 'from old b')"); log('old B wrote b2'); } catch (e) { log('old B write failed:', e.message); }
+      const ids = async d => { const out = []; try { for await (const r of d.getDatabase().eval('select Id from App.Message')) out.push(r.Id); } catch (e) { out.push(`read failed: ${e.message}`); } return out.join(', '); };
+      log(`old B reads its own rows: ${await ids(bDb)}`);
+      for (const wait of [15, 45]) {
+        await new Promise(r => setTimeout(r, wait * 1000));
+        log(`+${wait} s: A rows ${await ids(db)}; old B rows ${await ids(bDb)}; A plan ${await plan(db)}`);
+      }
+      // And the other way: a write on the upgraded side.
+      try { await db.getDatabase().exec("insert into App.Message (Id, Content) values ('a2', 'from new a')"); log('new A wrote a2'); } catch (e) { log('new A write failed:', e.message); }
+      await new Promise(r => setTimeout(r, 30_000));
+      log(`+30 s: A rows ${await ids(db)}; old B rows ${await ids(bDb)}`);
+    }
     await B2.stop();
   }
   for (const wait of [5, 30]) {
@@ -147,6 +170,13 @@ if (outcome.ok) {
     const again = [];
     try { for await (const r of db.getDatabase().eval('select Id from App.Message')) again.push(r.Id); } catch (e) { log('read failed:', e.message); }
     log(`after ${wait} s more: rows ${again.join(', ')}`);
+  }
+  if (CHANGE === 'index') {
+    // Is the new index there and used: an ordered read walks it instead of sorting.
+    const q = 'select Id from App.Message order by Content desc limit 1';
+    const ops = [];
+    try { for await (const r of db.getDatabase().eval(`select * from query_plan('${q}')`)) ops.push(r.op); } catch (e) { ops.push(`plan failed: ${e.message}`); }
+    log(`index check: ${ops.filter(o => /SCAN|SEEK|SORT|failed/.test(o)).join(' ')}`);
   }
 }
 await A.stop();

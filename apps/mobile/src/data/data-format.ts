@@ -20,6 +20,7 @@
  *   - a different marker        → incompatible.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CHAT_SAPP_VERSION } from '@chat/core';
 import { STORAGE_KEYS, STORAGE_KEY_PREFIX } from './persisted-names';
 
 /**
@@ -43,7 +44,16 @@ import { STORAGE_KEYS, STORAGE_KEY_PREFIX } from './persisted-names';
  *                earlier is refused at start (`ControlStoreIncompatibleError`); optimystic
  *                1.15.0, p2p-fret 1.1.0.
  */
-export const DATA_FORMAT = 'sereus-1.17';
+const STACK_FORMAT = 'sereus-1.17';
+
+/**
+ * The format marker: the stack format above, plus the chat sApp (schema) version, so a schema
+ * change is caught WITHOUT a hand bump (2026-11-07). While the app is a prototype shared between
+ * developers, a schema change is not migrated: the user is told to clear the app's data and
+ * start fresh. The first marker of this shape also catches every earlier install
+ * (`sereus-1.17` → `sereus-1.17+chat-0.3.0`).
+ */
+export const DATA_FORMAT = `${STACK_FORMAT}+chat-${CHAT_SAPP_VERSION}`;
 
 const MARKER_KEY = STORAGE_KEYS.dataFormat;
 const APP_PREFIX = STORAGE_KEY_PREFIX;

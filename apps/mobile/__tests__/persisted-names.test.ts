@@ -45,7 +45,8 @@ describe('persisted names', () => {
   });
 
   it('names the data format these were introduced with', () => {
-    // Bump together with any change above.
-    expect(DATA_FORMAT).toBe('sereus-1.17');
+    // Bump the stack part together with any change above. The chat schema version that
+    // follows it changes on its own (a schema change also means starting fresh).
+    expect(DATA_FORMAT).toMatch(/^sereus-1\.17\+chat-\d+\.\d+\.\d+$/);
   });
 });

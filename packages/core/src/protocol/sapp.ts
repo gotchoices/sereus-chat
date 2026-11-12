@@ -11,8 +11,11 @@ import { CHAT_SCHEMA_QSQL } from './schema.generated.js';
 /** sApp ID for the chat app — matches design/specs/project.md. */
 export const CHAT_SAPP_ID = 'org.sereus.chat';
 
-/** 0.2.0: `Message.Id` and `Attachment.Id` tagged `optimystic.fresh` (a tag only; rows unchanged). */
-export const CHAT_SAPP_VERSION = '0.2.0';
+/**
+ * 0.2.0: `Message.Id` and `Attachment.Id` tagged `optimystic.fresh` (a tag only; rows unchanged).
+ * 0.3.0: index `MessageByTime` on `Message (Timestamp, Id)` for the message list (Optimystic#52).
+ */
+export const CHAT_SAPP_VERSION = '0.3.0';
 
 /**
  * Strip `declare schema X { ... }` wrappers and comment lines. StrandDatabase re-wraps

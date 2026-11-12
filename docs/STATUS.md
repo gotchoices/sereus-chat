@@ -1342,6 +1342,90 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         `test/stack/restart-after-replicated-write.mjs`: lost in 12 of 14 runs with the stores left open,
         kept in 6 of 6 with the stores closed. Not filed upstream.
 
+- [x] **Lenses: two app versions on one strand** (2026-11-11; Quereus `docs/lens.md`,
+      `docs/migration.md`). The intended model: each app version has its own logical schema +
+      lens, local and never synced, over a shared **basis** (in a strand, the `App` schema). The
+      basis is frozen once published and evolves additively only. There is no version number on
+      the wire: compatibility is which basis tables both sides hold. Changes go expand →
+      converge → flip → contract, with maintained (materialized) tables. Sereus has no lens
+      surface; Optimystic's backlog `6.5-schema-versioning` names lenses as the plan.
+      `test/stack/lens-over-strand.mjs`:
+      - **Works:** a party's own `declare logical schema ChatV2` + `declare lens for ChatV2 over
+        App`, on its strand Database. The lens stays local (the other member gets "Table not
+        found"); reads, inserts, updates and deletes through it converge both ways with a v1
+        member on `App`; logical constraints are enforced.
+      - **Works:** a newer basis with a nullable column added, while the v1 member keeps writing.
+      - **Broken:** the v1 app re-opening after that, sereus#59.
+      - **Broken:** materialized views from remote rows, Optimystic#58.
+      - **Sereus's sApp parser:** takes `materialized view …` but not migration.md's
+        `create materialized view …`.
+      - **For chat now:** treat `chat-sapp.qsql` as the basis. Additive changes only: no drops or
+        renames; a changed representation is a new table. Hold the logical/lens layer until #59
+        (and #58 for representation changes) are fixed. Until then testers wipe
+        (`DATA_FORMAT`).
+
+- [x] **Stack 2026-11-07: sereus 1.22.0, optimystic 1.26.0, quereus 5.0.0** (p2p-fret 1.3.0,
+      libp2p 3.3.11 unchanged), with **chat sApp 0.3.0**: index `MessageByTime` on
+      `Message (Timestamp, Id)`.
+      - **Fixed upstream:**
+        - **Optimystic#52:** indexes serve `order by` / ranges / `in`;
+        - **Optimystic#54:** an interrupted write no longer wedges a collection;
+        - **Optimystic#53:** offline queue cost no longer grows with the queue;
+        - deletes report their row, so FKs are enforced on delete (chat deletes children first);
+        - sereus#57 `AppSchemaRefusedError`; sereus#58 full Noise on RN (unused);
+        - native Ed25519 verify on RN (chat already loads `polyfills/native-crypto`).
+      - **NativeScript:** `db-p2p-storage-ns` 1.26 requires sqlite ^4.1, so the 4.1.0
+        resolution override is dropped (the dependency stays).
+      - **Message list:** `queryMessages` drops the Member join, because an index walk serves
+        single-table queries only ("joins are unchanged"). Names come from one read of the small
+        Member table. `history-scale.mjs`, app read of the newest 100:
+
+        | Messages | 1.22 + 0.3.0 | 1.21 | 1.20 |
+        |---|---|---|---|
+        | 100 | 11 ms | 7 ms | 21 ms |
+        | 1,000 | 18 ms | 35 ms | ~100 ms |
+        | 5,000 | 20 ms | 150 ms | ~450 ms |
+
+        The old joined form still grows (105 ms at 5,000). A datetime column walks correctly:
+        same 100 rows and order as a full sort.
+      - **Checks:**
+        - core 74/74; CLI scenarios 3/3, offline 3/3 (one 20 s window), nickname 1/1, on 0.3.0;
+        - `schema-change-offline-peer.mjs CHANGE=index RETURN=1`, both modes: opens
+          `waiting-for-cohort`, index applied 15 s after the member returns, rows intact, the
+          ordered read is INDEXSCAN;
+        - #54 repro 6/6 resume.
+      - **S21:** join and talk 4/4 PASS.
+        - First two runs, right after the upgrade, while it re-applied the schema on its old
+          strands: Join → conversation 12.5 / 27.6 s, serchat's reply committed in 3.4 / 4.7 s.
+        - Once settled: 9.6 / 9.8 s, commits in 1.3 / 1.8 s (1.21: 7.1 / 8.5 s).
+      - **S7, ~20 conversations, most with members long gone:** 3 of 4 pass. The failure came
+        during the first start's upgrade load: the phone's message never showed. Settled:
+        Join → conversation 44 / 93 s, reply commits 10–24 s. Idle with 18 conversations: CPU
+        180 s per 5 min, traffic ~620 / 555 KB (1.21 with 11: 102–141 s, ~450 / 400 KB). That's
+        about the same per conversation, so no gain from native verify can be claimed. The S7's
+        numbers track how many conversations it carries; a fair comparison needs fresh data.
+      - **A schema bump costs a first start:** every strand re-applies the schema, and those
+        whose members are unreachable wait and retry. Worth remembering before shipping a
+        schema change to people with many old strands.
+      - **Fresh data, both phones wiped (`pm clear`) and set up again, 2026-11-07:**
+        - S21: join and talk 2/2, Join → conversation 8.6 / 5.6 s, reply commits 3.3 / 1.3 s.
+        - S7: 4/4 phone runs pass (two more failed in serchat's own setup; see the harness fix
+          below). Join → conversation 27.4 / 18.5 / 28.2 / 32.3 s as conversations accumulate
+          (1 to 5), phone → serchat 0.4–0.9 s, reply commits 4–9 s.
+        - S7 idle with 4 conversations, 5 min: CPU 76–79 s, ~185 / 145 KB, PSS 150–190 MB.
+          **This is the clean baseline for later stacks.** There's no 1.21 run at the same
+          count, so the native-verify effect is still unmeasured.
+      - **Harness:** `phone-joins-serchat.mjs` now waits up to 60 s for serchat's background-
+        founded strand to open before arming its watch. On 1.22 it sometimes wasn't open yet:
+        "serchat could not watch its own strand", 2 of 6 S7 runs.
+      - **Stale data is detected, not migrated** (the user, 2026-11-07: testers wipe; the app
+        must say so). The mobile `DATA_FORMAT` marker is now
+        `<stack format>+chat-<CHAT_SAPP_VERSION>` (`sereus-1.17+chat-0.3.0`), so any chat schema
+        change shows the existing "This phone holds data from an older version of the app …
+        clear the app's storage" screen without a hand bump. Seen on the S21 over its 0.2.0
+        data. Different versions among a conversation's members are not detected yet: that
+        would need each member's version in its `Member` row (a `chat-sapp.qsql` change).
+
 - [x] **Stack 2026-11-03: sereus 1.21.0, optimystic 1.25.0, quereus 4.25.0** (p2p-fret 1.3.0,
       libp2p 3.3.11 unchanged). No chat code change, no data wipe: 1.20 data opens on 1.21,
       on the S21 and the S7. Sereus requires optimystic 1.25 and quereus 4.25.
@@ -1638,20 +1722,26 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         other member offline, the strand opens on its old schema (`waiting-for-cohort`, after a
         ~5 s failed apply attempt). The change is applied 14.9 s after the member returns, in
         both modes (`CHANGE=tag RETURN=1 [OFFLINE=1] node test/stack/schema-change-offline-peer.mjs`).
-      - **gotchoices/Optimystic#52**: a secondary index is used only for equality, never for
-        ORDER BY or a range. Chat's message list is a full scan plus sort, so it grows with
-        history (about 2 s per read on the S7 at 5,000 messages). Repro:
-        `node test/stack/index-ordering-plans.mjs`. Fixed when the Optimystic rows show
-        INDEXSCAN or INDEXSEEK. Then check `history-scale.mjs` with an index on `(Timestamp, Id)`.
-        Filed 2026-11-02.
-      - **gotchoices/Optimystic#54**: a founding cut off by the process exiting before `stop()`
-        finishes leaves a pending record on the strand's `optimystic/schema`. Nothing clears it,
-        so every later `foundStrand` fails with "exhausted 10 retries" and the strand is lost.
-        On a phone that's the app being closed while a conversation (or the private strand) is
-        being founded. Found when a serchat one-shot exited mid-founding. serchat now waits for
-        that work before stopping, which is ordinary shutdown hygiene, not a workaround. Repro:
-        `STOP_AT=app-schema EXIT_AFTER_MS=500 node test/stack/interrupted-founding.mjs`. Fixed
-        when that resumes. Filed 2026-11-02.
+      - ~~**gotchoices/Optimystic#52**~~ **fixed in optimystic 1.26.0, closed 2026-11-07.** An index
+        now serves `order by` (both directions, a `limit` stops early), ranges and `in` lists.
+        `index-ordering-plans.mjs`: every query is INDEXSEEK or INDEXSCAN, with no SORT for the
+        descending one. A `datetime` column walks too: same 100 rows, same order as a full sort.
+        Chat 0.3.0 adds `MessageByTime` on `Message (Timestamp, Id)`.
+      - **gotchoices/sereus#59**: an app version that hasn't upgraded can't open a strand once
+        a newer version added a column. Its `apply schema App` is a full diff and runs
+        `ALTER TABLE … DROP COLUMN` (refused: super-majority 1/2), leaving its schema
+        partially migrated. This breaks Quereus's lens/migration pattern, whose shared basis
+        must only grow. Repro: `PHASE=column node test/stack/lens-over-strand.mjs`; control
+        `A_SAME=1 PHASE=column` passes. Fixed when B re-opens on v1 with A's column intact.
+        Filed 2026-11-11.
+      - **gotchoices/Optimystic#58**: a materialized view over a strand table is maintained only
+        for local writes; a source row from another member is never derived. This breaks
+        migration.md's "expand" phase. Repro: `PHASE=mv node test/stack/lens-over-strand.mjs`.
+        Filed 2026-11-11.
+      - ~~**gotchoices/Optimystic#54**~~ **fixed in optimystic 1.26.0, closed 2026-11-07.** The repro,
+        exiting 50 / 100 / 200 ms into `stop()` with the app DDL pending, resumes in 6 of 6 runs,
+        foreground and background (1.23: failed 8 of 8). A collection already blocked by an
+        earlier release stays blocked; none of ours is.
 
 - [ ] **Local workarounds to retire** as upstream catches up. Each is extra code or
       complexity carried only because of a stack limitation; on each stack release, re-run

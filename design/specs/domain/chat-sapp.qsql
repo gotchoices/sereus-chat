@@ -48,6 +48,12 @@ table Message (
     foreign key (MemberId) references Member(Id)
 ) with tags ("optimystic.network_watch" = true);
 
+-- THE MESSAGE LIST reads the newest page: `order by Timestamp desc, Id desc limit N`. With
+-- this index Optimystic (1.26, gotchoices/Optimystic#52) walks it backwards and stops after N
+-- rows; without it every read scans and sorts the whole conversation (about 2 s on a Galaxy
+-- S7 at 5,000 messages). Both columns are not null, which an ordered walk needs.
+index MessageByTime on Message (Timestamp, Id);
+
 table Attachment (
     Id text primary key with tags ("optimystic.fresh" = true),
     MessageId text not null,
