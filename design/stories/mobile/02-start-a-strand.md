@@ -29,6 +29,8 @@ cubicle. Bob's brother Mike is not.
 4. This is his brother, so the defaults are right. Had he wanted otherwise, a "Change" link beside
    that line lets him say who can use it (one person, or anyone with the link), how long it stays
    good, and whether the person taking it up can invite others, as he can.
+   He can also leave himself a note on the strand — who it is for, what it is about. Only he sees
+   it; it is not part of the invitation.
 5. He can see what the strand is, plainly and without asking: private, and open to growing, because
    Bob himself can still add people. The app does not treat this as a problem — it is simply what is
    true right now, and he can see it at a glance.
@@ -134,6 +136,8 @@ cubicle. Bob's brother Mike is not.
 - [ ] A new strand exists from the moment its first invitation is made, and reads as having nobody
       else in it until someone accepts
 - [ ] Further invitations made for it lead into that same strand, never into a new one
+- [ ] While making an invitation for a new strand, the user can leave himself a note on it, which
+      is not part of the invitation and reaches nobody else
 - [ ] A user who cannot yet be reached is told so at the moment they try to invite somebody, in
       terms of what it means rather than what is missing
 - [ ] That message is not a dead end: it offers running something of their own and borrowing

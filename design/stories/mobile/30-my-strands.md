@@ -77,7 +77,8 @@ is the screen he opens the app to, so it is the screen that has to be honest at 
 - [ ] Every strand the user is in appears in one list; nothing is reachable only from elsewhere
 - [ ] Each strand appears exactly once; its outstanding invitations are part of it, not separate rows
 - [ ] A strand nobody else has joined yet reads as waiting for someone to join, not under an invented
-      name
+      name; it shows his own note, if he left one
+- [ ] A strand can carry a private note of the user's, which reaches nobody else
 - [ ] A row identifies the strand, what was last said, and when — enough to choose without opening it
 - [ ] A group strand is shown as a group, not as one of its members
 - [ ] Only what a member has shared of themselves is ever displayed; a private name the user has
