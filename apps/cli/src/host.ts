@@ -8,6 +8,7 @@
  * LevelDB (as sereus's `cadre-cli` builds them). `--listen` adds a listen address, which
  * a phone cannot have, so two profiles on one machine can talk without a relay.
  */
+import { nodeFileAccess } from './files.js';
 import { readFile } from 'node:fs/promises';
 import { createServer, type AddressInfo } from 'node:net';
 import { join } from 'node:path';
@@ -218,6 +219,8 @@ export function createCliHost(opts: HostOptions): CliHost {
     slot: (name, key) => fileSlot(dirs, name, key),
     ownerKeyStore: keyStore,
     dev: opts.dev,
+    // Attachment bytes (docs/blobs.md): this profile's copies of blobs, under `<profile>/files`.
+    files: nodeFileAccess(join(dirs.root, 'files')),
   };
 }
 

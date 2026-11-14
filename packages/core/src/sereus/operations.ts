@@ -263,13 +263,15 @@ export async function queryReactions(strand: StrandInstance): Promise<ReactionRo
 export interface AttachmentRow {
   Id: string; MessageId: string; Type: string; Uri: string | null;
   MimeType?: string; Name?: string; ByteSize?: number | null; DurationMs?: number | null;
+  /** The content's blob ref (docs/blobs.md); null on rows written before 0.4.0. */
+  Blob?: string | null;
 }
 
 export async function queryAttachments(strand: StrandInstance): Promise<AttachmentRow[]> {
   const db = getDb(strand);
   const out: AttachmentRow[] = [];
   for await (const r of db.eval(
-    `select Id, MessageId, Type, Uri, MimeType, Name, ByteSize, DurationMs
+    `select Id, MessageId, Type, Uri, MimeType, Name, ByteSize, DurationMs, Blob
      from App.Attachment`,
   )) {
     out.push({
@@ -281,6 +283,7 @@ export async function queryAttachments(strand: StrandInstance): Promise<Attachme
       Name: (r.Name as string) ?? undefined,
       ByteSize: (r.ByteSize as number) ?? null,
       DurationMs: (r.DurationMs as number) ?? null,
+      Blob: (r.Blob as string) ?? null,
     });
   }
   return out;
@@ -293,7 +296,7 @@ export async function insertAttachments(
   messageId: string,
   attachments: Array<{
     type: string; uri?: string | null; mimeType?: string; name?: string;
-    byteSize?: number | null; durationMs?: number | null;
+    byteSize?: number | null; durationMs?: number | null; blob?: string | null;
   }>,
 ): Promise<AttachmentRow[]> {
   if (!attachments.length) return [];
@@ -302,15 +305,16 @@ export async function insertAttachments(
   for (const a of attachments) {
     const id = newId();
     await db.exec(
-      `insert into App.Attachment (Id, MessageId, Type, Uri, MimeType, Name, ByteSize, DurationMs)
-       values (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `insert into App.Attachment (Id, MessageId, Type, Uri, MimeType, Name, ByteSize, DurationMs, Blob)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, messageId, a.type, a.uri ?? null, a.mimeType ?? null, a.name ?? null,
-       a.byteSize ?? null, a.durationMs ?? null],
+       a.byteSize ?? null, a.durationMs ?? null, a.blob ?? null],
     );
     rows.push({
       Id: id, MessageId: messageId, Type: a.type, Uri: a.uri ?? null,
       MimeType: a.mimeType, Name: a.name,
       ByteSize: a.byteSize ?? null, DurationMs: a.durationMs ?? null,
+      Blob: a.blob ?? null,
     });
   }
   return rows;

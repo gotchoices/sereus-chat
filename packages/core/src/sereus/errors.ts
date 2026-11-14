@@ -17,10 +17,11 @@ import { defaultRetryable, ok } from '../model/index.js';
 
 export class ChatFailure extends Error {
   readonly chatError: ChatError;
-  constructor(kind: ChatErrorKind, message: string, opts: { retryable?: boolean; cause?: unknown } = {}) {
+  constructor(kind: ChatErrorKind, message: string, opts: { retryable?: boolean; cause?: unknown; reason?: string } = {}) {
     super(message);
     this.name = 'ChatFailure';
-    this.chatError = { kind, message, retryable: opts.retryable ?? defaultRetryable(kind), cause: opts.cause };
+    this.chatError = { kind, message, retryable: opts.retryable ?? defaultRetryable(kind), cause: opts.cause,
+      ...(opts.reason ? { reason: opts.reason } : {}) };
     Object.setPrototypeOf(this, ChatFailure.prototype);
   }
 }

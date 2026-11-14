@@ -245,6 +245,10 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
         return ok(data<StorageUsage>('StorageUsage', 'happy'));
       },
       async trim() { return ok({ bytesFreed: 402_000_000 }); },
+      async fetch(_strandId, attachmentId) {
+        const a = data<Attachment[]>('StrandMedia').find(x => x.id === attachmentId);
+        return a?.uri ? ok({ uri: a.uri }) : fail('unavailable', 'Still arriving: not every part of this file is here yet.', { retryable: true, reason: 'still-arriving' });
+      },
     },
 
     search: {

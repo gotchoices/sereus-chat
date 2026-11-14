@@ -1395,8 +1395,8 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         - The dev bridge's `arm` now logs why a read failed, and the GUI harness runs serchat
           `-v` and prints it, so a recurrence names its cause.
       - **sereus#57 verified fixed on 1.22:** 1 launch attempt in 90 s, typed
-        `AppSchemaRefusedError` from `foundStrand`. Closing it on GitHub is left to the user
-        (the tool was not permitted to post).
+        `AppSchemaRefusedError` from `foundStrand` (no `strand:error` seen in that path). Closed
+        on GitHub 2026-11-11 with the evidence.
       - **NativeScript on 1.22 (S7, debug, fresh data):**
         - setup passes;
         - join and talk 2/2 (reply commits 2.0 / 2.9 s);
@@ -1853,6 +1853,62 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         unless `@libp2p/websockets` or the sereus kit batches sends itself (sereus#45).
       - **Opening an invitation link waits for the node** (`startedNode` in
         `sereus/model.ts`) is a correctness fix, not a workaround: keep.
+
+## Next directions (agreed 2026-11-13)
+
+Basic chat works. In order, stepping through one at a time:
+
+- [ ] **1. Real attachments over chunked blobs** (stories 20/21). Today the composer drops the
+      picked file (`consumePendingAttachment` is never called), and only the sender's local path
+      would travel, never the bytes. The design is `docs/blobs.md`.
+      - chunked, content-addressed storage behind a `BlobStore` interface, written so it can
+        switch to native Quereus/Optimystic blobs when they exist;
+      - CLI first (`attach`, `fetch`), CLI-to-CLI tests, then the phone (needs a file library:
+        `react-native-blob-util` or `react-native-file-access`);
+      - locality comes from whether the chunks are held, not whether a path is set;
+      - an outgoing size limit as the user's own setting (story 20; story 41 lacks it).
+      Expected stack fodder: transactions near 7.5 MiB (Optimystic backlog
+      `0.7-feat-a-transaction-larger-than-one-frame-can-commit`), large pushes through relays
+      (`bug-a-large-replication-push-stalls-a-relayed-attach`), the offline queue carrying
+      large writes, and backfill on join.
+      - [x] *(2026-11-13)* **Core and CLI.**
+        - Schema 0.4.0: `Attachment.Blob`, content-keyed `BlobChunk` and `Blob`.
+        - `sereus/blob-store.ts`: 256 KiB chunks, 8 per transaction, the `Blob` row last; each
+          chunk checked against its hash and the whole against the ref, which is
+          `chunks:1:<sha-256>`.
+        - `ChatHost.files` (`FileAccess`) and `maxAttachmentBytes` (default 25 MB; the new error
+          kind `too-large` is checked before anything is written).
+        - `media.fetch`; locality from the device's cached copy.
+        - serchat: `send --file` (repeatable), `attachments`, `fetch [-o]`.
+        - Tests:
+          - core `sereus/attachments.test.ts`: 2.3 MB identical at B (send 2.7 s, fetch 155 ms
+            on loopback); the same file twice is one blob; over the limit is refused with
+            nothing written. Core 84/84.
+          - CLI `test/attachments.test.ts`, through a relay: 10 KB, 2 MB and 12 MB, all
+            identical.
+            - Online: the send commits 14 MB in 25 s (about 0.56 MB/s, worth profiling);
+              Alice fetches 12 MB in 2.6 s.
+            - Offline mode: the send returns in 5.4 s and drains behind it; fetch 3.0 s.
+      - [ ] **Phone.** A file library (`react-native-file-access` or `react-native-blob-util`,
+        a native rebuild) for `FileAccess`; wire `consumePendingAttachment` into
+        `ChatInterface`'s send; show images from the cached copy and fetch on display; "still
+        arriving" and "too large" states; the outgoing limit in Settings (story 41).
+      - [ ] **Measure and report:** where the 0.56 MB/s goes (per-transaction cost through a
+        relay), on the S7 too.
+- [ ] **2. A shared drive per strand** (folders and files) on the same chunk layer. Needs a
+      story first: draft for the user to review.
+- [ ] **3. `apps/web`** (Phase 9 below), after sereus's `reference-app-web` (`cadre-web.ts`,
+      `web-edge-platform.ts`), IndexedDB storage and slots, and Svelte over the core stores.
+      Open question: protecting keys in a browser (the reference app stores them unencrypted).
+- [ ] **4. Small story gaps:**
+      - read position, minimal (a): timestamp-based cursor, saved on view (throttled), kept in
+        the private store; also fixes the divider, which compares random UUIDs;
+      - then (b): unread counts, mark unread;
+      - mention picker; open reaction set; promote a member; swipe to archive; search filters;
+        MediaViewer save.
+- [ ] **5. Voice and video calls** (story 90, parked by decision). Media through
+      `react-native-webrtc` (and the browser's own WebRTC), with signaling over a libp2p stream
+      on the strand node. No TURN exists for symmetric NATs.
 
 ## Phase 8 — Diagnostics and the Node harness
 

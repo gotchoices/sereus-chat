@@ -19,8 +19,9 @@ import type { ChatHost } from './host.js';
 import { LocalRecords, OutgoingInvitations, StrandPrefsStore, SummaryCache } from './local-state.js';
 import {
   addReaction, insertAttachments, insertMessage, newId, queryAttachments, queryMembers, queryMessages,
-  queryReactions, removeMessage, removeReaction, updateMessage,
+  queryReactions, removeMessage, removeReaction, updateMessage, type AttachmentRow,
 } from './operations.js';
+import { BlobNotHereError, CHUNK_SIZE, putBlob, readBlob } from './blob-store.js';
 import { createChatStrand, foundChatStrandInBackground } from './sapp-strands.js';
 import { classifyClaimFailure, nodeReach, readNodeCode } from './node-code.js';
 import { ownerFingerprint, type CadreMachine, type CadreStatus } from '../model/index.js';
@@ -82,18 +83,22 @@ async function retryAfterRestart<T>(write: () => Promise<T>, perf: (...a: unknow
   }
 }
 
-function toAttachment(a: {
-  Id: string; MessageId: string; Type: string; Uri: string | null; MimeType?: string; Name?: string;
-  ByteSize?: number | null; DurationMs?: number | null;
-}): Attachment {
-  return {
+/**
+ * An attachment as the app sees it. With a blob (0.4.0 on), `held` is this device's cached copy,
+ * if it has one: held means `local`, not yet means `fetching` (never absent). A row from before
+ * 0.4.0 carries only the sender's own path, which means something on that device alone.
+ */
+function toAttachment(a: AttachmentRow, held?: string | null): Attachment {
+  const common = {
     id: a.Id, messageId: a.MessageId, type: a.Type as Attachment['type'],
-    uri: a.Uri, mimeType: a.MimeType, name: a.Name,
-    byteSize: a.ByteSize ?? null, durationMs: a.DurationMs ?? null,
-    // A row held with no URI is being fetched — a null URI never reads as absent.
-    locality: a.Uri ? 'local' : 'fetching',
+    mimeType: a.MimeType, name: a.Name, byteSize: a.ByteSize ?? null, durationMs: a.DurationMs ?? null,
   };
+  if (a.Blob) return { ...common, uri: held ?? null, blob: a.Blob, locality: held ? 'local' : 'fetching' };
+  return { ...common, uri: a.Uri, locality: a.Uri ? 'local' : 'fetching' };
 }
+
+/** The most an attachment may be by default (story 20: the user's own limit). */
+const DEFAULT_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
 export function createSereusModel(host: ChatHost): SereusModel {
   const runtime = new StrandRuntime(host);
@@ -261,6 +266,73 @@ export function createSereusModel(host: ChatHost): SereusModel {
     return { ...(await records.prefs()), relayAddrs: await host.node.getRelayAddrs() };
   }
 
+  /** Attachments with their locality on this device (a cached copy of the blob, or not yet). */
+  async function withLocality(rows: AttachmentRow[]): Promise<Attachment[]> {
+    const files = host.files;
+    return Promise.all(rows.map(async a => {
+      if (!a.Blob || !files) return toAttachment(a);
+      const path = files.cachePath(a.Blob, a.Name);
+      return toAttachment(a, (await files.exists(path).catch(() => false)) ? path : null);
+    }));
+  }
+
+  /**
+   * Store each attachment's file as a blob in the strand (docs/blobs.md) and keep this device's
+   * copy where any member's would be. Sizes are checked first, so nothing is written for a send
+   * that one file over the limit refuses. Without `host.files` the attachments pass as they are.
+   */
+  async function storeAttachmentFiles(strand: StrandInstance, attachments: Attachment[]): Promise<Array<Attachment & { blob?: string | null }>> {
+    const files = host.files;
+    const toStore = files ? attachments.filter(a => a.uri && !a.blob) : [];
+    if (!files || !toStore.length) return attachments;
+    const max = host.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES;
+    const sizes = new Map<Attachment, number>();
+    for (const a of toStore) {
+      const size = await files.size(a.uri!);
+      if (size > max) {
+        const mb = (n: number) => (n / 1024 / 1024).toFixed(1);
+        throw new ChatFailure('too-large', `${a.name ?? 'That file'} is ${mb(size)} MB; the limit is ${mb(max)} MB.`, { retryable: false });
+      }
+      sizes.set(a, size);
+    }
+    const out: Array<Attachment & { blob?: string | null }> = [];
+    for (const a of attachments) {
+      if (!sizes.has(a)) { out.push(a); continue; }
+      const { ref, size } = await putBlob(strand, files.read(a.uri!, CHUNK_SIZE));
+      const cached = files.cachePath(ref, a.name);
+      if (!(await files.exists(cached))) await files.write(cached, files.read(a.uri!, CHUNK_SIZE));
+      // The sender's own path is its device's business: the strand carries the ref.
+      out.push({ ...a, uri: null, blob: ref, byteSize: size });
+    }
+    return out;
+  }
+
+  /** An attachment's bytes, assembled from the strand into this device's cached copy. */
+  async function fetchAttachment(strandId: string, attachmentId: string): Promise<{ uri: string }> {
+    const files = host.files;
+    if (!files) throw new ChatFailure('not-supported', 'This app cannot keep files.');
+    const strand = await strandFor(strandId);
+    const row = (await queryAttachments(strand)).find(r => r.Id === attachmentId);
+    if (!row) throw new ChatFailure('unavailable', 'That attachment has not arrived yet.', { retryable: true, reason: 'still-arriving' });
+    if (!row.Blob) {
+      if (row.Uri && await files.exists(row.Uri).catch(() => false)) return { uri: row.Uri };
+      throw new ChatFailure('unavailable', 'This attachment was sent without its file (by an older version of the app).', { retryable: false });
+    }
+    const path = files.cachePath(row.Blob, row.Name);
+    if (await files.exists(path).catch(() => false)) return { uri: path };
+    try {
+      await files.write(path, readBlob(strand, row.Blob));
+    } catch (err) {
+      if (err instanceof BlobNotHereError) {
+        throw new ChatFailure('unavailable', 'Still arriving: not every part of this file is here yet.', { retryable: true, reason: 'still-arriving' });
+      }
+      throw err;
+    }
+    // Lists showing it as "still arriving" re-read.
+    for (const listener of [...privateListeners]) listener();
+    return { uri: path };
+  }
+
   async function listMessages(strandId: string): Promise<Message[]> {
     const t0 = Date.now();
     const strand = await strandFor(strandId);
@@ -276,10 +348,10 @@ export function createSereusModel(host: ChatHost): SereusModel {
       perf('listMessages', rows.length, 'rows in', Date.now() - t0, 'ms');
     }
     const attByMessage = new Map<string, Attachment[]>();
-    for (const a of atts) {
-      const list = attByMessage.get(a.MessageId) ?? [];
-      list.push(toAttachment(a));
-      attByMessage.set(a.MessageId, list);
+    for (const a of await withLocality(atts)) {
+      const list = attByMessage.get(a.messageId!) ?? [];
+      list.push(a);
+      attByMessage.set(a.messageId!, list);
     }
     const me = runtime.peerId;
     const byMessage = new Map<string, Reaction[]>();
@@ -413,11 +485,15 @@ export function createSereusModel(host: ChatHost): SereusModel {
           'Could not register you in this conversation yet — no other member was reachable. Try again in a moment.');
       }
     }
+    // THE BYTES FIRST (docs/blobs.md): each file's chunks and `Blob` row are written before the
+    // message, so whoever sees the attachment can read every part it names, or soon will.
+    const attachments = await storeAttachmentFiles(strand, input.attachments ?? []);
+    if (attachments.some(a => a.blob)) step('blobs');
     const row = await retryAfterRestart(() => insertMessage(strand, peerId, input.content, input.replyToId), perf);
     step('insertMessage');
     const mark = delivery.record(strandId, row.Tx, { kind: 'send', messageId: row.Id, preview: input.content.slice(0, 40) });
     perfDelivery(strandId, row.Tx, input.content);
-    const saved = await insertAttachments(strand, row.Id, input.attachments ?? []);
+    const saved = await insertAttachments(strand, row.Id, attachments);
     step('insertAttachments');
     perf('send total', Date.now() - t0, 'ms for', input.content.slice(0, 24));
     return {
@@ -427,7 +503,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       timestamp: row.Timestamp,
       replyToId: row.ReplyToId ?? null,
       editedAt: null,
-      attachments: saved.map(toAttachment),
+      attachments: await withLocality(saved),
       reactions: [],
       ...(mark ? { delivery: mark } : {}),
     };
@@ -774,8 +850,9 @@ export function createSereusModel(host: ChatHost): SereusModel {
     media: {
       list: (id, opts) => attempt(async () => {
         const rows = await queryAttachments(await strandFor(id));
-        return rows.filter(r => !opts?.kind || r.Type === opts.kind).map(toAttachment);
+        return withLocality(rows.filter(r => !opts?.kind || r.Type === opts.kind));
       }),
+      fetch: (strandId, attachmentId) => attempt(() => fetchAttachment(strandId, attachmentId)),
       storageUsage: () => attempt(async (): Promise<StorageUsage> => {
         // Attachment byte sizes are what can be accounted for; block storage is not exposed.
         const byStrand: StorageUsage['byStrand'] = [];

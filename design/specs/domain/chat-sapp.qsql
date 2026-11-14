@@ -58,13 +58,30 @@ table Attachment (
     Id text primary key with tags ("optimystic.fresh" = true),
     MessageId text not null,
     Type text not null,                 -- image | video | file | voice
-    Uri text null,                      -- null while not held locally; see `locality` in ops.md
+    Uri text null,                      -- not written since 0.4.0 (where a device caches a file is its own business)
     MimeType text null,
     Name text null,
     ByteSize integer null,
     DurationMs integer null,            -- video and voice
+    Blob text null,                     -- the content's ref (docs/blobs.md), e.g. 'chunks:1:<sha-256>'
     foreign key (MessageId) references Message(Id)
 ) with tags ("optimystic.network_watch" = true);
+
+-- BLOBS (docs/blobs.md): a file's bytes, until Quereus/Optimystic store large values natively.
+-- Content-addressed and content-keyed: two members storing the same bytes store the same rows,
+-- and a repeat insert is not a conflict. A file is split into chunks small enough for a block,
+-- written a few per transaction; `Blob` lists them in order. Rows are added, never changed.
+table BlobChunk (
+    Hash text primary key,              -- sha-256 of Bytes, lowercase hex
+    Bytes blob not null
+) with tags ("optimystic.content_key" = true, "optimystic.network_watch" = true);
+
+table Blob (
+    Id text primary key,                -- sha-256 of the whole content, lowercase hex
+    Size integer not null,
+    ChunkSize integer not null,
+    Chunks text not null                -- JSON array of chunk hashes, in order
+) with tags ("optimystic.content_key" = true, "optimystic.network_watch" = true);
 
 table Reaction (
     MessageId text not null,

@@ -102,44 +102,45 @@
     "shareAgain": "Share again"
   },
   "errors": {
-    "unreachable": "There is nowhere for them to answer yet.",
-    "not-attached": "This conversation is not on this device.",
-    "unavailable": {
-      "default": "Could not get through just now. Try again in a moment.",
-      "owner-not-ready": "This device is still setting up its network. Try again in a moment."
+    "claim-failed": {
+      "default": "Adding the machine did not finish. Trying again is safe.",
+      "busy": "A machine is already being added."
     },
-    "not-a-member": "This device could not be added as a member of the conversation.",
-    "unsent-messages": "This device still has messages here it has not sent.",
-    "rejected": "The other members refused this change.",
-    "not-supported": "That is not possible yet.",
-    "join-inviter-unreachable": "Could not reach the person who invited you. Their app may be closed or offline — try again when they are back.",
-    "invitation-spent": "This invitation has already been used or has expired. Ask for a new one.",
-    "invitation-not-ready": "The invitation is not ready on their side yet. Try again in a moment.",
-    "join-refused": "The person who invited you did not let this join go through.",
-    "join-host-busy": "Their side could not finish this join just now. Try again in a moment.",
-    "join-host-outdated": "This conversation was made with an older version and cannot take new members. Ask for a new invitation.",
-    "join-incomplete": "You were let in, but this device could not finish setting up the conversation. Ask for a new invitation.",
-    "invitation-unusable": "This invitation cannot be used. Ask for a new one.",
+    "claim-refused": {
+      "default": "The machine refused to join.",
+      "claim-rate-limited": "The machine is refusing for now after too many tries. Wait a little and try again."
+    },
     "invalid-node-code": {
       "default": "This is not a usable node code.",
       "not-node-code": "This is not a node code.",
       "newer-version": "This code comes from a newer version of the node software. Update the app to use it.",
       "damaged": "This code is incomplete or damaged."
     },
+    "invitation-not-ready": "The invitation is not ready on their side yet. Try again in a moment.",
+    "invitation-spent": "This invitation has already been used or has expired. Ask for a new one.",
+    "invitation-unusable": "This invitation cannot be used. Ask for a new one.",
+    "join-host-busy": "Their side could not finish this join just now. Try again in a moment.",
+    "join-host-outdated": "This conversation was made with an older version and cannot take new members. Ask for a new invitation.",
+    "join-incomplete": "You were let in, but this device could not finish setting up the conversation. Ask for a new invitation.",
+    "join-inviter-unreachable": "Could not reach the person who invited you. Their app may be closed or offline — try again when they are back.",
+    "join-refused": "The person who invited you did not let this join go through.",
     "node-unreachable": {
       "default": "Could not reach that machine. Check that it is running and try again.",
       "home-network": "Could not reach that machine. It can only be reached on its own network: join that Wi-Fi and try again.",
       "anywhere": "Could not reach that machine. Check that it is running and try again."
     },
-    "claim-refused": {
-      "default": "The machine refused to join.",
-      "claim-rate-limited": "The machine is refusing for now after too many tries. Wait a little and try again."
+    "not-a-member": "This device could not be added as a member of the conversation.",
+    "not-attached": "This conversation is not on this device.",
+    "not-supported": "That is not possible yet.",
+    "rejected": "The other members refused this change.",
+    "too-large": "That file is larger than your limit for attachments.",
+    "unavailable": {
+      "default": "Could not get through just now. Try again in a moment.",
+      "owner-not-ready": "This device is still setting up its network. Try again in a moment."
     },
-    "claim-failed": {
-      "default": "Adding the machine did not finish. Trying again is safe.",
-      "busy": "A machine is already being added."
-    },
-    "unexpected": "Something went wrong."
+    "unexpected": "Something went wrong.",
+    "unreachable": "There is nowhere for them to answer yet.",
+    "unsent-messages": "This device still has messages here it has not sent."
   },
   "invite": {
     "abandon": "Abandon",

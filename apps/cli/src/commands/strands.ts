@@ -1,5 +1,7 @@
 /** Strands and messages: `strands`, `log`, `tail`, `send`, `members`, `mute`, `archive`, `leave`, `outbox`, `edit`, `delete`, `react`. */
-import type { Member, Message, Muted, StrandSummary } from '@chat/core';
+import type { Attachment, Member, Message, Muted, StrandSummary } from '@chat/core';
+import { basename, extname } from 'node:path';
+import { copyFile } from 'node:fs/promises';
 import { UsageError, type Session } from '../session.js';
 import type { Row } from '../output.js';
 import { need, type Command } from './command.js';
@@ -145,8 +147,9 @@ const tail: Command = {
 const send: Command = {
   name: 'send',
   summary: 'Send a message ("-" reads it from stdin)',
-  usage: '<strand> <text...> | <strand> - [--reply <message>]',
-  options: { reply: { type: 'string' } },
+  usage: '<strand> <text...> | <strand> - [--reply <message>] [--file <path>]...',
+  // --file: attach a file (repeatable). Its bytes travel with the strand (docs/blobs.md).
+  options: { reply: { type: 'string' }, file: { type: 'string', multiple: true } },
   async run(session, args, values) {
     const strand = await session.strand(need(send, args, 0, 'strand'));
     let content = args.slice(1).join(' ');
@@ -157,7 +160,12 @@ const send: Command = {
     if (!content) throw new UsageError(`send: missing text\nusage: send ${send.usage}`);
     const replyToId = typeof values.reply === 'string' ? (await session.message(strand.id, values.reply)).id : null;
     const started = Date.now();
-    const sent = session.unwrap(await session.model.messages.send(strand.id, { content, replyToId }));
+    const files = (values.file as string[] | undefined) ?? [];
+    const attachments: Attachment[] = files.map((path, i) => {
+      const { type, mimeType } = kindOf(path);
+      return { id: `file-${i}`, type, mimeType, uri: path, name: basename(path), locality: 'local' };
+    });
+    const sent = session.unwrap(await session.model.messages.send(strand.id, { content, replyToId, ...(attachments.length ? { attachments } : {}) }));
     const commitMs = Date.now() - started;
     session.out.rows([...MESSAGE_COLUMNS, 'commitMs'], [{ ...messageRow('', strand.id, sent, () => 'me'), commitMs }]);
   },
@@ -354,4 +362,47 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-export const strandCommands = [strands, log, tail, send, edit, del, react, members, nickname, nicknames, note, mute, archive, unarchive, leave, outbox, sql];
+/** An attachment's kind and media type, from its file name. */
+function kindOf(path: string): { type: Attachment['type']; mimeType?: string } {
+  const ext = extname(path).toLowerCase().slice(1);
+  const image: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic' };
+  const video: Record<string, string> = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
+  const voice: Record<string, string> = { m4a: 'audio/mp4', mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav', aac: 'audio/aac' };
+  if (image[ext]) return { type: 'image', mimeType: image[ext] };
+  if (video[ext]) return { type: 'video', mimeType: video[ext] };
+  if (voice[ext]) return { type: 'voice', mimeType: voice[ext] };
+  return { type: 'file', ...(ext === 'pdf' ? { mimeType: 'application/pdf' } : {}) };
+}
+
+const attachments: Command = {
+  name: 'attachments',
+  summary: 'List the files shared in a strand, and whether this machine holds each one yet',
+  usage: '<strand>',
+  async run(session, args) {
+    const strand = await session.strand(need(attachments, args, 0, 'strand'));
+    const list = session.unwrap(await session.model.media.list(strand.id));
+    session.out.rows(['row', 'attachmentId', 'messageId', 'type', 'name', 'bytes', 'locality'],
+      list.map((a, i) => ({ row: i + 1, attachmentId: a.id, messageId: a.messageId, type: a.type, name: a.name, bytes: a.byteSize, locality: a.locality })));
+  },
+};
+
+const fetchFile: Command = {
+  name: 'fetch',
+  summary: "Bring a shared file's bytes to this machine; -o copies it out",
+  usage: '<strand> <attachment row|id> [-o <file>]',
+  options: { out: { type: 'string', short: 'o' } },
+  async run(session, args, values) {
+    const strand = await session.strand(need(fetchFile, args, 0, 'strand'));
+    const which = need(fetchFile, args, 1, 'attachment');
+    const list = session.unwrap(await session.model.media.list(strand.id));
+    const att = /^\d+$/.test(which) ? list[Number(which) - 1] : list.find(a => a.id === which || a.id.startsWith(which));
+    if (!att) throw new UsageError(`fetch: no attachment "${which}" in strand ${strand.id} (see "attachments")`);
+    const started = Date.now();
+    const { uri } = session.unwrap(await session.model.media.fetch(strand.id, att.id));
+    if (typeof values.out === 'string') await copyFile(uri, values.out);
+    session.out.rows(['attachmentId', 'name', 'bytes', 'path', 'fetchMs'],
+      [{ attachmentId: att.id, name: att.name, bytes: att.byteSize, path: typeof values.out === 'string' ? values.out : uri, fetchMs: Date.now() - started }]);
+  },
+};
+
+export const strandCommands = [strands, log, tail, send, edit, del, react, members, nickname, nicknames, note, attachments, fetchFile, mute, archive, unarchive, leave, outbox, sql];

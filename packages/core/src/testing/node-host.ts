@@ -3,6 +3,7 @@
  * node with in-memory block storage and in-memory slots, and an in-process circuit relay
  * for the relay-only topology phones live in.
  */
+import { nodeFileAccess } from './node-files.js';
 import { CadreNode, InMemoryKeyStore } from '@serfab/cadre-core';
 import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { MemoryRawStorage } from '@optimystic/db-p2p';
@@ -68,6 +69,8 @@ export async function createTestParty(tag: string, opts: {
   /** Strand offline mode, as the RN app runs it: a write returns once saved here. Journal in a temp directory
    *  (Optimystic refuses a memory journal: it would not survive a restart). */
   offline?: boolean;
+  /** The attachment size limit (`ChatHost.maxAttachmentBytes`). */
+  maxAttachmentBytes?: number;
 }): Promise<TestParty> {
   const scopes = new Map<string, MemoryRawStorage>();
   const journals = new Map<string, FileKVStore>();
@@ -140,7 +143,10 @@ export async function createTestParty(tag: string, opts: {
       return () => control.removeEventListener('self:peer:update', callback);
     },
   };
-  const host: ChatHost = { node: nodeHost, slot: memorySlots(), ownerKeyStore, backgroundFounding: opts.backgroundFounding };
+  // Attachment bytes (docs/blobs.md): this party's cached copies in a temp directory of its own.
+  const files = nodeFileAccess(mkdtempSync(join(tmpdir(), `chat-files-${tag}-`)));
+  const host: ChatHost = { node: nodeHost, slot: memorySlots(), ownerKeyStore, backgroundFounding: opts.backgroundFounding,
+    files, ...(opts.maxAttachmentBytes ? { maxAttachmentBytes: opts.maxAttachmentBytes } : {}) };
   const { model, boot, settle } = createSereusModel(host);
   return { tag, host, node, model, boot, settle, stop: async () => {
     await settle();

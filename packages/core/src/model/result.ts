@@ -13,6 +13,8 @@ export type ChatErrorKind =
   | 'unreachable'
   /** The strand is not on this device. */
   | 'not-attached'
+  /** An attachment is larger than the user's own limit (story 20). */
+  | 'too-large'
   /** The data could not be read or written right now (a peer, the cohort, a timeout). */
   | 'unavailable'
   /** This device could not be registered as a member of the strand. */
@@ -52,7 +54,7 @@ export type ChatErrorKind =
 
 /** Every kind, for catalogs and tools that must cover them all. */
 const KINDS: Record<ChatErrorKind, true> = {
-  'unreachable': true, 'not-attached': true, 'unavailable': true, 'not-a-member': true,
+  'unreachable': true, 'not-attached': true, 'too-large': true, 'unavailable': true, 'not-a-member': true,
   'join-inviter-unreachable': true, 'invitation-spent': true, 'invitation-not-ready': true,
   'join-refused': true, 'join-host-busy': true, 'join-host-outdated': true, 'join-incomplete': true,
   'invitation-unusable': true, 'invalid-node-code': true, 'node-unreachable': true,

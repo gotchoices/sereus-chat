@@ -62,6 +62,23 @@ export interface NodeHost {
 /** Build and start a fresh party's node: relay-only, isolated storage. */
 export type CreateExtraNode = (opts: { tag: string; partyId: string; relayAddrs: string[] }) => Promise<CadreNode>;
 
+/**
+ * The device's files, for blobs (docs/blobs.md): reading a file the user picked, in pieces, and
+ * keeping a cached copy of a blob. Supplied by each app (Node `fs`, a React Native file library,
+ * the browser's own), so `@chat/core` stays platform-free. Without it, attachments carry no bytes.
+ */
+export interface FileAccess {
+  /** A local file's size in bytes. */
+  size(uri: string): Promise<number>;
+  /** A local file's bytes in order, in pieces of about `pieceSize`. */
+  read(uri: string, pieceSize: number): AsyncIterable<Uint8Array>;
+  /** Where this device keeps its copy of a blob (stable for a ref; `name` keeps the extension). */
+  cachePath(ref: string, name?: string): string;
+  exists(uri: string): Promise<boolean>;
+  /** Write `pieces` in order to `uri`, replacing it: through a temporary file, so a reader never sees half. */
+  write(uri: string, pieces: AsyncIterable<Uint8Array>): Promise<void>;
+}
+
 export interface ChatHost {
   node: NodeHost;
   /** The slot for one record. `key` names the strand for per-strand records. */
@@ -88,4 +105,8 @@ export interface ChatHost {
   createExtraNode?: CreateExtraNode;
   /** Development build: step timings and narrated joins in the log. */
   dev?: boolean;
+  /** The device's files, for attachment bytes (docs/blobs.md). */
+  files?: FileAccess;
+  /** The largest attachment this device sends, in bytes (story 20: the user's own limit). Default 25 MB. */
+  maxAttachmentBytes?: number;
 }

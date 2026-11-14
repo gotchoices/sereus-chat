@@ -13,6 +13,8 @@ export type Attachment = {
   byteSize?: number | null;
   durationMs?: number | null;
   locality: Locality;
+  /** The content's ref (docs/blobs.md), when its bytes travel with the strand. */
+  blob?: string | null;
 };
 
 export type StorageUsage = {
@@ -22,6 +24,11 @@ export type StorageUsage = {
 
 export interface MediaModel {
   list(strandId: string, opts?: { kind?: Attachment['type'] }): Promise<Result<Attachment[]>>;
+  /**
+   * Bring an attachment's bytes to this device: assembled from the strand into a local copy, whose
+   * `uri` this returns. Fails `unavailable` (reason `still-arriving`) while parts have not arrived.
+   */
+  fetch(strandId: string, attachmentId: string): Promise<Result<{ uri: string }>>;
   storageUsage(): Promise<Result<StorageUsage>>;
   trim(strandId: string, criteria: { olderThan?: string; kind?: Attachment['type'] }): Promise<Result<{ bytesFreed: number }>>;
 }
