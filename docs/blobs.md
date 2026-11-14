@@ -1,6 +1,7 @@
 # Blobs: file bytes in a strand
 
-Status: design, 2026-11-13. Step 1 of "Next directions" in `STATUS.md`.
+Status: core and serchat built, 2026-11-13. Step 1 of "Next directions" in `STATUS.md`. Native
+support requested upstream as gotchoices/quereus#40 (use case, this workaround, measurements, ideas).
 
 Chat's attachments (stories 20 and 21), and later a per-strand shared drive, need a file's
 **bytes** to reach the other members. Today nothing carries them: an `Attachment` row holds

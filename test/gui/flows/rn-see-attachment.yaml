@@ -1,0 +1,9 @@
+# The conversation on screen shows a photo someone sent (docs/blobs.md): it arrives as a blob,
+# is fetched when shown, and appears from the device's own copy. Run by phone-joins-serchat.mjs
+# with FILE=<an image>.
+appId: org.sereus.chat
+---
+- extendedWaitUntil:
+    visible:
+      id: "attachment-image"
+    timeout: 180000

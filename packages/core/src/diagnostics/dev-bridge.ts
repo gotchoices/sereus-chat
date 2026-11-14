@@ -6,6 +6,9 @@
  *
  *   strands()             → [{ id, title }]
  *   send(strandId, text)  → { ms }      the same `send` a composer calls
+ *   send(strandId, text, files?) → { ms }  files: local paths on the bridged machine, attached
+ *   files(strandId)       → [{ id, name, byteSize, locality }]   the strand's attachments
+ *   fetchFile(strandId, id) → { uri, ms }   its bytes to this machine (checked against its ref)
  *   arm(strandId)         → true        watch it, as a chat view does
  *   seen(text)            → epoch ms when first seen here, or null
  *   prepare()             → true                start founding a private strand in the background
@@ -25,11 +28,13 @@ import { parseInviteToken } from '../protocol/index.js';
 import type { ChatModel, Result } from '../model/index.js';
 import type { NodeHost } from '../sereus/host.js';
 
-export type DevBridgeMethod = 'strands' | 'send' | 'arm' | 'seen' | 'prepare' | 'invite' | 'accept' | 'traffic' | 'relays';
+export type DevBridgeMethod = 'strands' | 'send' | 'files' | 'fetchFile' | 'arm' | 'seen' | 'prepare' | 'invite' | 'accept' | 'traffic' | 'relays';
 
 export interface DevBridge {
   strands(): Promise<Array<{ id: string; title: string }>>;
-  send(strandId: string, text: string): Promise<{ ms: number }>;
+  send(strandId: string, text: string, files?: string[]): Promise<{ ms: number }>;
+  files(strandId: string): Promise<Array<{ id: string; name?: string; byteSize?: number | null; locality: string }>>;
+  fetchFile(strandId: string, attachmentId: string): Promise<{ uri: string; ms: number }>;
   arm(strandId: string): Promise<boolean>;
   seen(text: string): number | null;
   prepare(): true;
@@ -112,10 +117,22 @@ export function createDevBridge(model: ChatModel, host?: NodeHost): DevBridge {
     async strands() {
       return value(await model.strands.list()).map(s => ({ id: s.id, title: s.title }));
     },
-    async send(strandId, text) {
+    async send(strandId, text, files) {
       const t0 = Date.now();
-      value(await model.messages.send(strandId, { content: text, replyToId: null }));
+      const attachments = (files ?? []).map((uri, i) => ({
+        id: `file-${i}`, type: /\.(jpe?g|png|gif|webp)$/i.test(uri) ? 'image' as const : 'file' as const,
+        uri, name: uri.split('/').pop(), locality: 'local' as const,
+      }));
+      value(await model.messages.send(strandId, { content: text, replyToId: null, ...(attachments.length ? { attachments } : {}) }));
       return { ms: Date.now() - t0 };
+    },
+    async files(strandId) {
+      return value(await model.media.list(strandId)).map(a => ({ id: a.id, name: a.name, byteSize: a.byteSize, locality: a.locality }));
+    },
+    async fetchFile(strandId, attachmentId) {
+      const t0 = Date.now();
+      const { uri } = value(await model.media.fetch(strandId, attachmentId));
+      return { uri, ms: Date.now() - t0 };
     },
     async arm(strandId) {
       if (armed.has(strandId)) return true;

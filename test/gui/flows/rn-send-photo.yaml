@@ -1,0 +1,24 @@
+# From the open conversation, attach the first photo in the system picker and send it
+# (docs/blobs.md). Run by phone-joins-serchat.mjs with PHONE_FILE=1.
+appId: org.sereus.chat
+---
+- tapOn: "Attach"
+- tapOn:
+    id: "media-gallery"
+- extendedWaitUntil:
+    visible:
+      id: ".*:id/icon_thumbnail"
+    timeout: 30000
+- tapOn:
+    id: ".*:id/icon_thumbnail"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "staged-attachments"
+    timeout: 30000
+- tapOn:
+    id: "composer-send"
+- extendedWaitUntil:
+    notVisible:
+      id: "staged-attachments"
+    timeout: 120000

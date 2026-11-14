@@ -1889,12 +1889,34 @@ Basic chat works. In order, stepping through one at a time:
             - Online: the send commits 14 MB in 25 s (about 0.56 MB/s, worth profiling);
               Alice fetches 12 MB in 2.6 s.
             - Offline mode: the send returns in 5.4 s and drains behind it; fetch 3.0 s.
-      - [ ] **Phone.** A file library (`react-native-file-access` or `react-native-blob-util`,
-        a native rebuild) for `FileAccess`; wire `consumePendingAttachment` into
-        `ChatInterface`'s send; show images from the cached copy and fetch on display; "still
-        arriving" and "too large" states; the outgoing limit in Settings (story 41).
-      - [ ] **Measure and report:** where the 0.56 MB/s goes (per-transaction cost through a
-        relay), on the S7 too.
+      - [x] *(2026-11-13)* **Phone: photos both ways on the S7** (RN release, public relay,
+        fresh data).
+        - `react-native-file-access` 4.0.4 (native) behind `host/files.ts`: `readFileChunk` in
+          base64 pieces, copies in `CacheDir/blobs`, `file://` URIs.
+        - `ChatInterface`:
+          - picked files are staged above the composer, removable, and sent with the message
+            (`consumePendingAttachment` is finally used);
+          - a photo still arriving is fetched as soon as it is shown, other kinds on tap;
+          - a refused send keeps the text and the files.
+        - Dev bridge: `send(…, files)`, `files`, `fetchFile`.
+        - GUI harness: `FILE=<image>` (serchat's reply carries it; flow `rn-see-attachment.yaml`)
+          and `PHONE_FILE=1` (the phone picks the first photo in Google's Photo Picker and sends
+          it; flow `rn-send-photo.yaml`; serchat must fetch it whole).
+        - Both pass:
+          - serchat → phone, 843 KB: the reply **committed in 111.7 s**, and the photo showed
+            46 s after the text;
+          - phone → serchat, 1.0 MB PNG: **at serchat 204 s after sending**, fetched in 98 ms.
+      - [ ] **Phone, rest:** the "too large" path on screen; the outgoing limit in Settings
+        (story 41); files, video and voice in the bubble and MediaViewer (open with another
+        app); saving to the phone (MediaViewer `save` is still a stub).
+      - [x] *(2026-11-13)* Native blobs requested as **gotchoices/quereus#40** (use case, this
+        workaround, measurements, and ideas from SQLite, PostgreSQL, Fossil and git LFS/IPFS).
+        There was no backlog ticket for it.
+      - [ ] **Measure and report — now the main item:** large writes are slow, worst with a phone in
+        the cohort: 0.56 MB/s CLI-to-CLI through a local relay; 112 s to commit 843 KB, and 204 s
+        for 1 MB to arrive, phone with serchat over the public relay. Split the phone's side (base64
+        file reads, sha-256 in JS on Hermes, journal writes) from the stack's (transaction size,
+        relay throughput, cohort approval); then a repro for Optimystic if it's theirs.
 - [ ] **2. A shared drive per strand** (folders and files) on the same chunk layer. Needs a
       story first: draft for the user to review.
 - [ ] **3. `apps/web`** (Phase 9 below), after sereus's `reference-app-web` (`cadre-web.ts`,

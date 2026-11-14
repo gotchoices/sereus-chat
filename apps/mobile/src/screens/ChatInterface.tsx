@@ -22,6 +22,7 @@ import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-na
 import { chatStore, isSending } from '@chat/core';
 import { useModel, useStore } from '../data/bind';
 import type { Message, Member, StrandState, Attachment, Delivery } from '@chat/core';
+import { consumePendingAttachment, type ProvisionalAttachment } from '../data/attachmentDraft';
 import { useErrorText, useT } from '../i18n';
 import { useDataRevision } from '../mock/VariantContext';
 import { ActionSheet,
@@ -43,12 +44,17 @@ const clock = (iso: string) =>
  * and neither is a broken image — a null uri never means the thing is absent
  * (design/specs/domain/overview.md).
  */
-function AttachmentView({ a, onPress }: { a: Attachment; onPress: () => void }) {
+function AttachmentView({ a, onPress, fetch }: { a: Attachment; onPress: () => void; fetch: () => void }) {
   const theme = useTheme();
-  if (a.locality === 'local' && a.uri && (a.type === 'image' || a.type === 'video')) {
+  // A photo still arriving is fetched as soon as it is shown (docs/blobs.md): the copy lands in
+  // this device's cache and the list re-reads it as local. Larger kinds wait for a tap.
+  useEffect(() => {
+    if (a.blob && a.locality !== 'local' && a.type === 'image') fetch();
+  }, [a.blob, a.locality, a.type, fetch]);
+  if (a.locality === 'local' && a.uri && a.type === 'image') {
     return (
       <Pressable onPress={onPress}>
-        <Image source={{ uri: a.uri }} style={styles.attachImage} />
+        <Image testID="attachment-image" accessibilityLabel={a.name ?? 'image'} source={{ uri: a.uri }} style={styles.attachImage} />
       </Pressable>
     );
   }
@@ -135,6 +141,18 @@ export default function ChatInterface() {
   const error = actionError ?? view.error?.message ?? null;
   const load = useCallback(() => { setActionError(null); store.reload(); }, [store]);
   const [draft, setDraft] = useState('');
+  /** Files picked for the next message (story 20: removable before sending). */
+  const [staged, setStaged] = useState<ProvisionalAttachment[]>([]);
+  useFocusEffect(useCallback(() => {
+    const picked = consumePendingAttachment();
+    if (picked) setStaged(list => [...list, picked]);
+  }, []));
+  const fetchAttachment = useCallback((attachmentId: string) => {
+    void model.media.fetch(strandId, attachmentId).then(r => {
+      // "Still arriving" is not an error: the bubble keeps saying so, and it is tried again.
+      if (!r.ok && r.error.reason !== 'still-arriving') setActionError(errorText(r.error));
+    });
+  }, [model, strandId, errorText]);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   const [readCursor, setReadCursor] = useState<string | null>(null);
@@ -188,7 +206,7 @@ export default function ChatInterface() {
 
   const doSend = async () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text && (editing || !staged.length)) return;
     if (editing) {
       // Edit in place — no version chain, no history (story 13).
       const target = editing;
@@ -203,11 +221,20 @@ export default function ChatInterface() {
     setDraft('');
     const pendingReply = replyTo?.id ?? null;
     setReplyTo(null);
+    const files = staged;
+    setStaged([]);
+    // Picked files travel as blobs (docs/blobs.md): the model stores their bytes before the message.
+    const attachments: Attachment[] = files.filter(f => f.uri).map(f => ({
+      id: f.id, type: f.type === 'location' ? 'file' : f.type, uri: f.uri!, name: f.name,
+      mimeType: f.mimeType, byteSize: f.size ?? null, locality: 'local',
+    }));
     // Shown at once as "Sending…"; the store swaps in the stored message when the write returns.
-    const sent = await store.send({ content: text, replyToId: pendingReply, memberId: me?.id });
+    const sent = await store.send({ content: text, replyToId: pendingReply, memberId: me?.id,
+      ...(attachments.length ? { attachments } : {}) });
     if (!sent.ok) {
-      // A genuine write failure — keep what they wrote.
+      // A genuine write failure (or a file over the limit): keep what they wrote and picked.
       setDraft(text);
+      setStaged(files);
       setActionError(errorText(sent.error));
     }
   };
@@ -296,9 +323,11 @@ export default function ChatInterface() {
         attachment={
           m.attachments.length
             ? m.attachments.map(a => (
-                <AttachmentView key={a.id} a={a}
-                  onPress={() => navigation.navigate('MediaViewer',
-                    { strandId, attachmentId: a.id, setFilter: 'all', title })} />
+                <AttachmentView key={a.id} a={a} fetch={() => fetchAttachment(a.id)}
+                  onPress={() => {
+                    if (a.locality !== 'local' && a.blob) { fetchAttachment(a.id); return; }
+                    navigation.navigate('MediaViewer', { strandId, attachmentId: a.id, setFilter: 'all', title });
+                  }} />
               ))
             : undefined
         }
@@ -404,6 +433,22 @@ export default function ChatInterface() {
         </View>
       ) : null}
 
+      {staged.length ? (
+        <View testID="staged-attachments" style={[styles.replyBar, { backgroundColor: theme.surfaceAlt, borderTopColor: theme.divider }]}>
+          <View style={styles.flex1}>
+            {staged.map(f => (
+              <View key={f.id} style={styles.stagedRow}>
+                <Text numberOfLines={1} style={[typography.small, styles.flex1, { color: theme.textPrimary }]}>
+                  {f.name ?? f.type}{f.size ? ` · ${(f.size / 1024 / 1024).toFixed(1)} MB` : ''}
+                </Text>
+                <IconButton name="close-outline" size={18} accessibilityLabel={t('common.remove')}
+                  testID={`staged-remove-${f.id}`} onPress={() => setStaged(list => list.filter(x => x.id !== f.id))} />
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       {replyTo ? (
         <View style={[styles.replyBar, { backgroundColor: theme.surfaceAlt, borderTopColor: theme.divider }]}>
           <View style={styles.flex1}>
@@ -428,7 +473,7 @@ export default function ChatInterface() {
           placeholderTextColor={theme.textMuted}
           style={[typography.body, styles.input, { color: theme.textPrimary, backgroundColor: theme.surfaceAlt }]}
         />
-        {draft.trim() ? (
+        {draft.trim() || (staged.length && !editing) ? (
           <IconButton name={editing ? 'checkmark-outline' : 'send-outline'} size={22} variant="accent"
             accessibilityLabel={editing ? t('common.save') : t('actions.send')}
             testID="composer-send"
@@ -463,6 +508,7 @@ const styles = StyleSheet.create({
   unreadRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], paddingVertical: spacing[1] },
   rule: { flex: 1, height: StyleSheet.hairlineWidth },
   jump: { position: 'absolute', right: spacing[3], bottom: 84, paddingHorizontal: spacing[2], paddingVertical: 6, borderRadius: radius.pill },
+  stagedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
   replyBar: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], padding: spacing[2], borderTopWidth: StyleSheet.hairlineWidth },
   flex1: { flex: 1 },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[1], padding: spacing[2], borderTopWidth: StyleSheet.hairlineWidth },

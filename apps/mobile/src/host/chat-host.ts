@@ -8,6 +8,7 @@ import type { ChatHost, DurableSlot, NodeHost, SlotName } from '@chat/core/sereu
 import { createExtraNode } from './extra-node';
 import { STORAGE_KEYS } from '../data/persisted-names';
 import { cadreService } from './CadreService';
+import { phoneFiles } from './files';
 import { SecureStoreKeyStore } from '@serfab/cadre-rn/key-store';
 import { keychainSecureStore } from './keychain';
 
@@ -53,4 +54,6 @@ export const chatHost: ChatHost = {
   // keychain store, with the same (default) options, the kit's phone node files it under.
   ownerKeyStore: new SecureStoreKeyStore(keychainSecureStore),
   dev: __DEV__,
+  // Attachment bytes (docs/blobs.md): read picked files, keep copies of blobs in the cache.
+  files: phoneFiles,
 };

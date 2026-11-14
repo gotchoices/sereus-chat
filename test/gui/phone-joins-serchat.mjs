@@ -18,7 +18,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connectBridge } from '../devices/bridge.mjs';
 
@@ -100,7 +100,8 @@ try {
       const seenAt = await other.call('seen', PHONE_TEXT);
       if (seenAt) {
         log(`serchat saw the phone's message; replying`);
-        const { ms } = await other.call('send', strandId, REPLY_TEXT);
+        // FILE=<path>: the reply carries that file (docs/blobs.md), and the phone must show it.
+        const { ms } = await other.call('send', strandId, REPLY_TEXT, ...(process.env.FILE ? [[process.env.FILE]] : []));
         log(`serchat's reply committed in ${ms} ms`);
         return true;
       }
@@ -110,8 +111,42 @@ try {
   })();
 
   const [flowCode, replied] = await Promise.all([flowDone, answered]);
+  let imageShown = true;
+  if (process.env.FILE && flowCode === 0 && replied) {
+    // The conversation is on screen: the reply's photo must arrive and show.
+    const t = Date.now();
+    const shown = spawnSync('maestro', ['--device', DEVICE, 'test', join(dirname(fileURLToPath(import.meta.url)), 'flows', 'rn-see-attachment.yaml')], { env, encoding: 'utf8' });
+    imageShown = shown.status === 0;
+    log(imageShown ? `the phone shows serchat's photo, ${Date.now() - t} ms after the text` : `FAIL: the photo never showed:\n${shown.stdout.split('\n').filter(l => /FAILED|COMPLETED/.test(l)).slice(-3).join('\n')}`);
+  }
+  let photoArrived = true;
+  if (process.env.PHONE_FILE === '1' && flowCode === 0 && replied) {
+    // The phone attaches a photo through the picker and sends it; serchat must fetch it whole
+    // (a fetch is checked chunk by chunk and against the ref, so success means intact).
+    const before = new Set((await other.call('files', strandId)).map(f => f.id));
+    const t = Date.now();
+    const sent = spawnSync('maestro', ['--device', DEVICE, 'test', join(dirname(fileURLToPath(import.meta.url)), 'flows', 'rn-send-photo.yaml')], { env, encoding: 'utf8' });
+    if (sent.status !== 0) {
+      photoArrived = false;
+      log(`FAIL: the phone could not send a photo:\n${sent.stdout.split('\n').filter(l => /FAILED|COMPLETED/.test(l)).slice(-3).join('\n')}`);
+    } else {
+      photoArrived = false;
+      for (const deadline = Date.now() + 300_000; !photoArrived && Date.now() < deadline;) {
+        const fresh = (await other.call('files', strandId)).filter(f => !before.has(f.id));
+        if (fresh.length) {
+          try {
+            const { ms } = await other.call('fetchFile', strandId, fresh[0].id);
+            log(`serchat fetched the phone's photo (${fresh[0].name}, ${fresh[0].byteSize} bytes) ${Date.now() - t} ms after the phone sent it (fetch ${ms} ms)`);
+            photoArrived = true;
+          } catch (err) { /* still arriving */ }
+        }
+        if (!photoArrived) await new Promise(r => setTimeout(r, 3000));
+      }
+      if (!photoArrived) log("FAIL: serchat never got the phone's photo whole within 300 s");
+    }
+  }
   other.close();
-  code = flowCode === 0 && replied ? 0 : 1;
+  code = flowCode === 0 && replied && imageShown && photoArrived ? 0 : 1;
   log(code === 0 ? 'PASS: the phone joined through its screens, and both messages crossed'
     : `FAIL: maestro exited ${flowCode}, serchat ${replied ? 'replied' : 'never saw the phone\'s message'}`);
 } catch (err) {
