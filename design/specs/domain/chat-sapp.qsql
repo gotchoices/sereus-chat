@@ -77,7 +77,7 @@ table BlobChunk (
 ) with tags ("optimystic.content_key" = true, "optimystic.network_watch" = true);
 
 table Blob (
-    Id text primary key,                -- sha-256 of the whole content, lowercase hex
+    Id text primary key,                -- sha-256 of the chunk list (size, chunk size, chunk hashes), lowercase hex
     Size integer not null,
     ChunkSize integer not null,
     Chunks text not null                -- JSON array of chunk hashes, in order

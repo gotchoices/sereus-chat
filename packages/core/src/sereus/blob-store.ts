@@ -3,7 +3,7 @@
  * values natively.
  *
  * A blob is split into chunks small enough for a block, each stored once under its sha-256 in
- * `App.BlobChunk`; `App.Blob` lists a blob's chunks in order under the sha-256 of the whole. Both
+ * `App.BlobChunk`; `App.Blob` lists a blob's chunks in order under the sha-256 of that list. Both
  * tables are content-keyed, so a repeat of the same bytes (the same file attached twice, or by two
  * members) writes nothing new. Chunks go a few per transaction, under Optimystic's 7.5 MiB limit,
  * and the `Blob` row last: whoever sees it can read every chunk it names, or soon will.
@@ -14,7 +14,7 @@
  */
 import type { StrandInstance } from '@serfab/cadre-core';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex } from '@noble/hashes/utils.js';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 
 export type BlobRef = string;
 
@@ -23,6 +23,28 @@ export const CHUNK_SIZE = 256 * 1024;
 /** Chunks per transaction: about 2 MiB raw, 2.7 MiB encoded, against the 7.5 MiB limit. */
 const CHUNKS_PER_TX = 8;
 const SCHEME = 'chunks:1:';
+
+/**
+ * SHA-256, natively where the platform has it (`crypto.subtle`: Node, browsers, and React Native
+ * through the cadre kit's native digest). Pure JavaScript was the phone's biggest cost: 19 s for
+ * 1 MB on the S7, 3.4 s on an S21 (2026-11-13). JavaScript remains the fallback.
+ */
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const subtle = (globalThis as { crypto?: { subtle?: { digest?(alg: string, data: Uint8Array): Promise<ArrayBuffer> } } }).crypto?.subtle;
+  if (subtle?.digest) {
+    try { return bytesToHex(new Uint8Array(await subtle.digest('SHA-256', bytes))); } catch { /* fall back */ }
+  }
+  return bytesToHex(sha256(bytes));
+}
+
+/**
+ * A blob's id: the SHA-256 of its chunk list (size, chunk size, then each chunk's hash), a hash
+ * list as in IPFS. Only chunks are hashed, each with the native digest (which has no incremental
+ * form for a whole stream); the id still names exactly this content in this chunking.
+ */
+function blobId(size: number, chunkSize: number, hashes: string[]): Promise<string> {
+  return sha256Hex(utf8ToBytes(`chunks:1\n${chunkSize}\n${size}\n${hashes.join('\n')}`));
+}
 
 export function isChunkRef(ref: string): boolean {
   return ref.startsWith(SCHEME);
@@ -56,12 +78,16 @@ async function* rechunk(source: AsyncIterable<Uint8Array>, size: number): AsyncI
  */
 export async function putBlob(strand: StrandInstance, source: AsyncIterable<Uint8Array>): Promise<{ ref: BlobRef; size: number }> {
   const d = db(strand);
-  const whole = sha256.create();
   const hashes: string[] = [];
   let size = 0;
   let batch: Array<[string, Uint8Array]> = [];
+  // Where the time goes (one log line per blob, always on: the costs differ a lot by device).
+  const t0 = Date.now();
+  let readMs = 0, hashMs = 0;
+  const txMs: number[] = [];
   const flush = async () => {
     if (!batch.length) return;
+    const tx = Date.now();
     await d.exec('begin');
     try {
       for (const [hash, bytes] of batch) {
@@ -72,28 +98,39 @@ export async function putBlob(strand: StrandInstance, source: AsyncIterable<Uint
       await d.exec('rollback').catch(() => {});
       throw err;
     }
+    txMs.push(Date.now() - tx);
     batch = [];
   };
-  for await (const chunk of rechunk(source, CHUNK_SIZE)) {
-    whole.update(chunk);
-    const hash = bytesToHex(sha256(chunk));
+  const chunks = rechunk(source, CHUNK_SIZE)[Symbol.asyncIterator]();
+  for (;;) {
+    let r = Date.now();
+    const next = await chunks.next();
+    readMs += Date.now() - r;
+    if (next.done) break;
+    const chunk = next.value;
+    r = Date.now();
+    const hash = await sha256Hex(chunk);
+    hashMs += Date.now() - r;
     hashes.push(hash);
     size += chunk.length;
     batch.push([hash, chunk]);
     if (batch.length >= CHUNKS_PER_TX) await flush();
   }
   await flush();
-  const id = bytesToHex(whole.digest());
+  const id = await blobId(size, CHUNK_SIZE, hashes);
+  const m = Date.now();
   await d.exec('insert or ignore into App.Blob (Id, Size, ChunkSize, Chunks) values (?, ?, ?, ?)',
     [id, size, CHUNK_SIZE, JSON.stringify(hashes)]);
+  console.info(`[blob] put ${(size / 1e6).toFixed(2)} MB in ${Date.now() - t0} ms: read ${readMs}, hash ${hashMs}, ` +
+    `${txMs.length} chunk tx [${txMs.join(', ')}] ms, manifest ${Date.now() - m} ms`);
   return { ref: `${SCHEME}${id}`, size };
 }
 
 /** A blob's manifest, or null while its `Blob` row has not arrived here. */
-export async function blobManifest(strand: StrandInstance, ref: BlobRef): Promise<{ size: number; chunks: string[] } | null> {
+export async function blobManifest(strand: StrandInstance, ref: BlobRef): Promise<{ size: number; chunkSize: number; chunks: string[] } | null> {
   if (!isChunkRef(ref)) throw new Error(`Not a chunk-store blob: ${ref}`);
-  for await (const r of db(strand).eval('select Size, Chunks from App.Blob where Id = ?', [ref.slice(SCHEME.length)])) {
-    return { size: Number(r.Size), chunks: JSON.parse(r.Chunks as string) as string[] };
+  for await (const r of db(strand).eval('select Size, ChunkSize, Chunks from App.Blob where Id = ?', [ref.slice(SCHEME.length)])) {
+    return { size: Number(r.Size), chunkSize: Number(r.ChunkSize), chunks: JSON.parse(r.Chunks as string) as string[] };
   }
   return null;
 }
@@ -103,21 +140,27 @@ export class BlobNotHereError extends Error {
 }
 
 /**
- * A blob's bytes, in order, each chunk checked against its hash and the whole against the ref.
+ * A blob's bytes, in order: the manifest checked against the ref, and each chunk against its hash.
  * Throws `BlobNotHereError` for a part not arrived yet, and plainly for a corrupt one.
  */
 export async function* readBlob(strand: StrandInstance, ref: BlobRef): AsyncIterable<Uint8Array> {
   const manifest = await blobManifest(strand, ref);
   if (!manifest) throw new BlobNotHereError(`Blob ${ref} has not arrived yet`, 'manifest');
+  // The manifest must be the one the ref names, so its chunk list can be trusted.
+  if (`${SCHEME}${await blobId(manifest.size, manifest.chunkSize, manifest.chunks)}` !== ref) {
+    throw new Error(`Blob ${ref}: its manifest does not match the ref`);
+  }
   const d = db(strand);
-  const whole = sha256.create();
+  const t0 = Date.now();
+  let queryMs = 0;
   for (const hash of manifest.chunks) {
     let bytes: Uint8Array | undefined;
+    const q = Date.now();
     for await (const r of d.eval('select Bytes from App.BlobChunk where Hash = ?', [hash])) bytes = r.Bytes as Uint8Array;
+    queryMs += Date.now() - q;
     if (!bytes) throw new BlobNotHereError(`A part of blob ${ref} has not arrived yet`, 'chunk');
-    if (bytesToHex(sha256(bytes)) !== hash) throw new Error(`A part of blob ${ref} does not match its hash`);
-    whole.update(bytes);
+    if (await sha256Hex(bytes) !== hash) throw new Error(`A part of blob ${ref} does not match its hash`);
     yield bytes;
   }
-  if (`${SCHEME}${bytesToHex(whole.digest())}` !== ref) throw new Error(`Blob ${ref} does not match its ref`);
+  console.info(`[blob] read ${(manifest.size / 1e6).toFixed(2)} MB in ${Date.now() - t0} ms (chunk queries ${queryMs} ms, ${manifest.chunks.length} chunks)`);
 }

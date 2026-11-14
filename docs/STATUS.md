@@ -1912,7 +1912,34 @@ Basic chat works. In order, stepping through one at a time:
       - [x] *(2026-11-13)* Native blobs requested as **gotchoices/quereus#40** (use case, this
         workaround, measurements, and ideas from SQLite, PostgreSQL, Fossil and git LFS/IPFS).
         There was no backlog ticket for it.
-      - [ ] **Measure and report — now the main item:** large writes are slow, worst with a phone in
+      - [x] *(2026-11-13)* **Breakdown, and the phone's share fixed.**
+        - **Logging:** `[blob] put` / `[blob] read` (file read, hash, per-transaction commit
+          times) and `[queue] … drained`, one line each, always on.
+        - **Phone, before:** SHA-256 in JavaScript on Hermes was the phone's biggest cost: 19.1 s
+          of 26.4 s for 1 MB on the S7, and 3.4 s of 4.4 s on an S21.
+        - **Fixed:** chunks are hashed with the native `crypto.subtle.digest` (the cadre kit's on
+          the phone). The blob id is now the SHA-256 of the chunk list (a hash list, as in IPFS),
+          since the native digest has no incremental form.
+        - **Phone, after:** put 0.99 s on the S21 (hash 0 ms) and 4.7 s on the S7 (hash 5 ms;
+          read 1.0 s, the local chunk transaction 3.7 s).
+        - **Still slow, the stack's share** (`test/stack/blob-cost.mjs`, loopback, no phone or
+          relay):
+          - about 0.6 MB/s, and per byte, not per transaction: a tiny commit takes 126 ms, one
+            256 KiB chunk 418 ms, 8 chunks 3.9 s;
+          - 16 chunks (4.2 MB raw) encode to 14.3 MB and are refused (7.5 MiB limit): about
+            3.4× the raw size, against base64's 1.33×;
+          - the CPU profile of one 8-chunk commit: Optimystic JSON encode, decode and
+            canonicalization, plus TextEncoder, about 35%; native hash `update` 12%; clones 5%;
+            Quereus `uint8ArrayToHex` 5%.
+        - **Network:** the queue drains in 6 s (S21) to 28–83 s (S7), and serchat sees the photo
+          39–98 s after sending, so ~30 s passes between commit and serchat reading it.
+          serchat → phone, the phone approving: 100–112 s for 843 KB over the public relay, even
+          with the S21.
+      - [ ] **Report the stack's share to Optimystic** (prepared, awaiting the user's OK): per-byte
+        commit cost and the 3.4× encoding, `blob-cost.mjs` with `PROFILE=`.
+      - [ ] **Next: try WebRTC direct** (relayed → direct): does it fix the queue drain and the
+        commit-with-a-phone time? Then the ~30 s from commit to serchat reading it.
+      - [ ] *(Superseded by the lines above.)* **Measure and report — now the main item:** large writes are slow, worst with a phone in
         the cohort: 0.56 MB/s CLI-to-CLI through a local relay; 112 s to commit 843 KB, and 204 s
         for 1 MB to arrive, phone with serchat over the public relay. Split the phone's side (base64
         file reads, sha-256 in JS on Hermes, journal writes) from the stack's (transaction size,

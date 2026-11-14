@@ -17,7 +17,7 @@ function value<T>(result: { ok: true; value: T } | { ok: false; error: { kind: s
 const sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
 
 describe('attachments carry their bytes', () => {
-  let a: TestParty, b: TestParty, strandId: string;
+  let a: TestParty, b: TestParty, strandId: string, firstRef = '';
   const dir = mkdtempSync(join(tmpdir(), 'chat-attach-'));
   // Not a multiple of the chunk size, and more than a transaction's worth of chunks.
   const bytes = new Uint8Array(randomBytes(2_300_123));
@@ -46,7 +46,7 @@ describe('attachments carry their bytes', () => {
     const sendMs = Date.now() - t0;
     const att = sent.attachments[0];
     expect(att.blob).toMatch(/^chunks:1:[0-9a-f]{64}$/);
-    expect(att.blob).toBe(`chunks:1:${sha(bytes)}`);
+    firstRef = att.blob!;
     expect(att.locality).toBe('local');          // the sender keeps its own copy
     expect(att.byteSize).toBe(bytes.length);
 
@@ -77,7 +77,7 @@ describe('attachments carry their bytes', () => {
       content: 'again',
       attachments: [{ id: 'local', type: 'image', uri: file, name: 'holiday.jpg', locality: 'local' }],
     }));
-    expect(again.attachments[0].blob).toBe(`chunks:1:${sha(bytes)}`);
+    expect(again.attachments[0].blob).toBe(firstRef);
     const db = a.node.getStrands().get(strandId)!.database!.getDatabase();
     let blobs = 0;
     for await (const _ of db.eval('select Id from App.Blob')) blobs++;

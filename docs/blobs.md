@@ -24,7 +24,7 @@ transaction.
 
 ```ts
 /** An opaque, self-describing reference: the scheme says which store wrote it. */
-type BlobRef = string;                 // 'chunks:1:<sha256 of the whole content>'
+type BlobRef = string;                 // 'chunks:1:<sha256 of the chunk list>'
 
 interface BlobStore {
   /** Store bytes read from `source` in order; resolves to its ref once every part is written. */
@@ -36,8 +36,10 @@ interface BlobStore {
 }
 ```
 
-- **A ref names content, not a place.** It is the hash of the whole content, so two members
-  attaching the same file make one blob, and a ref can be checked against what it reads.
+- **A ref names content, not a place.** It is the hash of the blob's chunk list (size, chunk
+  size, each chunk's hash), a hash list as in IPFS, so two members attaching the same file make
+  one blob, and everything read can be checked against the ref. Only chunks are hashed, with the
+  platform's native SHA-256: JavaScript hashing was 19 s per MB on the S7.
 - **The scheme prefix is the switch-over seam.** A native Quereus/Optimystic blob would get
   its own scheme (say `qblob:`). Readers dispatch on the prefix, so old messages keep reading
   through the chunk store while new ones use the native one. No data is migrated.
@@ -57,7 +59,7 @@ table BlobChunk (
 ) with tags ("optimystic.content_key" = true, "optimystic.network_watch" = true);
 
 table Blob (
-    Id text primary key,       -- sha-256 of the whole content, hex
+    Id text primary key,       -- sha-256 of the chunk list, hex
     Size integer not null,
     ChunkSize integer not null,
     Chunks text not null       -- JSON array of chunk hashes, in order
@@ -74,7 +76,7 @@ local path: where a file is cached on a device is that device's business.
 - **Read:** the `Blob` row lists the chunks; each is read by hash. All present: assemble into
   the device's cache and report `local`. Missing: `fetching`. Unreadable from anyone reachable:
   `unreachable`.
-- **Integrity:** each chunk is checked against its hash, and the whole against the ref.
+- **Integrity:** the manifest is checked against the ref, and each chunk against its hash.
 - **Size limit:** an outgoing ceiling as the user's own setting (story 20). Default 25 MB.
 - **Deleting a message** removes its `Attachment` rows. Chunks stay while any `Blob` row uses
   them; collecting orphans is a later step (and a question for a native design).

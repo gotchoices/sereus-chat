@@ -96,10 +96,24 @@ export class DeliveryTracker {
       this.apply(transactionId, t => this.setState(t, 'delivered'), strandId));
     on('strand:queue-state', ({ strandId, state }) => {
       this.queues.set(strandId, state as unknown as QueueState);
+      this.timeDrain(strandId, (state as unknown as QueueState).depth ?? 0);
       // Also the publication announcement: re-read what a restart restored.
       void this.refresh(strandId);
       this.emit(strandId);
     });
+  }
+
+  /** When each strand's offline queue last became non-empty, and the most it held since. */
+  private readonly busy = new Map<string, { since: number; most: number }>();
+  /** One log line per drain: how long the queue took to send what it held (always on: phones differ). */
+  private timeDrain(strandId: string, depth: number): void {
+    const b = this.busy.get(strandId);
+    if (depth > 0) {
+      if (b) b.most = Math.max(b.most, depth); else this.busy.set(strandId, { since: Date.now(), most: depth });
+    } else if (b) {
+      this.busy.delete(strandId);
+      console.info(`[queue] ${strandId.slice(0, 8)} drained (held up to ${b.most}) in ${Date.now() - b.since} ms`);
+    }
   }
 
   /** Load what an earlier run left waiting. */

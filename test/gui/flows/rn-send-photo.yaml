@@ -5,12 +5,12 @@ appId: org.sereus.chat
 - tapOn: "Attach"
 - tapOn:
     id: "media-gallery"
+# The system picker differs by Android version; both label a photo "Photo taken on …".
 - extendedWaitUntil:
-    visible:
-      id: ".*:id/icon_thumbnail"
+    visible: "Photo taken on.*"
     timeout: 30000
 - tapOn:
-    id: ".*:id/icon_thumbnail"
+    text: "Photo taken on.*"
     index: 0
 - extendedWaitUntil:
     visible:
