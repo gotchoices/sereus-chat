@@ -50,7 +50,8 @@ import { DATA_FORMAT } from '../data/data-format';
 import { NODE_STORAGE_NAMES, STORAGE_KEYS } from '../data/persisted-names';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { OWNER_GENESIS_TIMEOUT_MS } from './async';
-import { STRAND_REACTIVITY, WEBRTC } from '../data/config';
+import { PERF_LOG, STRAND_REACTIVITY, WEBRTC } from '../data/config';
+import { ipfsSmoke } from './ipfs-smoke';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { webRTC } from '@libp2p/webrtc';
@@ -516,6 +517,10 @@ class CadreServiceImpl {
         );
         this.watchReachability(status.node);
         this.logConnections(status.node);
+        if (PERF_LOG) {
+          const control = status.node.getControlNode();
+          if (control) void ipfsSmoke(control as never);
+        }
         break;
       case 'failed':
         this._startError = status.error.message;

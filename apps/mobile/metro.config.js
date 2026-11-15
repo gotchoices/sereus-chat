@@ -23,9 +23,10 @@ const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // stack packages (@noble/*, @multiformats/*) are left alone.
 // (docs/app-family.md, "Linked code must resolve the app's copy of the stack".)
 const packagesDir = path.join(projectRoot, 'packages') + path.sep;
-const corePeers = Object.keys(
-  require(path.join(projectRoot, 'packages/core/package.json')).peerDependencies ?? {},
-);
+// Every linked package's peers (the core's, and the strand IPFS layer's: helia and friends).
+const corePeers = [...new Set(['core', 'strand-ipfs'].flatMap(name => Object.keys(
+  require(path.join(projectRoot, `packages/${name}/package.json`)).peerDependencies ?? {},
+)))];
 const isCorePeer = name => corePeers.some(p => name === p || name.startsWith(p + '/'));
 const appOrigin = path.join(__dirname, 'index.js');
 
@@ -234,6 +235,17 @@ function resolveChat(context, moduleName, platform) {
         workspaceRoot,
         'sereus/node_modules/@multiformats/multiaddr/dist/src/convert.js',
       ),
+    };
+  }
+
+  // libp2p's `./user-agent` export has `browser` and `import` conditions but no `react-native`
+  // one; its React Native variant is named only in the legacy `react-native` field, which
+  // exports resolution never reads, so Metro picked the Node file (`node:process`). Helia's
+  // libp2p glue imports it (strand-ipfs branch); cadre's own libp2p use never did.
+  if (moduleName === 'libp2p/user-agent') {
+    return {
+      type: 'sourceFile',
+      filePath: path.resolve(__dirname, 'node_modules/libp2p/dist/src/user-agent.react-native.js'),
     };
   }
 
