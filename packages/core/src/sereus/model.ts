@@ -23,6 +23,7 @@ import {
 } from './operations.js';
 import { BlobNotHereError, CHUNK_SIZE, putBlob, readBlob } from './blob-store.js';
 import { ensureBenchHandler } from './bench.js';
+import { NotAvailableError, StrandFiles, type Libp2pLike } from '../files/index.js';
 import { createChatStrand, foundChatStrandInBackground } from './sapp-strands.js';
 import { classifyClaimFailure, nodeReach, readNodeCode } from './node-code.js';
 import { ownerFingerprint, type CadreMachine, type CadreStatus } from '../model/index.js';
@@ -100,6 +101,8 @@ function toAttachment(a: AttachmentRow, held?: string | null): Attachment {
 
 /** The most an attachment may be by default (story 20: the user's own limit). */
 const DEFAULT_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+/** An attachment ref naming a file in the strand file layer (`../files`): `cid:` + the file's CID. */
+const FILE_REF = 'cid:';
 
 export function createSereusModel(host: ChatHost): SereusModel {
   const runtime = new StrandRuntime(host);
@@ -142,6 +145,27 @@ export function createSereusModel(host: ChatHost): SereusModel {
       if (strand) void ensureBenchHandler(strand).catch(err => console.warn('[bench] handler not registered:', err instanceof Error ? err.message : err));
     });
   }
+
+  /**
+   * The strand file layer (`../files`, gotchoices/sereus#62): with a host that keeps blocks,
+   * attachments travel as files exchanged between members, and the strand carries only their id
+   * (`cid:…`). Each strand's node serves that strand's files.
+   */
+  const strandFiles = host.blocks && host.files
+    ? new StrandFiles({ blocks: host.blocks, log: line => console.info(line) })
+    : null;
+  const serveFiles = async (strandId: string, strand?: StrandInstance): Promise<Libp2pLike | undefined> => {
+    const node = (strand ?? host.node.node?.getStrands().get(strandId))?.libp2pNode as unknown as Libp2pLike | undefined;
+    if (strandFiles && node) await strandFiles.serve(strandId, node);
+    return node;
+  };
+  if (strandFiles) {
+    host.node.on('strand:started', ({ strandId }) => {
+      void serveFiles(strandId).catch(err => console.warn('[files] serving failed:', err instanceof Error ? err.message : err));
+    });
+  }
+  /** Attachments being fetched in the background, so one fetch per attachment at a time. */
+  const prefetching = new Set<string>();
 
   /** Development-build step timings for the message path, tagged `[perf]`. */
   const perf = (...a: unknown[]) => { if (host.dev) console.info('[perf]', ...a); };
@@ -277,13 +301,41 @@ export function createSereusModel(host: ChatHost): SereusModel {
   }
 
   /** Attachments with their locality on this device (a cached copy of the blob, or not yet). */
-  async function withLocality(rows: AttachmentRow[]): Promise<Attachment[]> {
+  async function withLocality(rows: AttachmentRow[], strandId?: string): Promise<Attachment[]> {
     const files = host.files;
     return Promise.all(rows.map(async a => {
       if (!a.Blob || !files) return toAttachment(a);
       const path = files.cachePath(a.Blob, a.Name);
-      return toAttachment(a, (await files.exists(path).catch(() => false)) ? path : null);
+      const here = await files.exists(path).catch(() => false);
+      // A record here points at the file: keep it (and serve it) for as long as that holds.
+      if (here && strandId && strandFiles && a.Blob.startsWith(FILE_REF)) void strandFiles.reference(strandId, a.Blob.slice(FILE_REF.length));
+      return toAttachment(a, here ? path : null);
     }));
+  }
+
+  /**
+   * Fetch attachments that have arrived as records but not as files, in the background, so a file
+   * spreads to the members who are online while its sender still is. Later lists retry what
+   * is not reachable yet.
+   */
+  function prefetchFiles(strandId: string, attachments: Attachment[]): void {
+    if (!strandFiles) return;
+    const max = host.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES;
+    for (const a of attachments) {
+      const ref = (a as Attachment & { blob?: string | null }).blob;
+      if (!ref?.startsWith(FILE_REF) || a.locality === 'local' || (a.byteSize ?? 0) > max || prefetching.has(a.id)) continue;
+      prefetching.add(a.id);
+      void fetchAttachment(strandId, a.id)
+        .catch(() => {})
+        .finally(() => prefetching.delete(a.id));
+    }
+  }
+
+  /** Store a file in the strand file layer; its ref is `cid:` + the file's CID. */
+  async function putFile(strand: StrandInstance, source: AsyncIterable<Uint8Array>): Promise<{ ref: string; size: number }> {
+    await serveFiles(strand.strandId, strand);
+    const { cid, size } = await strandFiles!.put(strand.strandId, source);
+    return { ref: `${FILE_REF}${cid}`, size };
   }
 
   /**
@@ -308,7 +360,9 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const out: Array<Attachment & { blob?: string | null }> = [];
     for (const a of attachments) {
       if (!sizes.has(a)) { out.push(a); continue; }
-      const { ref, size } = await putBlob(strand, files.read(a.uri!, CHUNK_SIZE));
+      const { ref, size } = strandFiles
+        ? await putFile(strand, files.read(a.uri!, CHUNK_SIZE))
+        : await putBlob(strand, files.read(a.uri!, CHUNK_SIZE));
       const cached = files.cachePath(ref, a.name);
       if (!(await files.exists(cached))) await files.write(cached, files.read(a.uri!, CHUNK_SIZE));
       // The sender's own path is its device's business: the strand carries the ref.
@@ -332,9 +386,19 @@ export function createSereusModel(host: ChatHost): SereusModel {
     if (await files.exists(path).catch(() => false)) return { uri: path };
     const t0 = Date.now();
     try {
-      await files.write(path, readBlob(strand, row.Blob));
+      if (row.Blob.startsWith(FILE_REF)) {
+        if (!strandFiles) throw new ChatFailure('not-supported', 'This app cannot read files sent this way.', { retryable: false });
+        const node = await serveFiles(strandId, strand);
+        await files.write(path, strandFiles.read(strandId, row.Blob.slice(FILE_REF.length), { node }));
+      } else {
+        await files.write(path, readBlob(strand, row.Blob));
+      }
       perf('fetch', attachmentId.slice(0, 8), 'whole in', Date.now() - t0, 'ms');
     } catch (err) {
+      if (err instanceof NotAvailableError) {
+        perf('fetch', attachmentId.slice(0, 8), 'not reachable yet:', err.message);
+        throw new ChatFailure('unavailable', 'Still arriving: no member who has this file is reachable yet.', { retryable: true, reason: 'still-arriving' });
+      }
       if (err instanceof BlobNotHereError) {
         perf('fetch', attachmentId.slice(0, 8), 'still arriving:', err.missing === 'manifest' ? 'no manifest yet' : err.message);
         throw new ChatFailure('unavailable', 'Still arriving: not every part of this file is here yet.', { retryable: true, reason: 'still-arriving' });
@@ -363,7 +427,9 @@ export function createSereusModel(host: ChatHost): SereusModel {
       perf('listMessages', rows.length, 'rows in', Date.now() - t0, 'ms');
     }
     const attByMessage = new Map<string, Attachment[]>();
-    for (const a of await withLocality(atts)) {
+    const located = await withLocality(atts, strandId);
+    prefetchFiles(strandId, located);
+    for (const a of located) {
       const list = attByMessage.get(a.messageId!) ?? [];
       list.push(a);
       attByMessage.set(a.messageId!, list);
@@ -518,7 +584,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       timestamp: row.Timestamp,
       replyToId: row.ReplyToId ?? null,
       editedAt: null,
-      attachments: await withLocality(saved),
+      attachments: await withLocality(saved, strand.strandId),
       reactions: [],
       ...(mark ? { delivery: mark } : {}),
     };
@@ -865,7 +931,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     media: {
       list: (id, opts) => attempt(async () => {
         const rows = await queryAttachments(await strandFor(id));
-        return withLocality(rows.filter(r => !opts?.kind || r.Type === opts.kind));
+        return withLocality(rows.filter(r => !opts?.kind || r.Type === opts.kind), id);
       }),
       fetch: (strandId, attachmentId) => attempt(() => fetchAttachment(strandId, attachmentId)),
       storageUsage: () => attempt(async (): Promise<StorageUsage> => {

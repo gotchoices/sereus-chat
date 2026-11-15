@@ -7,6 +7,7 @@
  * a file, memory) and pins their persisted names.
  */
 import type { CadreNode, CadreNodeEvents, DurableSlot, KeyStore } from '@serfab/cadre-core';
+import type { BlockStore } from '../files/index.js';
 
 export type { DurableSlot };
 
@@ -107,6 +108,12 @@ export interface ChatHost {
   dev?: boolean;
   /** The device's files, for attachment bytes (docs/blobs.md). */
   files?: FileAccess;
+  /**
+   * Block storage for the strand file layer (`../files`, gotchoices/sereus#62). With it (and
+   * `files`), attachments travel as files exchanged between members, and only their id goes in
+   * the strand; without it, as chunk rows in the strand (`blob-store.ts`).
+   */
+  blocks?: BlockStore;
   /** The largest attachment this device sends, in bytes (story 20: the user's own limit). Default 25 MB. */
   maxAttachmentBytes?: number;
 }
