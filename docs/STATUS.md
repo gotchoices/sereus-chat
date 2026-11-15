@@ -2045,9 +2045,16 @@ Basic chat works. In order, stepping through one at a time:
           - S7 → S21: on the S21 1.9 s after the message was delivered, before anyone opened it;
           - back from the background: viewable 6.7 s after returning.
 
-          Results and how to run them: `docs/strand-files.md`. Open: placement and availability
-          while every holder sleeps (Arachnode / an always-on member), the S7's slow base64 block
-          I/O, and the second, viewable copy beside the blocks.
+          Also: announcements (members fetch a new file at once, the manifest included),
+          native block import and assembly on the phone (`BlockStore.importFile`/`assemble`: the
+          S7's whole send went from 8.7 s to 1.5 s), pipelined serving, leases with gc, and a
+          sleep/wake harness (`test/gui/phone-wakes.mjs`). Results and how to run them:
+          `docs/strand-files.md`. Open: placement and availability while every holder sleeps
+          (Arachnode, or an always-on member); serving from a slow phone (S7: 6.6 s per MB,
+          its block reads); the second, viewable copy beside the blocks.
+          - Tests: core 98/98, serchat unit 14/14, serchat scenarios 8/8. "A strand Bob left
+            stays left" hung once in a slow full run and passed alone. The phone's Jest `App`
+            suites fail on `main` too (no mock for react-native-keyboard-controller).
       - [ ] Then the ~30 s from commit to the other side reading it.
       - [ ] *(Superseded by the lines above.)* **Measure and report — now the main item:** large writes are slow, worst with a phone in
         the cohort: 0.56 MB/s CLI-to-CLI through a local relay; 112 s to commit 843 KB, and 204 s

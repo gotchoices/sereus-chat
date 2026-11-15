@@ -23,7 +23,8 @@ The same photo, the same relay (relay.sereus.org), the same phones, through the 
 | serchat → S21: file on the phone | about 3 min | 3.4 s after serchat began (phone fetch 1.2 s) |
 | S21 → serchat, 0.84 MB: delivered | 57 s | 0.6 s after the phone's put (0.4 s) |
 | S21 → serchat: file at serchat | 91 s | fetched in 0.98 s, in the background |
-| S7 → S21, 1 MB: file on the S21 | 4 min, or never (S7 on cellular) | 1.9 s after the message was delivered, before the conversation was opened |
+| S7 → S21, 1 MB: file on the S21 | 4 min, or never (S7 on cellular) | before the conversation is opened: fetched 6.6 s after the S7's announcement |
+| S21 → S7, 0.84 MB: file on the S7 | | fetched in 5.2 s, 2.7 s after delivery |
 | S21 asleep while serchat sends; back in the app | n/a | photo viewable 6.7 s after returning |
 | S21 sends, then goes to the background at once | n/a | serchat already had it (announced, 1.1 s) |
 | Raw bytes over the same connection (`bench.ts`), for reference | 0.4–0.9 s per MB | |
@@ -45,8 +46,14 @@ Measured on the S7 sending 1 MB to the S21:
 | whole send | 8.7 s | 1.5 s |
 | S21 viewable copy | 0.97 s | 17 ms |
 
-Serving from the S7 is still 8.3 s per MB. The bytes must be in JavaScript to go out over libp2p,
-so the S7's block reads, and its stream encryption, remain.
+Serving from the S7 went from 8.3 s per MB to 6.6 s:
+- reading the next block while the current one is sending;
+- sending the file's manifest with its announcement (the receiver checks it against the CID),
+  which saves a round trip.
+
+The rest is the S7 reading its blocks into JavaScript (base64 through the bridge), which libp2p
+needs, while the phone is also delivering its message. Its raw bench is 1.1 s per MB each way.
+On the S21 the same fetch takes about 1.2 s.
 
 ## What it does not do yet
 
