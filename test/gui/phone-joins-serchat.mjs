@@ -7,6 +7,8 @@
  *   BENCH=<bytes>   raw bytes each way first, no database (phone built with PERF_LOG)
  *   FILE=<path>     serchat's reply carries this file; the phone must show it
  *   PHONE_FILE=1    then the phone sends a photo from its picker; serchat must fetch it
+ *   PHONE_LOG=<path>  the phone's app log, collected through the run (nothing is printed)
+ *   SERCHAT_LOG=<path>  serchat's own log (its stderr), node codes and links dropped
  *
  * APP_ID picks the app: org.sereus.chat (React Native) or org.sereus.chat.ns (NativeScript,
  * apps/mobile-ns), each with its own flow and link scheme.
@@ -19,11 +21,12 @@
  * Exit 0 when the phone showed serchat's reply after serchat saw the phone's message.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connectBridge } from '../devices/bridge.mjs';
+import { collectLogcat } from './logcat.mjs';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const SERCHAT = join(here, '../../apps/cli/dist/serchat.js');
@@ -53,16 +56,20 @@ if (spawnSync('maestro', ['--version'], { stdio: 'ignore', env }).status !== 0) 
 const home = mkdtempSync(join(tmpdir(), 'serchat-gui-'));
 const serchat = (...args) => [SERCHAT, '--home', home, '-p', 'other', ...args];
 let idle;
+let notes = '';
 let code = 1;
+const ADB = join(process.env.ANDROID_HOME ?? join(homedir(), 'Library/Android/sdk'), 'platform-tools/adb');
+const phoneLog = process.env.PHONE_LOG ? collectLogcat(ADB, DEVICE) : null;
 try {
   log(`serchat: a profile with relay ${RELAY}`);
   const setUp = spawnSync(process.execPath, serchat('--wait', '30', 'profile', 'set', 'name=Serchat', ';', 'relay', 'add', RELAY), { encoding: 'utf8' });
   if (setUp.status !== 0) throw new Error(`serchat setup failed:\n${setUp.stderr}`);
 
   // -v: the stack's log on stderr, so a failed `arm` reports why ("[dev-bridge] arm: …").
-  idle = spawn(process.execPath, serchat('-v', '--bridge', String(PORT), 'idle'), { stdio: ['ignore', 'ignore', 'pipe'] });
-  let notes = '';
+  idle = spawn(process.execPath, serchat('-v', '--bridge', String(PORT), 'idle'), { stdio: ['ignore', 'pipe', 'pipe'] });
   idle.stderr.setEncoding('utf8').on('data', d => { notes += d; });
+  // console.info (the file layer's `[files]` lines) goes to stdout.
+  idle.stdout.setEncoding('utf8').on('data', d => { notes += d; });
   while (!notes.includes('idle;')) {
     if (idle.exitCode !== null) throw new Error(`serchat stopped:\n${notes}`);
     await new Promise(r => setTimeout(r, 250));
@@ -169,6 +176,10 @@ try {
 } finally {
   idle?.kill('SIGINT');
   await new Promise(r => setTimeout(r, 3000));
+  if (phoneLog) log(`phone log: ${await phoneLog.stop(process.env.PHONE_LOG)} lines in ${process.env.PHONE_LOG}`);
+  if (process.env.SERCHAT_LOG) {
+    writeFileSync(process.env.SERCHAT_LOG, notes.split('\n').filter(l => !/sereus-join|https?:\/\/|chat:\/\/invite/.test(l)).join('\n'));
+  }
   rmSync(home, { recursive: true, force: true });
   process.exit(code);
 }
