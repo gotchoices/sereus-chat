@@ -58,6 +58,29 @@ describe('attachments through the strand file layer', () => {
     process.stderr.write(`[file layer] 2.3 MB: send ${sendMs} ms, local at B ${arrivedMs} ms after the send began\n`);
   }, 180_000);
 
+  it("a receiver whose strand slept still gets the file once it wakes", async () => {
+    // The receiver sleeps while the file is sent; after waking it still gets it.
+    await b.node.hibernateStrand(strandId);
+    const other = join(dir, 'second.jpg');
+    const second = new Uint8Array(randomBytes(700_000));
+    writeFileSync(other, second);
+    value(await a.model.messages.send(strandId, {
+      content: 'while you slept', attachments: [{ id: 'y', type: 'image', uri: other, name: 'second.jpg', locality: 'local' }],
+    }));
+    await b.node.wakeStrand(strandId);
+    let att: { id: string; locality: string; uri?: string | null } | undefined;
+    await until(async () => {
+      const msgs = await b.model.messages.list(strandId);
+      att = msgs.ok ? msgs.value.find(x => x.content === 'while you slept')?.attachments[0] : undefined;
+      return att?.locality === 'local';
+    }, 'the file at B after it woke', 120_000);
+    expect(sha(new Uint8Array(readFileSync(att!.uri!)))).toBe(sha(second));
+
+    // (The sender's side of a wake, a new node serving its files, is checked on the phones:
+    // here both strand nodes would come back on new direct ports neither knows, and only a
+    // relay, as phones use, reconnects them.)
+  }, 300_000);
+
   it('the same file twice is the same file', async () => {
     const one = value(await a.model.messages.send(strandId, {
       content: 'again', attachments: [{ id: 'x', type: 'image', uri: file, name: 'holiday.jpg', locality: 'local' }],

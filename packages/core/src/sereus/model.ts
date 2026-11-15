@@ -170,6 +170,19 @@ export function createSereusModel(host: ChatHost): SereusModel {
       void serveFiles(strandId).catch(err => console.warn('[files] serving failed:', err instanceof Error ? err.message : err));
     });
   }
+  if (strandFiles) {
+    // Expired files go: once soon after start, then daily. A file stays while its records are
+    // read (`reference` in `withLocality`), or for a lease after it last moved.
+    const collect = () => {
+      void strandFiles.gc()
+        .then(r => { if (r.files || r.blocks) console.info(`[files] gc removed ${r.files} file(s), ${r.blocks} block(s)`); })
+        .catch(err => console.warn('[files] gc failed:', err instanceof Error ? err.message : err));
+    };
+    const first = setTimeout(collect, 60_000) as { unref?: () => void };
+    first.unref?.();
+    const daily = setInterval(collect, 24 * 60 * 60 * 1000) as { unref?: () => void };
+    daily.unref?.();
+  }
   /** Attachments being fetched in the background, so one fetch per attachment at a time. */
   const prefetching = new Set<string>();
 
