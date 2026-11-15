@@ -77,6 +77,13 @@ export interface FetchReport {
 }
 
 const encoder = new TextEncoder();
+
+function hexToBytes(hex: string): Uint8Array {
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) throw new Error(`not a SHA-256 hex digest: ${hex}`);
+  const out = new Uint8Array(32);
+  for (let i = 0; i < 32; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}
 const decoder = new TextDecoder();
 
 async function* rechunk(source: AsyncIterable<Uint8Array>, size: number): AsyncIterable<Uint8Array> {
@@ -194,13 +201,29 @@ export class StrandFiles {
       chunks.push(cid);
       size += chunk.length;
     }
+    return this.finishPut(scope, chunks, size, t0, `put (hash ${hashMs} ms, store ${storeMs} ms)`);
+  }
+
+  /**
+   * Store the file at `path` (a path on this device) in `scope`: natively when the block store
+   * can import files (`BlockStore.importFile`), else from `read()`, as `put` does.
+   */
+  async putPath(scope: string, path: string, read: () => AsyncIterable<Uint8Array>): Promise<{ cid: string; size: number }> {
+    if (!this.blocks.importFile) return this.put(scope, read());
+    await this.open();
+    const t0 = Date.now();
+    const { keys, size } = await this.blocks.importFile(path, this.chunkSize, hex => cidFor(RAW, hexToBytes(hex)));
+    return this.finishPut(scope, keys, size, t0, 'imported');
+  }
+
+  private async finishPut(scope: string, chunks: string[], size: number, t0: number, how: string): Promise<{ cid: string; size: number }> {
     const manifest: Manifest = { v: 1, size, chunkSize: this.chunkSize, chunks };
     const bytes = encodeManifest(manifest);
     const cid = cidFor(JSON_CODEC, await sha256(bytes));
     await this.blocks.put(cid, bytes);
     this.index(cid, manifest, [scope], Date.now() + this.leaseMs);
     await this.save();
-    this.log(`[files] put ${(size / 1e6).toFixed(2)} MB as ${chunks.length} chunks in ${Date.now() - t0} ms (hash ${hashMs}, store ${storeMs})`);
+    this.log(`[files] ${how} ${(size / 1e6).toFixed(2)} MB as ${chunks.length} chunks in ${Date.now() - t0} ms`);
     return { cid, size };
   }
 

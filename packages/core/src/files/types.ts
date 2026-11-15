@@ -21,6 +21,12 @@ export interface BlockStore {
    * into base64 and back costs seconds per MB on a slow one.
    */
   assemble?(keys: string[], path: string): Promise<void>;
+  /**
+   * Optional: store the file at `path` as blocks of `chunkSize`, natively: each chunk is read,
+   * hashed (SHA-256, lowercase hex) and kept under the key `name(hex)`, its bytes never entering
+   * JavaScript. Resolves to the keys in order and the file's size.
+   */
+  importFile?(path: string, chunkSize: number, name: (sha256Hex: string) => string): Promise<{ keys: string[]; size: number }>;
 }
 
 /** A chunk of a libp2p stream: bytes, or a list of byte arrays (libp2p 3's Uint8ArrayList). */

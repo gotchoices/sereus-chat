@@ -142,3 +142,33 @@ describe('announcements', () => {
     expect((await fb.manifest(big.cid))?.size).toBe(1_500_000);
   });
 });
+
+describe('native import', () => {
+  it('gives the same CID as a plain put, empty files included', async () => {
+    const { mkdtempSync, writeFileSync, readFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    // A block store that imports like a phone does: chunk by chunk, hashed outside the layer.
+    const store = new MemoryBlockStore() as MemoryBlockStore & { importFile: NonNullable<import('./types.js').BlockStore['importFile']> };
+    store.importFile = async (path, chunkSize, name) => {
+      const all = new Uint8Array(readFileSync(path));
+      const keys: string[] = [];
+      for (let at = 0; at < all.length; at += chunkSize) {
+        const chunk = all.subarray(at, at + chunkSize);
+        const key = name(createHash('sha256').update(chunk).digest('hex'));
+        await store.put(key, chunk);
+        keys.push(key);
+      }
+      return { keys, size: all.length };
+    };
+    const dir = mkdtempSync(join(tmpdir(), 'files-import-'));
+    for (const n of [0, 1000, 262_144, 600_001]) {
+      const bytes = new Uint8Array(randomBytes(n));
+      const path = join(dir, `f${n}`);
+      writeFileSync(path, bytes);
+      const imported = await new StrandFiles({ blocks: store }).putPath('s1', path, () => once(bytes));
+      const plain = await new StrandFiles({ blocks: new MemoryBlockStore() }).put('s1', once(bytes));
+      expect(imported).toEqual(plain);
+    }
+  });
+});

@@ -351,9 +351,10 @@ export function createSereusModel(host: ChatHost): SereusModel {
   }
 
   /** Store a file in the strand file layer; its ref is `cid:` + the file's CID. */
-  async function putFile(strand: StrandInstance, source: AsyncIterable<Uint8Array>): Promise<{ ref: string; size: number }> {
+  async function putFile(strand: StrandInstance, uri: string): Promise<{ ref: string; size: number }> {
     await serveFiles(strand.strandId, strand);
-    const { cid, size } = await strandFiles!.put(strand.strandId, source);
+    const files = host.files!;
+    const { cid, size } = await strandFiles!.putPath(strand.strandId, uri, () => files.read(uri, CHUNK_SIZE));
     // The members online fetch it now, while the message's own write is under way.
     void strandFiles!.announce(strand.strandId, cid).catch(() => {});
     return { ref: `${FILE_REF}${cid}`, size };
@@ -382,7 +383,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     for (const a of attachments) {
       if (!sizes.has(a)) { out.push(a); continue; }
       const { ref, size } = strandFiles
-        ? await putFile(strand, files.read(a.uri!, CHUNK_SIZE))
+        ? await putFile(strand, a.uri!)
         : await putBlob(strand, files.read(a.uri!, CHUNK_SIZE));
       const cached = files.cachePath(ref, a.name);
       if (!(await files.exists(cached))) {

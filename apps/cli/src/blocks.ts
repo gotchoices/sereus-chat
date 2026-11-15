@@ -3,7 +3,8 @@
  * one file per block in a directory of the profile, named by its key (a base32 CID, or the
  * layer's own `_index`). Writes go through a temporary file, so a reader never sees half a block.
  */
-import { appendFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { dirname } from 'node:path';
 import { join } from 'node:path';
 import type { BlockStore } from '@chat/core/files';
@@ -35,6 +36,33 @@ export function nodeBlockStore(dir: string): BlockStore {
     },
     async keys() {
       try { return (await readdir(dir)).filter(n => !n.includes('.part-')); } catch { return []; }
+    },
+    async importFile(path, chunkSize, name) {
+      await ready();
+      const fh = await open(path, 'r');
+      const keys: string[] = [];
+      let size = 0;
+      try {
+        for (;;) {
+          const buf = new Uint8Array(chunkSize);
+          let fill = 0;
+          while (fill < chunkSize) {
+            const { bytesRead } = await fh.read(buf, fill, chunkSize - fill, null);
+            if (!bytesRead) break;
+            fill += bytesRead;
+          }
+          if (!fill) break;
+          const chunk = buf.subarray(0, fill);
+          const key = name(createHash('sha256').update(chunk).digest('hex'));
+          if (!(await this.has(key))) await this.put(key, chunk);
+          keys.push(key);
+          size += fill;
+          if (fill < chunkSize) break;
+        }
+      } finally {
+        await fh.close();
+      }
+      return { keys, size };
     },
     async assemble(keys, path) {
       await mkdir(dirname(path), { recursive: true });

@@ -48,6 +48,26 @@ export const phoneBlocks: BlockStore = {
     if (!(await FileSystem.exists(DIR))) return [];
     return (await FileSystem.ls(DIR)).filter(n => !n.endsWith('.part'));
   },
+  // A file to send, cut into blocks natively: each chunk goes from the file to a block file as
+  // the base64 string the bridge carries anyway, and is hashed in native code; its bytes never
+  // become a JavaScript array (seconds per MB on the S7).
+  async importFile(source, chunkSize, name) {
+    await ready();
+    const p = source.startsWith('file://') ? decodeURI(source.slice('file://'.length)) : source;
+    const size = (await FileSystem.stat(p)).size;
+    const keys: string[] = [];
+    const tmp = `${DIR}/import.part`;
+    for (let at = 0; at < size; at += chunkSize) {
+      const b64 = await FileSystem.readFileChunk(p, at, Math.min(chunkSize, size - at), 'base64');
+      await FileSystem.writeFile(tmp, b64, 'base64');
+      const key = name(await FileSystem.hash(tmp, 'SHA-256'));
+      const target = pathOf(key);
+      if (await FileSystem.exists(target)) await FileSystem.unlink(tmp);
+      else await FileSystem.mv(tmp, target);
+      keys.push(key);
+    }
+    return { keys, size };
+  },
   // The viewable copy of a file, appended block by block natively: no base64 round trip.
   async assemble(keys, target) {
     const p = target.startsWith('file://') ? decodeURI(target.slice('file://'.length)) : target;
