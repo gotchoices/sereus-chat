@@ -13,7 +13,7 @@
  */
 import { withBitswap, type BitswapOptions } from '@helia/bitswap'
 import { defaultLogger } from '@libp2p/logger'
-import { sha256 } from 'multiformats/hashes/sha2'
+import { sha256 } from './hasher.js'
 import { identity } from 'multiformats/hashes/identity'
 import { NotFoundError } from 'interface-store'
 import { NetworkedBlockstore } from './networked-blockstore.js'

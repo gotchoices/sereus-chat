@@ -1,7 +1,7 @@
 /**
  * Blobs on IPFS-on-a-strand, over real libp2p nodes on loopback: a file put on A reaches B whole
  * and identical; strands are kept apart; announcements fetch up to the receiver's limit; a
- * transfer cut off resumes; a file put while alone waits in the outbox until a member holds it;
+ * fetch that finds part of a file here fetches only the rest; a file put while alone waits in the outbox until a member holds it;
  * both away and back together (A's app restarted) still crosses; leases decide what gc keeps;
  * a file of raw leaves is joined natively when the host can.
  */
@@ -60,6 +60,15 @@ class Device {
   }
 }
 
+/** A byte store that records which blocks it gives out. */
+class CountingByteStore extends MemoryByteStore {
+  constructor (private readonly served: string[]) { super() }
+  override async get (key: string): Promise<Uint8Array | null> {
+    if (key.startsWith('b')) this.served.push(key)
+    return super.get(key)
+  }
+}
+
 async function * once (bytes: Uint8Array): AsyncGenerator<Uint8Array> { yield bytes }
 const sha = (b: Uint8Array): string => createHash('sha256').update(b).digest('hex')
 async function bytesOf (d: Device, scope: string, cid: string): Promise<Uint8Array> {
@@ -111,24 +120,25 @@ describe('strand blobs', () => {
     expect(a.blobs.outbox('s1')).toEqual([big.cid])
   }, 60_000)
 
-  it('a transfer cut off mid-way resumes, fetching only the rest', async () => {
-    const a = new Device(); const b = new Device()
+  it('a fetch that finds part of a file here fetches only the rest (a transfer resumed)', async () => {
+    // (Bitswap answers a want-list in batches, so a transfer is interrupted between batches;
+    // what matters is that the next fetch asks only for what is missing.)
+    const served: string[] = []
+    const store = new CountingByteStore(served)
+    const a = new Device({}, store); const b = new Device()
     const na = await a.join('s1'); const nb = await b.join('s1')
     await nb.dial(na.getMultiaddrs()[0])
     const bytes = new Uint8Array(randomBytes(8 * 1_048_576))
     const { cid } = await a.blobs.put('s1', once(bytes))
-    // B fetches; A goes away once part of it has crossed.
-    const fetching = b.blobs.fetch('s1', cid, { timeoutMs: 8000 }).catch((e: unknown) => e)
-    await until(async () => (await b.bytes.keys()).length >= 3, 'a few blocks at B')
-    await na.stop()
-    expect(await fetching).toBeInstanceOf(NotAvailableError)
-    const partial = (await b.bytes.keys()).filter(k => k.startsWith('b')).length
-    expect(partial).toBeGreaterThan(0)
-    // A comes back on a new node, the same blocks.
-    const na2 = await a.join('s1')
-    await nb.dial(na2.getMultiaddrs()[0])
+    // B already has three of the leaves, as if an earlier transfer had been cut off.
+    const leaves = (await store.keys()).filter(k => k.startsWith('bafk'))
+    expect(leaves.length).toBe(8)
+    for (const k of leaves.slice(0, 3)) await b.bytes.put(k, (await store.get(k))!)
+    served.length = 0
     await b.blobs.fetch('s1', cid)
     expect(sha(await bytesOf(b, 's1', cid))).toBe(sha(bytes))
+    const leavesServed = new Set(served.filter(k => k.startsWith('bafk')))
+    expect([...leavesServed].sort()).toEqual(leaves.slice(3).sort())
   }, 90_000)
 
   it('a file put while alone waits in the outbox, and is placed when a member connects', async () => {

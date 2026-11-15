@@ -20,7 +20,7 @@
  */
 import { unixfs } from '@helia/unixfs'
 import { CID } from 'multiformats/cid'
-import { readJson, sendJson, type StrandIpfs, type ByteStore } from '@chat/strand-ipfs'
+import { readJson, sendJson, sha256, type StrandIpfs, type ByteStore } from '@chat/strand-ipfs'
 import { dagShape } from './dag.js'
 import type { Blockstore } from 'interface-blockstore'
 import type { Stream, Connection } from '@libp2p/interface'
@@ -208,7 +208,8 @@ export class StrandBlobs {
     const store = ipfs?.blockstore ?? this.init.blockstore
     let size = 0
     const counted = (async function * () { for await (const p of source) { size += p.length; yield p } })()
-    const root = await unixfs({ blockstore: store }).addByteStream(counted, { profile: IMPORT_PROFILE } as never)
+    // Hashed natively where the platform can (strand-ipfs `sha256`).
+    const root = await unixfs({ blockstore: store }).addByteStream(counted, { profile: IMPORT_PROFILE, hasher: sha256 } as never)
     const cid = root.toString()
     const e = this.entry(cid, 'put', size)
     e.scopes.add(scope)
