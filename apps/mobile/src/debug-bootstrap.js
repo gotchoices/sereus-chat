@@ -40,6 +40,8 @@ if (!globalThis.process.env) globalThis.process.env = {};
 // globalThis.process.env.DEBUG = 'optimystic:db-p2p:protocol-client,optimystic:db-core:network-transactor';
 // A phone's write that never leaves its queue (2026-11-14, sender on cellular): the offline
 // queue, each request to another machine, and strand wake/redial. Comment out when done.
+// Where the time goes, S21 against serchat (2026-11-14): each pend and commit, and each request.
+// globalThis.process.env.DEBUG = 'optimystic:db-core:network-transactor,optimystic:db-p2p:protocol-client';
 // globalThis.process.env.DEBUG = 'optimystic:db-core:offline,optimystic:db-core:network-transactor,optimystic:db-p2p:protocol-client,sereus:cadre:strand-wake,sereus:cadre:hibernation,sereus:cadre:strand-redial,sereus:cadre:peer-dial';
 // Device idle/latency analysis (2026-10-09): every sereus channel, optimystic's network layer and
 // write coordinator. High volume; comment out when done.

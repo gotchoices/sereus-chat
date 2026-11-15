@@ -22,6 +22,7 @@ import {
   queryReactions, removeMessage, removeReaction, updateMessage, type AttachmentRow,
 } from './operations.js';
 import { BlobNotHereError, CHUNK_SIZE, putBlob, readBlob } from './blob-store.js';
+import { ensureBenchHandler } from './bench.js';
 import { createChatStrand, foundChatStrandInBackground } from './sapp-strands.js';
 import { classifyClaimFailure, nodeReach, readNodeCode } from './node-code.js';
 import { ownerFingerprint, type CadreMachine, type CadreStatus } from '../model/index.js';
@@ -132,6 +133,15 @@ export function createSereusModel(host: ChatHost): SereusModel {
   const delivery = new DeliveryTracker(host, id => host.node.node?.getStrands().get(id));
   delivery.wire();
   void delivery.load();
+
+  // Development builds answer the raw-throughput bench on every strand node (`bench.ts`), so
+  // a test can time plain bytes against the same peer that attachments go to.
+  if (host.dev) {
+    host.node.on('strand:started', ({ strandId }) => {
+      const strand = host.node.node?.getStrands().get(strandId);
+      if (strand) void ensureBenchHandler(strand).catch(err => console.warn('[bench] handler not registered:', err instanceof Error ? err.message : err));
+    });
+  }
 
   /** Development-build step timings for the message path, tagged `[perf]`. */
   const perf = (...a: unknown[]) => { if (host.dev) console.info('[perf]', ...a); };

@@ -4,6 +4,9 @@
  *
  *   node test/gui/phone-joins-serchat.mjs [device-serial]      default 6a61c968 (the S7)
  *   RELAY=relay.sereus.org  APP_ID=org.sereus.chat  BRIDGE_PORT=9302
+ *   BENCH=<bytes>   raw bytes each way first, no database (phone built with PERF_LOG)
+ *   FILE=<path>     serchat's reply carries this file; the phone must show it
+ *   PHONE_FILE=1    then the phone sends a photo from its picker; serchat must fetch it
  *
  * APP_ID picks the app: org.sereus.chat (React Native) or org.sereus.chat.ns (NativeScript,
  * apps/mobile-ns), each with its own flow and link scheme.
@@ -111,6 +114,18 @@ try {
   })();
 
   const [flowCode, replied] = await Promise.all([flowDone, answered]);
+  if (process.env.BENCH && flowCode === 0 && replied) {
+    // BENCH=<bytes>: the floor. Plain bytes each way between serchat and the phone over the
+    // strand's own connections, no database (packages/core/src/sereus/bench.ts). Needs a phone
+    // build with `PERF_LOG` (or a development build), whose strand nodes answer the bench.
+    try {
+      for (const r of await other.call('bench', strandId, Number(process.env.BENCH))) {
+        log(`bench: serchat ${r.direction === 'send' ? '→ phone' : '← phone'} ${(r.bytes / 1e6).toFixed(2)} MB ${r.path} in ${r.ms} ms (${r.mbPerSecond} MB/s)`);
+      }
+    } catch (err) {
+      log(`bench failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
   let imageShown = true;
   if (process.env.FILE && flowCode === 0 && replied) {
     // The conversation is on screen: the reply's photo must arrive and show.

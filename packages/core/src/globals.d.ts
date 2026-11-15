@@ -16,6 +16,11 @@ interface AbortSignal {
   removeEventListener(type: 'abort', listener: () => void): void;
 }
 
+declare class AbortController {
+  readonly signal: AbortSignal;
+  abort(reason?: unknown): void;
+}
+
 interface Crypto {
   getRandomValues<T extends ArrayBufferView>(array: T): T;
   randomUUID?(): string;

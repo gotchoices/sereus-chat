@@ -2020,6 +2020,22 @@ Basic chat works. In order, stepping through one at a time:
         - **Next:** sereus fixes the fallback (per-address budget, or the circuit address in
           parallel); then find where the phone-to-phone time goes now that the link is direct (4 minutes for 1 MB against about 3 s in Node); then `WEBRTC` on. Across NATs that do not
           punch through, phones stay relayed unless the relays offer TURN.
+      - [ ] **Where the time goes: the network is not it** (2026-11-14, S21 ↔ serchat, relayed
+        through relay.sereus.org, `BENCH=1000000 FILE=… PHONE_FILE=1 node
+        test/gui/phone-joins-serchat.mjs RFCR10M17LY`, phone built with `PERF_LOG`):
+        - **The floor:** 1 MB of plain bytes over the strand's own connection, no database
+          (`packages/core/src/sereus/bench.ts`): 0.38–0.49 s each way, 2.0–2.6 MB/s.
+        - **Through chat:**
+          - phone → serchat: 0.84 MB delivered in 57 s, fetchable at serchat in 91 s;
+          - serchat → phone: a 1 MB photo committed in 149 s.
+        - **Per chunk write** (one 256 KiB chunk, about 0.9 MB encoded): pend 8.8–9.3 s, commit
+          5.4–9.2 s, where small writes take 0.2–0.4 s. The phone's own put (read, hash, local
+          write) is 1.4 s for all four chunks.
+        - So the stack takes 100–300× what the link does: per-byte work (about 3× encoding,
+          canonicalize, hash, validate, store) on each side, worst on Hermes and when the phone
+          is the side approving. Next: a CPU profile of one chunk write on the S21 to name it,
+          and a prototype that moves attachment bytes over a plain stream (by hash) with only
+          the manifest in the database.
       - [ ] Then the ~30 s from commit to the other side reading it.
       - [ ] *(Superseded by the lines above.)* **Measure and report — now the main item:** large writes are slow, worst with a phone in
         the cohort: 0.56 MB/s CLI-to-CLI through a local relay; 112 s to commit 843 KB, and 204 s

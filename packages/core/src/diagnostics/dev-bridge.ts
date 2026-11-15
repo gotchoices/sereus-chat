@@ -16,6 +16,8 @@
  *   accept(url)           → { strandId }        join through it
  *   traffic(seconds)      → new streams per node, protocol and direction
  *   relays([addrs])       → the relays; with addrs, set them first
+ *   bench(strandId, bytes) → [{ peer, path, direction, bytes, ms, mbPerSecond }]   raw bytes
+ *                           each way over the strand's connections, no database (`bench.ts`)
  *
  * Hermes's inspector ignores `awaitPromise`, so an async call is started with
  * `start(id, method, ...args)` and its outcome collected later with `take(id)` →
@@ -27,8 +29,9 @@
 import { parseInviteToken } from '../protocol/index.js';
 import type { ChatModel, Result } from '../model/index.js';
 import type { NodeHost } from '../sereus/host.js';
+import { benchStrand, type BenchResult } from '../sereus/bench.js';
 
-export type DevBridgeMethod = 'strands' | 'send' | 'files' | 'fetchFile' | 'arm' | 'seen' | 'prepare' | 'invite' | 'accept' | 'traffic' | 'relays';
+export type DevBridgeMethod = 'strands' | 'send' | 'files' | 'fetchFile' | 'arm' | 'seen' | 'prepare' | 'invite' | 'accept' | 'traffic' | 'relays' | 'bench';
 
 export interface DevBridge {
   strands(): Promise<Array<{ id: string; title: string }>>;
@@ -42,6 +45,7 @@ export interface DevBridge {
   accept(url: string): Promise<{ strandId: string }>;
   traffic(seconds: number): Promise<Record<string, Record<string, number>>>;
   relays(addrs?: string[]): Promise<string[]>;
+  bench(strandId: string, bytes: number): Promise<BenchResult[]>;
   start(id: string, method: DevBridgeMethod, ...args: unknown[]): true;
   take(id: string): { ok: true; value: unknown } | { ok: false; error: string } | undefined;
 }
@@ -163,6 +167,11 @@ export function createDevBridge(model: ChatModel, host?: NodeHost): DevBridge {
     async relays(addrs) {
       if (addrs) value(await model.prefs.set({ relayAddrs: addrs }));
       return value(await model.prefs.get()).relayAddrs;
+    },
+    async bench(strandId, bytes) {
+      const strand = host?.node?.getStrands().get(strandId);
+      if (!strand) throw new Error(`strand ${strandId} is not open here`);
+      return benchStrand(strand, bytes);
     },
     async accept(url) {
       const token = parseInviteToken(url);
