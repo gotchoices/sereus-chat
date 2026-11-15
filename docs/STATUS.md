@@ -2052,6 +2052,14 @@ Basic chat works. In order, stepping through one at a time:
           `docs/strand-files.md`. Open: placement and availability while every holder sleeps
           (Arachnode, or an always-on member); serving from a slow phone (S7: 6.6 s per MB,
           its block reads); the second, viewable copy beside the blocks.
+        - [x] **Second pass on branch `strand-ipfs`** (2026-11-15), the layering agreed with Nate:
+          IPFS on FRET beside Optimystic (`packages/strand-ipfs`: Helia's Bitswap and UnixFS
+          without Helia's libp2p bundle; FRET content routing; membership and scope gates),
+          blobs (`packages/strand-blobs`: chat attachments, `ipfs:<CID>`), and a drive on MFS
+          (`packages/strand-drive`, no screen yet). Same speeds as the prototype, with standard
+          CIDs. Passes on the S21, the S7 and serchat, including sleep and wake. See
+          `docs/strand-ipfs.md`. Open: the cadre membership hook, concurrent drive edits,
+          Arachnode placement.
           - Tests: core 98/98, serchat unit 14/14, serchat scenarios 8/8. "A strand Bob left
             stays left" hung once in a slow full run and passed alone. The phone's Jest `App`
             suites fail on `main` too (no mock for react-native-keyboard-controller).

@@ -11,7 +11,7 @@ file system for the strand drive.
 |---|---|---|
 | `packages/strand-ipfs` | IPFS on a strand's libp2p node: Helia's Bitswap and UnixFS without Helia's own libp2p bundle; content routing on FRET; a membership gate; host byte stores as IPFS block stores | everything below |
 | `packages/strand-blobs` | Files a record refers to: put, fetch and read by CID; scope per strand; announcements; placement and the outbox; leases and gc; native joins | chat attachments |
-| (next) MFS | A directory tree (`@helia/mfs`) whose root is kept in a strand record | the strand drive |
+| `packages/strand-drive` | A directory tree (`@helia/mfs`) whose root is kept in a strand record; the blob layer keeps and serves the current tree | the strand drive (no screen yet) |
 
 In chat, `packages/core/src/sereus/strand-media.ts` runs one IPFS node per strand node (remade on
 a wake) and one blob layer per device. An attachment's ref is `ipfs:<CID>`, a UnixFS root.
@@ -34,16 +34,41 @@ it: talking to the public IPFS network isn't a goal for strand-scoped files.
 | Core, a cadre member: message while Alice away / photo after she returns | 0.45 s / 0.70 s | 0.54 s / 0.56 s |
 | serchat, 14 MB in three files: send / 12 MB fetch | 3.2 s / 240 ms | 3.8 s / 633 ms |
 | S21 ↔ serchat: serchat's photo on the phone; the phone's at serchat | 3.4 s / about 1 s | announced, fetched, placed; the phone's 1.68 MB put in 0.8 s, fetched in 1.8 s |
+| S7 → S21, 1 MB: the S7's put / whole send / the S21's fetch | 0.47 s / 1.5 s / 6.6 s | 0.66 s / 1.65 s / 5.6–8.1 s |
 
-Unit tests: strand-ipfs 21, including IPFS's own block-store compliance suite (18); strand-blobs
-8 (transfer, scope, announcements, interrupted transfer, outbox, both away with a restart, gc,
-native join); core 90.
+On the S21 against serchat (`test/gui/phone-wakes.mjs`, PASS):
+- **The phone asleep while serchat sends:** when the phone woke, serchat offered the file again,
+  and the phone fetched it.
+- **The phone sends, then leaves at once:** serchat had it 0.5 s later.
+- **Both away, then back together:** the phone imported its photo natively (1 MB in 25 ms), and
+  the announcement reached nobody. When both came back, the phone's outbox offered it, serchat
+  fetched it in 1.4 s, and it was placed 7.1 s after the return.
+
+Unit tests:
+- strand-ipfs: 21, including IPFS's own block-store compliance suite (18 of them);
+- strand-blobs: 9 (transfer, scope, announcements, a resumed fetch, outbox, both away with a
+  restart, gc, native join, native import giving the importer's CIDs);
+- strand-drive: 1;
+- core: 90.
+
+On the phone, two things kept a file's bytes out of JavaScript where they needn't be there:
+- **Native hashing.** multiformats' sha256 becomes pure JavaScript on a phone; strand-ipfs
+  hashes with `crypto.subtle`.
+- **Native import.** The phone cuts a file into raw leaves itself, and the layer builds the same
+  file node the UnixFS importer would. The S7's 1 MB put went from 3.3 s to 0.66 s, with the
+  same CID.
+
+Borrowed test suites: IPFS's `interface-blockstore-tests` run as they are (aegir's `expect`
+replaced by chai with the same plugins). Helia's interop specs compare Helia against kubo (Go)
+for the same CIDs and exchange. Without kubo, their scenarios (a large file each way over
+Bitswap) are covered by our tests, with our node on both ends.
 
 ## Open
 
 - **A cadre hook for the membership check.** These protocols need the check that sereus applies
   only to Optimystic's protocols today.
-- **Native import on the phone.** UnixFS import runs in JavaScript. The prototype's native chunk
-  import doesn't apply as is, because a UnixFS root must be built to match.
-- **MFS and the shared root for the strand drive.**
+- **Concurrent drive edits:** last writer wins on the root; compare-and-set or a tree merge
+  would close it.
+- **Serving from a slow phone:** the S7 reads each block into JavaScript for libp2p, which takes
+  5–8 s per MB.
 - **Placement on storage nodes (Arachnode); quotas; partial reads.**

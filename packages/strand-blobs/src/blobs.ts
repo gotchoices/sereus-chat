@@ -274,6 +274,34 @@ export class StrandBlobs {
     return this.finishPut(scope, root, size, t0, 'imported')
   }
 
+  /**
+   * Take on a DAG already in the block store (a layer above wrote it: a drive's new root): serve
+   * it in `scope`, keep it a lease, and provide it, without announcing it (members fetch what
+   * they read).
+   */
+  async adopt (scope: string, cid: string): Promise<void> {
+    await this.open()
+    const root = CID.parse(cid)
+    const shape = await this.shapeHere(root)
+    if (shape == null) throw new Error(`not every block of ${cid} is here to adopt`)
+    const e = this.entry(cid, 'put', 0)
+    e.announce = false
+    e.scopes.add(scope)
+    e.expiresAt = Math.max(e.expiresAt, Date.now() + this.leaseMs)
+    this.complete(cid, shape.blocks, shape.rawLeaves)
+    this.saveSoon()
+    void this.ipfs.get(scope)?.provide(root).catch(() => {})
+  }
+
+  /** Let a file or tree go at the next gc (blocks another live one uses stay). */
+  async release (cid: string): Promise<void> {
+    await this.open()
+    const e = this.entries.get(cid)
+    if (e == null) return
+    e.expiresAt = 0
+    this.saveSoon()
+  }
+
   /** Is every block of the file here? */
   async has (cid: string): Promise<boolean> {
     await this.open()
