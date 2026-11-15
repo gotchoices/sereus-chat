@@ -2033,9 +2033,11 @@ Basic chat works. In order, stepping through one at a time:
           write) is 1.4 s for all four chunks.
         - So the stack takes 100–300× what the link does: per-byte work (about 3× encoding,
           canonicalize, hash, validate, store) on each side, worst on Hermes and when the phone
-          is the side approving. Next: a CPU profile of one chunk write on the S21 to name it,
-          and a prototype that moves attachment bytes over a plain stream (by hash) with only
-          the manifest in the database.
+          is the side approving. Next: a CPU profile of one chunk write on the S21 to name it.
+        - **Proposed upstream, not built:** a strand-scoped file layer (content-addressed chunks,
+          transfer outside transactions, lease-based lifetime, Arachnode placement later):
+          gotchoices/sereus#62, design questions for Nate before any prototype. No stream
+          protocol of chat's own; we coordinate instead.
       - [ ] Then the ~30 s from commit to the other side reading it.
       - [ ] *(Superseded by the lines above.)* **Measure and report — now the main item:** large writes are slow, worst with a phone in
         the cohort: 0.56 MB/s CLI-to-CLI through a local relay; 112 s to commit 843 KB, and 204 s

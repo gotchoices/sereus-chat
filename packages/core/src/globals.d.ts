@@ -21,6 +21,14 @@ declare class AbortController {
   abort(reason?: unknown): void;
 }
 
+declare class TextEncoder {
+  encode(input?: string): Uint8Array;
+}
+declare class TextDecoder {
+  constructor(label?: string);
+  decode(input?: Uint8Array): string;
+}
+
 interface Crypto {
   getRandomValues<T extends ArrayBufferView>(array: T): T;
   randomUUID?(): string;
