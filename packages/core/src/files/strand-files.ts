@@ -442,13 +442,17 @@ export class StrandFiles {
   async announce(scope: string, cid: string, opts: { node?: Libp2pLike } = {}): Promise<number> {
     const node = opts.node ?? this.nodes.get(scope);
     if (!node) return 0;
+    // The manifest goes with the announcement (checked against the CID on arrival), saving the
+    // receiver a round trip.
+    const raw = await this.blocks.get(cid);
+    const manifest = raw ? decoder.decode(raw) : null;
     let told = 0;
     await Promise.all(this.candidates(node).map(async (peer) => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(new Error('announce timed out')), 10_000);
       try {
         const stream = await node.dialProtocol(peer, FILES_PROTOCOL, { signal: controller.signal, runOnLimitedConnection: true });
-        await sendJson(stream, { announce: [cid] }, controller.signal);
+        await sendJson(stream, { announce: [cid], manifests: manifest ? { [cid]: manifest } : {} }, controller.signal);
         await stream.close();
         told++;
       } catch (err) {
@@ -489,20 +493,29 @@ export class StrandFiles {
     try {
       await this.open();
       const reader = new ByteReader(stream);
-      const request = await readJson<{ want?: string[]; announce?: string[] }>(reader, 64 * 1024);
+      const request = await readJson<{ want?: string[]; announce?: string[]; manifests?: Record<string, string> }>(reader, MAX_MANIFEST_BYTES);
       if (Array.isArray(request.announce)) {
         await stream.close();
-        for (const cid of request.announce.slice(0, MAX_WANT)) void this.announced(scope, cid);
+        for (const cid of request.announce.slice(0, MAX_WANT)) {
+          const m = request.manifests?.[cid];
+          void this.announced(scope, cid, typeof m === 'string' ? m : undefined);
+        }
         return;
       }
       const want = request.want;
       if (!Array.isArray(want) || want.length > MAX_WANT) throw new Error('bad want-list');
       const t0 = Date.now();
       let readMs = 0, served = 0, bytesOut = 0;
-      for (const key of want) {
+      // The next block is read while this one is sent: on a slow phone the read is most of the cost.
+      const readOf = (key: unknown) => {
         const t = Date.now();
-        const bytes = typeof key === 'string' && this.allowed(scope, key) ? await this.blocks.get(key) : null;
-        readMs += Date.now() - t;
+        const p = typeof key === 'string' && this.allowed(scope, key) ? this.blocks.get(key) : Promise.resolve(null);
+        return p.then(b => { readMs += Date.now() - t; return b; });
+      };
+      let next = want.length ? readOf(want[0]) : null;
+      for (let i = 0; i < want.length; i++) {
+        const bytes = await next!;
+        next = i + 1 < want.length ? readOf(want[i + 1]) : null;
         await send(stream, new Uint8Array([bytes ? 1 : 0]));
         await send(stream, u32(bytes?.length ?? 0));
         if (bytes) { await send(stream, bytes); served++; bytesOut += bytes.length; }
@@ -517,10 +530,22 @@ export class StrandFiles {
   }
 
   /** A member announced `cid`: fetch it if the app wants it and it is not here yet. */
-  private async announced(scope: string, cid: string): Promise<void> {
+  private async announced(scope: string, cid: string, manifest?: string): Promise<void> {
     try {
       parseCid(cid);
       if (!this.onAnnounce || await this.has(cid)) return;
+      // Its manifest came along: keep it if it is the one the CID names.
+      if (manifest !== undefined && !this.roots.has(cid)) {
+        const raw = encoder.encode(manifest);
+        if (await matches(cid, raw)) {
+          const parsed = JSON.parse(manifest) as Manifest;
+          if (parsed.v === 1 && Array.isArray(parsed.chunks)) {
+            await this.blocks.put(cid, raw);
+            this.index(cid, parsed, [scope], Date.now() + this.leaseMs);
+            this.saveSoon();
+          }
+        }
+      }
       const maxBytes = await this.onAnnounce(scope, cid);
       if (maxBytes === false) return;
       await this.fetch(scope, cid, { maxBytes });
