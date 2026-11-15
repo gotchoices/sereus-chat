@@ -392,8 +392,21 @@ export function createSereusModel(host: ChatHost): SereusModel {
     return out;
   }
 
+  /** Fetches under way, by strand and attachment: a second caller (a view and the background) shares one. */
+  const attachmentFetches = new Map<string, Promise<{ uri: string }>>();
+
   /** An attachment's bytes, assembled from the strand into this device's cached copy. */
-  async function fetchAttachment(strandId: string, attachmentId: string): Promise<{ uri: string }> {
+  function fetchAttachment(strandId: string, attachmentId: string): Promise<{ uri: string }> {
+    const key = `${strandId} ${attachmentId}`;
+    let p = attachmentFetches.get(key);
+    if (!p) {
+      p = fetchAttachmentOnce(strandId, attachmentId).finally(() => attachmentFetches.delete(key));
+      attachmentFetches.set(key, p);
+    }
+    return p;
+  }
+
+  async function fetchAttachmentOnce(strandId: string, attachmentId: string): Promise<{ uri: string }> {
     const files = host.files;
     if (!files) throw new ChatFailure('not-supported', 'This app cannot keep files.');
     const strand = await strandFor(strandId);
