@@ -4,7 +4,10 @@
  *   1. goes to the background (its strand hibernates); serchat sends a photo; the phone comes
  *      back, and must show the photo;
  *   2. sends a photo and goes to the background at once; serchat may not reach it while it
- *      sleeps; the phone comes back, and serchat must then fetch the photo from it.
+ *      sleeps; the phone comes back, and serchat must then fetch the photo from it;
+ *   3. both away: serchat stops, the phone sends a photo (its message and file wait on the
+ *      phone) and goes to the background; then both come back at the same moment, and serchat
+ *      must get the message and the photo (the phone's queue and its file outbox).
  * Each step is timed. Needs the app with FILE_LAYER, a relay both can reach (the phone set up
  * with it), Maestro, serchat built.
  *
@@ -48,14 +51,18 @@ let idle, notes = '', code = 1;
 try {
   const setUp = spawnSync(process.execPath, serchat('--wait', '30', 'profile', 'set', 'name=Serchat', ';', 'relay', 'add', RELAY), { encoding: 'utf8' });
   if (setUp.status !== 0) throw new Error(`serchat setup failed:\n${setUp.stderr}`);
-  idle = spawn(process.execPath, serchat('-v', '--bridge', String(PORT), 'idle'), { stdio: ['ignore', 'pipe', 'pipe'] });
-  idle.stderr.setEncoding('utf8').on('data', d => { notes += d; });
-  idle.stdout.setEncoding('utf8').on('data', d => { notes += d; });
-  while (!notes.includes('idle;')) {
-    if (idle.exitCode !== null) throw new Error('serchat stopped');
-    await sleep(250);
-  }
-  const other = await connectBridge(`node:${PORT}`);
+  const startIdle = async () => {
+    const mark = notes.length;
+    idle = spawn(process.execPath, serchat('-v', '--bridge', String(PORT), 'idle'), { stdio: ['ignore', 'pipe', 'pipe'] });
+    idle.stderr.setEncoding('utf8').on('data', d => { notes += d; });
+    idle.stdout.setEncoding('utf8').on('data', d => { notes += d; });
+    while (!notes.slice(mark).includes('idle;')) {
+      if (idle.exitCode !== null) throw new Error('serchat stopped');
+      await sleep(250);
+    }
+    return connectBridge(`node:${PORT}`);
+  };
+  let other = await startIdle();
   const { url, strandId } = await other.call('invite');
   for (const deadline = Date.now() + 60_000; !(await other.call('arm', strandId)) && Date.now() < deadline;) await sleep(1000);
   log('the phone joins');
@@ -106,6 +113,39 @@ try {
     if (!done) throw new Error("serchat never got the phone's photo");
     log(`serchat got the phone's photo ${((Date.now() - back2) / 1000).toFixed(1)} s after the phone came back`);
   }
+  // 3. Both away, then both back at once.
+  const known = new Set((await other.call('files', strandId)).map(f => f.id));
+  other.close();
+  idle.kill('SIGINT');
+  await new Promise(r => idle.on('exit', r));
+  log('3. serchat is away; the phone sends a photo and goes to the background');
+  toForeground();
+  await sleep(5000);
+  // The picker is occasionally slow to show just after the app comes forward: one retry.
+  // A different photo from case 2's, or serchat would hold it already (same content, same CID).
+  await flow('rn-send-second-photo.yaml').catch(async (err) => {
+    log(`the send flow failed once (${err.message}); again`);
+    adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');   // out of a picker left open
+    await sleep(3000);
+    await flow('rn-send-second-photo.yaml');
+  });
+  toBackground();
+  await sleep(15_000);
+  const together = Date.now();
+  toForeground();
+  other = await startIdle();
+  log(`both back (serchat up in ${((Date.now() - together) / 1000).toFixed(1)} s)`);
+  await other.call('arm', strandId);
+  let got3 = false;
+  for (const deadline = Date.now() + 240_000; Date.now() < deadline && !got3;) {
+    const fresh = (await other.call('files', strandId)).filter(f => !known.has(f.id));
+    if (fresh.length) {
+      try { await other.call('fetchFile', strandId, fresh[0].id); got3 = true; } catch { /* not yet */ }
+    }
+    if (!got3) await sleep(2000);
+  }
+  if (!got3) throw new Error("3. serchat never got the photo sent while both were away");
+  log(`3. serchat got the message and the photo ${((Date.now() - together) / 1000).toFixed(1)} s after both came back`);
   other.close();
   code = 0;
   log('PASS');

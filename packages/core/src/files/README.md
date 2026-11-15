@@ -38,6 +38,14 @@ record, and the bytes move here.
   fetch it now, and up to what size. That size is checked against the manifest before any chunk
   moves. A member that misses the announcement, for instance because it was asleep, fetches when
   it reads the file.
+- **Outbox (the file layer's offline mode).** A file records which members hold it: a member
+  that finishes a fetch announces it, and the sender records the announcement. A file put here
+  that no other member holds yet waits in the outbox. It is offered again whenever a member
+  connects, whenever the strand's node is served again (after a wake), and every minute, until
+  someone holds it. `status(cid)` says `placed` or not, and `onPlaced` fires when it becomes
+  placed. The outbox survives an app restart (it is in the index). This is what lets two
+  transient devices, a new pair of users with no DHT to speak of, get a file across when they
+  are rarely online together.
 - **Spread.** Whoever fetches a file then serves it, so a file survives its sender going offline
   as soon as any other member has fetched it. With announcements, that is usually within
   seconds.
@@ -50,10 +58,11 @@ record, and the bytes move here.
 ## API
 
 ```ts
-const files = new StrandFiles({ blocks, chunkSize?, leaseMs?, parallel?, perRequest?, log?, onAnnounce? });
+const files = new StrandFiles({ blocks, chunkSize?, leaseMs?, parallel?, perRequest?, log?, onAnnounce?, onPlaced? });
 await files.serve(strandId, libp2pNode);       // answer requests in that strand (again after a wake)
 const { cid, size } = await files.put(strandId, bytes);   // stored here; nothing is sent
 await files.announce(strandId, cid);           // members that want it fetch it now
+await files.status(cid);  files.outbox(strandId);          // placed yet? what still waits
 for await (const piece of files.read(strandId, cid)) …    // fetches what is missing first
 await files.fetch(strandId, cid);              // throws NotAvailableError: retry later
 await files.has(cid);  await files.manifest(cid);

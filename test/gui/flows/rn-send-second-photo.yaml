@@ -1,0 +1,25 @@
+# As rn-send-photo.yaml, but the picker's second photo: a different file from the first.
+# From the open conversation, attach the second photo in the system picker and send it
+# (docs/blobs.md). Run by phone-wakes.mjs.
+appId: org.sereus.chat
+---
+- tapOn: "Attach"
+- tapOn:
+    id: "media-gallery"
+# The system picker differs by Android version; both label a photo "Photo taken on …".
+- extendedWaitUntil:
+    visible: "Photo taken on.*"
+    timeout: 30000
+- tapOn:
+    text: "Photo taken on.*"
+    index: 1
+- extendedWaitUntil:
+    visible:
+      id: "staged-attachments"
+    timeout: 30000
+- tapOn:
+    id: "composer-send"
+- extendedWaitUntil:
+    notVisible:
+      id: "staged-attachments"
+    timeout: 120000

@@ -55,6 +55,34 @@ The rest is the S7 reading its blocks into JavaScript (base64 through the bridge
 needs, while the phone is also delivering its message. Its raw bench is 1.1 s per MB each way.
 On the S21 the same fetch takes about 1.2 s.
 
+## Transient members
+
+Two members who are rarely online together, the case a new pair of users is in, tested with
+their strands put to sleep and woken as phones do (`file-transient.test.ts`,
+`files/transient.test.ts`):
+- **An interrupted transfer resumes:** the receiver keeps the chunks it got, and on the next try
+  fetches only the rest.
+- **A file put while alone waits in the outbox,** is offered when a member connects, and is
+  marked placed once a member holds it. This survives an app restart.
+- **Both away, then back at the same moment:** the photo was at Bob 0.7 s after both woke.
+- **Alice's party with a cadre member,** a storage-profile cadre-core node with no chat app. With
+  Alice away, Bob got her message from the member's replica 0.45 s after waking. The photo
+  stayed "still arriving" (no error, no hang) until Alice returned, then arrived 0.7 s later.
+  The member holds the strand's rows but no files: placement (#62) would close that.
+
+On the S21 against serchat (`test/gui/phone-wakes.mjs`, PASS):
+- **The phone asleep while serchat sends:** serchat's announcement reached nobody. When the
+  phone woke, serchat's outbox offered the file again; the phone fetched it (1.1 s) and the
+  file was placed.
+- **The phone sends, then leaves at once:** serchat already had it, 0.5 s after.
+- **Both away** (serchat stopped; the phone sends, its photo announced to nobody, and goes to the
+  background), **then back together:** the phone's message queue drained, and its outbox offered
+  the file. serchat had the message and the 1 MB photo 6.6 s after both came back.
+
+The tests found one bug: a wake rebuilds a strand's node and announces it as `strand:waking`,
+not `strand:started`. So after a wake, files were served only from the dead node until the next
+put or fetch. Fixed.
+
 ## What it does not do yet
 
 See the module README, "Not done". In short:
@@ -67,11 +95,12 @@ See the module README, "Not done". In short:
 
 ## Running it
 
-- **Core:** `yarn workspace @chat/core vitest run src/files src/sereus/file-layer.test.ts`
+- **Core:** `yarn workspace @chat/core vitest run src/files src/sereus/file-layer.test.ts src/sereus/file-transient.test.ts`
 - **serchat** (bundled first): `vitest run -c vitest.scenarios.config.ts test/attachments.test.ts`.
   `SERCHAT_CHUNK_STORE=1` goes back to chunk rows.
 - **Phones** (`FILE_LAYER` in `apps/mobile/src/data/config.ts`; `PERF_LOG` for the timeline):
   - `node test/gui/phone-joins-serchat.mjs <S21>` with `BENCH=1000000 FILE=<jpg> PHONE_FILE=1
     PHONE_LOG=… SERCHAT_LOG=…`;
   - `node test/gui/phones-talk.mjs <S21> <S7> Bob`;
-  - `PHOTO=<jpg> node test/gui/phone-wakes.mjs <S21>`.
+  - `PHOTO=<jpg> node test/gui/phone-wakes.mjs <S21>`: the phone asleep while serchat sends;
+    the phone sending and leaving at once; both away and back together.
