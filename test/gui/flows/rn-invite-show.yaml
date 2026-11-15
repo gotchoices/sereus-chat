@@ -15,6 +15,20 @@ appId: org.sereus.chat
     direction: DOWN
     timeout: 20000
 - tapOn: "Make an invitation"
-- extendedWaitUntil:
-    visible: "Make another invitation"
-    timeout: 120000
+# A slow phone just launched (the S7) can fail the first try ("Could not get through just now"):
+# press Retry, as a person would, until the invitation shows.
+- repeat:
+    while:
+      notVisible: "Make another invitation"
+    times: 12
+    commands:
+      - runFlow:
+          when:
+            visible: "Retry"
+          commands:
+            - tapOn: "Retry"
+      - extendedWaitUntil:
+          visible: "Make another invitation"
+          timeout: 10000
+          optional: true
+- assertVisible: "Make another invitation"
