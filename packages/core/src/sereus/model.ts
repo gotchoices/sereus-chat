@@ -152,7 +152,13 @@ export function createSereusModel(host: ChatHost): SereusModel {
    * (`cid:…`). Each strand's node serves that strand's files.
    */
   const strandFiles = host.blocks && host.files
-    ? new StrandFiles({ blocks: host.blocks, log: line => console.info(line) })
+    ? new StrandFiles({
+      blocks: host.blocks,
+      log: line => console.info(line),
+      // A member announced a new file: fetch it now, up to the attachment limit, so it is here
+      // before anyone opens the conversation.
+      onAnnounce: () => host.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES,
+    })
     : null;
   const serveFiles = async (strandId: string, strand?: StrandInstance): Promise<Libp2pLike | undefined> => {
     const node = (strand ?? host.node.node?.getStrands().get(strandId))?.libp2pNode as unknown as Libp2pLike | undefined;
@@ -335,6 +341,8 @@ export function createSereusModel(host: ChatHost): SereusModel {
   async function putFile(strand: StrandInstance, source: AsyncIterable<Uint8Array>): Promise<{ ref: string; size: number }> {
     await serveFiles(strand.strandId, strand);
     const { cid, size } = await strandFiles!.put(strand.strandId, source);
+    // The members online fetch it now, while the message's own write is under way.
+    void strandFiles!.announce(strand.strandId, cid).catch(() => {});
     return { ref: `${FILE_REF}${cid}`, size };
   }
 

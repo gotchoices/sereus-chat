@@ -118,3 +118,27 @@ describe('strand files over libp2p', () => {
     expect(await again.has(kept.cid)).toBe(true);
   });
 });
+
+describe('announcements', () => {
+  let a: Libp2p, b: Libp2p;
+  afterAll(async () => { await Promise.allSettled([a?.stop(), b?.stop()]); });
+
+  it('a member that wants an announced file fetches it, up to its limit', async () => {
+    [a, b] = await Promise.all([node(), node()]);
+    const fa = new StrandFiles({ blocks: new MemoryBlockStore() });
+    const fb = new StrandFiles({ blocks: new MemoryBlockStore(), onAnnounce: () => 1_000_000 });
+    await fa.serve('s1', lite(a));
+    await fb.serve('s1', lite(b));
+    await a.dial(b.getMultiaddrs()[0]);
+
+    const small = await fa.put('s1', once(new Uint8Array(randomBytes(600_000))));
+    const big = await fa.put('s1', once(new Uint8Array(randomBytes(1_500_000))));
+    expect(await fa.announce('s1', small.cid)).toBe(1);
+    await fa.announce('s1', big.cid);
+    for (let i = 0; i < 50 && !(await fb.has(small.cid)); i++) await new Promise(r => setTimeout(r, 100));
+    expect(await fb.has(small.cid)).toBe(true);
+    // Over B's limit: the manifest is known, no chunk was fetched.
+    expect(await fb.has(big.cid)).toBe(false);
+    expect((await fb.manifest(big.cid))?.size).toBe(1_500_000);
+  });
+});

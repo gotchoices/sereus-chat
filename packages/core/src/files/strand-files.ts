@@ -54,6 +54,12 @@ export class NotAvailableError extends Error {
 
 export interface StrandFilesOptions {
   blocks: BlockStore;
+  /**
+   * A member announced a new file in `scope` (`announce`). Return the most bytes to fetch it at
+   * (checked against its manifest before any chunk moves), or false to leave it; without this
+   * nothing announced is fetched.
+   */
+  onAnnounce?: (scope: string, cid: string) => number | false | Promise<number | false>;
   chunkSize?: number;
   leaseMs?: number;
   /** Requests in flight per fetch. */
@@ -105,6 +111,7 @@ export class StrandFiles {
   private readonly parallel: number;
   private readonly perRequest: number;
   private readonly log: (line: string) => void;
+  private readonly onAnnounce?: (scope: string, cid: string) => number | false | Promise<number | false>;
   private readonly roots = new Map<string, RootEntry>();
   /** chunk CID → the roots that list it. */
   private readonly chunkRoots = new Map<string, Set<string>>();
@@ -122,6 +129,7 @@ export class StrandFiles {
     this.parallel = opts.parallel ?? 4;
     this.perRequest = opts.perRequest ?? 4;
     this.log = opts.log ?? (() => {});
+    this.onAnnounce = opts.onAnnounce;
   }
 
   // ---------------------------------------------------------------- index
@@ -229,7 +237,7 @@ export class StrandFiles {
    * call while one runs shares it. Throws `NotAvailableError` when no reachable member has some
    * part (retry later: a member with it may come online).
    */
-  fetch(scope: string, cid: string, opts: { node?: Libp2pLike } = {}): Promise<FetchReport> {
+  fetch(scope: string, cid: string, opts: { node?: Libp2pLike; maxBytes?: number } = {}): Promise<FetchReport> {
     const key = `${scope} ${cid}`;
     let p = this.inFlight.get(key);
     if (!p) {
@@ -239,7 +247,7 @@ export class StrandFiles {
     return p;
   }
 
-  private async doFetch(scope: string, cid: string, opts: { node?: Libp2pLike }): Promise<FetchReport> {
+  private async doFetch(scope: string, cid: string, opts: { node?: Libp2pLike; maxBytes?: number }): Promise<FetchReport> {
     await this.open();
     const node = opts.node ?? this.nodes.get(scope);
     if (!node) throw new NotAvailableError(`no network for ${scope} here`, 'manifest');
@@ -264,6 +272,9 @@ export class StrandFiles {
       this.saveSoon();
     }
 
+    if (opts.maxBytes !== undefined && entry.manifest.size > opts.maxBytes) {
+      throw new Error(`file ${cid} is ${entry.manifest.size} bytes, over the ${opts.maxBytes}-byte limit`);
+    }
     const missing: string[] = [];
     for (const c of entry.manifest.chunks) if (!(await this.blocks.has(c))) missing.push(c);
     if (missing.length) {
@@ -388,6 +399,34 @@ export class StrandFiles {
     }
   }
 
+  /**
+   * Tell the scope's connected members that this file is here, so the ones that want it fetch it
+   * now rather than when someone looks (their `onAnnounce` decides). Best-effort: a member that
+   * misses the announcement fetches when it reads the file.
+   */
+  async announce(scope: string, cid: string, opts: { node?: Libp2pLike } = {}): Promise<number> {
+    const node = opts.node ?? this.nodes.get(scope);
+    if (!node) return 0;
+    let told = 0;
+    await Promise.all(this.candidates(node).map(async (peer) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(new Error('announce timed out')), 10_000);
+      try {
+        const stream = await node.dialProtocol(peer, FILES_PROTOCOL, { signal: controller.signal, runOnLimitedConnection: true });
+        await sendJson(stream, { announce: [cid] }, controller.signal);
+        await stream.close();
+        told++;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (/protocol|negotiat|not supported|UnsupportedProtocol/i.test(message)) this.muted.set(peer.toString(), Date.now() + MUTE_MS);
+      } finally {
+        clearTimeout(timer);
+      }
+    }));
+    this.log(`[files] announced ${cid.slice(-8)} to ${told} member(s)`);
+    return told;
+  }
+
   // ---------------------------------------------------------------- serve
 
   /** Serve this scope's files over `node` (idempotent; call again with a replacement node). */
@@ -415,7 +454,13 @@ export class StrandFiles {
     try {
       await this.open();
       const reader = new ByteReader(stream);
-      const { want } = await readJson<{ want: string[] }>(reader, 64 * 1024);
+      const request = await readJson<{ want?: string[]; announce?: string[] }>(reader, 64 * 1024);
+      if (Array.isArray(request.announce)) {
+        await stream.close();
+        for (const cid of request.announce.slice(0, MAX_WANT)) void this.announced(scope, cid);
+        return;
+      }
+      const want = request.want;
       if (!Array.isArray(want) || want.length > MAX_WANT) throw new Error('bad want-list');
       for (const key of want) {
         const bytes = typeof key === 'string' && this.allowed(scope, key) ? await this.blocks.get(key) : null;
@@ -426,6 +471,19 @@ export class StrandFiles {
       await stream.close();
     } catch (err) {
       stream.abort(err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+
+  /** A member announced `cid`: fetch it if the app wants it and it is not here yet. */
+  private async announced(scope: string, cid: string): Promise<void> {
+    try {
+      parseCid(cid);
+      if (!this.onAnnounce || await this.has(cid)) return;
+      const maxBytes = await this.onAnnounce(scope, cid);
+      if (maxBytes === false) return;
+      await this.fetch(scope, cid, { maxBytes });
+    } catch (err) {
+      this.log(`[files] fetching announced ${cid.slice(-8)} failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
