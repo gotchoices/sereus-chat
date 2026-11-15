@@ -15,9 +15,10 @@ import { withBitswap, type BitswapOptions } from '@helia/bitswap'
 import { defaultLogger } from '@libp2p/logger'
 import { sha256 } from 'multiformats/hashes/sha2'
 import { identity } from 'multiformats/hashes/identity'
+import { NotFoundError } from 'interface-store'
 import { NetworkedBlockstore } from './networked-blockstore.js'
 import type { BlockBroker, Routing, Provider } from '@helia/interface'
-import type { Libp2p, ComponentLogger } from '@libp2p/interface'
+import type { Libp2p, ComponentLogger, Stream, Connection } from '@libp2p/interface'
 import type { Blockstore } from 'interface-blockstore'
 import type { CID } from 'multiformats/cid'
 import type { MultihashHasher } from 'multiformats/hashes/interface'
@@ -46,6 +47,32 @@ export interface StrandIpfsInit {
    * reads it. Default: anyone the node is connected to.
    */
   authorize?: (peerId: string) => boolean | Promise<boolean>
+  /**
+   * May this block be given out over this node? A device's block store is shared by all its
+   * strands, so a strand's node should serve only that strand's blocks (a layer above, which
+   * knows which files belong where, answers). Default: every block here.
+   */
+  servable?: (cid: CID) => boolean | Promise<boolean>
+}
+
+/** The block store Bitswap serves from: blocks `servable` refuses read as absent. */
+function scoped (local: Blockstore, servable?: (cid: CID) => boolean | Promise<boolean>): Blockstore {
+  if (servable == null) return local
+  return new Proxy(local, {
+    get (target, prop) {
+      if (prop === 'has') {
+        return async (cid: CID, options?: AbortOptions) => (await servable(cid)) && target.has(cid, options)
+      }
+      if (prop === 'get') {
+        return async function * (cid: CID, options?: AbortOptions) {
+          if (!(await servable(cid))) throw new NotFoundError(`block ${cid.toString()} is not served here`)
+          yield * target.get(cid, options)
+        }
+      }
+      const value = Reflect.get(target, prop, target)
+      return typeof value === 'function' ? value.bind(target) : value
+    }
+  })
 }
 
 /**
@@ -77,6 +104,8 @@ export class StrandIpfs {
   readonly libp2p: Libp2p
   /** What Bitswap is given: the node, with its handlers behind `authorize`. */
   private readonly served: Libp2p
+  /** What Bitswap serves from: the local blocks this strand may give out. */
+  private readonly servedBlocks: Blockstore
   /** Read and write blocks through this: misses are fetched from the strand. */
   readonly blockstore: NetworkedBlockstore
   readonly local: Blockstore
@@ -90,6 +119,7 @@ export class StrandIpfs {
     this.libp2p = init.libp2p
     this.served = gated(init.libp2p, init.authorize)
     this.local = init.blockstore
+    this.servedBlocks = scoped(init.blockstore, init.servable)
     this.routers = init.routers ?? []
     this.logger = init.logger ?? defaultLogger()
     this.blockstore = new NetworkedBlockstore({
@@ -116,6 +146,15 @@ export class StrandIpfs {
     for (const m of this.mixins) await m.stop?.(this.heliaLike())
     this.brokers.length = 0
     this.status = 'stopped'
+  }
+
+  /** Serve a protocol of a layer above (blobs' announcements) behind the same membership gate. */
+  async serveProtocol (protocol: string, handler: (stream: Stream, connection: Connection) => void | Promise<void>): Promise<void> {
+    await this.served.handle(protocol, handler, { runOnLimitedConnection: true })
+  }
+
+  async unserveProtocol (protocol: string): Promise<void> {
+    await this.libp2p.unhandle(protocol).catch(() => {})
   }
 
   /**
@@ -150,7 +189,7 @@ export class StrandIpfs {
     return {
       status: this.status,
       libp2p: this.served,
-      blockstore: this.local,
+      blockstore: this.servedBlocks,
       routing: this.routing,
       logger: this.logger,
       getHasher: (code: number) => this.getHasher(code),
