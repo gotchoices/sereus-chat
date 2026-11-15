@@ -72,9 +72,11 @@ interface Entry {
   blocks: string[] | null
   /** Raw leaves in order, when the file is made of them. */
   rawLeaves: string[] | null
+  /** Offered to members (a file), or kept quietly (a tree adopted from a layer above, like a drive's root). */
+  announce: boolean
 }
 
-interface Saved { scopes: string[], expiresAt: number, origin: 'put' | 'fetched', heldBy: string[], size: number, blocks: string[] | null, rawLeaves: string[] | null }
+interface Saved { scopes: string[], expiresAt: number, origin: 'put' | 'fetched', heldBy: string[], size: number, blocks: string[] | null, rawLeaves: string[] | null, announce?: boolean }
 
 export class StrandBlobs {
   private readonly init: StrandBlobsInit
@@ -108,6 +110,7 @@ export class StrandBlobs {
           for (const sc of s.scopes) e.scopes.add(sc)
           for (const p of s.heldBy) e.heldBy.add(p)
           e.expiresAt = s.expiresAt
+          e.announce = s.announce !== false
           if (s.blocks != null) this.complete(cid, s.blocks, s.rawLeaves)
         }
       }
@@ -119,7 +122,7 @@ export class StrandBlobs {
   private entry (cid: string, origin: 'put' | 'fetched', size: number): Entry {
     let e = this.entries.get(cid)
     if (e == null) {
-      e = { scopes: new Set(), expiresAt: Date.now() + this.leaseMs, origin, heldBy: new Set(), size, blocks: null, rawLeaves: null }
+      e = { scopes: new Set(), expiresAt: Date.now() + this.leaseMs, origin, heldBy: new Set(), size, blocks: null, rawLeaves: null, announce: true }
       this.entries.set(cid, e)
     }
     if (origin === 'put') e.origin = 'put'
@@ -138,7 +141,7 @@ export class StrandBlobs {
   private async save (): Promise<void> {
     const files: Record<string, Saved> = {}
     for (const [cid, e] of this.entries) {
-      files[cid] = { scopes: [...e.scopes], expiresAt: e.expiresAt, origin: e.origin, heldBy: [...e.heldBy], size: e.size, blocks: e.blocks, rawLeaves: e.rawLeaves }
+      files[cid] = { scopes: [...e.scopes], expiresAt: e.expiresAt, origin: e.origin, heldBy: [...e.heldBy], size: e.size, blocks: e.blocks, rawLeaves: e.rawLeaves, announce: e.announce }
     }
     await this.init.index.put(INDEX_KEY, new TextEncoder().encode(JSON.stringify({ v: 1, files })))
   }
@@ -226,6 +229,34 @@ export class StrandBlobs {
     return { cid, size }
   }
 
+  /**
+   * Take on a DAG already in the block store (a layer above wrote it: a drive's new root): serve
+   * it in `scope`, keep it a lease, and provide it, without announcing it (members fetch what
+   * they read).
+   */
+  async adopt (scope: string, cid: string): Promise<void> {
+    await this.open()
+    const root = CID.parse(cid)
+    const shape = await this.shapeHere(root)
+    if (shape == null) throw new Error(`not every block of ${cid} is here to adopt`)
+    const e = this.entry(cid, 'put', 0)
+    e.announce = false
+    e.scopes.add(scope)
+    e.expiresAt = Math.max(e.expiresAt, Date.now() + this.leaseMs)
+    this.complete(cid, shape.blocks, shape.rawLeaves)
+    this.saveSoon()
+    void this.ipfs.get(scope)?.provide(root).catch(() => {})
+  }
+
+  /** Let a file or tree go at the next gc (blocks another live one uses stay). */
+  async release (cid: string): Promise<void> {
+    await this.open()
+    const e = this.entries.get(cid)
+    if (e == null) return
+    e.expiresAt = 0
+    this.saveSoon()
+  }
+
   /** Is every block of the file here? */
   async has (cid: string): Promise<boolean> {
     await this.open()
@@ -243,7 +274,7 @@ export class StrandBlobs {
   outbox (scope?: string): string[] {
     const out: string[] = []
     for (const [cid, e] of this.entries) {
-      if (e.origin === 'put' && e.heldBy.size === 0 && (scope == null || e.scopes.has(scope))) out.push(cid)
+      if (e.origin === 'put' && e.announce && e.heldBy.size === 0 && (scope == null || e.scopes.has(scope))) out.push(cid)
     }
     return out
   }
