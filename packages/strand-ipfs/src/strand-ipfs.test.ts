@@ -51,4 +51,26 @@ describe('IPFS on an existing libp2p node', () => {
     await ia.stop()
     expect(a.status).toBe('started')
   }, 60_000)
+
+  it('serves only peers the membership check admits', async () => {
+    const [a, b, c] = await Promise.all([node(), node(), node()])
+    nodes.push(a, b, c)
+    // A serves C, not B.
+    const ia = new StrandIpfs({ libp2p: a, blockstore: new MemoryBlockstore(), authorize: peer => peer === c.peerId.toString() })
+    const ib = new StrandIpfs({ libp2p: b, blockstore: new MemoryBlockstore() })
+    const ic = new StrandIpfs({ libp2p: c, blockstore: new MemoryBlockstore() })
+    ipfs.push(ia, ib, ic)
+    await Promise.all([ia.start(), ib.start(), ic.start()])
+    await b.dial(a.getMultiaddrs()[0])
+    await c.dial(a.getMultiaddrs()[0])
+    const cid = await unixfs(ia).addBytes(new Uint8Array(randomBytes(100_000)))
+
+    const refused = await (async () => {
+      for await (const _ of unixfs(ib).cat(cid, { signal: AbortSignal.timeout(3000) })) { /* no */ }
+    })().then(() => 'read', (e: Error) => e.name)
+    expect(refused).not.toBe('read')
+    let n = 0
+    for await (const p of unixfs(ic).cat(cid, { signal: AbortSignal.timeout(10_000) })) n += p.length
+    expect(n).toBe(100_000)
+  }, 60_000)
 })

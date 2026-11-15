@@ -40,12 +40,43 @@ export interface StrandIpfsInit {
   routers?: ContentRouter[]
   bitswap?: BitswapOptions
   logger?: ComponentLogger
+  /**
+   * May this peer use the exchange? (The strand's membership check.) Every protocol Bitswap
+   * serves is behind it: an inbound stream from a peer it refuses is closed before Bitswap
+   * reads it. Default: anyone the node is connected to.
+   */
+  authorize?: (peerId: string) => boolean | Promise<boolean>
+}
+
+/**
+ * The node as Bitswap sees it: the same node, except that a protocol handler registered through
+ * it answers only peers `authorize` admits.
+ */
+function gated (libp2p: Libp2p, authorize?: (peerId: string) => boolean | Promise<boolean>): Libp2p {
+  if (authorize == null) return libp2p
+  return new Proxy(libp2p, {
+    get (target, prop) {
+      if (prop === 'handle') {
+        return async (protocol: string | string[], handler: (stream: any, connection: any) => void | Promise<void>, options?: unknown) =>
+          target.handle(protocol, async (stream, connection) => {
+            let ok = false
+            try { ok = (await authorize(connection.remotePeer.toString())) === true } catch { ok = false }
+            if (!ok) { stream.abort(new Error('not authorized')); return }
+            await handler(stream, connection)
+          }, options as never)
+      }
+      const value = Reflect.get(target, prop, target)
+      return typeof value === 'function' ? value.bind(target) : value
+    }
+  })
 }
 
 interface Mixin { name: string, start?(helia: unknown): Promise<void> | void, stop?(helia: unknown): Promise<void> | void }
 
 export class StrandIpfs {
   readonly libp2p: Libp2p
+  /** What Bitswap is given: the node, with its handlers behind `authorize`. */
+  private readonly served: Libp2p
   /** Read and write blocks through this: misses are fetched from the strand. */
   readonly blockstore: NetworkedBlockstore
   readonly local: Blockstore
@@ -57,6 +88,7 @@ export class StrandIpfs {
 
   constructor (init: StrandIpfsInit) {
     this.libp2p = init.libp2p
+    this.served = gated(init.libp2p, init.authorize)
     this.local = init.blockstore
     this.routers = init.routers ?? []
     this.logger = init.logger ?? defaultLogger()
@@ -117,7 +149,7 @@ export class StrandIpfs {
   private heliaLike (): Record<string, unknown> {
     return {
       status: this.status,
-      libp2p: this.libp2p,
+      libp2p: this.served,
       blockstore: this.local,
       routing: this.routing,
       logger: this.logger,
