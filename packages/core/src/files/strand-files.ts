@@ -497,13 +497,20 @@ export class StrandFiles {
       }
       const want = request.want;
       if (!Array.isArray(want) || want.length > MAX_WANT) throw new Error('bad want-list');
+      const t0 = Date.now();
+      let readMs = 0, served = 0, bytesOut = 0;
       for (const key of want) {
+        const t = Date.now();
         const bytes = typeof key === 'string' && this.allowed(scope, key) ? await this.blocks.get(key) : null;
+        readMs += Date.now() - t;
         await send(stream, new Uint8Array([bytes ? 1 : 0]));
         await send(stream, u32(bytes?.length ?? 0));
-        if (bytes) await send(stream, bytes);
+        if (bytes) { await send(stream, bytes); served++; bytesOut += bytes.length; }
       }
       await stream.close();
+      if (bytesOut > 64 * 1024) {
+        this.log(`[files] served ${served} block(s), ${(bytesOut / 1e6).toFixed(2)} MB, in ${Date.now() - t0} ms (reading ${readMs} ms)`);
+      }
     } catch (err) {
       stream.abort(err instanceof Error ? err : new Error(String(err)));
     }

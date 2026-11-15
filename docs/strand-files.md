@@ -32,10 +32,21 @@ Core tests (two in-process parties over loopback): 2.3 MB sent in 107–150 ms, 
 other party 400 ms after the send began. serchat scenario (two processes, a local relay): 14 MB
 in three files sent in 3.2 s, and a 12 MB fetch in 240 ms.
 
-On the phones, the slow parts left are local:
-- the S7 writing and reading blocks through react-native-file-access's base64 bridge: 3.7 s to
-  put 1 MB, 8.3 s to serve it;
-- the extra viewable copy chat writes beside the blocks: about 1 s per MB on the S21.
+On the phones, base64 through JavaScript was the cost. Two optional host capabilities now keep a
+file's bytes out of JavaScript where the bytes aren't needed there:
+- **`importFile`:** a sent file is cut into blocks natively (read a chunk, write it, hash it).
+- **`assemble`:** a viewable copy is made by appending block files natively.
+
+Measured on the S7 sending 1 MB to the S21:
+
+| Step | Before | After |
+|---|---|---|
+| put (cut into blocks) | 3.8 s | 0.47 s |
+| whole send | 8.7 s | 1.5 s |
+| S21 viewable copy | 0.97 s | 17 ms |
+
+Serving from the S7 is still 8.3 s per MB. The bytes must be in JavaScript to go out over libp2p,
+so the S7's block reads, and its stream encryption, remain.
 
 ## What it does not do yet
 
