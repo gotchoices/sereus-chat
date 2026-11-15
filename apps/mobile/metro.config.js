@@ -23,8 +23,8 @@ const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // stack packages (@noble/*, @multiformats/*) are left alone.
 // (docs/app-family.md, "Linked code must resolve the app's copy of the stack".)
 const packagesDir = path.join(projectRoot, 'packages') + path.sep;
-// Every linked package's peers (the core's, and the strand IPFS layer's: helia and friends).
-const corePeers = [...new Set(['core', 'strand-ipfs'].flatMap(name => Object.keys(
+// Every linked package's peers (the core's, and the IPFS and blob layers': Helia's pieces and friends).
+const corePeers = [...new Set(['core', 'strand-ipfs', 'strand-blobs'].flatMap(name => Object.keys(
   require(path.join(projectRoot, `packages/${name}/package.json`)).peerDependencies ?? {},
 )))];
 const isCorePeer = name => corePeers.some(p => name === p || name.startsWith(p + '/'));

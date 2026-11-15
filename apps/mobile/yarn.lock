@@ -1894,6 +1894,12 @@ __metadata:
   languageName: node
   linkType: soft
 
+"@chat/strand-blobs@link:../../packages/strand-blobs::locator=mobile%40workspace%3A.":
+  version: 0.0.0-use.local
+  resolution: "@chat/strand-blobs@link:../../packages/strand-blobs::locator=mobile%40workspace%3A."
+  languageName: node
+  linkType: soft
+
 "@chat/strand-ipfs@link:../../packages/strand-ipfs::locator=mobile%40workspace%3A.":
   version: 0.0.0-use.local
   resolution: "@chat/strand-ipfs@link:../../packages/strand-ipfs::locator=mobile%40workspace%3A."
@@ -2222,7 +2228,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ipld/dag-pb@npm:^4.1.7, @ipld/dag-pb@npm:^4.2.0":
+"@ipld/dag-pb@npm:^4.1.0, @ipld/dag-pb@npm:^4.1.7, @ipld/dag-pb@npm:^4.2.0":
   version: 4.2.0
   resolution: "@ipld/dag-pb@npm:4.2.0"
   dependencies:
@@ -10913,12 +10919,15 @@ __metadata:
     "@babel/runtime": "npm:^7.29.2"
     "@chat/core": "link:../../packages/core"
     "@chat/resources": "link:../../packages/resources"
+    "@chat/strand-blobs": "link:../../packages/strand-blobs"
     "@chat/strand-ipfs": "link:../../packages/strand-ipfs"
     "@craftzdog/react-native-buffer": "npm:^6.1.2"
     "@helia/bitswap": "npm:^4.0.20"
     "@helia/interface": "npm:^7.1.2"
     "@helia/unixfs": "npm:^8.0.9"
+    "@ipld/dag-pb": "npm:^4.1.0"
     "@libp2p/logger": "npm:^6.2.14"
+    "@libp2p/peer-id": "npm:^6.0.18"
     "@libp2p/webrtc": "npm:6.0.33"
     "@libp2p/websockets": "npm:^10.1.21"
     "@noble/ciphers": "npm:^2.2.0"
@@ -10959,6 +10968,7 @@ __metadata:
     event-target-polyfill: "npm:^0.0.4"
     interface-blockstore: "npm:^7.0.1"
     interface-datastore: "npm:^10.0.1"
+    interface-store: "npm:^8.0.0"
     jest: "npm:^29.6.3"
     p2p-fret: "npm:1.3.0"
     prettier: "npm:2.8.8"
