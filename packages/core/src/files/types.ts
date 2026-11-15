@@ -49,6 +49,8 @@ export interface Libp2pLike {
   unhandle?(protocol: string): Promise<void>;
   dialProtocol(peer: PeerIdLike, protocol: string, options?: { signal?: AbortSignal; runOnLimitedConnection?: boolean }): Promise<StreamLike>;
   getConnections(): Array<{ remotePeer: PeerIdLike; remoteAddr: { toString(): string } }>;
+  /** Optional: a peer connected (libp2p's `peer:connect`), when to offer unplaced files again. */
+  addEventListener?(type: 'peer:connect', listener: (event: { detail: PeerIdLike }) => void): void;
 }
 
 /** Block storage in memory, for tests and for hosts with nothing better. */

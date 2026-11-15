@@ -43,7 +43,26 @@ interface RootEntry {
   manifest: Manifest;
   scopes: Set<string>;
   expiresAt: number;
+  /** Put here (this device is its source) or fetched from a member. */
+  origin: 'put' | 'fetched';
+  /** Other members known to hold the whole file: they announced it, or this device fetched it from them. */
+  heldBy: Set<string>;
 }
+
+/** Where a file stands on this device. */
+export interface FileStatus {
+  /** Every block is here. */
+  here: boolean;
+  /** Put here, or fetched. */
+  origin: 'put' | 'fetched';
+  /** Members known to hold it too (peer ids of their strand nodes). */
+  heldBy: string[];
+  /** Some other member holds it: it no longer depends on this device alone. */
+  placed: boolean;
+}
+
+/** How often files no other member holds yet are offered again while any remain. */
+const OUTBOX_RETRY_MS = 60_000;
 
 export class NotAvailableError extends Error {
   constructor(message: string, readonly missing: 'manifest' | 'chunks', readonly have = 0, readonly total = 0) {
@@ -60,6 +79,12 @@ export interface StrandFilesOptions {
    * nothing announced is fetched.
    */
   onAnnounce?: (scope: string, cid: string) => number | false | Promise<number | false>;
+  /**
+   * A file put here is now held by another member too (the file layer's equivalent of a write
+   * leaving the offline queue). Until then it is in the outbox: offered again to every member
+   * that connects, and every minute.
+   */
+  onPlaced?: (scope: string, cid: string, by: string) => void;
   chunkSize?: number;
   leaseMs?: number;
   /** Requests in flight per fetch. */
@@ -111,6 +136,8 @@ async function matches(cid: string, bytes: Uint8Array): Promise<boolean> {
   return equalBytes(digest, await sha256(bytes));
 }
 
+interface SavedRoot { scopes: string[]; expiresAt: number; origin?: 'put' | 'fetched'; heldBy?: string[] }
+
 export class StrandFiles {
   private readonly blocks: BlockStore;
   private readonly chunkSize: number;
@@ -119,6 +146,9 @@ export class StrandFiles {
   private readonly perRequest: number;
   private readonly log: (line: string) => void;
   private readonly onAnnounce?: (scope: string, cid: string) => number | false | Promise<number | false>;
+  private readonly onPlaced?: (scope: string, cid: string, by: string) => void;
+  private outboxTimer: unknown = null;
+  private readonly offerTimers = new Map<string, unknown>();
   private readonly roots = new Map<string, RootEntry>();
   /** chunk CID → the roots that list it. */
   private readonly chunkRoots = new Map<string, Set<string>>();
@@ -137,6 +167,7 @@ export class StrandFiles {
     this.perRequest = opts.perRequest ?? 4;
     this.log = opts.log ?? (() => {});
     this.onAnnounce = opts.onAnnounce;
+    this.onPlaced = opts.onPlaced;
   }
 
   // ---------------------------------------------------------------- index
@@ -146,31 +177,34 @@ export class StrandFiles {
     this.opened ??= (async () => {
       const raw = await this.blocks.get(INDEX_KEY);
       if (!raw) return;
-      const saved = JSON.parse(decoder.decode(raw)) as { v: 1; roots: Record<string, { scopes: string[]; expiresAt: number }> };
+      const saved = JSON.parse(decoder.decode(raw)) as { v: 1; roots: Record<string, SavedRoot> };
       for (const [cid, r] of Object.entries(saved.roots ?? {})) {
         const bytes = await this.blocks.get(cid);
         if (!bytes) continue;
-        this.index(cid, JSON.parse(decoder.decode(bytes)) as Manifest, r.scopes, r.expiresAt);
+        const entry = this.index(cid, JSON.parse(decoder.decode(bytes)) as Manifest, r.scopes, r.expiresAt, r.origin ?? 'fetched');
+        for (const p of r.heldBy ?? []) entry.heldBy.add(p);
       }
+      if (this.outbox().length) this.armOutbox();
     })();
     return this.opened;
   }
 
-  private index(cid: string, manifest: Manifest, scopes: Iterable<string>, expiresAt: number): RootEntry {
+  private index(cid: string, manifest: Manifest, scopes: Iterable<string>, expiresAt: number, origin: 'put' | 'fetched' = 'fetched'): RootEntry {
     let entry = this.roots.get(cid);
     if (!entry) {
-      entry = { manifest, scopes: new Set(), expiresAt };
+      entry = { manifest, scopes: new Set(), expiresAt, origin, heldBy: new Set() };
       this.roots.set(cid, entry);
       for (const c of manifest.chunks) (this.chunkRoots.get(c) ?? this.chunkRoots.set(c, new Set()).get(c)!).add(cid);
     }
     for (const s of scopes) entry.scopes.add(s);
     entry.expiresAt = Math.max(entry.expiresAt, expiresAt);
+    if (origin === 'put') entry.origin = 'put';
     return entry;
   }
 
   private async save(): Promise<void> {
-    const roots: Record<string, { scopes: string[]; expiresAt: number }> = {};
-    for (const [cid, r] of this.roots) roots[cid] = { scopes: [...r.scopes], expiresAt: r.expiresAt };
+    const roots: Record<string, SavedRoot> = {};
+    for (const [cid, r] of this.roots) roots[cid] = { scopes: [...r.scopes], expiresAt: r.expiresAt, origin: r.origin, heldBy: [...r.heldBy] };
     await this.blocks.put(INDEX_KEY, encoder.encode(JSON.stringify({ v: 1, roots })));
   }
 
@@ -221,8 +255,9 @@ export class StrandFiles {
     const bytes = encodeManifest(manifest);
     const cid = cidFor(JSON_CODEC, await sha256(bytes));
     await this.blocks.put(cid, bytes);
-    this.index(cid, manifest, [scope], Date.now() + this.leaseMs);
+    this.index(cid, manifest, [scope], Date.now() + this.leaseMs, 'put');
     await this.save();
+    this.armOutbox();
     this.log(`[files] ${how} ${(size / 1e6).toFixed(2)} MB as ${chunks.length} chunks in ${Date.now() - t0} ms`);
     return { cid, size };
   }
@@ -323,7 +358,11 @@ export class StrandFiles {
       }
     }
     entry.expiresAt = Math.max(entry.expiresAt, Date.now() + this.leaseMs);
+    for (const p of used) entry.heldBy.add(p);
     this.saveSoon();
+    // Now a holder: tell the members, so the source knows the file is placed, and others can
+    // fetch from here too.
+    void this.announce(scope, cid, { node }).catch(() => {});
     const report: FetchReport = { bytes, chunks: fetched, ms: Date.now() - t0, peers: [...used] };
     this.log(`[files] fetched ${(bytes / 1e6).toFixed(2)} MB (${fetched} chunks) in ${report.ms} ms from ${used.size} peer(s)`);
     return report;
@@ -439,7 +478,7 @@ export class StrandFiles {
    * now rather than when someone looks (their `onAnnounce` decides). Best-effort: a member that
    * misses the announcement fetches when it reads the file.
    */
-  async announce(scope: string, cid: string, opts: { node?: Libp2pLike } = {}): Promise<number> {
+  async announce(scope: string, cid: string, opts: { node?: Libp2pLike; quiet?: boolean } = {}): Promise<number> {
     const node = opts.node ?? this.nodes.get(scope);
     if (!node) return 0;
     // The manifest goes with the announcement (checked against the CID on arrival), saving the
@@ -462,7 +501,7 @@ export class StrandFiles {
         clearTimeout(timer);
       }
     }));
-    this.log(`[files] announced ${cid.slice(-8)} to ${told} member(s)`);
+    if (told || !opts.quiet) this.log(`[files] announced ${cid.slice(-8)} to ${told} member(s)`);
     return told;
   }
 
@@ -473,8 +512,75 @@ export class StrandFiles {
     this.nodes.set(scope, node);
     if (this.handled.has(node)) return;
     this.handled.add(node);
-    await node.handle(FILES_PROTOCOL, (stream) => this.answer(scope, stream), { runOnLimitedConnection: true, maxInboundStreams: 64 })
+    await node.handle(FILES_PROTOCOL, (stream, connection) => this.answer(scope, stream, connection?.remotePeer?.toString()),
+      { runOnLimitedConnection: true, maxInboundStreams: 64 })
       .catch((err: unknown) => { this.handled.delete(node); throw err; });
+    // A member connecting is the moment to offer what nobody else holds yet.
+    node.addEventListener?.('peer:connect', () => {
+      if (this.nodes.get(scope) === node) this.offerSoon(scope);
+    });
+    this.offerSoon(scope);
+  }
+
+  /** Where a file stands here, or null when it is unknown. */
+  async status(cid: string): Promise<FileStatus | null> {
+    await this.open();
+    const entry = this.roots.get(cid);
+    if (!entry) return null;
+    return { here: await this.has(cid), origin: entry.origin, heldBy: [...entry.heldBy], placed: entry.heldBy.size > 0 };
+  }
+
+  /** Files put here in `scope` (or any scope) that no other member is known to hold. */
+  outbox(scope?: string): string[] {
+    const out: string[] = [];
+    for (const [cid, r] of this.roots) {
+      if (r.origin === 'put' && r.heldBy.size === 0 && (!scope || r.scopes.has(scope))) out.push(cid);
+    }
+    return out;
+  }
+
+  /** Offer the scope's outbox to its connected members, once for a burst of connections. */
+  private offerSoon(scope: string): void {
+    if (this.offerTimers.has(scope)) return;
+    const t = setTimeout(() => {
+      this.offerTimers.delete(scope);
+      void this.offer(scope);
+    }, 1500) as { unref?: () => void };
+    t.unref?.();
+    this.offerTimers.set(scope, t);
+  }
+
+  private async offer(scope: string): Promise<void> {
+    await this.open();
+    const pending = this.outbox(scope);
+    if (!pending.length || !this.nodes.has(scope)) return;
+    let told = 0;
+    for (const cid of pending) told += await this.announce(scope, cid, { quiet: true }).catch(() => 0);
+    if (told) this.log(`[files] offered ${pending.length} file(s) nobody else holds yet in ${scope.slice(0, 8)}`);
+  }
+
+  /** While any file is unplaced, offer every scope's outbox each minute. */
+  private armOutbox(): void {
+    if (this.outboxTimer) return;
+    const t = setInterval(() => {
+      if (!this.outbox().length) { clearInterval(t as never); this.outboxTimer = null; return; }
+      for (const scope of this.nodes.keys()) void this.offer(scope);
+    }, OUTBOX_RETRY_MS) as { unref?: () => void };
+    t.unref?.();
+    this.outboxTimer = t;
+  }
+
+  /** `peer` says it holds `cid`. */
+  private heldElsewhere(scope: string, cid: string, peer: string): void {
+    const entry = this.roots.get(cid);
+    if (!entry || entry.heldBy.has(peer)) return;
+    const wasPlaced = entry.heldBy.size > 0;
+    entry.heldBy.add(peer);
+    this.saveSoon();
+    if (!wasPlaced && entry.origin === 'put') {
+      this.log(`[files] ${cid.slice(-8)} placed: ${peer.slice(-8)} holds it`);
+      this.onPlaced?.(scope, cid, peer);
+    }
   }
 
   /** Stop serving `scope` (its node is going away). */
@@ -489,7 +595,7 @@ export class StrandFiles {
     return false;
   }
 
-  private async answer(scope: string, stream: StreamLike): Promise<void> {
+  private async answer(scope: string, stream: StreamLike, from?: string): Promise<void> {
     try {
       await this.open();
       const reader = new ByteReader(stream);
@@ -498,7 +604,7 @@ export class StrandFiles {
         await stream.close();
         for (const cid of request.announce.slice(0, MAX_WANT)) {
           const m = request.manifests?.[cid];
-          void this.announced(scope, cid, typeof m === 'string' ? m : undefined);
+          void this.announced(scope, cid, typeof m === 'string' ? m : undefined, from);
         }
         return;
       }
@@ -530,9 +636,11 @@ export class StrandFiles {
   }
 
   /** A member announced `cid`: fetch it if the app wants it and it is not here yet. */
-  private async announced(scope: string, cid: string, manifest?: string): Promise<void> {
+  private async announced(scope: string, cid: string, manifest?: string, from?: string): Promise<void> {
     try {
       parseCid(cid);
+      // An announcer holds the whole file.
+      if (from && this.roots.get(cid)?.scopes.has(scope)) this.heldElsewhere(scope, cid, from);
       if (!this.onAnnounce || await this.has(cid)) return;
       // Its manifest came along: keep it if it is the one the CID names.
       if (manifest !== undefined && !this.roots.has(cid)) {

@@ -166,9 +166,13 @@ export function createSereusModel(host: ChatHost): SereusModel {
     return node;
   };
   if (strandFiles) {
-    host.node.on('strand:started', ({ strandId }) => {
-      void serveFiles(strandId).catch(err => console.warn('[files] serving failed:', err instanceof Error ? err.message : err));
-    });
+    // A wake rebuilds the strand's node (`strand:waking`, not `strand:started`): serve on the new
+    // one, which also offers what nobody else holds yet.
+    for (const event of STRAND_UP_EVENTS) {
+      host.node.on(event, ({ strandId }) => {
+        void serveFiles(strandId).catch(err => console.warn('[files] serving failed:', err instanceof Error ? err.message : err));
+      });
+    }
   }
   if (strandFiles) {
     // Expired files go: once soon after start, then daily. A file stays while its records are
