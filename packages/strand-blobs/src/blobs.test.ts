@@ -195,3 +195,36 @@ describe('strand blobs', () => {
     expect(sha(new Uint8Array(Buffer.concat(joined)))).toBe(sha(bytes))
   }, 30_000)
 })
+
+describe('native import', () => {
+  it('gives the CID the UnixFS importer gives, at every size', async () => {
+    const { mkdtempSync, writeFileSync, readFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const dir = mkdtempSync(join(tmpdir(), 'blobs-import-'))
+    for (const n of [0, 1, 1000, 1_048_576, 1_048_577, 3_670_016]) {
+      const bytes = new Uint8Array(randomBytes(n))
+      const path = join(dir, `f${n}`)
+      writeFileSync(path, bytes)
+      const native = new Device({
+        // As a phone does it: chunk by chunk, each kept and hashed outside the layer.
+        importFile: async (p, chunkSize, name) => {
+          const all = new Uint8Array(readFileSync(p))
+          const keys: string[] = []
+          for (let at = 0; at < all.length; at += chunkSize) {
+            const chunk = all.subarray(at, at + chunkSize)
+            const key = name(createHash('sha256').update(chunk).digest('hex'))
+            await native.bytes.put(key, chunk)
+            keys.push(key)
+          }
+          return { keys, size: all.length }
+        }
+      })
+      const plain = new Device()
+      const a = await native.blobs.putPath('s1', path, () => once(bytes))
+      const b = await plain.blobs.put('s1', once(bytes))
+      expect(a, `size ${n}`).toEqual(b)
+      expect(sha(await bytesOf(native, 's1', a.cid))).toBe(sha(bytes))
+    }
+  }, 60_000)
+})

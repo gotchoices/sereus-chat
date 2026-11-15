@@ -22,6 +22,10 @@ import { unixfs } from '@helia/unixfs'
 import { CID } from 'multiformats/cid'
 import { readJson, sendJson, sha256, type StrandIpfs, type ByteStore } from '@chat/strand-ipfs'
 import { dagShape } from './dag.js'
+import * as dagPb from '@ipld/dag-pb'
+import * as raw from 'multiformats/codecs/raw'
+import { create as digestOf } from 'multiformats/hashes/digest'
+import { UnixFS } from 'ipfs-unixfs'
 import type { Blockstore } from 'interface-blockstore'
 import type { Stream, Connection } from '@libp2p/interface'
 
@@ -31,6 +35,9 @@ const INDEX_KEY = '_blobs_index'
 const OUTBOX_RETRY_MS = 60_000
 /** The UnixFS layout every file gets: CIDv1, raw leaves, 1 MiB chunks (the current standard). */
 const IMPORT_PROFILE = 'unixfs-v1-2025'
+/** The profile's chunk size and widest node: what a native import must match. */
+const CHUNK_SIZE = 1024 * 1024
+const MAX_CHILDREN = 1024
 
 export class NotAvailableError extends Error {
   constructor (message: string) { super(message); this.name = 'NotAvailableError' }
@@ -59,6 +66,12 @@ export interface StrandBlobsInit {
   onPlaced?: (scope: string, cid: string, by: string) => void
   /** Optional: join these blocks, in order, into one file at `path`, natively. */
   assemble?: (keys: string[], path: string) => Promise<void>
+  /**
+   * Optional: cut the file at `path` into blocks natively (read a chunk, keep it, hash it), each
+   * kept under `name(its SHA-256, hex)`; resolves to the keys in order and the file's size. A
+   * phone's file library can, and a file's bytes then never pass through JavaScript.
+   */
+  importFile?: (path: string, chunkSize: number, name: (sha256Hex: string) => string) => Promise<{ keys: string[], size: number }>
   log?: (line: string) => void
 }
 
@@ -213,6 +226,11 @@ export class StrandBlobs {
     const counted = (async function * () { for await (const p of source) { size += p.length; yield p } })()
     // Hashed natively where the platform can (strand-ipfs `sha256`).
     const root = await unixfs({ blockstore: store }).addByteStream(counted, { profile: IMPORT_PROFILE, hasher: sha256 } as never)
+    return this.finishPut(scope, root, size, t0, 'put')
+  }
+
+  private async finishPut (scope: string, root: CID, size: number, t0: number, how: string): Promise<{ cid: string, size: number }> {
+    const ipfs = this.ipfs.get(scope)
     const cid = root.toString()
     const e = this.entry(cid, 'put', size)
     e.scopes.add(scope)
@@ -221,7 +239,7 @@ export class StrandBlobs {
     if (shape != null) this.complete(cid, shape.blocks, shape.rawLeaves)
     await this.save()
     this.armOutbox()
-    this.log(`[blobs] put ${(size / 1e6).toFixed(2)} MB as ${shape?.blocks.length ?? '?'} blocks in ${Date.now() - t0} ms`)
+    this.log(`[blobs] ${how} ${(size / 1e6).toFixed(2)} MB as ${shape?.blocks.length ?? '?'} blocks in ${Date.now() - t0} ms`)
     if (ipfs != null) {
       void this.announce(scope, cid).catch(() => {})
       void ipfs.provide(root).catch(() => {})
@@ -230,31 +248,30 @@ export class StrandBlobs {
   }
 
   /**
-   * Take on a DAG already in the block store (a layer above wrote it: a drive's new root): serve
-   * it in `scope`, keep it a lease, and provide it, without announcing it (members fetch what
-   * they read).
+   * Store the file at `path` (a path on this device): cut into blocks natively when the host can
+   * (`importFile`), giving the same CID UnixFS would; else read through `read`, as `put`.
    */
-  async adopt (scope: string, cid: string): Promise<void> {
+  async putPath (scope: string, path: string, read: () => AsyncIterable<Uint8Array>): Promise<{ cid: string, size: number }> {
+    if (this.init.importFile == null) return this.put(scope, read())
     await this.open()
-    const root = CID.parse(cid)
-    const shape = await this.shapeHere(root)
-    if (shape == null) throw new Error(`not every block of ${cid} is here to adopt`)
-    const e = this.entry(cid, 'put', 0)
-    e.announce = false
-    e.scopes.add(scope)
-    e.expiresAt = Math.max(e.expiresAt, Date.now() + this.leaseMs)
-    this.complete(cid, shape.blocks, shape.rawLeaves)
-    this.saveSoon()
-    void this.ipfs.get(scope)?.provide(root).catch(() => {})
-  }
-
-  /** Let a file or tree go at the next gc (blocks another live one uses stay). */
-  async release (cid: string): Promise<void> {
-    await this.open()
-    const e = this.entries.get(cid)
-    if (e == null) return
-    e.expiresAt = 0
-    this.saveSoon()
+    const t0 = Date.now()
+    const { keys, size } = await this.init.importFile(path, CHUNK_SIZE, hex => CID.createV1(raw.code, digestOf(0x12, hexToBytes(hex))).toString())
+    // The importer's layout for an empty file, or one wider than one node, is left to it.
+    if (size === 0 || keys.length > MAX_CHILDREN) return this.put(scope, read())
+    let root: CID
+    if (keys.length === 1) {
+      // One chunk: the file is its raw leaf (the profile reduces a single leaf to itself).
+      root = CID.parse(keys[0])
+    } else {
+      // The importer's file node: a UnixFS file header listing each leaf's size, linking them.
+      const sizes = keys.map((_, i) => i < keys.length - 1 ? CHUNK_SIZE : size - CHUNK_SIZE * (keys.length - 1))
+      const f = new UnixFS({ type: 'file' })
+      for (const n of sizes) f.addBlockSize(BigInt(n))
+      const block = dagPb.encode(dagPb.prepare({ Data: f.marshal(), Links: keys.map((k, i) => ({ Name: '', Tsize: sizes[i], Hash: CID.parse(k) })) }))
+      root = CID.createV1(dagPb.code, await sha256.digest(block))
+      await this.init.blockstore.put(root, block)
+    }
+    return this.finishPut(scope, root, size, t0, 'imported')
   }
 
   /** Is every block of the file here? */
@@ -489,6 +506,13 @@ export class StrandBlobs {
     if (files > 0) await this.save()
     return { files, blocks }
   }
+}
+
+function hexToBytes (hex: string): Uint8Array {
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) throw new Error(`not a SHA-256 hex digest: ${hex}`)
+  const out = new Uint8Array(32)
+  for (let i = 0; i < 32; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
+  return out
 }
 
 function concat (parts: Uint8Array[]): Uint8Array {

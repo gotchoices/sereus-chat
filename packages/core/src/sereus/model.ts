@@ -357,7 +357,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     await ipfsFor(strand.strandId, strand);
     const files = host.files!;
     // Stored as a UnixFS file, announced to the members online, and provided on FRET.
-    const { cid, size } = await media!.blobs.put(strand.strandId, files.read(uri, CHUNK_SIZE));
+    const { cid, size } = await media!.blobs.putPath(strand.strandId, uri, () => files.read(uri, CHUNK_SIZE));
     return { ref: `${FILE_REF}${cid}`, size };
   }
 

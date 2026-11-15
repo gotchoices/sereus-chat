@@ -29,6 +29,7 @@ export class StrandMedia {
     this.log = opts.log;
     this.blockstore = new KvBlockstore(blocks);
     const assemble = blocks.assemble?.bind(blocks);
+    const importFile = blocks.importFile?.bind(blocks);
     this.blobs = new StrandBlobs({
       blockstore: this.blockstore,
       index: blocks,
@@ -37,6 +38,8 @@ export class StrandMedia {
       // before anyone opens the conversation.
       onAnnounce: () => opts.maxAnnouncedBytes(),
       ...(assemble ? { assemble } : {}),
+      // A phone cuts a file into blocks natively; the CID is the one UnixFS would give.
+      ...(importFile ? { importFile } : {}),
     });
   }
 

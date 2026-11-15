@@ -14,7 +14,10 @@ export interface BlockStore {
    * through JavaScript (a phone's file appends). A file made of raw leaves is joined this way.
    */
   assemble?(keys: string[], path: string): Promise<void>;
-  /** Optional, unused for now: cut a file into blocks natively (see the strand-files branch). */
+  /**
+   * Optional: cut the file at `path` into blocks natively (read a chunk, keep it, hash it), each
+   * kept under `name(its SHA-256, hex)`. A sent file's bytes then never pass through JavaScript.
+   */
   importFile?(path: string, chunkSize: number, name: (sha256Hex: string) => string): Promise<{ keys: string[]; size: number }>;
 }
 
