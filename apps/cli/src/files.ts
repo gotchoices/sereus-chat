@@ -5,7 +5,7 @@
  * same name. Writes go through a temporary file, so a reader never sees a half-written copy.
  */
 import { createReadStream } from 'node:fs';
-import { mkdir, open, rename, rm, stat } from 'node:fs/promises';
+import { copyFile, mkdir, open, rename, rm, stat } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import type { FileAccess } from '@chat/core/sereus';
 
@@ -21,6 +21,10 @@ export function nodeFileAccess(cacheDir: string): FileAccess {
       return join(cacheDir, `${id}${ext}`);
     },
     async exists(uri) { try { await stat(uri); return true; } catch { return false; } },
+    async copy(from, to) {
+      await mkdir(join(to, '..'), { recursive: true });
+      await copyFile(from, to);
+    },
     async write(uri, pieces) {
       await mkdir(join(uri, '..'), { recursive: true });
       const tmp = `${uri}.part-${process.pid}-${Date.now()}`;

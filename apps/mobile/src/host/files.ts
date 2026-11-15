@@ -34,6 +34,13 @@ export const phoneFiles: FileAccess = {
   async exists(uri) {
     return FileSystem.exists(path(uri));
   },
+  // This phone's own copy of a file it sends: natively, no base64 round trip.
+  async copy(from, to) {
+    if (!(await FileSystem.exists(BLOB_DIR))) await FileSystem.mkdir(BLOB_DIR);
+    const target = path(to);
+    if (await FileSystem.exists(target)) await FileSystem.unlink(target);
+    await FileSystem.cp(path(from), target);
+  },
   async write(uri, pieces) {
     const p = path(uri);
     if (!(await FileSystem.exists(BLOB_DIR))) await FileSystem.mkdir(BLOB_DIR);

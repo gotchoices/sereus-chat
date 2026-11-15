@@ -3,7 +3,8 @@
  * one file per block in a directory of the profile, named by its key (a base32 CID, or the
  * layer's own `_index`). Writes go through a temporary file, so a reader never sees half a block.
  */
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { join } from 'node:path';
 import type { BlockStore } from '@chat/core/files';
 
@@ -34,6 +35,18 @@ export function nodeBlockStore(dir: string): BlockStore {
     },
     async keys() {
       try { return (await readdir(dir)).filter(n => !n.includes('.part-')); } catch { return []; }
+    },
+    async assemble(keys, path) {
+      await mkdir(dirname(path), { recursive: true });
+      const tmp = `${path}.part-${process.pid}-${Date.now()}`;
+      try {
+        await writeFile(tmp, new Uint8Array(0));
+        for (const key of keys) await appendFile(tmp, await readFile(join(dir, safe(key))));
+        await rename(tmp, path);
+      } catch (err) {
+        await rm(tmp, { force: true });
+        throw err;
+      }
     },
   };
 }

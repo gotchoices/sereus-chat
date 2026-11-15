@@ -15,6 +15,12 @@ export interface BlockStore {
   has(key: string): Promise<boolean>;
   delete(key: string): Promise<void>;
   keys(): Promise<string[]>;
+  /**
+   * Optional: write these blocks, in order, as one file at `path` (a path on the host), without
+   * passing the bytes through JavaScript. A phone has native file appends; turning every block
+   * into base64 and back costs seconds per MB on a slow one.
+   */
+  assemble?(keys: string[], path: string): Promise<void>;
 }
 
 /** A chunk of a libp2p stream: bytes, or a list of byte arrays (libp2p 3's Uint8ArrayList). */

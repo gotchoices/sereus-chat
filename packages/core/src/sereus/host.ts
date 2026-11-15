@@ -78,6 +78,8 @@ export interface FileAccess {
   exists(uri: string): Promise<boolean>;
   /** Write `pieces` in order to `uri`, replacing it: through a temporary file, so a reader never sees half. */
   write(uri: string, pieces: AsyncIterable<Uint8Array>): Promise<void>;
+  /** Optional: copy a file natively (a phone's own copy of a file it sends, without base64). */
+  copy?(from: string, to: string): Promise<void>;
 }
 
 export interface ChatHost {

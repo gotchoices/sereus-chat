@@ -48,4 +48,20 @@ export const phoneBlocks: BlockStore = {
     if (!(await FileSystem.exists(DIR))) return [];
     return (await FileSystem.ls(DIR)).filter(n => !n.endsWith('.part'));
   },
+  // The viewable copy of a file, appended block by block natively: no base64 round trip.
+  async assemble(keys, target) {
+    const p = target.startsWith('file://') ? decodeURI(target.slice('file://'.length)) : target;
+    const dir = p.slice(0, p.lastIndexOf('/'));
+    if (!(await FileSystem.exists(dir))) await FileSystem.mkdir(dir);
+    const tmp = `${p}.part`;
+    await FileSystem.writeFile(tmp, '', 'utf8');
+    try {
+      for (const key of keys) await FileSystem.concatFiles(pathOf(key), tmp);
+      if (await FileSystem.exists(p)) await FileSystem.unlink(p);
+      await FileSystem.mv(tmp, p);
+    } catch (err) {
+      await FileSystem.unlink(tmp).catch(() => {});
+      throw err;
+    }
+  },
 };

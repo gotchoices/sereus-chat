@@ -233,6 +233,18 @@ export class StrandFiles {
   }
 
   /**
+   * Write the whole file to `path` on this device, fetching what is missing first. Natively when
+   * the block store can (`BlockStore.assemble`); returns false, writing nothing, when it can't
+   * (the caller writes `read()` itself).
+   */
+  async saveAs(scope: string, cid: string, path: string, opts: { node?: Libp2pLike } = {}): Promise<boolean> {
+    if (!this.blocks.assemble) return false;
+    if (!(await this.has(cid))) await this.fetch(scope, cid, opts);
+    await this.blocks.assemble(this.roots.get(cid)!.manifest.chunks, path);
+    return true;
+  }
+
+  /**
    * Bring the whole file here from the scope's members. One fetch per file at a time; a second
    * call while one runs shares it. Throws `NotAvailableError` when no reachable member has some
    * part (retry later: a member with it may come online).

@@ -53,7 +53,7 @@ export const WEBRTC = false;
  * The core's `[perf]` timeline (when a message is written, first seen, fetched) in a release
  * build, as a development build always logs it. For measuring on phones; off for everyone else.
  */
-export const PERF_LOG = false;
+export const PERF_LOG = true;
 
 /**
  * Attachments through the strand file layer (`@chat/core/files`, gotchoices/sereus#62): files

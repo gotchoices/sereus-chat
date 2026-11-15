@@ -385,7 +385,10 @@ export function createSereusModel(host: ChatHost): SereusModel {
         ? await putFile(strand, files.read(a.uri!, CHUNK_SIZE))
         : await putBlob(strand, files.read(a.uri!, CHUNK_SIZE));
       const cached = files.cachePath(ref, a.name);
-      if (!(await files.exists(cached))) await files.write(cached, files.read(a.uri!, CHUNK_SIZE));
+      if (!(await files.exists(cached))) {
+        if (files.copy) await files.copy(a.uri!, cached);
+        else await files.write(cached, files.read(a.uri!, CHUNK_SIZE));
+      }
       // The sender's own path is its device's business: the strand carries the ref.
       out.push({ ...a, uri: null, blob: ref, byteSize: size });
     }
@@ -423,7 +426,10 @@ export function createSereusModel(host: ChatHost): SereusModel {
       if (row.Blob.startsWith(FILE_REF)) {
         if (!strandFiles) throw new ChatFailure('not-supported', 'This app cannot read files sent this way.', { retryable: false });
         const node = await serveFiles(strandId, strand);
-        await files.write(path, strandFiles.read(strandId, row.Blob.slice(FILE_REF.length), { node }));
+        const cid = row.Blob.slice(FILE_REF.length);
+        if (!(await strandFiles.saveAs(strandId, cid, path, { node }))) {
+          await files.write(path, strandFiles.read(strandId, cid, { node }));
+        }
       } else {
         await files.write(path, readBlob(strand, row.Blob));
       }
