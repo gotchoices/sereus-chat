@@ -17,6 +17,7 @@
  */
 
 import {
+  resolveStunServers,
   type CadreNode,
   type CadreNodeEvents,
   type ControlDatabase,
@@ -49,7 +50,23 @@ import { DATA_FORMAT } from '../data/data-format';
 import { NODE_STORAGE_NAMES, STORAGE_KEYS } from '../data/persisted-names';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { OWNER_GENESIS_TIMEOUT_MS } from './async';
-import { STRAND_REACTIVITY } from '../data/config';
+import { STRAND_REACTIVITY, WEBRTC } from '../data/config';
+import { webSockets } from '@libp2p/websockets';
+import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
+import { webRTC } from '@libp2p/webrtc';
+import { installWebRTCDiagnostics, logNatMapping } from './webrtc-diagnostics';
+
+let natChecked = false;
+/** The relays' STUN servers, counted in the log (`[ice]`), and this network's NAT checked once. */
+function stunServers(relayAddrs: readonly string[]) {
+  const servers = resolveStunServers([...relayAddrs]);
+  console.info(`[ice] STUN servers: ${servers.length} (from ${relayAddrs.length} relay(s))`);
+  if (!natChecked) {
+    natChecked = true;
+    void logNatMapping(servers as never).catch(err => console.warn('[ice] NAT check failed', err));
+  }
+  return servers;
+}
 
 type EventHandler<T> = (payload: T) => void;
 
@@ -59,7 +76,22 @@ type EventHandler<T> = (payload: T) => void;
 /** How writes are acknowledged: saved here first (`offline`), or by the other members (`online`). */
 export type SendMode = 'offline' | 'online';
 
+if (WEBRTC) installWebRTCDiagnostics();
+
 const phone = createPhoneNode({
+  // WebRTC (`WEBRTC`): meet through the relay, then go direct where ICE finds a path, with the
+  // relays' STUN servers (each sereus relay runs one). The kit's default is the first two only.
+  ...(WEBRTC ? {
+    transports: (relayAddrs: readonly string[]) => [
+      webSockets(),
+      circuitRelayTransport(),
+      webRTC({ rtcConfiguration: { iceServers: stunServers(relayAddrs) } }),
+    ] as never,   // the transports' component types differ in detail; libp2p accepts them
+    // Listening on `/webrtc` (with a relay) is what lets a relayed connection upgrade: the phone
+    // then advertises `<relay>/p2p-circuit/webrtc/p2p/<id>`, which other WebRTC peers dial,
+    // signalling through the relay. The kit's browser default; a phone's is `[]`.
+    listenAddrs: (relayAddrs: readonly string[]) => (relayAddrs.length ? ['/webrtc'] : []),
+  } : {}),
   secureStore: keychainSecureStore,
   leveldb: {
     openFn: (name, createIfMissing, errorIfExists) => new LevelDB(name, createIfMissing, errorIfExists),
@@ -446,6 +478,35 @@ class CadreServiceImpl {
   // Status and reachability
   // -----------------------------------------------------------------------
 
+  private connTimer: ReturnType<typeof setInterval> | null = null;
+  /**
+   * Every 30 s, one `[conn]` line when it changed: this phone's connections over the control node
+   * and every strand node, by kind (direct WebRTC, relayed, other). Shows whether WebRTC
+   * upgrades relayed connections, and keeps showing it in release builds.
+   */
+  private logConnections(node: CadreNode): void {
+    if (this.connTimer) clearInterval(this.connTimer);
+    let last = '';
+    this.connTimer = setInterval(() => {
+      const kinds = { webrtc: 0, relayed: 0, limited: 0, other: 0 };
+      const nodes = [node.getControlNode(), ...[...node.getStrands().values()].map(s => (s as { libp2pNode?: unknown }).libp2pNode)];
+      for (const n of nodes) {
+        for (const c of (n as { getConnections?(): Array<{ remoteAddr: { toString(): string }; limits?: unknown }> } | null)?.getConnections?.() ?? []) {
+          const addr = c.remoteAddr.toString();
+          // `/webrtc` first: a WebRTC connection signalled through a relay carries `/p2p-circuit` too.
+          if (addr.includes('/webrtc')) kinds.webrtc++;
+          else if (addr.includes('/p2p-circuit')) {
+            kinds.relayed++;
+            // A relay's time or byte cap on the circuit: the relay closes it when reached.
+            if (c.limits) kinds.limited++;
+          } else kinds.other++;
+        }
+      }
+      const line = `[conn] direct webrtc ${kinds.webrtc}, relayed ${kinds.relayed} (limited ${kinds.limited}), other ${kinds.other}`;
+      if (line !== last) { console.info(line); last = line; }
+    }, 30_000);
+  }
+
   private onStatus(status: PhoneNodeStatus): void {
     this.notifyReachability();
     switch (status.state) {
@@ -454,6 +515,7 @@ class CadreServiceImpl {
           `[CadreService] ✓ node running. Peer ID: ${status.node.peerId?.toString()} — owner genesis: ${status.owner}`,
         );
         this.watchReachability(status.node);
+        this.logConnections(status.node);
         break;
       case 'failed':
         this._startError = status.error.message;

@@ -12,7 +12,7 @@ import { nodeFileAccess } from './files.js';
 import { readFile } from 'node:fs/promises';
 import { createServer, type AddressInfo } from 'node:net';
 import { join } from 'node:path';
-import { CadreNode, DEFAULT_IDENTITY_KEY_ID, type CadreNodeConfig } from '@serfab/cadre-core';
+import { CadreNode, DEFAULT_IDENTITY_KEY_ID, resolveStunServers, type CadreNodeConfig } from '@serfab/cadre-core';
 import { FileKeyStore } from '@serfab/cadre-core/key-store-file';
 import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { FileTrustedOwnerStore } from '@serfab/cadre-core/trusted-owner-store-file';
@@ -26,6 +26,18 @@ import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { CHAT_SAPP_ID } from '@chat/core';
 import type { ChatHost, DurableSlot, NodeHost, SlotName } from '@chat/core/sereus';
 import { saveConfig, writeTextAtomic, type ProfileConfig, type ProfileDirs } from './home.js';
+
+/**
+ * EXPERIMENT (SERCHAT_WEBRTC=1): WebRTC as the phone has it, so a phone and serchat can try a
+ * direct connection (docs/STATUS.md, WebRTC). Loaded only when asked for; the package comes from
+ * the workspace (test/stack), not from serchat's own dependencies.
+ */
+async function experimentalWebRTC(relayAddrs: string[]): Promise<unknown[]> {
+  if (process.env.SERCHAT_WEBRTC !== '1') return [];
+  const name = '@libp2p/webrtc';
+  const { webRTC } = await import(name) as { webRTC(init: unknown): unknown };
+  return [webRTC({ rtcConfiguration: { iceServers: resolveStunServers(relayAddrs) } })];
+}
 
 /** `--listen` with no address: loopback, on the profile's own port (see `listenAddress`). */
 export const DEFAULT_LISTEN = 'default';
@@ -117,8 +129,8 @@ export function createCliHost(opts: HostOptions): CliHost {
           : (scope: string) => track(new FileRawStorage(join(dirs.blocks, scope))),
       },
       network: {
-        transports: [webSockets(), circuitRelayTransport()] as never,
-        listenAddrs: opts.listen,
+        transports: [webSockets(), circuitRelayTransport(), ...await experimentalWebRTC(relays())] as never,
+        listenAddrs: [...opts.listen, ...(process.env.SERCHAT_WEBRTC === '1' && relays().length ? ['/webrtc'] : [])],
         relayAddrs: relays(),
         requireRelay: false,
         // Plain ws://, loopback and private addresses are fine to dial: Noise and the pinned

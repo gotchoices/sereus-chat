@@ -14,6 +14,7 @@
     "@chat/core": "workspace:*",
     "@libp2p/circuit-relay-v2": "^4.2.13",
     "@libp2p/crypto": "^5.1.23",
+    "@libp2p/webrtc": "6.0.33",
     "@libp2p/websockets": "^10.1.21",
     "@optimystic/db-core": "1.26.0",
     "@optimystic/db-p2p": "1.26.0",

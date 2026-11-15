@@ -1,0 +1,14 @@
+# From the strand list, open the conversation with the other phone (its name is PARTNER).
+appId: org.sereus.chat
+---
+# Back to the strand list from wherever the invitation left it (no restart: the other phone may
+# be sending to this one).
+- back
+- extendedWaitUntil:
+    visible: "^${PARTNER}$"
+    timeout: 300000
+- tapOn: "^${PARTNER}$"
+- extendedWaitUntil:
+    visible:
+      id: "composer"
+    timeout: 120000

@@ -1799,6 +1799,18 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         for local writes; a source row from another member is never derived. This breaks
         migration.md's "expand" phase. Repro: `PHASE=mv node test/stack/lens-over-strand.mjs`.
         Filed 2026-11-11.
+      - **gotchoices/Optimystic#63**: large writes cost about 1.7 s per MB on loopback (JSON
+        encode, canonicalize, hash, clone), and a blob value encodes to 2.75–3.4× its size, so
+        about 2.2 MB raw fits a transaction. Repro: `node test/stack/large-write-cost.mjs`. Fixed
+        when 8 values of 256 KiB commit well under a second and 16 fit. Filed 2026-11-13.
+        *Comment 2026-11-14:* on a slow link (phone on cellular, through the relay), a 3 MB
+        transaction never commits (fixed time budget, whole-transaction retries). Asked that any
+        size just work: progress-based deadlines first. When it does, chat goes back to several
+        chunks per transaction (`CHUNKS_PER_TX` in `blob-store.ts`).
+      - **gotchoices/sereus#61**: formation never falls back to the relayed address when a
+        `/webrtc` address can't connect, so with WebRTC on a join fails wherever ICE fails.
+        Repro: `WEBRTC=1 ICE_FAIL=1 node test/stack/webrtc-phone-to-phone.mjs`. Filed 2026-11-14.
+        Fixed when that run forms over the relay. Until then chat keeps `WEBRTC` off.
       - ~~**gotchoices/Optimystic#54**~~ **fixed in optimystic 1.26.0, closed 2026-11-07.** The repro,
         exiting 50 / 100 / 200 ms into `stop()` with the app DDL pending, resumes in 6 of 6 runs,
         foreground and background (1.23: failed 8 of 8). A collection already blocked by an
@@ -1935,10 +1947,80 @@ Basic chat works. In order, stepping through one at a time:
           39–98 s after sending, so ~30 s passes between commit and serchat reading it.
           serchat → phone, the phone approving: 100–112 s for 843 KB over the public relay, even
           with the S21.
-      - [ ] **Report the stack's share to Optimystic** (prepared, awaiting the user's OK): per-byte
-        commit cost and the 3.4× encoding, `blob-cost.mjs` with `PROFILE=`.
-      - [ ] **Next: try WebRTC direct** (relayed → direct): does it fix the queue drain and the
-        commit-with-a-phone time? Then the ~30 s from commit to serchat reading it.
+      - [x] *(2026-11-13)* **Reported as gotchoices/Optimystic#63**, with a standalone repro,
+        `test/stack/large-write-cost.mjs` (stack packages only; `CHUNKS=16` shows the size
+        refusal; `PROFILE=`).
+      - [ ] **WebRTC direct (relayed → direct): wired, OFF; works, but a failed ICE breaks the join** (2026-11-13, diagnosed 2026-11-14).
+        - **Wiring:** `config.ts` `WEBRTC`; `@libp2p/webrtc` 6.0.33 and `react-native-webrtc`
+          124.0.8 (+10 MB APK); `polyfills/webrtc` in `index.js`; the kit's `transports` (with
+          the relays' STUN servers from `resolveStunServers`) and `listenAddrs` (`/webrtc` when
+          there are relays, the kit's browser default). `[conn]` lines count direct, relayed and
+          other connections every 30 s.
+        - **The transport alone:** phones never upgraded (0 direct, up to 15 relayed). Without
+          `/webrtc` listening, nothing advertises a WebRTC address to dial. The sereus reference
+          phone app is set up the same way, so it probably never goes direct either.
+        - **With `/webrtc` listening:** the joining phone (S7) could not join an S21's invitation,
+          3 of 3 runs. **Diagnosed 2026-11-14:**
+          - *Signalling works, ICE does not.* B dials A's `/p2p-circuit/webrtc` address, gets
+            A's answer and two candidates over the relay, and closes the peer connection 23 s
+            later, never connected. The two phones have no direct path: the S21 is on
+            192.168.3.x behind another router, the S7 on 192.168.2.x (neither pings the other),
+            so only STUN-learned addresses remain, and that NAT pairing does not connect. That
+            is TURN territory, which the relays do not offer (sereus#17 retired coturn).
+          - *No fallback: the stack bug.* Formation dials the inviter's addresses one after
+            another inside one 25 s budget (`openFormationStream`; its NOTE predicts exactly
+            this), and the hung WebRTC address uses it all; the plain circuit address beside it
+            is never tried. So wherever ICE fails, WebRTC turns a slow join into no join.
+            **Node repro:** `test/stack/webrtc-phone-to-phone.mjs` with `WEBRTC=1 ICE_FAIL=1`
+            (relay-only ICE, no TURN): `FormationUnreachableError: Formation dial-connect timed
+            out after 25000ms`. Reported as gotchoices/sereus#61.
+        - **WebRTC itself works, Node and phone:**
+          - Node, two phone-like parties (`webrtc-phone-to-phone.mjs`, no listen address, relay
+            reservation, `/webrtc` listening): local relay and the public one with its STUN
+            server. Both strand nodes go direct (`webrtc 1`); 1 MB commits in 2.4–3.2 s, against
+            3.8 s relay-only.
+          - Phone ↔ serchat on one LAN (`SERCHAT_WEBRTC=1 node test/gui/phone-joins-serchat.mjs`,
+            S7): the phone opened a direct WebRTC connection to serchat in about 0.5 s
+            (react-native-webrtc, the kit's polyfill). The join itself went over the relay
+            (serchat's invitation had no `/webrtc` address yet).
+          - **Phone ↔ phone across two separate networks: works** (2026-11-14). The S21 was on
+            maple-dmz behind the ER605 and the S7 on a hotspot sharing cellular data. ICE paired
+            `local srflx ↔ remote srflx`, a hole punch through both NATs, and connected within
+            about 0.5 s of checking. The join and the 1 MB photo both completed. The photo still
+            took about 4 minutes to show at A, no faster than relay-only, so the time goes
+            somewhere other than the link.
+          - **What didn't work before was the test network, not WebRTC.** With both phones
+            behind the one ER605 (two VLANs, one public IP), the hole punch needs NAT
+            hairpinning, and the VLAN isolation rightly prevents it. A hotspot on the home Wi-Fi
+            shares that Wi-Fi, not cellular.
+          - **NAT types** (the app logs `[ice] NAT mapping` at startup when `WEBRTC` is on): the
+            ER605 (maple-net and maple-dmz) and the carrier both map one local socket to one
+            public port for every destination (a cone NAT), which allows a hole punch.
+          - **The stall was never WebRTC** (2026-11-14). With the sender on cellular, a 1 MB
+            photo never arrived, with WebRTC on or off. Its 4-chunk transaction (6 blocks, about
+            3 MB encoded) could not finish within Optimystic's fixed per-transaction budget, so
+            it was pended, cancelled and resent for good, with the message queued behind it
+            `waiting`. Small transactions committed in milliseconds throughout. **Fix in chat:**
+            one chunk per transaction (`CHUNKS_PER_TX`). Then: delivered in 157 s, shown at A in
+            250 s, PASS. Asked Optimystic to make any size just work (progress-based deadlines,
+            size-scaled allowances, resumable retries) in a comment on Optimystic#63.
+          - **Seen, not yet explained:** WebRTC connections live 1–2 minutes, then one side
+            closes them (the other then sees `disconnected → failed`) and new ones form.
+          - **`[ice]` log lines** (`src/host/webrtc-diagnostics.ts`): each candidate's kind
+            (never its address), ICE states, and the pair used.
+        - **Harness:** `phones-talk.mjs` now enlarges each phone's log buffer and dumps it at the
+          end (an on-device `logcat -f` wrote nothing on the S21).
+        - **Phone ↔ phone baseline through the public relay, WebRTC off**
+          (`test/gui/phones-talk.mjs`, S21 invites, S7 joins and sends a 1 MB photo):
+          - 3 passes and 1 fail;
+          - the join takes 89–168 s;
+          - the photo crosses in 146–279 s.
+
+          The S7 gets heavier with each run (a conversation per run).
+        - **Next:** sereus fixes the fallback (per-address budget, or the circuit address in
+          parallel); then find where the phone-to-phone time goes now that the link is direct (4 minutes for 1 MB against about 3 s in Node); then `WEBRTC` on. Across NATs that do not
+          punch through, phones stay relayed unless the relays offer TURN.
+      - [ ] Then the ~30 s from commit to the other side reading it.
       - [ ] *(Superseded by the lines above.)* **Measure and report — now the main item:** large writes are slow, worst with a phone in
         the cohort: 0.56 MB/s CLI-to-CLI through a local relay; 112 s to commit 843 KB, and 204 s
         for 1 MB to arrive, phone with serchat over the public relay. Split the phone's side (base64
@@ -1955,6 +2037,16 @@ Basic chat works. In order, stepping through one at a time:
       - then (b): unread counts, mark unread;
       - mention picker; open reaction set; promote a member; swipe to archive; search filters;
         MediaViewer save.
+      - *(Considering, 2026-11-14; not in the stories yet.)* **Connection quality indicator:**
+        - a simple level per member or conversation (good / slow / can't reach), computed in
+          chat from recent delivery times and current reachability;
+        - an expert drill-down: path (direct / relayed), round-trip time, and with WebRTC the
+          kind of connection ICE made (same network, hole-punched, TURN).
+
+        Prototype first on libp2p's `connection:open`/`close` events (resubscribe on wake, as
+        strand nodes are replaced). Then a low-priority sereus request for a hook that survives
+        hibernation, e.g. `strand:peer-path { strandId, peerId, path, transport, rttMs }`, firing
+        when the best path to a peer changes, with a snapshot call beside it.
 - [ ] **5. Voice and video calls** (story 90, parked by decision). Media through
       `react-native-webrtc` (and the browser's own WebRTC), with signaling over a libp2p stream
       on the strand node. No TURN exists for symmetric NATs.

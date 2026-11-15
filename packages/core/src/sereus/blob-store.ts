@@ -5,7 +5,7 @@
  * A blob is split into chunks small enough for a block, each stored once under its sha-256 in
  * `App.BlobChunk`; `App.Blob` lists a blob's chunks in order under the sha-256 of that list. Both
  * tables are content-keyed, so a repeat of the same bytes (the same file attached twice, or by two
- * members) writes nothing new. Chunks go a few per transaction, under Optimystic's 7.5 MiB limit,
+ * members) writes nothing new. Chunks go one per transaction (see `CHUNKS_PER_TX`),
  * and the `Blob` row last: whoever sees it can read every chunk it names, or soon will.
  *
  * THE REF IS THE SWITCH-OVER SEAM. `chunks:1:<sha-256>` names this store and its format; a native
@@ -20,8 +20,14 @@ export type BlobRef = string;
 
 /** Raw bytes per chunk: about 342 KiB once base64-encoded, well inside a 1 MiB block target. */
 export const CHUNK_SIZE = 256 * 1024;
-/** Chunks per transaction: about 2 MiB raw, 2.7 MiB encoded, against the 7.5 MiB limit. */
-const CHUNKS_PER_TX = 8;
+/**
+ * Chunks per transaction: one, about 0.9 MB encoded. The stack gives a transaction one fixed
+ * time budget whatever its size, and a retry resends all of it. Eight chunks (about 3 MB
+ * encoded) from a phone on cellular, through the relay, never fit: pend, cancel, pend again
+ * for minutes, with the message queued behind it (2026-11-14). One chunk fits, and a retry
+ * costs one chunk.
+ */
+const CHUNKS_PER_TX = 1;
 const SCHEME = 'chunks:1:';
 
 /**
@@ -153,12 +159,12 @@ export async function* readBlob(strand: StrandInstance, ref: BlobRef): AsyncIter
   const d = db(strand);
   const t0 = Date.now();
   let queryMs = 0;
-  for (const hash of manifest.chunks) {
+  for (const [i, hash] of manifest.chunks.entries()) {
     let bytes: Uint8Array | undefined;
     const q = Date.now();
     for await (const r of d.eval('select Bytes from App.BlobChunk where Hash = ?', [hash])) bytes = r.Bytes as Uint8Array;
     queryMs += Date.now() - q;
-    if (!bytes) throw new BlobNotHereError(`A part of blob ${ref} has not arrived yet`, 'chunk');
+    if (!bytes) throw new BlobNotHereError(`part ${i + 1} of ${manifest.chunks.length} has not arrived yet`, 'chunk');
     if (await sha256Hex(bytes) !== hash) throw new Error(`A part of blob ${ref} does not match its hash`);
     yield bytes;
   }

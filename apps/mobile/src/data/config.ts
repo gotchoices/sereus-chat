@@ -38,3 +38,19 @@ export const USE_SEREUS = true;
  * Re-measure before turning it on.
  */
 export const STRAND_REACTIVITY = false;
+
+/**
+ * WebRTC (2026-11-13, experiment): phones meet through the relay, then try a direct connection
+ * (`@libp2p/webrtc`, ICE with the relays' own STUN servers) and keep the relay as the fallback.
+ * What large writes cost through the public relay is why: 100–200 s for a 1 MB photo with a
+ * phone in the cohort (docs/STATUS.md). `[conn]` log lines show which connections are direct.
+ */
+// OFF: with the transport alone nothing went direct; with `/webrtc` listening, a join fails outright
+// wherever ICE cannot connect (no fallback to the relay in formation; 2026-11-14). See docs/STATUS.md.
+export const WEBRTC = false;
+
+/**
+ * The core's `[perf]` timeline (when a message is written, first seen, fetched) in a release
+ * build, as a development build always logs it. For measuring on phones; off for everyone else.
+ */
+export const PERF_LOG = false;

@@ -11,6 +11,7 @@ import { cadreService } from './CadreService';
 import { phoneFiles } from './files';
 import { SecureStoreKeyStore } from '@serfab/cadre-rn/key-store';
 import { keychainSecureStore } from './keychain';
+import { PERF_LOG } from '../data/config';
 
 function storageKey(name: SlotName, key?: string): string {
   switch (name) {
@@ -53,7 +54,7 @@ export const chatHost: ChatHost = {
   // The party's owner key (separate from the machine identity since sereus 1.17): the same
   // keychain store, with the same (default) options, the kit's phone node files it under.
   ownerKeyStore: new SecureStoreKeyStore(keychainSecureStore),
-  dev: __DEV__,
+  dev: __DEV__ || PERF_LOG,
   // Attachment bytes (docs/blobs.md): read picked files, keep copies of blobs in the cache.
   files: phoneFiles,
 };

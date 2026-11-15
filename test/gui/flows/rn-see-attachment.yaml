@@ -6,4 +6,4 @@ appId: org.sereus.chat
 - extendedWaitUntil:
     visible:
       id: "attachment-image"
-    timeout: 180000
+    timeout: 420000

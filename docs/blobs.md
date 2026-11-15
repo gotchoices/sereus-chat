@@ -69,9 +69,12 @@ table Blob (
 `Attachment` gains `Blob text null` (the ref). `Attachment.Uri` stops carrying the sender's
 local path: where a file is cached on a device is that device's business.
 
-- **Write:** read the file in 256 KiB chunks, hashing as we go; insert chunks a few per
-  transaction (8 chunks ≈ 2 MiB raw, ≈ 2.7 MiB encoded); then the `Blob` row; then the message
-  and its `Attachment` rows. A member who sees the attachment before the last chunk reads
+- **Write:** read the file in 256 KiB chunks, hashing as we go; insert each chunk in its own
+  transaction (about 0.9 MB encoded); then the `Blob` row; then the message and its `Attachment`
+  rows. One chunk per transaction because the stack gives a transaction one fixed time budget
+  whatever its size, and a retry resends all of it. Eight chunks per transaction (about 3 MB
+  encoded) from a phone on cellular, through the relay, never fit, and the message waited behind
+  them for good (2026-11-14). A member who sees the attachment before the last chunk reads
   "still arriving", never a broken file.
 - **Read:** the `Blob` row lists the chunks; each is read by hash. All present: assemble into
   the device's cache and report `local`. Missing: `fetching`. Unreadable from anyone reachable:
@@ -112,6 +115,7 @@ Together they suggest a native design:
 - streaming reads and writes, with a "known but not here yet" state that reads can report;
 - an inline threshold for small values;
 - transactions that carry handles, not bytes, which sidesteps the 7.5 MiB limit without
-  framing every hop.
+  framing every hop, and the fixed per-transaction time budget that a large transaction on a
+  slow link cannot meet.
 
 Chat's chunk store is a working prototype of that shape, with measurements to share.

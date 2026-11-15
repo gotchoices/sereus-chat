@@ -1,0 +1,20 @@
+# Make an invitation into a new strand and leave it on screen (phones-talk.mjs reads the link).
+appId: org.sereus.chat
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Strands"
+    timeout: 120000
+- openLink: chat://invite
+- extendedWaitUntil:
+    visible: "Make an invitation"
+    timeout: 60000
+- scrollUntilVisible:
+    element: "Make an invitation"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Make an invitation"
+- extendedWaitUntil:
+    visible: "Make another invitation"
+    timeout: 120000

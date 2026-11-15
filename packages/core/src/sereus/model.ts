@@ -320,10 +320,13 @@ export function createSereusModel(host: ChatHost): SereusModel {
     }
     const path = files.cachePath(row.Blob, row.Name);
     if (await files.exists(path).catch(() => false)) return { uri: path };
+    const t0 = Date.now();
     try {
       await files.write(path, readBlob(strand, row.Blob));
+      perf('fetch', attachmentId.slice(0, 8), 'whole in', Date.now() - t0, 'ms');
     } catch (err) {
       if (err instanceof BlobNotHereError) {
+        perf('fetch', attachmentId.slice(0, 8), 'still arriving:', err.missing === 'manifest' ? 'no manifest yet' : err.message);
         throw new ChatFailure('unavailable', 'Still arriving: not every part of this file is here yet.', { retryable: true, reason: 'still-arriving' });
       }
       throw err;
@@ -343,7 +346,9 @@ export function createSereusModel(host: ChatHost): SereusModel {
     ]);
     if (host.dev) {
       const seen = seenMessageIds.get(strandId);
-      if (seen) for (const r of rows.filter(r => !seen.has(r.Id))) perf('first seen', r.Content.slice(0, 24), 'sent', r.Timestamp, 'UTC');
+      if (seen) for (const r of rows.filter(r => !seen.has(r.Id))) {
+        perf('first seen', r.Id.slice(0, 8), `${((Date.now() - Date.parse(r.Timestamp)) / 1000).toFixed(1)} s after it was sent`, JSON.stringify(r.Content.slice(0, 24)));
+      }
       seenMessageIds.set(strandId, new Set(rows.map(r => r.Id)));
       perf('listMessages', rows.length, 'rows in', Date.now() - t0, 'ms');
     }

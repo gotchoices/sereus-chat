@@ -1,0 +1,20 @@
+# Join through an invitation link and wait for the conversation (phones-talk.mjs).
+#   LINK  chat://invite/<token>
+appId: org.sereus.chat
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Strands"
+    timeout: 120000
+- openLink: ${LINK}
+- extendedWaitUntil:
+    visible:
+      id: "invite-accept"
+    timeout: 120000
+- tapOn:
+    id: "invite-accept"
+- extendedWaitUntil:
+    visible:
+      id: "composer"
+    timeout: 300000
