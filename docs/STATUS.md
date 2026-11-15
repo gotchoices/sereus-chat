@@ -2034,10 +2034,20 @@ Basic chat works. In order, stepping through one at a time:
         - So the stack takes 100–300× what the link does: per-byte work (about 3× encoding,
           canonicalize, hash, validate, store) on each side, worst on Hermes and when the phone
           is the side approving. Next: a CPU profile of one chunk write on the S21 to name it.
-        - **Proposed upstream, not built:** a strand-scoped file layer (content-addressed chunks,
-          transfer outside transactions, lease-based lifetime, Arachnode placement later):
-          gotchoices/sereus#62, design questions for Nate before any prototype. No stream
-          protocol of chat's own; we coordinate instead.
+        - **Proposed upstream:** a strand-scoped file layer (content-addressed chunks, transfer
+          outside transactions, lease-based lifetime, Arachnode placement later):
+          gotchoices/sereus#62.
+        - [x] **Prototyped on branch `strand-files`** (2026-11-14/15; the user asked for it while
+          #62 waits). `packages/core/src/files`, self-contained so it can become a sereus
+          package; chat's attachments use it when the host keeps blocks (`ChatHost.blocks`;
+          phone `FILE_LAYER`; serchat `<profile>/file-blocks`). A 1 MB photo:
+          - serchat → S21: commit 1.1 s (was 149 s), on the phone 3.4 s after the send began;
+          - S7 → S21: on the S21 1.9 s after the message was delivered, before anyone opened it;
+          - back from the background: viewable 6.7 s after returning.
+
+          Results and how to run them: `docs/strand-files.md`. Open: placement and availability
+          while every holder sleeps (Arachnode / an always-on member), the S7's slow base64 block
+          I/O, and the second, viewable copy beside the blocks.
       - [ ] Then the ~30 s from commit to the other side reading it.
       - [ ] *(Superseded by the lines above.)* **Measure and report — now the main item:** large writes are slow, worst with a phone in
         the cohort: 0.56 MB/s CLI-to-CLI through a local relay; 112 s to commit 843 KB, and 204 s

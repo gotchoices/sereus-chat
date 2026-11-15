@@ -33,8 +33,14 @@ record, and the bytes move here.
 - **Scope.** A file belongs to the strands it was put or fetched in. A peer asking over one
   strand's node gets only that strand's files, so knowing a CID doesn't let anyone read across
   strands. Only the strand's members can reach its node at all.
+- **Announce.** After putting a file, its holder announces it to the strand's connected members
+  (`{ "announce": [cid] }` on the same protocol). Each member's `onAnnounce` decides whether to
+  fetch it now, and up to what size. That size is checked against the manifest before any chunk
+  moves. A member that misses the announcement, for instance because it was asleep, fetches when
+  it reads the file.
 - **Spread.** Whoever fetches a file then serves it, so a file survives its sender going offline
-  as soon as any other member has fetched it.
+  as soon as any other member has fetched it. With announcements, that is usually within
+  seconds.
 - **Lifetime.** Every file has a lease (default 30 days). Putting, fetching, `touch` or
   `reference` extends it, and `gc` deletes what has run out, plus blocks no live file uses. An
   app keeps a file for as long as a record points at it by calling `reference` when it reads that
@@ -44,9 +50,10 @@ record, and the bytes move here.
 ## API
 
 ```ts
-const files = new StrandFiles({ blocks, chunkSize?, leaseMs?, parallel?, perRequest?, log? });
+const files = new StrandFiles({ blocks, chunkSize?, leaseMs?, parallel?, perRequest?, log?, onAnnounce? });
 await files.serve(strandId, libp2pNode);       // answer requests in that strand (again after a wake)
 const { cid, size } = await files.put(strandId, bytes);   // stored here; nothing is sent
+await files.announce(strandId, cid);           // members that want it fetch it now
 for await (const piece of files.read(strandId, cid)) …    // fetches what is missing first
 await files.fetch(strandId, cid);              // throws NotAvailableError: retry later
 await files.has(cid);  await files.manifest(cid);
@@ -57,8 +64,14 @@ await files.reference(strandId, cid);  await files.touch(cid, ms);  await files.
 
 - **Placement.** Today blocks live where they were put or fetched. Arachnode's rings would add
   storage nodes that hold a strand's files without anyone asking for them.
-- **Push.** Nobody pushes a new file to the others. Readers fetch, and chat fetches eagerly when
-  an attachment arrives.
+- **Availability while asleep.** A phone in the background hibernates its strand and serves
+  nothing until it returns. A file it put is reachable only from members that already fetched
+  it, which announcements make likely but don't guarantee. An always-on member (a party's
+  storage node) or Arachnode placement would close this.
 - **Discovery.** Only directly connected peers are asked. Fine for a strand's members; a large
   strand would want its DHT.
-- **Partial reads, resumable transfers, and quotas.**
+- **Partial reads, resumable transfers, and quotas.** A fetch keeps the chunks it got, so a
+  retry asks only for the rest, but no single chunk resumes mid-way.
+- **One copy, not two.** Chat keeps a viewable copy of each file beside its blocks, because a
+  phone's image view wants a path. A host that can read a file from its blocks would not need
+  the second copy.
