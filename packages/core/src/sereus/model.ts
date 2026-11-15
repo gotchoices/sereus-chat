@@ -23,7 +23,8 @@ import {
 } from './operations.js';
 import { BlobNotHereError, CHUNK_SIZE, putBlob, readBlob } from './blob-store.js';
 import { ensureBenchHandler } from './bench.js';
-import { NotAvailableError, StrandFiles, type Libp2pLike } from '../files/index.js';
+import { NotAvailableError } from '@chat/strand-blobs';
+import { IPFS_REF, StrandMedia } from './strand-media.js';
 import { createChatStrand, foundChatStrandInBackground } from './sapp-strands.js';
 import { classifyClaimFailure, nodeReach, readNodeCode } from './node-code.js';
 import { ownerFingerprint, type CadreMachine, type CadreStatus } from '../model/index.js';
@@ -101,8 +102,8 @@ function toAttachment(a: AttachmentRow, held?: string | null): Attachment {
 
 /** The most an attachment may be by default (story 20: the user's own limit). */
 const DEFAULT_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-/** An attachment ref naming a file in the strand file layer (`../files`): `cid:` + the file's CID. */
-const FILE_REF = 'cid:';
+/** An attachment ref naming a file on IPFS-on-a-strand (`strand-media.ts`): `ipfs:` + its CID. */
+const FILE_REF = IPFS_REF;
 
 export function createSereusModel(host: ChatHost): SereusModel {
   const runtime = new StrandRuntime(host);
@@ -147,40 +148,37 @@ export function createSereusModel(host: ChatHost): SereusModel {
   }
 
   /**
-   * The strand file layer (`../files`, gotchoices/sereus#62): with a host that keeps blocks,
-   * attachments travel as files exchanged between members, and the strand carries only their id
-   * (`cid:…`). Each strand's node serves that strand's files.
+   * Chat's files on IPFS-on-a-strand (`strand-media.ts`, gotchoices/sereus#62): with a host that
+   * keeps blocks, an attachment is a UnixFS file exchanged between members, and the strand carries
+   * only its CID (`ipfs:…`). Each strand's node runs an IPFS node (remade on a wake) that serves
+   * that strand's files.
    */
-  const strandFiles = host.blocks && host.files
-    ? new StrandFiles({
-      blocks: host.blocks,
+  const media = host.blocks && host.files
+    ? new StrandMedia(host.blocks, {
+      maxAnnouncedBytes: () => host.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES,
       log: line => console.info(line),
-      // A member announced a new file: fetch it now, up to the attachment limit, so it is here
-      // before anyone opens the conversation.
-      onAnnounce: () => host.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES,
     })
     : null;
-  const serveFiles = async (strandId: string, strand?: StrandInstance): Promise<Libp2pLike | undefined> => {
-    const node = (strand ?? host.node.node?.getStrands().get(strandId))?.libp2pNode as unknown as Libp2pLike | undefined;
-    if (strandFiles && node) await strandFiles.serve(strandId, node);
-    return node;
-  };
-  if (strandFiles) {
-    // A wake rebuilds the strand's node (`strand:waking`, not `strand:started`): serve on the new
-    // one, which also offers what nobody else holds yet.
+  /** The strand's IPFS node, on its current libp2p node. */
+  const ipfsFor = (strandId: string, strand?: StrandInstance) =>
+    media ? media.ensure(strandId, strand ?? host.node.node?.getStrands().get(strandId)) : Promise.resolve(undefined);
+  if (media) {
+    // A wake rebuilds the strand's node (`strand:waking`, not `strand:started`): IPFS on the new
+    // one, which also offers what nobody else holds yet. Going down stops it.
     for (const event of STRAND_UP_EVENTS) {
       host.node.on(event, ({ strandId }) => {
-        void serveFiles(strandId).catch(err => console.warn('[files] serving failed:', err instanceof Error ? err.message : err));
+        void ipfsFor(strandId).catch(err => console.warn('[media] starting IPFS failed:', err instanceof Error ? err.message : err));
       });
     }
-  }
-  if (strandFiles) {
+    for (const event of STRAND_DOWN_EVENTS) {
+      host.node.on(event, ({ strandId }) => { void media.stop(strandId); });
+    }
     // Expired files go: once soon after start, then daily. A file stays while its records are
     // read (`reference` in `withLocality`), or for a lease after it last moved.
     const collect = () => {
-      void strandFiles.gc()
-        .then(r => { if (r.files || r.blocks) console.info(`[files] gc removed ${r.files} file(s), ${r.blocks} block(s)`); })
-        .catch(err => console.warn('[files] gc failed:', err instanceof Error ? err.message : err));
+      void media.blobs.gc()
+        .then(r => { if (r.files || r.blocks) console.info(`[media] gc removed ${r.files} file(s), ${r.blocks} block(s)`); })
+        .catch(err => console.warn('[media] gc failed:', err instanceof Error ? err.message : err));
     };
     const first = setTimeout(collect, 60_000) as { unref?: () => void };
     first.unref?.();
@@ -331,7 +329,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       const path = files.cachePath(a.Blob, a.Name);
       const here = await files.exists(path).catch(() => false);
       // A record here points at the file: keep it (and serve it) for as long as that holds.
-      if (here && strandId && strandFiles && a.Blob.startsWith(FILE_REF)) void strandFiles.reference(strandId, a.Blob.slice(FILE_REF.length));
+      if (here && strandId && media && a.Blob.startsWith(FILE_REF)) void media.blobs.reference(strandId, a.Blob.slice(FILE_REF.length));
       return toAttachment(a, here ? path : null);
     }));
   }
@@ -342,7 +340,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
    * is not reachable yet.
    */
   function prefetchFiles(strandId: string, attachments: Attachment[]): void {
-    if (!strandFiles) return;
+    if (!media) return;
     const max = host.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES;
     for (const a of attachments) {
       const ref = (a as Attachment & { blob?: string | null }).blob;
@@ -356,11 +354,10 @@ export function createSereusModel(host: ChatHost): SereusModel {
 
   /** Store a file in the strand file layer; its ref is `cid:` + the file's CID. */
   async function putFile(strand: StrandInstance, uri: string): Promise<{ ref: string; size: number }> {
-    await serveFiles(strand.strandId, strand);
+    await ipfsFor(strand.strandId, strand);
     const files = host.files!;
-    const { cid, size } = await strandFiles!.putPath(strand.strandId, uri, () => files.read(uri, CHUNK_SIZE));
-    // The members online fetch it now, while the message's own write is under way.
-    void strandFiles!.announce(strand.strandId, cid).catch(() => {});
+    // Stored as a UnixFS file, announced to the members online, and provided on FRET.
+    const { cid, size } = await media!.blobs.put(strand.strandId, files.read(uri, CHUNK_SIZE));
     return { ref: `${FILE_REF}${cid}`, size };
   }
 
@@ -386,7 +383,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const out: Array<Attachment & { blob?: string | null }> = [];
     for (const a of attachments) {
       if (!sizes.has(a)) { out.push(a); continue; }
-      const { ref, size } = strandFiles
+      const { ref, size } = media
         ? await putFile(strand, a.uri!)
         : await putBlob(strand, files.read(a.uri!, CHUNK_SIZE));
       const cached = files.cachePath(ref, a.name);
@@ -429,11 +426,11 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const t0 = Date.now();
     try {
       if (row.Blob.startsWith(FILE_REF)) {
-        if (!strandFiles) throw new ChatFailure('not-supported', 'This app cannot read files sent this way.', { retryable: false });
-        const node = await serveFiles(strandId, strand);
+        if (!media) throw new ChatFailure('not-supported', 'This app cannot read files sent this way.', { retryable: false });
+        await ipfsFor(strandId, strand);
         const cid = row.Blob.slice(FILE_REF.length);
-        if (!(await strandFiles.saveAs(strandId, cid, path, { node }))) {
-          await files.write(path, strandFiles.read(strandId, cid, { node }));
+        if (!(await media.blobs.saveAs(strandId, cid, path))) {
+          await files.write(path, media.blobs.read(strandId, cid));
         }
       } else {
         await files.write(path, readBlob(strand, row.Blob));

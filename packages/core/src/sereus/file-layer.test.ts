@@ -1,6 +1,6 @@
 /**
- * Attachments through the strand file layer (`../files`, gotchoices/sereus#62): the strand
- * carries a `cid:` ref, the bytes go member to member, B gets them identical (fetched in the
+ * Attachments on IPFS-on-a-strand (`strand-media.ts`, gotchoices/sereus#62): the strand
+ * carries an `ipfs:` ref, the bytes go member to member, B gets them identical (fetched in the
  * background as soon as the message lists), and the same file twice is one file.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -36,14 +36,14 @@ describe('attachments through the strand file layer', () => {
   }, 180_000);
   afterAll(async () => { await Promise.allSettled([a?.stop(), b?.stop()]); });
 
-  it('sends a cid: ref, and B has the file identical without asking', async () => {
+  it('sends an ipfs: ref, and B has the file identical without asking', async () => {
     const t0 = Date.now();
     const sent = value(await a.model.messages.send(strandId, {
       content: 'the photo',
       attachments: [{ id: 'local', type: 'image', uri: file, name: 'holiday.jpg', mimeType: 'image/jpeg', locality: 'local' }],
     }));
     const sendMs = Date.now() - t0;
-    expect(sent.attachments[0].blob).toMatch(/^cid:b[a-z2-7]+$/);
+    expect(sent.attachments[0].blob).toMatch(/^ipfs:bafy[a-z2-7]+$/);
     expect(sent.attachments[0].locality).toBe('local');
 
     // B lists the message; the background fetch brings the file without B asking for it.
