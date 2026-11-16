@@ -1,36 +1,35 @@
 # @chat/strand-drive
 
-> **Being replaced.** This package is the first attempt, on MFS (one root per tree,
-> last-writer-wins). The drive is being rebuilt as rows in the strand's database on top of
-> `@chat/strand-blobs`, so concurrent edits merge row by row: see [SPEC.md](SPEC.md). The MFS
-> version below stays until that lands.
+A strand's shared drive: folders and files as rows in the strand's database, with each file
+naming a blob. It's built to move into the sereus stack as a module any sApp can include
+([gotchoices/sereus#62](https://github.com/gotchoices/sereus/issues/62)). The design is
+[SPEC.md](SPEC.md).
 
-A strand's shared drive: a directory tree on IPFS-on-a-strand, edited with MFS
-([`@helia/mfs`](https://github.com/ipfs/helia/tree/main/packages/mfs)), with its root kept where
-every member sees it: a strand record, which the app supplies as a `DriveRoot`. Built to move into
-the sereus stack ([gotchoices/sereus#62](https://github.com/gotchoices/sereus/issues/62)).
+- **`driveSchema(prefix = 'Drive')`:** the schema fragment an app merges into its own sApp schema
+  (`DriveFolder`, `DriveFile`).
+- **`StrandDrive`:** reads and writes those rows under the spec's rules. It needs only a database
+  that runs SQL (`exec`, `eval`: Quereus's, on the strand), the schema name, the prefix, and the
+  viewer's member id.
+- **No bytes here.** The app puts a file's bytes in its blob layer (`@chat/strand-blobs`) and
+  passes the ref (`ipfs:<CID>`). `blobs()` lists the refs that live files name, which the app
+  keeps alive.
 
-## How it works
-
-- **The root comes from the strand.** MFS keeps its root under one datastore key and caches it.
-  Here that key reads and writes the strand's record, and every operation uses a fresh MFS, so
-  it starts from the root the strand has now, including one another member wrote.
-- **Kept and served through the blob layer.** After a change, the blob layer adopts the new root
-  (`StrandBlobs.adopt`): it is served in the strand, kept from gc, and provided on FRET. The old
-  root is released; blocks the new tree still uses stay.
-- **Fetched on demand.** Members read what they open (`ls`, `cat`) over the strand. Nobody is
-  sent the whole tree.
-
-## Open: concurrent edits
-
-The root is last-writer-wins. When two members change the drive at the same time, only the later
-tree survives. `DriveRoot.save` is told the root the change started from, so a compare-and-set
-(retry on conflict), or a three-way merge of the trees, can be added there. That design question
-is for #62.
+Concurrent edits merge row by row in the database: two members adding at once are two rows, and
+same names coexist by design.
 
 ## Tests
 
-Two members over libp2p on loopback, with the strand record simulated by one shared value:
-- A builds a tree; B lists it and reads a 2.5 MB file over the network;
-- B adds a file, and A sees both;
-- A's gc keeps the live tree.
+Eight, against a real Quereus database with the fragment applied as sereus applies an sApp schema:
+- every member sees the same folders and files;
+- a folder only its creator adds to;
+- same names coexist;
+- only authors rename, move and remove, while anyone can keep a file longer;
+- expiry;
+- removing a folder;
+- the move-cycle rule;
+- a file whose folder hasn't arrived yet.
+
+## History
+
+The first attempt used MFS (`@helia/mfs`): one root per tree, last writer wins. It's in the git
+history of this branch.

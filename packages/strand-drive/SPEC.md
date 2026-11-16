@@ -72,12 +72,13 @@ index DriveFileByFolder on DriveFile (FolderId, Name);
 
 ## Rules
 
-Who may do what. Each member's app applies these rules both to what it writes and to what it
-shows: a row written against the rules is ignored, not displayed. This is how chat treats
-authorship today (a member edits and deletes only their own messages). Enforcing the rules in the
-schema needs signed mutation context (`with context`, the writer's key and a signature checked
-against the member's key). That is the hardening path once sereus exposes members' keys to checks,
-and the spec reserves it without depending on it.
+Who may do what. Each member's app applies these rules to what it writes: it offers only what the
+rules allow, and refuses the rest. That is how chat treats authorship today (a member edits and
+deletes only their own messages). Rows don't record who last changed them, so an app can't tell
+afterwards that a row was written against the rules. Enforcement by the schema itself needs signed
+mutation context (`with context`: the writer's key, and a signature checked against the member's
+key). That is the hardening path once sereus exposes members' keys to checks, and this spec
+reserves it without depending on it.
 
 | Act | Who |
 |---|---|

@@ -1,90 +1,115 @@
 /**
- * A strand's shared drive over real libp2p on loopback. The strand record holding the root is
- * simulated by one shared value (in chat it would be a strand table row, replicated by the
- * database). A builds a tree; B lists it and reads a photo over the network; B adds a file and A
- * sees it; A's gc keeps everything the current tree uses.
+ * The drive's rules (SPEC.md) against a real Quereus database, the fragment applied as sereus
+ * applies an sApp schema (`declare schema App { … }; apply schema App;`). Two members share one
+ * database, standing in for a strand's replicated one.
  */
-import { afterAll, describe, expect, it } from 'vitest'
-import { randomBytes, createHash } from 'node:crypto'
-import { createLibp2p, type Libp2p } from 'libp2p'
-import { webSockets } from '@libp2p/websockets'
-import { noise } from '@chainsafe/libp2p-noise'
-import { yamux } from '@chainsafe/libp2p-yamux'
-import { identify } from '@libp2p/identify'
-import { StrandIpfs, KvBlockstore, MemoryByteStore } from '@chat/strand-ipfs'
-import { StrandBlobs } from '@chat/strand-blobs'
-import { StrandDrive, type DriveRoot } from './index.js'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { Database } from '@quereus/quereus'
+import { StrandDrive, DriveError, driveSchema, type DriveDb } from './index.js'
 
-const nodes: Libp2p[] = []
-const ipfsNodes: StrandIpfs[] = []
-afterAll(async () => {
-  await Promise.allSettled(ipfsNodes.map(i => i.stop()))
-  await Promise.allSettled(nodes.map(n => n.stop()))
+let db: Database
+let clock = Date.parse('2026-11-15T12:00:00Z')
+const now = (): Date => new Date(clock)
+const as = (me: string): StrandDrive => new StrandDrive({ db: () => db as unknown as DriveDb, me: () => me, now })
+const blob = (n: number): string => `ipfs:bafkreiexample${String(n).padStart(6, '0')}`
+
+beforeEach(async () => {
+  db = new Database()
+  await db.exec(`declare schema App { ${driveSchema()} }; apply schema App;`)
+  clock = Date.parse('2026-11-15T12:00:00Z')
 })
 
-async function node (): Promise<Libp2p> {
-  const n = await createLibp2p({
-    addresses: { listen: ['/ip4/127.0.0.1/tcp/0/ws'] },
-    transports: [webSockets()], connectionEncrypters: [noise()], streamMuxers: [yamux()],
-    connectionGater: { denyDialMultiaddr: () => false },
-    services: { identify: identify() }
-  })
-  nodes.push(n)
-  return n
-}
-
-async function member (scope: string, root: DriveRoot): Promise<{ libp2p: Libp2p, drive: StrandDrive, blobs: StrandBlobs, bytes: MemoryByteStore }> {
-  const bytes = new MemoryByteStore()
-  const blockstore = new KvBlockstore(bytes)
-  const blobs = new StrandBlobs({ blockstore, index: bytes })
-  const libp2p = await node()
-  const ipfs = new StrandIpfs({ libp2p, blockstore, servable: cid => blobs.servable(scope, cid) })
-  await ipfs.start()
-  ipfsNodes.push(ipfs)
-  await blobs.attach(scope, ipfs)
-  return { libp2p, drive: new StrandDrive({ scope, blockstore: () => ipfs.blockstore, blobs, root }), blobs, bytes }
-}
-
-const sha = (b: Uint8Array): string => createHash('sha256').update(b).digest('hex')
-async function all (source: AsyncIterable<Uint8Array>): Promise<Uint8Array> {
-  const parts: Uint8Array[] = []
-  for await (const p of source) parts.push(p)
-  return new Uint8Array(Buffer.concat(parts))
-}
+const names = (l: { folders: Array<{ name: string }>, files: Array<{ name: string }> }): string[] =>
+  [...l.folders.map(f => `${f.name}/`), ...l.files.map(f => f.name)]
 
 describe('a strand drive', () => {
-  it('two members share a tree through a root kept in the strand', async () => {
-    // The strand's record of the root, as both members see it.
-    let shared: string | null = null
-    const saves: string[] = []
-    const root: DriveRoot = { load: async () => shared, save: async (cid) => { shared = cid; saves.push(cid) } }
+  it('folders and files, seen alike by every member', async () => {
+    const priya = as('priya'); const bob = as('bob')
+    const routes = await priya.addFolder(null, 'Routes')
+    await priya.addFile(routes.id, { name: 'loop.gpx', blob: blob(1), size: 1200, mimeType: 'application/gpx+xml', keepFor: 'year' })
+    await bob.addFile(null, { name: 'waiver.pdf', blob: blob(2), size: 50_000 })
+    expect(names(await bob.list())).toEqual(['Routes/', 'waiver.pdf'])
+    const inRoutes = await bob.list(routes.id)
+    expect(names(inRoutes)).toEqual(['loop.gpx'])
+    expect(inRoutes.files[0].mine).toBe(false)
+    expect(inRoutes.path).toEqual([])
+    expect((await priya.list(routes.id)).files[0].mine).toBe(true)
+  })
 
-    const a = await member('s1', root)
-    const b = await member('s1', root)
-    await b.libp2p.dial(a.libp2p.getMultiaddrs()[0])
+  it('a folder only its creator adds to', async () => {
+    const priya = as('priya'); const bob = as('bob')
+    const routes = await priya.addFolder(null, 'Routes', 'creator')
+    expect((await bob.list(routes.id)).canAdd).toBe(false)
+    await expect(bob.addFile(routes.id, { name: 'x', blob: blob(3), size: 1 })).rejects.toMatchObject({ kind: 'not-allowed' })
+    await expect(bob.setAddPolicy(routes.id, 'anyone')).rejects.toBeInstanceOf(DriveError)
+    await priya.setAddPolicy(routes.id, 'anyone')
+    await bob.addFile(routes.id, { name: 'x', blob: blob(3), size: 1 })
+  })
 
-    const photo = new Uint8Array(randomBytes(2_500_000))
-    await a.drive.mkdir('/photos')
-    await a.drive.writeBytes('/photos/a.jpg', photo)
-    await a.drive.writeBytes('/notes.txt', new TextEncoder().encode('hello drive'))
-    expect(saves.length).toBeGreaterThanOrEqual(3)
+  it('same names never replace each other', async () => {
+    await as('susan').addFile(null, { name: 'waiver.pdf', blob: blob(4), size: 1 })
+    await as('bob').addFile(null, { name: 'waiver.pdf', blob: blob(5), size: 1 })
+    const files = (await as('priya').list()).files
+    expect(files.map(f => f.name)).toEqual(['waiver.pdf', 'waiver.pdf'])
+    expect(new Set(files.map(f => f.fingerprint)).size).toBe(2)
+  })
 
-    // B: the tree A built, read over the network.
-    const top: string[] = []
-    for await (const e of b.drive.ls('/')) top.push(e.name)
-    expect(top.sort()).toEqual(['notes.txt', 'photos'])
-    expect(sha(await all(b.drive.cat('/photos/a.jpg')))).toBe(sha(photo))
-    expect(new TextDecoder().decode(await all(b.drive.cat('/notes.txt')))).toBe('hello drive')
+  it('only authors rename, move and remove their files; anyone keeps one longer', async () => {
+    const bob = as('bob'); const susan = as('susan')
+    const f = await bob.addFile(null, { name: 'summit.jpg', blob: blob(6), size: 1, keepFor: 'week' })
+    await expect(susan.rename('file', f.id, 'mine.jpg')).rejects.toMatchObject({ kind: 'not-allowed' })
+    await expect(susan.remove('file', f.id)).rejects.toMatchObject({ kind: 'not-allowed' })
+    const kept = await susan.keep(f.id, 'year')
+    expect(kept.expiresAt > f.expiresAt).toBe(true)
+    // Keeping for less never shortens it.
+    expect((await susan.keep(f.id, 'day')).expiresAt).toBe(kept.expiresAt)
+    await bob.rename('file', f.id, 'summit-2026.jpg')
+    expect((await bob.list()).files[0].name).toBe('summit-2026.jpg')
+    await bob.remove('file', f.id)
+    expect((await bob.list()).files).toEqual([])
+  })
 
-    // B adds a file; A, starting from the root the strand has now, sees both.
-    await b.drive.writeBytes('/photos/b.jpg', new Uint8Array(randomBytes(300_000)))
-    const photos: string[] = []
-    for await (const e of a.drive.ls('/photos')) photos.push(e.name)
-    expect(photos.sort()).toEqual(['a.jpg', 'b.jpg'])
+  it('files expire for everyone, and any member may then remove them', async () => {
+    const bob = as('bob')
+    await bob.addFile(null, { name: 'old.jpg', blob: blob(7), size: 1, keepFor: 'day' })
+    await bob.addFile(null, { name: 'kept.jpg', blob: blob(8), size: 1, keepFor: 'month' })
+    clock += 2 * 24 * 60 * 60 * 1000
+    expect(names(await as('susan').list())).toEqual(['kept.jpg'])
+    expect(await as('susan').blobs()).toEqual([blob(8)])
+    expect(await as('susan').removeExpired()).toBe(1)
+  })
 
-    // A's gc: old roots go, everything the current tree uses stays.
-    const removed = await a.blobs.gc(Date.now() + 1000)
-    expect(removed.files).toBeGreaterThan(0)
-    expect(sha(await all(a.drive.cat('/photos/a.jpg')))).toBe(sha(photo))
-  }, 90_000)
+  it("a folder goes only when nothing of anyone else's is in it", async () => {
+    const bob = as('bob'); const susan = as('susan')
+    const rides = await bob.addFolder(null, 'Ride photos')
+    const inner = await bob.addFolder(rides.id, 'Saturday')
+    await bob.addFile(inner.id, { name: 'a.jpg', blob: blob(9), size: 1 })
+    const hers = await susan.addFile(inner.id, { name: 'b.jpg', blob: blob(10), size: 1 })
+    await expect(susan.remove('folder', rides.id)).rejects.toMatchObject({ kind: 'not-allowed' })
+    await expect(bob.remove('folder', rides.id)).rejects.toMatchObject({ kind: 'not-allowed' })
+    await susan.remove('file', hers.id)
+    await bob.remove('folder', rides.id)
+    expect(names(await bob.list())).toEqual([])
+  })
+
+  it('moves: never into itself; a cycle from concurrent moves is broken the same way everywhere', async () => {
+    const bob = as('bob')
+    const a = await bob.addFolder(null, 'A')
+    const b = await bob.addFolder(a.id, 'B')
+    await expect(bob.move('folder', a.id, b.id)).rejects.toMatchObject({ kind: 'invalid' })
+    // Two devices' moves, each valid on its own, crossing: A into B and B into A.
+    await db.exec('update App.DriveFolder set ParentId = ? where Id = ?', [b.id, a.id])
+    const top = await as('susan').list()
+    const breakAt = [a.id, b.id].sort()[0]
+    expect(top.folders.map(f => f.id)).toEqual([breakAt])
+    const other = breakAt === a.id ? b : a
+    expect((await as('susan').list(breakAt)).folders.map(f => f.id)).toEqual([other.id])
+    expect((await as('susan').list(other.id)).path.map(f => f.id)).toEqual([breakAt])
+  })
+
+  it('a file whose folder has not arrived shows at the top', async () => {
+    await db.exec('insert into App.DriveFile (Id, FolderId, Name, Blob, Size, MimeType, AddedBy, AddedAt, ExpiresAt) values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      ['f-early', 'folder-not-here-yet', 'early.jpg', blob(11), 1, null, 'bob', now().toISOString(), new Date(clock + 1e9).toISOString()])
+    expect(names(await as('priya').list())).toEqual(['early.jpg'])
+  })
 })
