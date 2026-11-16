@@ -6,6 +6,7 @@
  * `schema.generated.ts` from it (scripts/gen-schema.mjs).
  */
 import type { SAppConfig } from '@serfab/cadre-core';
+import { driveSchema } from '@chat/strand-drive';
 import { CHAT_SCHEMA_QSQL } from './schema.generated.js';
 
 /** sApp ID for the chat app — matches design/specs/project.md. */
@@ -15,8 +16,12 @@ export const CHAT_SAPP_ID = 'org.sereus.chat';
  * 0.2.0: `Message.Id` and `Attachment.Id` tagged `optimystic.fresh` (a tag only; rows unchanged).
  * 0.3.0: index `MessageByTime` on `Message (Timestamp, Id)` for the message list (Optimystic#52).
  * 0.4.0: blobs (docs/blobs.md): `Attachment.Blob`, tables `BlobChunk` and `Blob`.
+ * 0.5.0: the strand drive (`@chat/strand-drive`): tables `DriveFolder` and `DriveFile`.
  */
-export const CHAT_SAPP_VERSION = '0.4.0';
+export const CHAT_SAPP_VERSION = '0.5.0';
+
+/** The drive's tables carry this prefix in chat's schema (`App.DriveFolder`, `App.DriveFile`). */
+export const DRIVE_PREFIX = 'Drive';
 
 /**
  * Strip `declare schema X { ... }` wrappers and comment lines. StrandDatabase re-wraps
@@ -31,8 +36,12 @@ export function extractInnerDDL(schemaSql: string): string {
     .trim();
 }
 
-/** The schema as StrandDatabase takes it. */
-export const CHAT_SCHEMA_DDL = extractInnerDDL(CHAT_SCHEMA_QSQL);
+/**
+ * The schema as StrandDatabase takes it: chat's own tables (design/specs/domain/chat-sapp.qsql)
+ * and the drive module's fragment, merged into one `App` schema.
+ */
+export const CHAT_SCHEMA_DDL = extractInnerDDL(`${CHAT_SCHEMA_QSQL}
+${driveSchema(DRIVE_PREFIX)}`);
 
 export function getChatSAppConfig(): SAppConfig {
   return {

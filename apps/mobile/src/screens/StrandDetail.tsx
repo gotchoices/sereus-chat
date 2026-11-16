@@ -295,6 +295,12 @@ export default function StrandDetail() {
         title={t('strand.mediaCount').replace('{{n}}', String(media.length))}
         onPress={() => navigation.navigate('StrandMedia', { strandId, title })}
       />
+      <ListRow
+        testID="strand-drive"
+        title={t('strand.drive')}
+        subtitle={t('strand.driveHint')}
+        onPress={() => navigation.navigate('Drive', { strandId })}
+      />
 
       <SectionHeader label={t('strand.thisConversation')} />
       <View style={styles.rows}>

@@ -41,6 +41,7 @@
     "@chat/core": "link:../../packages/core",
     "@chat/resources": "link:../../packages/resources",
     "@chat/strand-blobs": "link:../../packages/strand-blobs",
+    "@chat/strand-drive": "link:../../packages/strand-drive",
     "@chat/strand-ipfs": "link:../../packages/strand-ipfs",
     "@craftzdog/react-native-buffer": "^6.1.2",
     "@helia/bitswap": "^4.0.20",

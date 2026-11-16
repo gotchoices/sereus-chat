@@ -22,6 +22,9 @@ const FIXTURES: Record<string, unknown> = {
   'Invitations/empty': require('../../mock/data/Invitations/empty.json'),
   'Prefs/happy': require('../../mock/data/Prefs/happy.json'),
   'StorageUsage/happy': require('../../mock/data/StorageUsage/happy.json'),
+  'Drive/happy': require('../../mock/data/Drive/happy.json'),
+  'Drive/empty': require('../../mock/data/Drive/empty.json'),
+  'Drive/error': require('../../mock/data/Drive/error.json'),
   'Profile/happy': require('../../mock/data/Profile/happy.json'),
 };
 

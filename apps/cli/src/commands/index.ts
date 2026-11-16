@@ -1,6 +1,7 @@
 /** Every command, `help`, and running one command line's commands in order. */
 import { CliFailure, EXIT, UsageError, type Session } from '../session.js';
 import { parseCommand, type Command } from './command.js';
+import { driveCommands } from './drive.js';
 import { inviteCommands } from './invites.js';
 import { settingsCommands } from './settings.js';
 import { strandCommands } from './strands.js';
@@ -25,7 +26,7 @@ const help: Command = {
   },
 };
 
-export const COMMANDS: Command[] = [help, ...settingsCommands, ...strandCommands, ...inviteCommands];
+export const COMMANDS: Command[] = [help, ...settingsCommands, ...strandCommands, ...driveCommands, ...inviteCommands];
 
 /**
  * The command a word names: a name or alias exactly, else the one command whose name or

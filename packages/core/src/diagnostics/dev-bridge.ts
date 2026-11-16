@@ -9,6 +9,7 @@
  *   send(strandId, text, files?) → { ms }  files: local paths on the bridged machine, attached
  *   files(strandId)       → [{ id, name, byteSize, locality }]   the strand's attachments
  *   fetchFile(strandId, id) → { uri, ms }   its bytes to this machine (checked against its ref)
+ *   drive(strandId, op, ...args) → the value of `model.drive[op](strandId, ...args)` (story 23)
  *   arm(strandId)         → true        watch it, as a chat view does
  *   seen(text)            → epoch ms when first seen here, or null
  *   prepare()             → true                start founding a private strand in the background
@@ -31,13 +32,14 @@ import type { ChatModel, Result } from '../model/index.js';
 import type { NodeHost } from '../sereus/host.js';
 import { benchStrand, type BenchResult } from '../sereus/bench.js';
 
-export type DevBridgeMethod = 'strands' | 'send' | 'files' | 'fetchFile' | 'arm' | 'seen' | 'prepare' | 'invite' | 'accept' | 'traffic' | 'relays' | 'bench';
+export type DevBridgeMethod = 'strands' | 'send' | 'files' | 'fetchFile' | 'drive' | 'arm' | 'seen' | 'prepare' | 'invite' | 'accept' | 'traffic' | 'relays' | 'bench';
 
 export interface DevBridge {
   strands(): Promise<Array<{ id: string; title: string }>>;
   send(strandId: string, text: string, files?: string[]): Promise<{ ms: number }>;
   files(strandId: string): Promise<Array<{ id: string; name?: string; byteSize?: number | null; locality: string }>>;
   fetchFile(strandId: string, attachmentId: string): Promise<{ uri: string; ms: number }>;
+  drive(strandId: string, op: keyof ChatModel['drive'], ...args: unknown[]): Promise<unknown>;
   arm(strandId: string): Promise<boolean>;
   seen(text: string): number | null;
   prepare(): true;
@@ -137,6 +139,11 @@ export function createDevBridge(model: ChatModel, host?: NodeHost): DevBridge {
       const t0 = Date.now();
       const { uri } = value(await model.media.fetch(strandId, attachmentId));
       return { uri, ms: Date.now() - t0 };
+    },
+    async drive(strandId, op, ...args) {
+      const fn = model.drive[op] as (strandId: string, ...a: unknown[]) => Promise<Result<unknown>>;
+      if (typeof fn !== 'function') throw new Error(`no drive.${String(op)}`);
+      return value(await fn(strandId, ...args));
     },
     async arm(strandId) {
       if (armed.has(strandId)) return true;

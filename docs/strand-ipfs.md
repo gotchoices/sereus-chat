@@ -11,7 +11,7 @@ file system for the strand drive.
 |---|---|---|
 | `packages/strand-ipfs` | IPFS on a strand's libp2p node: Helia's Bitswap and UnixFS without Helia's own libp2p bundle; content routing on FRET; a membership gate; host byte stores as IPFS block stores | everything below |
 | `packages/strand-blobs` | Files a record refers to: put, fetch and read by CID; scope per strand; announcements; placement and the outbox; leases and gc; native joins | chat attachments |
-| `packages/strand-drive` | A directory tree (`@helia/mfs`) whose root is kept in a strand record; the blob layer keeps and serves the current tree | the strand drive (no screen yet) |
+| `packages/strand-drive` | A shared drive as rows in the strand's database (`DriveFolder`, `DriveFile`, prefix chosen by the app), each file naming a blob; folder rules, expiry ([SPEC.md](../packages/strand-drive/SPEC.md)) | chat's Drive screen and `serchat drive` (story 23) |
 
 In chat, `packages/core/src/sereus/strand-media.ts` runs one IPFS node per strand node (remade on
 a wake) and one blob layer per device. An attachment's ref is `ipfs:<CID>`, a UnixFS root.
@@ -67,8 +67,10 @@ Bitswap) are covered by our tests, with our node on both ends.
 
 - **A cadre hook for the membership check.** These protocols need the check that sereus applies
   only to Optimystic's protocols today.
-- **Concurrent drive edits:** last writer wins on the root; compare-and-set or a tree merge
-  would close it.
+- **The drive's rules are kept by each app on its own writes.** A modified client could write
+  rows the rules forbid; signed writes (Quereus mutation context) are the hardening path.
+- **Expired drive rows stay** (hidden from listings) until a member removes them; nothing runs
+  `removeExpired` yet.
 - **Serving from a slow phone:** the S7 reads each block into JavaScript for libp2p, which takes
   5–8 s per MB.
 - **Placement on storage nodes (Arachnode); quotas; partial reads.**

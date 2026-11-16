@@ -3,6 +3,7 @@ export * from './strands.js';
 export * from './messages.js';
 export * from './members.js';
 export * from './media.js';
+export * from './drive.js';
 export * from './search.js';
 export * from './invitations.js';
 export * from './profile.js';

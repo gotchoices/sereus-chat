@@ -141,6 +141,22 @@ export function describeChatModelContract(name: string, setup: () => Promise<Con
       expect(value(await model.profile.get()).name).toBe('Contract Name');
     });
 
+    it("keeps the user's folders in a strand's drive, and only theirs to rename and remove", async () => {
+      const made = value(await model.drive.addFolder(strandId, null, 'Contract folder', { addPolicy: 'creator' }));
+      expect(made).toMatchObject({ name: 'Contract folder', mine: true, canAdd: true, addPolicy: 'creator' });
+      const inner = value(await model.drive.addFolder(strandId, made.id, 'Inner'));
+      const listing = value(await model.drive.list(strandId, inner.id));
+      expect(listing.folder?.id).toBe(inner.id);
+      expect(listing.path.map(f => f.id)).toEqual([made.id]);
+      value(await model.drive.rename(strandId, 'folder', made.id, 'Renamed'));
+      expect(value(await model.drive.list(strandId)).folders.some(f => f.id === made.id && f.name === 'Renamed')).toBe(true);
+      const cycle = await model.drive.move(strandId, 'folder', made.id, inner.id);
+      expect(cycle.ok ? 'ok' : cycle.error.kind).toBe('invalid-input');
+      value(await model.drive.remove(strandId, 'folder', made.id));
+      const gone = await model.drive.list(strandId, made.id);
+      expect(gone.ok ? 'ok' : gone.error.kind).toBe('not-found');
+    });
+
     it('searches in batches that end with every strand searched', async () => {
       let last: { strandsSearched: number; strandsTotal: number } | null = null;
       for await (const batch of model.search.run('a')) {

@@ -120,6 +120,7 @@ __metadata:
     "@chainsafe/libp2p-noise": "npm:17.0.0"
     "@chainsafe/libp2p-yamux": "npm:8.0.1"
     "@chat/strand-blobs": "workspace:*"
+    "@chat/strand-drive": "workspace:*"
     "@chat/strand-ipfs": "workspace:*"
     "@libp2p/circuit-relay-v2": "npm:4.2.14"
     "@libp2p/crypto": "npm:5.1.24"
@@ -139,6 +140,7 @@ __metadata:
     vitest: "npm:^4.0.17"
   peerDependencies:
     "@chat/strand-blobs": "*"
+    "@chat/strand-drive": "*"
     "@chat/strand-ipfs": "*"
     "@noble/ciphers": ^2.2.0
     "@noble/curves": ^2.2.0
@@ -211,7 +213,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@chat/strand-drive@workspace:packages/strand-drive":
+"@chat/strand-drive@workspace:*, @chat/strand-drive@workspace:packages/strand-drive":
   version: 0.0.0-use.local
   resolution: "@chat/strand-drive@workspace:packages/strand-drive"
   dependencies:

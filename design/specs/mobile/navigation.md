@@ -17,6 +17,7 @@ StrandList  ← root
 └── ChatInterface (push)              ← tap a strand row
     ├── StrandDetail (push)           ← tap the header
     │   └── StrandMedia (push)
+    ├── Drive (push)                  ← chat header folder, or StrandDetail
     ├── MediaPicker (sheet)           ← composer "+"
     ├── MediaViewer (full-screen)     ← tap an attachment
     ├── VoiceCallOverlay (overlay)    ← parked, story 90
@@ -31,6 +32,7 @@ StrandList  ← root
 | ChatInterface | ChatInterface | Tap a strand row | Push |
 | StrandDetail | StrandDetail | Chat header (title / member count) | Push |
 | StrandMedia | StrandMedia | StrandDetail, or a search result | Push |
+| Drive | Drive | Chat header (folder), or StrandDetail "Drive"; a folder inside pushes Drive again | Push |
 | MediaViewer | MediaViewer | Tap an attachment, in chat or StrandMedia | Full-screen |
 | MediaPicker | MediaPicker | Composer "+" | Sheet |
 | SearchInterface | SearchInterface | Home header, or chat header for in-strand | Push |
@@ -76,6 +78,7 @@ browser in the way. `chat://` remains as an alias.
 |------|---------|
 | `sereus://invite/{token}` | InvitationAcceptance |
 | `sereus://strand/{id}` | ChatInterface |
+| `sereus://strand/{id}/drive` | Drive |
 | `sereus://relay?addr={multiaddr}` | Relay offer |
 | `sereus://screen/{Route}?variant={…}` | Mock builds only |
 

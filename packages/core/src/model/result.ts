@@ -47,6 +47,12 @@ export type ChatErrorKind =
   | 'unsent-messages'
   /** The other members judged the write invalid. Final: sending it again gets the same answer. */
   | 'rejected'
+  /** The rules don't let this member do that (story 23: someone else's file or folder). */
+  | 'not-allowed'
+  /** The thing asked for is not there (removed, expired, or not arrived yet). */
+  | 'not-found'
+  /** The input is not acceptable (a name too long or empty). */
+  | 'invalid-input'
   /** The operation exists in the model but this implementation cannot do it yet. */
   | 'not-supported'
   /** Anything else. */
@@ -57,7 +63,7 @@ const KINDS: Record<ChatErrorKind, true> = {
   'unreachable': true, 'not-attached': true, 'too-large': true, 'unavailable': true, 'not-a-member': true,
   'join-inviter-unreachable': true, 'invitation-spent': true, 'invitation-not-ready': true,
   'join-refused': true, 'join-host-busy': true, 'join-host-outdated': true, 'join-incomplete': true,
-  'invitation-unusable': true, 'invalid-node-code': true, 'node-unreachable': true,
+  'invitation-unusable': true, 'not-allowed': true, 'not-found': true, 'invalid-input': true, 'invalid-node-code': true, 'node-unreachable': true,
   'claim-refused': true, 'claim-failed': true, 'unsent-messages': true, 'rejected': true, 'not-supported': true,
   'unexpected': true,
 };

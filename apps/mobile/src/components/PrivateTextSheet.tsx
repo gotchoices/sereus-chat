@@ -27,6 +27,9 @@ export interface PrivateTextSheetProps {
   maxLength?: number;
   /** Offer "change it for all N" (a name other members also carry). */
   everywhere?: { label: string };
+  /** Offer "remove" when there is text (a name or note); off where empty means nothing (a file's name). */
+  removable?: boolean;
+  autoCapitalize?: 'none' | 'sentences' | 'words';
   labels: {
     title: string; note: string; placeholder: string; used: string;
     save: string; remove: string; cancel: string;
@@ -35,7 +38,7 @@ export interface PrivateTextSheetProps {
   onDismiss: () => void;
 }
 
-export function PrivateTextSheet({ visible, current, used = [], multiline = false, maxLength = 100, everywhere, labels, onSave, onDismiss }: PrivateTextSheetProps) {
+export function PrivateTextSheet({ visible, current, used = [], multiline = false, maxLength = 100, everywhere, removable = true, autoCapitalize = 'words', labels, onSave, onDismiss }: PrivateTextSheetProps) {
   const theme = useTheme();
   const [text, setText] = useState(current ?? '');
   const [all, setAll] = useState(false);
@@ -61,7 +64,7 @@ export function PrivateTextSheet({ visible, current, used = [], multiline = fals
             // A name is often not a dictionary word: the S7's keyboard turned "Roofer" into "Roger".
             autoCorrect={false}
             spellCheck={false}
-            autoCapitalize="words"
+            autoCapitalize={autoCapitalize}
             maxLength={maxLength}
             multiline={multiline}
             returnKeyType={multiline ? 'default' : 'done'}
@@ -75,7 +78,7 @@ export function PrivateTextSheet({ visible, current, used = [], multiline = fals
             </View>
           ) : null}
           <View style={styles.buttons}>
-            {current ? (
+            {current && removable ? (
               <Pressable testID="private-text-remove" accessibilityRole="button" onPress={() => finish(null)} style={styles.button}>
                 <Text style={[typography.body, { color: theme.textMuted }]}>{labels.remove}</Text>
               </Pressable>

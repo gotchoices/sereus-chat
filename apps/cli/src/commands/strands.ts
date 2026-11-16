@@ -363,7 +363,7 @@ async function readStdin(): Promise<string> {
 }
 
 /** An attachment's kind and media type, from its file name. */
-function kindOf(path: string): { type: Attachment['type']; mimeType?: string } {
+export function kindOf(path: string): { type: Attachment['type']; mimeType?: string } {
   const ext = extname(path).toLowerCase().slice(1);
   const image: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic' };
   const video: Record<string, string> = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };

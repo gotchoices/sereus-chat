@@ -1,0 +1,76 @@
+# Story 23 on the phone, from the open conversation: the strand's drive shows the folder serchat
+# made ("Routes", only its creator adds), the phone opens serchat's photo in it, then adds a
+# photo of its own at the top. Run by phone-joins-serchat.mjs with DRIVE=<an image>.
+appId: org.sereus.chat
+---
+- tapOn:
+    id: "chat-drive"
+- extendedWaitUntil:
+    visible:
+      id: "drive-folder-Routes"
+    timeout: 120000
+- takeScreenshot: drive-top
+- tapOn:
+    id: "drive-folder-Routes"
+- extendedWaitUntil:
+    visible:
+      id: "drive-creator-only"
+    timeout: 30000
+- assertNotVisible:
+    id: "drive-add"
+- extendedWaitUntil:
+    visible:
+      id: "drive-file-route.jpg"
+    timeout: 60000
+- takeScreenshot: drive-routes
+# Opening fetches it the first time; while it is still arriving the tap only says so.
+- repeat:
+    while:
+      notVisible:
+        id: "drive-image"
+    times: 30
+    commands:
+      - tapOn:
+          id: "drive-file-route.jpg"
+      - extendedWaitUntil:
+          visible:
+            id: "drive-image"
+          timeout: 8000
+          optional: true
+- takeScreenshot: drive-image
+- back
+- back
+- extendedWaitUntil:
+    visible:
+      id: "drive-add"
+    timeout: 30000
+- tapOn:
+    id: "drive-add"
+- tapOn:
+    id: "drive-add-photos"
+- extendedWaitUntil:
+    visible: "Photo taken on.*"
+    timeout: 30000
+- tapOn:
+    text: "Photo taken on.*"
+    index: 0
+# A picker that takes several (the S21's) stays up and asks to confirm; the S7's returns on the
+# tap. (Not "is an Add button visible": the drive's own "+" is labelled "Add" too.)
+- waitForAnimationToEnd:
+    timeout: 3000
+- runFlow:
+    when:
+      visible: "Photo taken on.*"
+    commands:
+      - tapOn: "^(Add|Done|Select)( \\(1\\))?$"
+- extendedWaitUntil:
+    visible:
+      id: "drive-keep-week"
+    timeout: 30000
+- tapOn:
+    id: "drive-keep-week"
+# The phone's own file row, back in the drive.
+- extendedWaitUntil:
+    visible:
+      id: "drive-file-.*"
+    timeout: 120000

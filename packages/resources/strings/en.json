@@ -102,6 +102,46 @@
     "share": "Share",
     "shareAgain": "Share again"
   },
+  "drive": {
+    "add": "Add",
+    "addFiles": "Files",
+    "addPhotos": "Photos",
+    "addTitle": "Add to the drive",
+    "added": "Added {{n}}",
+    "adding": "Adding {{n}}…",
+    "anyoneAdds": "Anyone adds to it",
+    "by": "by {{name}}",
+    "creatorOnly": "Only {{name}} adds to this folder.",
+    "empty": "Folders and files kept here stay apart from the conversation, the same for everyone in the strand. Each file is kept as long as whoever added it chooses, then it is gone.",
+    "emptyFolder": "Nothing in this folder yet.",
+    "emptyTitle": "Nothing in the drive yet",
+    "folderName": "Folder name",
+    "folderNote": "Everyone in this strand sees it.",
+    "keep": {
+      "day": "A day",
+      "week": "A week",
+      "month": "A month",
+      "year": "A year"
+    },
+    "keepFor": "Keep it for",
+    "keepLonger": "Keep longer",
+    "keepLongerNote": "Anyone here can keep a file longer. Nobody can make it go sooner.",
+    "keptUntil": "kept until {{date}}",
+    "move": "Move",
+    "moveTo": "Move to",
+    "name": "Name",
+    "newFolder": "New folder",
+    "onlyMeAdds": "Only I add to it",
+    "remove": "Remove",
+    "removeNote": "It is gone from the drive for everyone. Anyone who already opened or saved it may still have a copy, and nothing can reach those copies.",
+    "rename": "Rename",
+    "saveDownloads": "Save to Downloads",
+    "saved": "Saved to Downloads",
+    "stillArriving": "Still arriving: it opens once someone who has it is reachable.",
+    "title": "Drive",
+    "top": "Top of the drive",
+    "you": "you"
+  },
   "errors": {
     "claim-failed": {
       "default": "Adding the machine did not finish. Trying again is safe.",
@@ -111,6 +151,7 @@
       "default": "The machine refused to join.",
       "claim-rate-limited": "The machine is refusing for now after too many tries. Wait a little and try again."
     },
+    "invalid-input": "That cannot be done.",
     "invalid-node-code": {
       "default": "This is not a usable node code.",
       "not-node-code": "This is not a node code.",
@@ -131,7 +172,9 @@
       "anywhere": "Could not reach that machine. Check that it is running and try again."
     },
     "not-a-member": "This device could not be added as a member of the conversation.",
+    "not-allowed": "Only the member who made this can change it.",
     "not-attached": "This conversation is not on this device.",
+    "not-found": "That is no longer there.",
     "not-supported": "That is not possible yet.",
     "rejected": "The other members refused this change.",
     "too-large": "That file is larger than your limit for attachments.",
@@ -300,6 +343,8 @@
   "strand": {
     "addSomeone": "Add someone",
     "archiveHint": "Hide it from your list; nothing changes for anyone else",
+    "drive": "Drive",
+    "driveHint": "Folders and files kept for everyone here",
     "forget": "Forget entirely",
     "forgetBody": "Permanent. What identifies you here is discarded along with everything you hold. If you are ever invited back you arrive as a stranger, and what you said before stays under who you used to be.",
     "forgetConfirm": "This cannot be undone.",

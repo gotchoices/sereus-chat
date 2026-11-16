@@ -2069,8 +2069,23 @@ Basic chat works. In order, stepping through one at a time:
         for 1 MB to arrive, phone with serchat over the public relay. Split the phone's side (base64
         file reads, sha-256 in JS on Hermes, journal writes) from the stack's (transaction size,
         relay throughput, cohort approval); then a repro for Optimystic if it's theirs.
-- [ ] **2. A shared drive per strand** (folders and files) on the same chunk layer. Needs a
-      story first: draft for the user to review.
+- [ ] **2. A shared drive per strand** (folders and files) on the same chunk layer. Story 23
+      drafted (in review).
+      - [x] **Relational drive, chat's Drive screen and `serchat drive`** (2026-11-15, branch
+        `strand-ipfs`). `packages/strand-drive` keeps folders and files as rows in the strand's
+        database (sApp 0.5.0, a data wipe), files as blobs. Core `ChatModel.drive` (mock and
+        sereus), the Drive screen (appeus slice `Drive`: chat header folder or StrandDetail),
+        `serchat drive ls|mkdir|add|get|mv|rename|keep|rm|policy`, and a dev-bridge `drive` call.
+        A drive file's blob is held as long as its row (it outlived the 30-day lease).
+        - Tests: core 96 (a two-member drive test and a contract case; the cadre-member transient
+          test failed once under the full run's load and passed alone twice), strand-drive 8,
+          serchat unit 15, `test/cli/serchat-drive.mjs` (two serchat profiles through the public
+          relay: 3 MB file identical, fetched in about 1 s; the creator-only folder refused).
+        - Phones (`DRIVE=<image> node test/gui/phone-joins-serchat.mjs <device>`, flow
+          `rn-drive.yaml`): S21 and S7 each see serchat's creator-only "Routes" with no Add, open
+          its photo, add a photo of their own at the top that serchat opens (S21 1.5 s, S7 0.3 s).
+        - Open: drive activity in the conversation (story 23 Open), a folder picker for Move,
+          expired rows are only hidden.
 - [ ] **3. `apps/web`** (Phase 9 below), after sereus's `reference-app-web` (`cadre-web.ts`,
       `web-edge-platform.ts`), IndexedDB storage and slots, and Svelte over the core stores.
       Open question: protecting keys in a browser (the reference app stores them unencrypted).

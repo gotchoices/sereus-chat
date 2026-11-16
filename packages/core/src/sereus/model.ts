@@ -10,7 +10,7 @@
 import { FormationRejectedError, readOwnerPrivateKey, type StrandInstance } from '@serfab/cadre-core';
 import { buildInviteUrl, CHAT_SAPP_ID } from '../protocol/index.js';
 import type {
-  Attachment, ChatModel, Delivery, Invitation, InvitationPreview, Member, Message, Prefs, Reaction,
+  Attachment, ChatModel, Delivery, DriveFile, DriveFolder, DriveListing, Invitation, InvitationPreview, Member, Message, Prefs, Reaction,
   SearchBatch, StorageUsage, StrandState, StrandSummary, Visibility,
 } from '../model/index.js';
 import { fail, INVITATION_VALIDITY, ok, pageMessages } from '../model/index.js';
@@ -24,6 +24,8 @@ import {
 import { BlobNotHereError, CHUNK_SIZE, putBlob, readBlob } from './blob-store.js';
 import { ensureBenchHandler } from './bench.js';
 import { NotAvailableError } from '@chat/strand-blobs';
+import { StrandDrive, DriveError, type DriveDb, type DriveFile as DriveFileRow, type DriveFolder as DriveFolderRow } from '@chat/strand-drive';
+import { DRIVE_PREFIX } from '../protocol/sapp.js';
 import { IPFS_REF, StrandMedia } from './strand-media.js';
 import { createChatStrand, foundChatStrandInBackground } from './sapp-strands.js';
 import { classifyClaimFailure, nodeReach, readNodeCode } from './node-code.js';
@@ -450,6 +452,85 @@ export function createSereusModel(host: ChatHost): SereusModel {
     // Lists showing it as "still arriving" re-read.
     for (const listener of [...privateListeners]) listener();
     return { uri: path };
+  }
+
+  // ------------------------------------------------------------------ the strand drive (story 23)
+
+  /** The strand's drive: rows in its database (`@chat/strand-drive`), files as blobs. */
+  function driveFor(strandId: string): StrandDrive {
+    return new StrandDrive({
+      db: async () => {
+        const d = (await strandFor(strandId)).database?.getDatabase();
+        if (!d) throw new ChatFailure('unavailable', 'The strand is not open here yet.', { retryable: true });
+        return d as unknown as DriveDb;
+      },
+      me: () => runtime.peerId ?? '',
+      schema: 'App',
+      prefix: DRIVE_PREFIX,
+      newId,
+    });
+  }
+
+  /** A drive rule, or a missing row, as the model's error kinds. */
+  async function inDrive<T>(op: () => Promise<T>): Promise<T> {
+    try {
+      return await op();
+    } catch (err) {
+      if (err instanceof DriveError) {
+        throw new ChatFailure(err.kind === 'invalid' ? 'invalid-input' : err.kind, err.message, { retryable: false });
+      }
+      throw err;
+    }
+  }
+
+  async function driveNames(strandId: string): Promise<(id: string) => string> {
+    const strand = await strandFor(strandId);
+    const nicknames = await nicknamesOrNone();
+    const names = new Map((await queryMembers(strand)).map(r => [r.Id, nicknameIn(nicknames, strandId, r.Id) || r.Name]));
+    return id => names.get(id) ?? id.slice(-6);
+  }
+
+  async function toDriveFile(strandId: string, f: DriveFileRow, nameOf: (id: string) => string): Promise<DriveFile> {
+    const files = host.files;
+    const path = files?.cachePath(f.blob, f.name);
+    const here = path ? await files!.exists(path).catch(() => false) : false;
+    // A record here points at the file: keep its blob (and serve it) while the row is live.
+    // A drive file may be kept longer than a blob's lease (a year): hold it as long as the row.
+    if (media && f.blob.startsWith(FILE_REF)) {
+      const cid = f.blob.slice(FILE_REF.length);
+      void media.blobs.reference(strandId, cid).then(() => media!.blobs.touch(cid, Date.parse(f.expiresAt) - Date.now()));
+    }
+    return {
+      id: f.id, folderId: f.folderId, name: f.name, size: f.size, mimeType: f.mimeType,
+      addedBy: f.addedBy, addedByName: nameOf(f.addedBy), addedAt: f.addedAt, expiresAt: f.expiresAt,
+      fingerprint: f.fingerprint, mine: f.mine, here, uri: here ? path! : null,
+    };
+  }
+
+  const toDriveFolder = (f: DriveFolderRow, nameOf: (id: string) => string): DriveFolder => ({
+    id: f.id, parentId: f.parentId, name: f.name, createdBy: f.createdBy, createdByName: nameOf(f.createdBy),
+    createdAt: f.createdAt, addPolicy: f.addPolicy, mine: f.mine, canAdd: f.canAdd,
+  });
+
+  /** A blob's bytes as a file on this device (the viewable copy), fetched from the strand if needed. */
+  async function materialize(strandId: string, ref: string, name: string | undefined): Promise<string> {
+    const files = host.files;
+    if (!files) throw new ChatFailure('not-supported', 'This app cannot keep files.');
+    const path = files.cachePath(ref, name);
+    if (await files.exists(path).catch(() => false)) return path;
+    if (!media || !ref.startsWith(FILE_REF)) throw new ChatFailure('not-supported', 'This app cannot read files kept this way.', { retryable: false });
+    const strand = await strandFor(strandId);
+    await ipfsFor(strandId, strand);
+    const cid = ref.slice(FILE_REF.length);
+    try {
+      if (!(await media.blobs.saveAs(strandId, cid, path))) await files.write(path, media.blobs.read(strandId, cid));
+    } catch (err) {
+      if (err instanceof NotAvailableError) {
+        throw new ChatFailure('unavailable', 'Still arriving: no member who has this file is reachable yet.', { retryable: true, reason: 'still-arriving' });
+      }
+      throw err;
+    }
+    return path;
   }
 
   async function listMessages(strandId: string): Promise<Message[]> {
@@ -994,6 +1075,62 @@ export function createSereusModel(host: ChatHost): SereusModel {
       trim: async () => fail('not-supported', 'Trimming storage is not supported yet.'),
     },
 
+    drive: {
+      list: (strandId, folderId) => attempt(() => inDrive(async (): Promise<DriveListing> => {
+        const [l, nameOf] = await Promise.all([driveFor(strandId).list(folderId ?? null), driveNames(strandId)]);
+        return {
+          folder: l.folder ? toDriveFolder(l.folder, nameOf) : null,
+          path: l.path.map(f => toDriveFolder(f, nameOf)),
+          canAdd: l.canAdd,
+          folders: l.folders.map(f => toDriveFolder(f, nameOf)),
+          files: await Promise.all(l.files.map(f => toDriveFile(strandId, f, nameOf))),
+        };
+      })),
+      addFolder: (strandId, parentId, name, opts) => attempt(() => inDrive(async () => {
+        const f = await driveFor(strandId).addFolder(parentId, name, opts?.addPolicy ?? 'anyone');
+        return toDriveFolder(f, await driveNames(strandId));
+      })),
+      addFile: (strandId, folderId, file) => attempt(() => inDrive(async () => {
+        const files = host.files;
+        if (!files || !media) throw new ChatFailure('not-supported', 'This app cannot keep files.');
+        const drive = driveFor(strandId);
+        // Refused before any bytes move: a folder only its creator adds to, or a file over the limit.
+        const size = await files.size(file.uri);
+        const max = host.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES;
+        if (size > max) {
+          const mb = (n: number) => (n / 1024 / 1024).toFixed(1);
+          throw new ChatFailure('too-large', `${file.name} is ${mb(size)} MB; the limit is ${mb(max)} MB.`, { retryable: false });
+        }
+        if (folderId) {
+          const here = await drive.list(folderId);
+          if (!here.canAdd) throw new DriveError('not-allowed', `Only the person who made "${here.folder?.name}" can add to it.`);
+        }
+        const strand = await strandFor(strandId);
+        await ipfsFor(strandId, strand);
+        const { cid } = await media.blobs.putPath(strandId, file.uri, () => files.read(file.uri, CHUNK_SIZE));
+        const ref = `${FILE_REF}${cid}`;
+        // The adder's own viewable copy, as for an attachment.
+        const cached = files.cachePath(ref, file.name);
+        if (!(await files.exists(cached).catch(() => false))) {
+          if (files.copy) await files.copy(file.uri, cached);
+          else await files.write(cached, files.read(file.uri, CHUNK_SIZE));
+        }
+        const row = await retryAfterRestart(() => drive.addFile(folderId, { name: file.name, blob: ref, size, mimeType: file.mimeType ?? null, keepFor: file.keepFor }), perf);
+        return toDriveFile(strandId, row, await driveNames(strandId));
+      })),
+      open: (strandId, fileId) => attempt(() => inDrive(async () => {
+        const f = await driveFor(strandId).file(fileId);
+        if (!f) throw new DriveError('not-found', 'That file is not in the drive (removed or expired).');
+        return { uri: await materialize(strandId, f.blob, f.name) };
+      })),
+      rename: (strandId, kind, id, name) => attempt(() => inDrive(() => driveFor(strandId).rename(kind, id, name))),
+      move: (strandId, kind, id, to) => attempt(() => inDrive(() => driveFor(strandId).move(kind, id, to))),
+      keep: (strandId, fileId, keepFor) => attempt(() => inDrive(async () =>
+        toDriveFile(strandId, await driveFor(strandId).keep(fileId, keepFor), await driveNames(strandId)))),
+      remove: (strandId, kind, id) => attempt(() => inDrive(() => driveFor(strandId).remove(kind, id))),
+      setAddPolicy: (strandId, folderId, policy) => attempt(() => inDrive(() => driveFor(strandId).setAddPolicy(folderId, policy))),
+    },
+
     search: {
       /**
        * Over attached strands, one batch per strand, reporting what could not be read:
@@ -1193,7 +1330,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
           detach();
           const db = database.getDatabase();
           try {
-            for (const table of ['Message', 'Reaction', 'Attachment', 'Member']) {
+            for (const table of ['Message', 'Reaction', 'Attachment', 'Member', `${DRIVE_PREFIX}Folder`, `${DRIVE_PREFIX}File`]) {
               const stmt = db.prepare(`select * from App.${table}`); // only for its scope
               const scope = stmt.getChangeScope();
               void stmt.finalize().catch(() => {});

@@ -3,6 +3,7 @@ import { splitArgv, splitLine } from './lex.js';
 import { createOutput, escapeField } from './output.js';
 import { RefError, resolveRef } from './refs.js';
 import { find } from './commands/index.js';
+import { resolveDrivePath } from './commands/drive.js';
 
 describe('command lines', () => {
   it('splits words, quotes, escapes and commands', () => {
@@ -63,5 +64,25 @@ describe('command names', () => {
   it('refuses an ambiguous or unknown word', () => {
     expect(() => find('s')).toThrow(/could be/);
     expect(() => find('nope')).toThrow(/no command/);
+  });
+});
+
+describe('naming things in a drive', () => {
+  const folder = (id: string, name: string, parentId: string | null) => ({ id, name, parentId, createdBy: 'p', createdByName: 'P', createdAt: '', addPolicy: 'anyone' as const, mine: true, canAdd: true });
+  const file = (id: string, name: string, folderId: string | null, fingerprint: string) => ({ id, name, folderId, fingerprint, size: 1, mimeType: null, addedBy: 'p', addedByName: 'P', addedAt: '', expiresAt: '', mine: true, here: true, uri: null });
+  const folders = [folder('f1', 'Routes', null), folder('f2', 'Saturday', 'f1')];
+  const files = [file('a', 'waiver.pdf', null, 'c8ph4r'), file('b', 'waiver.pdf', null, 'zt6e1b'), file('c', 'summit.jpg', 'f2', 'w2ny5h')];
+  const list = async (id: string | null) => ({
+    folder: null, path: [], canAdd: true,
+    folders: folders.filter(f => f.parentId === id), files: files.filter(f => f.folderId === id),
+  });
+  it('by path, by name~fingerprint, by id', async () => {
+    expect(await resolveDrivePath('/', list)).toEqual({ kind: 'top' });
+    expect(await resolveDrivePath('Routes/Saturday', list)).toMatchObject({ kind: 'folder', folder: { id: 'f2' } });
+    expect(await resolveDrivePath('Routes/Saturday/summit.jpg', list)).toMatchObject({ kind: 'file', file: { id: 'c' } });
+    await expect(resolveDrivePath('waiver.pdf', list)).rejects.toThrow(/~fingerprint/);
+    expect(await resolveDrivePath('waiver.pdf~zt6e1b', list)).toMatchObject({ file: { id: 'b' } });
+    expect(await resolveDrivePath('c', list)).toMatchObject({ file: { id: 'c' } });
+    await expect(resolveDrivePath('Routes/nope', list)).rejects.toThrow(/no "nope"/);
   });
 });

@@ -8,6 +8,7 @@ Derived from `design/stories/mobile/` (19 stories). Routes are PascalCase; spec 
 | ChatInterface | ChatInterface | One strand's conversation: reading, writing, replying, reacting | happy, empty, error |
 | StrandDetail | StrandDetail | Who is in a strand, what it is, and what the user can do about it | happy, empty, error |
 | StrandMedia | StrandMedia | Everything shared in one strand, in one place | happy, empty, error |
+| Drive | Drive | A strand's shared drive: folders and files kept apart from the conversation | happy, empty, error |
 | MediaViewer | MediaViewer | Full-screen attachment: view, zoom, move between, keep | happy, error |
 | MediaPicker | MediaPicker | Choose where an attachment comes from | happy, error |
 | SearchInterface | SearchInterface | Progressive search across or within strands | happy, empty, error |

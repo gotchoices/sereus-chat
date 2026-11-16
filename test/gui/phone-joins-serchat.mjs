@@ -7,6 +7,9 @@
  *   BENCH=<bytes>   raw bytes each way first, no database (phone built with PERF_LOG)
  *   FILE=<path>     serchat's reply carries this file; the phone must show it
  *   PHONE_FILE=1    then the phone sends a photo from its picker; serchat must fetch it
+ *   DRIVE=<path>    then the drive (story 23): serchat makes "Routes" (only it adds) with this
+ *                   image as route.jpg; the phone opens it there, then adds a photo at the top,
+ *                   which serchat must open whole. SHOTS=<dir> keeps the screenshots.
  *   PHONE_LOG=<path>  the phone's app log, collected through the run (nothing is printed)
  *   SERCHAT_LOG=<path>  serchat's own log (its stderr), node codes and links dropped
  *
@@ -21,7 +24,8 @@
  * Exit 0 when the phone showed serchat's reply after serchat saw the phone's message.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -167,8 +171,41 @@ try {
       if (!photoArrived) log("FAIL: serchat never got the phone's photo whole within 300 s");
     }
   }
+  let driveOk = true;
+  if (process.env.DRIVE && flowCode === 0 && replied) {
+    driveOk = false;
+    const routes = await other.call('drive', strandId, 'addFolder', null, 'Routes', { addPolicy: 'creator' });
+    const t = Date.now();
+    // Random bytes after the image (a JPEG ignores them): never the same file as a photo the
+    // phone already holds, whose blob it would then add without anything crossing.
+    const unique = join(home, 'route.jpg');
+    writeFileSync(unique, Buffer.concat([readFileSync(process.env.DRIVE), randomBytes(64)]));
+    const added = await other.call('drive', strandId, 'addFile', routes.id, { uri: unique, name: 'route.jpg', mimeType: 'image/jpeg', keepFor: 'year' });
+    log(`serchat: "Routes" (only serchat adds) with route.jpg, ${added.size} bytes, added in ${Date.now() - t} ms`);
+    const shots = process.env.SHOTS ?? mkdtempSync(join(tmpdir(), 'drive-shots-'));
+    const flow = spawnSync('maestro', ['--device', DEVICE, 'test', `--test-output-dir=${shots}`, join(dirname(fileURLToPath(import.meta.url)), 'flows', 'rn-drive.yaml')], { env, encoding: 'utf8' });
+    if (flow.status !== 0) {
+      log(`FAIL: the drive flow:\n${flow.stdout.split('\n').filter(l => /FAILED|COMPLETED|WARNED/.test(l)).slice(-4).join('\n')}`);
+    } else {
+      log(`the phone saw "Routes", was not offered "add" there, opened route.jpg, and added a photo (screenshots in ${shots})`);
+      for (const deadline = Date.now() + 300_000; !driveOk && Date.now() < deadline;) {
+        const top = await other.call('drive', strandId, 'list', null);
+        const theirs = top.files.filter(f => !f.mine);
+        if (theirs.length) {
+          try {
+            const t1 = Date.now();
+            await other.call('drive', strandId, 'open', theirs[0].id);
+            log(`serchat opened the phone's ${theirs[0].name} (${theirs[0].size} bytes, kept until ${theirs[0].expiresAt.slice(0, 10)}) in ${Date.now() - t1} ms`);
+            driveOk = true;
+          } catch { /* still arriving */ }
+        }
+        if (!driveOk) await new Promise(r => setTimeout(r, 3000));
+      }
+      if (!driveOk) log("FAIL: serchat never opened the phone's drive file within 300 s");
+    }
+  }
   other.close();
-  code = flowCode === 0 && replied && imageShown && photoArrived ? 0 : 1;
+  code = flowCode === 0 && replied && imageShown && photoArrived && driveOk ? 0 : 1;
   log(code === 0 ? 'PASS: the phone joined through its screens, and both messages crossed'
     : `FAIL: maestro exited ${flowCode}, serchat ${replied ? 'replied' : 'never saw the phone\'s message'}`);
 } catch (err) {

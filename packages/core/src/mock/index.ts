@@ -15,14 +15,14 @@
  */
 import { buildInviteUrl } from '../protocol/index.js';
 import type {
-  Attachment, ChatModel, Invitation, InvitationPreview, Member, Message, Prefs, Profile,
+  AddPolicy, Attachment, ChatModel, DriveFile, DriveFolder, Invitation, KeepFor, InvitationPreview, Member, Message, Prefs, Profile,
   Result, SearchBatch, StorageUsage, StrandState, StrandSummary,
 } from '../model/index.js';
 import { fail, ok, pageMessages } from '../model/index.js';
 
 export type FixtureName =
   | 'Strands' | 'Messages' | 'Members' | 'StrandMedia' | 'StrandState'
-  | 'Search' | 'Invitations' | 'Prefs' | 'StorageUsage' | 'Profile';
+  | 'Search' | 'Invitations' | 'Prefs' | 'StorageUsage' | 'Profile' | 'Drive';
 export type FixtureVariant = 'happy' | 'empty' | 'error';
 
 /** One fixture file's parsed contents, or undefined when there is none. */
@@ -37,6 +37,14 @@ export interface MockControls {
   /** Forget in-memory writes (sent messages, prefs, profile). */
   reset(): void;
 }
+
+type DriveFixture = {
+  folders: Array<Omit<DriveFolder, 'mine' | 'canAdd'>>;
+  files: Array<Omit<DriveFile, 'mine'>>;
+};
+
+const ME = 'p-bob';
+const KEEP_MS: Record<KeepFor, number> = { day: 86_400_000, week: 7 * 86_400_000, month: 30 * 86_400_000, year: 365 * 86_400_000 };
 
 const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
@@ -64,6 +72,26 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
   let prefs: Prefs = { ...data<Prefs>('Prefs', 'happy') };
   let profile: Profile = { ...data<Profile>('Profile', 'happy') };
 
+  /** Each strand's drive, seeded from the `Drive` fixture on first use; writes stay in memory. */
+  let drives = new Map<string, DriveFixture>();
+  const driveOf = (strandId: string): DriveFixture => {
+    let d = drives.get(strandId);
+    if (!d) {
+      const src = data<DriveFixture>('Drive');
+      drives.set(strandId, (d = { folders: src.folders.map(f => ({ ...f })), files: src.files.map(f => ({ ...f })) }));
+    }
+    return d;
+  };
+  const folderView = (f: DriveFixture['folders'][number]): DriveFolder =>
+    ({ ...f, mine: f.createdBy === ME, canAdd: f.addPolicy === 'anyone' || f.createdBy === ME });
+  const live = (f: DriveFixture['files'][number]) => Date.parse(f.expiresAt) > Date.now();
+  const fileView = (f: DriveFixture['files'][number]): DriveFile => ({ ...f, mine: f.addedBy === ME });
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
+  const notAllowed = <T>(message: string): Result<T> => fail<T>('not-allowed', message);
+  const notFound = <T>(message: string): Result<T> => fail<T>('not-found', message);
+  const driveId = (prefix: string) => `${prefix}-local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const driveWrite = <T>(strandId: string, value: T): Result<T> => { notifyStrand(strandId); return ok(value); };
+
   const strandsListeners = new Set<() => void>();
   const strandListeners = new Map<string, Set<() => void>>();
   const notifyStrand = (strandId: string) => strandListeners.get(strandId)?.forEach(fn => fn());
@@ -76,6 +104,7 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
     getVariant: () => variant,
     setVariant(next) {
       variant = next;
+      drives = new Map();
       notifyAll();
     },
     reset() {
@@ -84,6 +113,7 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       readCursors = {};
       nicknames.clear();
       notes.clear();
+      drives = new Map();
       prefs = { ...data<Prefs>('Prefs', 'happy') };
       profile = { ...data<Profile>('Profile', 'happy') };
       notifyAll();
@@ -248,6 +278,118 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       async fetch(_strandId, attachmentId) {
         const a = data<Attachment[]>('StrandMedia').find(x => x.id === attachmentId);
         return a?.uri ? ok({ uri: a.uri }) : fail('unavailable', 'Still arriving: not every part of this file is here yet.', { retryable: true, reason: 'still-arriving' });
+      },
+    },
+
+    drive: {
+      async list(strandId, folderId = null) {
+        if (isError()) return unavailable(data<{ error?: string }>('Drive', 'error').error ?? 'Could not read the drive');
+        const d = driveOf(strandId);
+        const folder = folderId ? d.folders.find(f => f.id === folderId) : null;
+        if (folderId && !folder) return notFound('That folder is no longer in the drive.');
+        const path: DriveFolder[] = [];
+        for (let up = folder?.parentId; up; up = d.folders.find(f => f.id === up)?.parentId) {
+          const p = d.folders.find(f => f.id === up);
+          if (!p) break;
+          path.unshift(folderView(p));
+        }
+        const here = folder ? folderView(folder) : null;
+        return ok({
+          folder: here,
+          path,
+          canAdd: here?.canAdd ?? true,
+          folders: d.folders.filter(f => f.parentId === (folderId ?? null)).sort(byName).map(folderView),
+          files: d.files.filter(f => f.folderId === (folderId ?? null) && live(f)).sort(byName).map(fileView),
+        });
+      },
+      async addFolder(strandId, parentId, name, opts) {
+        if (isError()) return unavailable('Could not add that folder');
+        const d = driveOf(strandId);
+        const parent = parentId ? d.folders.find(f => f.id === parentId) : null;
+        if (parent && !folderView(parent).canAdd) return notAllowed('Only the member who made this folder adds to it.');
+        const folder = { id: driveId('df'), parentId, name: name.trim(), createdBy: ME, createdByName: profile.name || 'Me', createdAt: new Date().toISOString(), addPolicy: opts?.addPolicy ?? 'anyone' as AddPolicy };
+        d.folders.push(folder);
+        return driveWrite(strandId, folderView(folder));
+      },
+      async addFile(strandId, folderId, input) {
+        if (isError()) return unavailable('Could not add that file');
+        const d = driveOf(strandId);
+        const folder = folderId ? d.folders.find(f => f.id === folderId) : null;
+        if (folder && !folderView(folder).canAdd) return notAllowed('Only the member who made this folder adds to it.');
+        const now = Date.now();
+        const file = {
+          id: driveId('dfile'), folderId, name: input.name, size: 250_000, mimeType: input.mimeType ?? null,
+          addedBy: ME, addedByName: profile.name || 'Me', addedAt: new Date(now).toISOString(),
+          expiresAt: new Date(now + KEEP_MS[input.keepFor ?? 'month']).toISOString(),
+          fingerprint: Math.random().toString(36).slice(2, 8), here: true, uri: input.uri,
+        };
+        d.files.push(file);
+        return driveWrite(strandId, fileView(file));
+      },
+      async open(strandId, fileId) {
+        if (isError()) return unavailable('Could not open that file');
+        const f = driveOf(strandId).files.find(x => x.id === fileId);
+        if (!f) return notFound('That file is no longer in the drive.');
+        return f.uri ? ok({ uri: f.uri }) : fail('unavailable', 'Still arriving: not every part of this file is here yet.', { retryable: true, reason: 'still-arriving' });
+      },
+      async rename(strandId, kind, id, name) {
+        const d = driveOf(strandId);
+        const row = kind === 'folder' ? d.folders.find(f => f.id === id) : d.files.find(f => f.id === id);
+        if (!row) return notFound('That is no longer in the drive.');
+        if (('createdBy' in row ? row.createdBy : row.addedBy) !== ME) return notAllowed('Only the member who added it can rename it.');
+        row.name = name.trim();
+        return driveWrite(strandId, undefined);
+      },
+      async move(strandId, kind, id, to) {
+        const d = driveOf(strandId);
+        const row = kind === 'folder' ? d.folders.find(f => f.id === id) : d.files.find(f => f.id === id);
+        if (!row) return notFound('That is no longer in the drive.');
+        if (('createdBy' in row ? row.createdBy : row.addedBy) !== ME) return notAllowed('Only the member who added it can move it.');
+        if (kind === 'folder') {
+          for (let at: string | null = to; at; at = d.folders.find(f => f.id === at)?.parentId ?? null) {
+            if (at === id) return fail('invalid-input', 'A folder cannot go inside itself.');
+          }
+          (row as DriveFixture['folders'][number]).parentId = to;
+        } else (row as DriveFixture['files'][number]).folderId = to;
+        return driveWrite(strandId, undefined);
+      },
+      async keep(strandId, fileId, keepFor) {
+        const f = driveOf(strandId).files.find(x => x.id === fileId);
+        if (!f) return notFound('That file is no longer in the drive.');
+        const until = Date.now() + KEEP_MS[keepFor];
+        if (until > Date.parse(f.expiresAt)) f.expiresAt = new Date(until).toISOString();
+        return driveWrite(strandId, fileView(f));
+      },
+      async remove(strandId, kind, id) {
+        const d = driveOf(strandId);
+        if (kind === 'file') {
+          const f = d.files.find(x => x.id === id);
+          if (!f) return notFound('That file is no longer in the drive.');
+          if (f.addedBy !== ME && live(f)) return notAllowed('Only the member who added it can remove it.');
+          d.files = d.files.filter(x => x.id !== id);
+          return driveWrite(strandId, undefined);
+        }
+        const folder = d.folders.find(x => x.id === id);
+        if (!folder) return notFound('That folder is no longer in the drive.');
+        if (folder.createdBy !== ME) return notAllowed('Only the member who made it can remove it.');
+        const inside = new Set([id]);
+        for (let grew = true; grew;) {
+          grew = false;
+          for (const f of d.folders) if (f.parentId && inside.has(f.parentId) && !inside.has(f.id)) { inside.add(f.id); grew = true; }
+        }
+        const others = d.folders.some(f => inside.has(f.id) && f.createdBy !== ME)
+          || d.files.some(f => f.folderId && inside.has(f.folderId) && f.addedBy !== ME && live(f));
+        if (others) return notAllowed('Someone else’s files or folders are still in it.');
+        d.folders = d.folders.filter(f => !inside.has(f.id));
+        d.files = d.files.filter(f => !(f.folderId && inside.has(f.folderId)));
+        return driveWrite(strandId, undefined);
+      },
+      async setAddPolicy(strandId, folderId, policy) {
+        const f = driveOf(strandId).folders.find(x => x.id === folderId);
+        if (!f) return notFound('That folder is no longer in the drive.');
+        if (f.createdBy !== ME) return notAllowed('Only the member who made this folder chooses who adds to it.');
+        f.addPolicy = policy;
+        return driveWrite(strandId, undefined);
       },
     },
 

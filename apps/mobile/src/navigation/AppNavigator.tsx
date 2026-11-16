@@ -14,6 +14,7 @@ import Profile from '../screens/Profile';
 import Settings from '../screens/Settings';
 import StrandDetail from '../screens/StrandDetail';
 import StrandMedia from '../screens/StrandMedia';
+import Drive from '../screens/Drive';
 import MediaViewer from '../screens/MediaViewer';
 import RelayOffer from '../screens/RelayOffer';
 import QrScanner from '../screens/QrScanner';
@@ -89,6 +90,7 @@ export default function AppNavigator() {
         ChatInterface: 'strand/:strandId',
         StrandDetail: 'strand/:strandId/about',
         StrandMedia: 'strand/:strandId/shared',
+        Drive: 'strand/:strandId/drive',
         SearchInterface: 'search',
         InvitationGenerator: 'invite',
         InvitationAcceptance: 'invite/:token',
@@ -160,6 +162,7 @@ export default function AppNavigator() {
           options={({ route }: any) => ({ title: route?.params?.title ?? 'About' })}
         />
         <Stack.Screen name="StrandMedia" component={StrandMedia} options={{ title: 'Shared here' }} />
+        <Stack.Screen name="Drive" component={Drive} options={{ title: 'Drive' }} />
         <Stack.Screen
           name="MediaViewer"
           component={MediaViewer}
@@ -227,6 +230,8 @@ export default function AppNavigator() {
                   {/* Calls are parked (story 90) — kept visible so the objective
                       is not forgotten, honest about not being built. */}
                   <IconButton name="call-outline" size={20} accessibilityLabel="Voice call" onPress={() => showToast('Calls are not built yet')} />
+                  <IconButton name="folder-outline" size={20} accessibilityLabel="Drive" testID="chat-drive"
+                    onPress={() => navigation.navigate('Drive', { strandId: params.strandId })} />
                   <IconButton name="search-outline" size={20} accessibilityLabel="Search in strand"
                     onPress={() => navigation.navigate('SearchInterface', { strandId: params.strandId })} />
                 </View>

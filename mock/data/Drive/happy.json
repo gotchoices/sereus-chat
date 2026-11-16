@@ -1,0 +1,14 @@
+{
+  "folders": [
+    { "id": "df-routes", "parentId": null, "name": "Routes", "createdBy": "p-priya", "createdByName": "Priya", "createdAt": "2026-11-02T18:20:00Z", "addPolicy": "creator" },
+    { "id": "df-rides", "parentId": null, "name": "Ride photos", "createdBy": "p-bob", "createdByName": "Bob", "createdAt": "2026-11-08T16:05:00Z", "addPolicy": "anyone" },
+    { "id": "df-saturday", "parentId": "df-rides", "name": "Saturday", "createdBy": "p-bob", "createdByName": "Bob", "createdAt": "2026-11-08T16:06:00Z", "addPolicy": "anyone" }
+  ],
+  "files": [
+    { "id": "dfile-loop", "folderId": "df-routes", "name": "canyon-loop.gpx", "size": 48200, "mimeType": "application/gpx+xml", "addedBy": "p-priya", "addedByName": "Priya", "addedAt": "2026-11-02T18:22:00Z", "expiresAt": "2027-11-02T18:22:00Z", "fingerprint": "q7k2vd", "here": true, "uri": null },
+    { "id": "dfile-ridge", "folderId": "df-routes", "name": "ridge-route.pdf", "size": 1840000, "mimeType": "application/pdf", "addedBy": "p-priya", "addedByName": "Priya", "addedAt": "2026-11-02T18:24:00Z", "expiresAt": "2027-11-02T18:24:00Z", "fingerprint": "m3x9ta", "here": false, "uri": null },
+    { "id": "dfile-summit", "folderId": "df-saturday", "name": "summit.jpg", "size": 2410000, "mimeType": "image/jpeg", "addedBy": "p-bob", "addedByName": "Bob", "addedAt": "2026-11-08T16:10:00Z", "expiresAt": "2026-12-08T16:10:00Z", "fingerprint": "w2ny5h", "here": true, "uri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAcCAIAAACcd2qBAAAAKklEQVR4nO3NQQkAAAgEsMvtwyhmNYYIg/2Xmj4RsVgsFovFYrFYLP4TL3QQ8JseZMZNAAAAAElFTkSuQmCC" },
+    { "id": "dfile-waiver-s", "folderId": null, "name": "waiver.pdf", "size": 96000, "mimeType": "application/pdf", "addedBy": "p-susan", "addedByName": "Susan", "addedAt": "2026-11-10T09:01:00Z", "expiresAt": "2026-12-10T09:01:00Z", "fingerprint": "c8ph4r", "here": true, "uri": null },
+    { "id": "dfile-waiver-b", "folderId": null, "name": "waiver.pdf", "size": 101000, "mimeType": "application/pdf", "addedBy": "p-bob", "addedByName": "Bob", "addedAt": "2026-11-10T09:01:30Z", "expiresAt": "2026-12-10T09:01:30Z", "fingerprint": "zt6e1b", "here": true, "uri": null }
+  ]
+}

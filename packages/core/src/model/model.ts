@@ -10,6 +10,7 @@ import type { CadreModel } from './cadre.js';
 import type { ChangesModel } from './changes.js';
 import type { InvitationsModel } from './invitations.js';
 import type { MediaModel } from './media.js';
+import type { DriveModel } from './drive.js';
 import type { MembersModel } from './members.js';
 import type { MessagesModel } from './messages.js';
 import type { PrefsModel } from './prefs.js';
@@ -24,6 +25,8 @@ export interface ChatModel {
   members: MembersModel;
   invitations: InvitationsModel;
   media: MediaModel;
+  /** A strand's shared drive (story 23). */
+  drive: DriveModel;
   search: SearchModel;
   profile: ProfileModel;
   prefs: PrefsModel;
