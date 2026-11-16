@@ -14,7 +14,7 @@ planned story; it states the topic and what it must cover.
 
 - **01–05 Getting connected** — first run through a strand that has grown
 - **10–13 Everyday messaging** — reading, writing, replying, correcting
-- **20–22 Media** — sending, receiving, passing on
+- **20–23 Media** — sending, receiving, passing on, and the strand's shared drive
 - **30–33 Strands and housekeeping** — the list, the membership, finding, managing
 - **40–42 Me and my app** — profile, settings, and what a user notices of their own machines
 - **90 Calls** — kept as an objective, developed last
@@ -34,6 +34,7 @@ planned story; it states the topic and what it must cover.
 | 13 | [Correcting a message](13-correcting-a-message.md) | drafted |
 | 20 | [Sending media](20-sending-media.md) | renamed, awaiting revision |
 | 21 | [Receiving media](21-receiving-media.md) | drafted |
+| 23 | [A shared drive](23-a-shared-drive.md) | drafted |
 | 30 | [My strands](30-my-strands.md) | renamed, awaiting revision |
 | 31 | [Who's in this strand](31-whos-in-this-strand.md) | drafted |
 | 32 | [Finding something](32-finding-something.md) | renamed, awaiting revision |

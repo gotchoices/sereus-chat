@@ -10,7 +10,7 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
 
 ## The set
 
-19 stories. Numbering is gapped so stories can be inserted without renaming.
+20 stories. Numbering is gapped so stories can be inserted without renaming.
 
 | # | Story | State | Outstanding |
 |---|-------|-------|-------------|
@@ -25,6 +25,7 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
 | 13 | [Correcting a message](13-correcting-a-message.md) | revised | review |
 | 20 | [Sending media](20-sending-media.md) | revised | review — size limit is the user's setting; paired with 21 |
 | 21 | [Receiving media](21-receiving-media.md) | drafted | review |
+| 23 | [A shared drive](23-a-shared-drive.md) | drafted | review — keep-for choices, manager removal, and drive activity in the conversation are open; spec `packages/strand-drive/SPEC.md` (pointer in `specs/domain/drive.md`) |
 | 30 | [My strands](30-my-strands.md) | revised | review — no email; narrowing defers to 32 |
 | 31 | [Who's in this strand](31-whos-in-this-strand.md) | drafted | review |
 | 32 | [Finding something](32-finding-something.md) | revised | review — narrow by name vs. search what was said |

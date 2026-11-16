@@ -1,5 +1,10 @@
 # @chat/strand-drive
 
+> **Being replaced.** This package is the first attempt, on MFS (one root per tree,
+> last-writer-wins). The drive is being rebuilt as rows in the strand's database on top of
+> `@chat/strand-blobs`, so concurrent edits merge row by row: see [SPEC.md](SPEC.md). The MFS
+> version below stays until that lands.
+
 A strand's shared drive: a directory tree on IPFS-on-a-strand, edited with MFS
 ([`@helia/mfs`](https://github.com/ipfs/helia/tree/main/packages/mfs)), with its root kept where
 every member sees it: a strand record, which the app supplies as a `DriveRoot`. Built to move into
