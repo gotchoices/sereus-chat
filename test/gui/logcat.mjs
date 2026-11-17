@@ -30,6 +30,8 @@ export function collectLogcat(adb, serial) {
   };
   const timer = setInterval(() => { void collect(); }, 10_000);
   return {
+    /** Read the buffer now (before a Maestro flow clears it). */
+    flush: collect,
     async stop(path) {
       clearInterval(timer);
       await collect();

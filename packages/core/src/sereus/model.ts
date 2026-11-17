@@ -193,6 +193,8 @@ export function createSereusModel(host: ChatHost): SereusModel {
   /** Development-build step timings for the message path, tagged `[perf]`. */
   const perf = (...a: unknown[]) => { if (host.dev) console.info('[perf]', ...a); };
   const seenMessageIds = new Map<string, Set<string>>();
+  const seenAttachments = new Set<string>();
+  const seenLocalFiles = new Set<string>();
   /** Strands whose list reads are still running (see `strands.list`). */
   const listReadsInFlight = new Set<string>();
 
@@ -552,6 +554,16 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const attByMessage = new Map<string, Attachment[]>();
     const located = await withLocality(atts, strandId);
     prefetchFiles(strandId, located);
+    if (host.dev) {
+      // When each attachment's row, then its file, first shows here, against the message's send time.
+      const sentAt = new Map(rows.map(r => [r.Id, Date.parse(r.Timestamp)]));
+      const ago = (a: Attachment) => `${((Date.now() - (sentAt.get(a.messageId!) ?? Date.now())) / 1000).toFixed(1)} s after it was sent`;
+      for (const a of located) {
+        const key = `${strandId}\n${a.id}`;
+        if (!seenAttachments.has(key)) { seenAttachments.add(key); perf('attachment row', a.id.slice(0, 8), a.locality, ago(a)); }
+        if (a.locality === 'local' && !seenLocalFiles.has(key)) { seenLocalFiles.add(key); perf('file here', a.id.slice(0, 8), ago(a)); }
+      }
+    }
     for (const a of located) {
       const list = attByMessage.get(a.messageId!) ?? [];
       list.push(a);

@@ -140,6 +140,10 @@ try {
   let imageShown = true;
   if (process.env.FILE && flowCode === 0 && replied) {
     // The conversation is on screen: the reply's photo must arrive and show.
+    // HOLD_MS: wait that long first with no Maestro running, so the phone's log of the photo's
+    // arrival survives (Maestro clears the log buffer when a flow starts).
+    if (process.env.HOLD_MS) await new Promise(r => setTimeout(r, Number(process.env.HOLD_MS)));
+    if (process.env.HOLD_MS && phoneLog) await phoneLog.flush?.();
     const t = Date.now();
     const shown = spawnSync('maestro', ['--device', DEVICE, 'test', join(dirname(fileURLToPath(import.meta.url)), 'flows', 'rn-see-attachment.yaml')], { env, encoding: 'utf8' });
     imageShown = shown.status === 0;

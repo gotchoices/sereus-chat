@@ -1438,10 +1438,22 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
       - Tests: core 96/96, strand-ipfs 21, strand-blobs 9, strand-drive 8, serchat 15,
         `test/cli/serchat-drive.mjs` PASS, and `phone-joins-serchat.mjs` with photos both ways
         and the drive phase PASS on the S21 and the S7.
-      - **Timing, not from the upgrade:** serchat's photo shows on the S21 18–19 s after the
-        text on both 1.22 and 1.23 (two runs each, same day). The strand-files prototype took
-        3.4 s (`docs/strand-ipfs.md`, Results); the IPFS layers were not timed for this case, so
-        this may be theirs. The S7: 60 s, and its photo at serchat 126 s after sending. To find.
+      - **Photo timing (2026-11-16), measured on the phones, not through Maestro:** the "18 s"
+        was Maestro, which takes 9–17 s to confirm a photo already on screen. Phone-side
+        `[perf] attachment row` / `file here` lines (time since the message was sent) give:
+
+        | | photo usable at the other end |
+        |---|---|
+        | serchat → S21 / S21 → serchat | 1.0 s / 3.8 s (1.68 MB fetched in 1.7 s) |
+        | serchat → S7 | 2.3–2.6 s |
+        | S7 → serchat, 13 strands on the S7 | 22 s: import 8.6 s, text held behind it (10.8 s), serving 19 s |
+        | S7 → serchat, 1 strand | 9.9 s: send 1.2 s, serving about 8 s |
+
+        Open: **every strand a phone holds slows everything on it** (the S7's import 7×, serving
+        2× with 13 strands, each running its IPFS node, FRET and sync); **the text waits for the
+        file's import** (messages are written after the blob); **serving from the S7** (about
+        8 s per MB). `HOLD_MS` in `phone-joins-serchat.mjs` keeps Maestro out of the window.
+        A join refused by serchat ("their side could not finish this join") hit 2 of 6 runs.
 - [x] **Stack 2026-11-07: sereus 1.22.0, optimystic 1.26.0, quereus 5.0.0** (p2p-fret 1.3.0,
       libp2p 3.3.11 unchanged), with **chat sApp 0.3.0**: index `MessageByTime` on
       `Message (Timestamp, Id)`.
