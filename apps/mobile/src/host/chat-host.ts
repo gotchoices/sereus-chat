@@ -61,4 +61,7 @@ export const chatHost: ChatHost = {
   // The strand file layer (gotchoices/sereus#62, `FILE_LAYER`): attachments as files between
   // members, the strand carrying only their id. Off: as chunk rows in the strand.
   ...(FILE_LAYER ? { blocks: phoneBlocks } : {}),
+  // A phone brings strands up a few at a time and leaves quiet ones asleep until opened: on
+  // the S7, 7–11 strands at once blocked the app for a minute (docs/STATUS.md, 2026-11-17).
+  strandStart: { recentCount: 5, recentMs: 24 * 60 * 60 * 1000, gapMs: 2000 },
 };

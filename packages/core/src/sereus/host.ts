@@ -118,4 +118,11 @@ export interface ChatHost {
   blocks?: BlockStore;
   /** The largest attachment this device sends, in bytes (story 20: the user's own limit). Default 25 MB. */
   maxAttachmentBytes?: number;
+  /**
+   * How a slow device brings strands up (docs/STATUS.md, 2026-11-17): at start-up and after a
+   * return, the `recentCount` most recently active strands and any active within `recentMs`,
+   * one at a time `gapMs` apart; the rest stay asleep until opened. Unset (a computer, an
+   * always-on peer): every strand, one at a time, with no pause.
+   */
+  strandStart?: { recentCount: number; recentMs: number; gapMs: number };
 }

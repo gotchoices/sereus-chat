@@ -78,6 +78,9 @@ export function strandListStore(model: ChatModel): Loader<StrandList> {
       }
       const memberNames: Record<string, string[]> = {};
       await Promise.all(strands.map(async s => {
+        // An asleep or connecting strand keeps the names already shown: reading its members
+        // would wake (or start) it, and a list must not wake every strand on the phone.
+        if (s.asleep || s.opening) { memberNames[s.id] = latest?.memberNames[s.id] ?? []; return; }
         const members = await model.members.list(s.id);
         memberNames[s.id] = members.ok ? members.value.map(m => m.name) : [];
       }));

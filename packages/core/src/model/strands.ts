@@ -29,6 +29,12 @@ export type StrandSummary = {
    */
   opening?: boolean;
   /**
+   * On this device but asleep (its node hibernated: the app was away, or the strand has been
+   * quiet). The row is the last one this device showed; opening the strand wakes it, and until
+   * then what others wrote since has not arrived here.
+   */
+  asleep?: boolean;
+  /**
    * The user's private note on this strand: what it is for, who they invited. Only the user's
    * own machines hold it; no other member ever sees it.
    */
@@ -80,6 +86,12 @@ export interface StrandsModel {
   bootError(): Promise<string | null>;
   /** Re-attempt start-up after a failure. */
   retryBoot(): Promise<Result<void>>;
+  /**
+   * Bring sleeping strands back after the app returns: `first` (the one on screen), then the
+   * most recently active, one at a time with a pause between, so a phone stays usable. Strands
+   * quiet for longer stay asleep until opened. Resolves when the sweep is done.
+   */
+  awaken(opts?: { first?: string | null }): Promise<Result<{ woken: string[]; asleep: string[] }>>;
   /** Device-local (story 33). */
   settings(strandId: string): Promise<Result<StrandSettings>>;
   /** The user's private note on a strand, or null. */

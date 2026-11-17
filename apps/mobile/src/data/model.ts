@@ -10,6 +10,7 @@ import { createMockModel, type ChatModel, type MockControls } from '@chat/core';
 // outside the app folder ("Could not load bundle").
 import { createSereusModel, type SereusModel } from '@chat/core/sereus';
 import { chatHost } from '../host/chat-host';
+import { cadreService } from '../host/CadreService';
 import { appFixtures } from './mock-fixtures';
 import { USE_SEREUS } from './config';
 
@@ -17,6 +18,9 @@ const sereus: SereusModel | null = USE_SEREUS ? createSereusModel(chatHost) : nu
 const mock: { model: ChatModel; controls: MockControls } | null = USE_SEREUS ? null : createMockModel(appFixtures);
 
 export const chatModel: ChatModel = sereus ? sereus.model : mock!.model;
+
+// Back in front: wake the strand on screen, then the most recently active, one at a time.
+if (sereus) cadreService.onForeground(() => { void chatModel.strands.awaken(); });
 
 /**
  * Start-up for the Sereus model: watch for offered strands, start the node, re-attach

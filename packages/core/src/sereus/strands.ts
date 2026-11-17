@@ -41,6 +41,17 @@ export class StrandRuntime {
    */
   private readonly attaching = new Set<string>();
   private discoveryWired = false;
+  /**
+   * ONE STRAND AT A TIME AT START-UP. Each strand is its own node; on the S7, starting 7–11
+   * at once blocked the JavaScript thread for a minute, one timer 35–42 s late
+   * (docs/STATUS.md, 2026-11-17). Attaches wait here and run in order: strands this device
+   * has never listed first (a strand an invitation just made must run promptly), then the
+   * most recently active, with a pause between.
+   */
+  private readonly queue = new Map<string, { attach: () => Promise<void>; done: () => void }>();
+  private pumping = false;
+  /** Quiet strands left down at start-up; each attaches when it is opened (`attachDeferred`). */
+  private readonly deferred = new Map<string, () => Promise<void>>();
 
   constructor(private readonly host: ChatHost) {
     this.joined = new JoinedStrands(host);
@@ -168,7 +179,7 @@ export class StrandRuntime {
       this.discoveryWired = true;
       // Subscribe first (the host keeps it across node restarts) …
       this.host.node.on('strand:discovered', ({ strandId, strand }) => {
-        void this.attachDiscovered(strandId, strand);
+        void this.enqueue(strandId, () => this.attachDiscovered(strandId, strand));
       });
       // … and re-read the offers after a rebuild, for the window in which an offer went
       // to a node on its way out.
@@ -184,7 +195,7 @@ export class StrandRuntime {
     const node = this.node;
     if (!node) return;
     for (const [strandId, strandRow] of node.getDiscoveredStrands()) {
-      void this.attachDiscovered(strandId, strandRow);
+      void this.enqueue(strandId, () => this.attachDiscovered(strandId, strandRow));
     }
   }
 
@@ -220,24 +231,94 @@ export class StrandRuntime {
     await this.ensureUp();
     const node = this.node;
     if (!node) return;
-    for (const row of remembered) {
-      if (row.Left) continue; // left on purpose; kept only for its membership key
-      if (this.attaching.has(row.Id) || node.getStrands().has(row.Id)) continue;
-      this.attaching.add(row.Id);
-      try {
-        const instance = await joinChatStrand(node, row);
-        await this.registerSelf(instance);
-        console.info('[chat-strand] ✓ re-attached joined strand:', row.Id);
-      } catch (err) {
-        const message = describeThrown(err);
-        const awaitingSync = err instanceof Error && err.name === 'StrandAwaitingFirstSyncError';
-        console[awaitingSync ? 'info' : 'warn'](
-          `[chat-strand] ${awaitingSync ? 'joined strand launched, awaiting first sync' : 'could not re-attach joined strand'}: ${row.Id} — ${message}`,
-        );
-      } finally {
-        this.attaching.delete(row.Id);
-      }
+    await Promise.all(remembered.filter(row => !row.Left).map(row => this.enqueue(row.Id, () => this.attachRemembered(row))));
+  }
+
+  private async attachRemembered(row: JoinedStrand): Promise<void> {
+    const node = this.node;
+    if (!node) return;
+    if (this.attaching.has(row.Id) || node.getStrands().has(row.Id)) return;
+    this.attaching.add(row.Id);
+    try {
+      const instance = await joinChatStrand(node, row);
+      await this.registerSelf(instance);
+      console.info('[chat-strand] ✓ re-attached joined strand:', row.Id);
+    } catch (err) {
+      const message = describeThrown(err);
+      const awaitingSync = err instanceof Error && err.name === 'StrandAwaitingFirstSyncError';
+      console[awaitingSync ? 'info' : 'warn'](
+        `[chat-strand] ${awaitingSync ? 'joined strand launched, awaiting first sync' : 'could not re-attach joined strand'}: ${row.Id} — ${message}`,
+      );
+    } finally {
+      this.attaching.delete(row.Id);
     }
+  }
+
+  // ── The start-up queue ─────────────────────────────────────────────────────────
+
+  /** Queue an attach; resolves once it ran (or was left for later, a quiet strand). */
+  private enqueue(strandId: string, attach: () => Promise<void>): Promise<void> {
+    const node = this.node;
+    if (node?.getStrands().has(strandId) || this.attaching.has(strandId)) {
+      if (this.host.dev) console.info(`[start-queue] ${strandId.slice(0, 8)} already ${this.attaching.has(strandId) ? 'attaching' : node?.getStrands().get(strandId)?.status}`);
+      return Promise.resolve();
+    }
+    if (this.deferred.has(strandId)) { this.deferred.set(strandId, attach); return Promise.resolve(); }
+    const queued = this.queue.get(strandId);
+    return new Promise<void>(resolve => {
+      const done = queued ? () => { queued.done(); resolve(); } : resolve;
+      this.queue.set(strandId, { attach, done });
+      void this.pump();
+    });
+  }
+
+  private async pump(): Promise<void> {
+    if (this.pumping) return;
+    this.pumping = true;
+    try {
+      let ran = 0;
+      while (this.queue.size) {
+        const cached = await this.summaries.read();
+        const lastAt = (id: string) => Date.parse(cached[id]?.lastMessage?.timestamp ?? '') || 0;
+        // Recent: the most recently active few, and anything active lately.
+        const known = Object.keys(cached);
+        const policy = this.host.strandStart;
+        const recent = new Set([...known].sort((x, y) => lastAt(y) - lastAt(x))
+          .filter((id, i) => !policy || i < policy.recentCount || Date.now() - lastAt(id) < policy.recentMs));
+        const [strandId, entry] = [...this.queue].sort(([x], [y]) =>
+          (cached[x] ? 1 : 0) - (cached[y] ? 1 : 0) || lastAt(y) - lastAt(x))[0];
+        this.queue.delete(strandId);
+        if (cached[strandId] && !recent.has(strandId)) {
+          // Quiet: left down until opened. Listed as asleep, from the last list shown.
+          this.deferred.set(strandId, entry.attach);
+          if (this.host.dev) console.info(`[start-queue] ${strandId.slice(0, 8)} left asleep (quiet)`);
+          entry.done();
+          continue;
+        }
+        if (ran++ > 0 && policy?.gapMs) await new Promise(r => setTimeout(r, policy.gapMs));
+        const t0 = Date.now();
+        if (this.host.dev) console.info(`[start-queue] ${strandId.slice(0, 8)} starting (${this.queue.size} waiting)`);
+        try { await entry.attach(); } finally { entry.done(); }
+        if (this.host.dev) console.info(`[start-queue] ${strandId.slice(0, 8)} done in ${Date.now() - t0} ms`);
+      }
+    } finally {
+      this.pumping = false;
+      if (this.queue.size) void this.pump();
+    }
+  }
+
+  /** Left down at start-up as quiet. */
+  isDeferred(strandId: string): boolean {
+    return this.deferred.has(strandId);
+  }
+
+  /** Attach a strand left down at start-up, now that it is wanted. False if it was not. */
+  async attachDeferred(strandId: string): Promise<boolean> {
+    const attach = this.deferred.get(strandId);
+    if (!attach) return false;
+    this.deferred.delete(strandId);
+    await attach();
+    return true;
   }
 
   /**

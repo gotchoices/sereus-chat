@@ -133,52 +133,26 @@ const phone = createPhoneNode({
  * Started once, after the first successful start: it assumes a node exists.
  */
 const runner = createBackgroundRunner({ ...phoneNodeLifecycle(phone), appState: AppState });
+/** Who to tell when the app is back in front with its node up (the model's `awaken`). */
+const foregroundListeners = new Set<() => void>();
+
 runner.onStateChange(state => {
   console.info(
     `[CadreService] lifecycle: ${state}${runner.resuming ? ' (resuming)' : ''}${runner.degraded ? ' (degraded)' : ''}`,
   );
-  if (state === 'foreground' && !runner.resuming) void wakeHibernatedStrands();
+  // The runner hibernated every strand on the way out; the model decides which to wake, and
+  // in what order (the core's `strands.awaken`: not all at once, 2026-11-17). The kit wakes
+  // a hibernated strand only on a push (`serviceWake`), and a read or send wakes its own.
+  if (state === 'foreground' && !runner.resuming) foregroundListeners.forEach(fn => fn());
 });
 
-/**
- * Wake every strand the runner hibernated. The kit wakes a hibernated strand only on a
- * push (`serviceWake`), so on a plain return to the app every conversation would stay
- * down — measured: the first send after returning failed with "database not available
- * (status: hibernating)". One at a time, to keep a phone's return from rebuilding every
- * strand network at once. Waking rebuilds the strand's database; `watchStrand`
- * re-attaches to it on `strand:waking`. Idempotent: only hibernating strands are touched.
- */
-async function wakeHibernatedStrands(): Promise<void> {
-  const node = phone.node;
-  if (!node) return;
-  for (const [strandId, instance] of node.getStrands()) {
-    if (instance.status !== 'hibernating') continue;
-    await wakeStrand(strandId).catch(() => { /* logged in wakeStrand */ });
-  }
-}
-
-/** Wakes in flight, so the sweep never asks for the same strand twice. (A read or send
- *  in the core wakes a hibernated strand itself; cadre-core coalesces the two.) */
-const wakes = new Map<string, Promise<void>>();
-
-function wakeStrand(strandId: string): Promise<void> {
-  const inFlight = wakes.get(strandId);
-  if (inFlight) return inFlight;
-  const node = phone.node;
-  if (!node) return Promise.resolve();
-  const t0 = Date.now();
-  const wake = node.wakeStrand(strandId).then(
-    () => console.info(`[CadreService] woke strand ${strandId.slice(0, 8)} in ${Date.now() - t0}ms`),
-    (err: unknown) => {
-      console.warn(`[CadreService] waking strand ${strandId.slice(0, 8)} failed:`, err);
-      throw err;
-    },
-  ).finally(() => wakes.delete(strandId));
-  wakes.set(strandId, wake);
-  return wake;
-}
-
 class CadreServiceImpl {
+  /** Run `fn` whenever the app returns to the foreground with its node up. */
+  onForeground(fn: () => void): () => void {
+    foregroundListeners.add(fn);
+    return () => { foregroundListeners.delete(fn); };
+  }
+
   /**
    * The options the node last started with, or will start with: loaded from the kit's
    * saved start on first use, then whatever the last start used. Kept here as well as

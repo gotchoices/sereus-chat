@@ -1469,6 +1469,16 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         - Not ours: sereus's edge config runs every strand all the time (`hibernation:
           { enabled: false }`), and push wake works only within one's own cadre, so letting
           strands hibernate would delay messages from other parties to check-in times.
+        - **Fixed in chat (2026-11-17): strands start a few at a time** (`ChatHost.strandStart`, the
+          phone's: 5 most recent plus any active in a day, 2 s apart; quiet ones stay asleep and
+          start when opened, listed as `asleep`). The strand list no longer reads members of an
+          asleep strand (it woke every one). After a return, `strands.awaken` wakes the strand last
+          viewed, then the recent ones, 2 s apart. S7, 11 strands: cold start worst timer 6.3 s
+          (was 35–42 s), 6 left asleep; return worst 2.2 s (was 41 s); an asleep strand opened
+          in about 3 s. serchat and other hosts without the setting start every strand, in turn.
+        - **Next, with sereus:** background check-ins that ask one's own cadre "what changed?"
+          without starting strands, then a local notification; needs an activity record and a
+          control-network query upstream (draft issue, not posted).
 - [x] **Stack 2026-11-07: sereus 1.22.0, optimystic 1.26.0, quereus 5.0.0** (p2p-fret 1.3.0,
       libp2p 3.3.11 unchanged), with **chat sApp 0.3.0**: index `MessageByTime` on
       `Message (Timestamp, Id)`.

@@ -234,6 +234,8 @@ export function createSereusModel(host: ChatHost): SereusModel {
     if (pending && !node.getStrands().get(strandId)?.database) {
       await withTimeout(pending, OPENING_WAIT_MS, 'opening the conversation').catch(() => { /* reported below */ });
     }
+    // Left down at start-up as quiet (`StrandRuntime` start-up queue): start it now.
+    if (!node.getStrands().has(strandId)) await runtime.attachDeferred(strandId);
     const strand = node.getStrands().get(strandId);
     if (!strand) throw new ChatFailure('not-attached', `Strand ${strandId} is not attached on this device.`);
     // Hibernating, or already being woken (`starting` with no database yet — the app's
@@ -244,8 +246,12 @@ export function createSereusModel(host: ChatHost): SereusModel {
     return strand;
   }
 
-  /** An attached strand, without waking it (inviting into an existing conversation). */
-  function attachedStrand(strandId: string): StrandInstance {
+  /**
+   * An attached strand, without waking it (inviting into an existing conversation). One left
+   * down at start-up as quiet is started first: it was never attached.
+   */
+  async function attachedStrand(strandId: string): Promise<StrandInstance> {
+    if (!requireNode().getStrands().has(strandId)) await runtime.attachDeferred(strandId);
     const strand = requireNode().getStrands().get(strandId);
     if (!strand) throw new ChatFailure('not-attached', `Strand ${strandId} is not attached on this device.`);
     return strand;
@@ -537,6 +543,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
 
   async function listMessages(strandId: string): Promise<Message[]> {
     const t0 = Date.now();
+    lastViewedStrand = strandId;
     const strand = await strandFor(strandId);
     const [rows, reactions, atts] = await Promise.all([
       queryMessages(strand),
@@ -595,6 +602,50 @@ export function createSereusModel(host: ChatHost): SereusModel {
     if (!mine) return {};
     const mark = delivery.messageDelivery(strandId, messageId);
     return mark ? { delivery: mark } : {};
+  }
+
+  /** The strand whose messages were read last: the one on screen, as far as the core can tell. */
+  let lastViewedStrand: string | null = null;
+  /** Strands `awaken` is waking now, so the list says "connecting" rather than "asleep". */
+  const wakesInFlight = new Set<string>();
+  let awakening: Promise<{ woken: string[]; asleep: string[] }> | null = null;
+
+  /**
+   * AFTER A RETURN, NOT EVERY STRAND AT ONCE. Each strand is its own node; on the S7, waking 11
+   * back to back blocked the JavaScript thread for a minute, one timer 42 s late
+   * (docs/STATUS.md, 2026-11-17). So: the strand on screen, then the most recently active,
+   * one at a time with a pause; the rest stay asleep until opened (`strandFor` wakes them).
+   */
+  async function awaken(first: string | null): Promise<{ woken: string[]; asleep: string[] }> {
+    const node = host.node.node;
+    if (!node) return { woken: [], asleep: [] };
+    const sleeping = [...node.getStrands()].filter(([, s]) => s.status === 'hibernating').map(([id]) => id);
+    if (!sleeping.length) return { woken: [], asleep: [] };
+    const cached = await summaries.read();
+    const lastAt = (id: string) => Date.parse(cached[id]?.lastMessage?.timestamp ?? '') || 0;
+    const byRecent = [...sleeping].sort((x, y) => lastAt(y) - lastAt(x));
+    const now = Date.now();
+    // The host's policy (`ChatHost.strandStart`); without one, every strand.
+    const policy = host.strandStart;
+    const chosen = byRecent.filter((id, i) => !policy || i < policy.recentCount || now - lastAt(id) < policy.recentMs);
+    const order = first && sleeping.includes(first) ? [first, ...chosen.filter(id => id !== first)] : chosen;
+    const woken: string[] = [];
+    for (const [i, id] of order.entries()) {
+      if (node.getStrands().get(id)?.status !== 'hibernating') continue;
+      if (i > 0 && policy?.gapMs) await new Promise(r => setTimeout(r, policy.gapMs));
+      wakesInFlight.add(id);
+      const t0 = Date.now();
+      try {
+        await node.wakeStrand(id);
+        woken.push(id);
+        perf('awaken', id.slice(0, 8), 'in', Date.now() - t0, 'ms');
+      } catch (err) {
+        console.warn('[sereus-model] waking', id.slice(0, 8), 'failed:', err instanceof Error ? err.message : err);
+      } finally {
+        wakesInFlight.delete(id);
+      }
+    }
+    return { woken, asleep: sleeping.filter(id => !woken.includes(id)) };
   }
 
   async function listStrands(): Promise<StrandSummary[]> {
@@ -668,8 +719,12 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const open = new Set(listed.map(s => s.id));
     for (const known of Object.values(cached)) {
       if (open.has(known.id) || hidden.has(known.id)) continue;
+      // Hibernated on purpose (`awaken` left it, or the app was away): asleep, not opening.
+      const asleep = (strands.get(known.id)?.status === 'hibernating' && !wakesInFlight.has(known.id))
+        || runtime.isDeferred(known.id);
       listed.push({
-        ...known, unreadCount: 0, mentioned: false, draftPreview: null, pending: false, opening: true,
+        ...known, unreadCount: 0, mentioned: false, draftPreview: null, pending: false,
+        ...(asleep ? { asleep: true } : { opening: true }),
         note: notes.get(known.id) ?? null,
         muted: prefsById[known.id]?.muted ?? 'none', archived: prefsById[known.id]?.archived ?? false,
       });
@@ -773,7 +828,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     // With a `strandId` the conversation exists and its type was fixed at founding;
     // without one, the Private/Open choice is the point of the screen.
     const kind = input.visibility ?? 'private';
-    const picked = input.strandId ? attachedStrand(input.strandId) : await takePrepared(kind);
+    const picked = input.strandId ? await attachedStrand(input.strandId) : await takePrepared(kind);
     step(picked ? 'strand (existing or prepared)' : 'nothing prepared');
     // A new conversation is founded in the BACKGROUND (sereus 1.17, sereus#49): the
     // invitation needs only the published row, and nobody can redeem it before the strand
@@ -936,6 +991,10 @@ export function createSereusModel(host: ChatHost): SereusModel {
       async settling() { return !runtime.hasSwept(); },
       async bootError() { return runtime.bootError(); },
       retryBoot: () => attempt(() => runtime.boot()),
+      awaken: opts => attempt(() => {
+        awakening ??= awaken(opts?.first ?? lastViewedStrand).finally(() => { awakening = null; });
+        return awakening;
+      }),
       settings: id => attempt(() => strandPrefs.get(id)),
       note: id => attempt(async () => (await privateStore.notes()).get(id) ?? null),
       setNote: (id, text) => attempt(async () => {

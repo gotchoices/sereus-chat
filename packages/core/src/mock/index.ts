@@ -130,6 +130,7 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       async settling() { return false; },
       async bootError() { return null; },
       async retryBoot() { return ok(); },
+      async awaken() { return ok({ woken: [], asleep: [] }); },
       async settings(strandId) {
         const listed = data<StrandSummary[]>('Strands').find(s => s.id === strandId);
         return ok({ muted: listed?.muted ?? 'none', archived: listed?.archived ?? false });
