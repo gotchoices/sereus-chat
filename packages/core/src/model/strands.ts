@@ -92,6 +92,12 @@ export interface StrandsModel {
    * quiet for longer stay asleep until opened. Resolves when the sweep is done.
    */
   awaken(opts?: { first?: string | null }): Promise<Result<{ woken: string[]; asleep: string[] }>>;
+  /**
+   * While the app is in front, visit sleeping strands one at a time, now and then, so they hear
+   * from their members: a visit wakes one, lets it sync briefly, and puts it back to sleep unless
+   * something new arrived. Off when the app leaves the front.
+   */
+  rotate(on: boolean): void;
   /** Device-local (story 33). */
   settings(strandId: string): Promise<Result<StrandSettings>>;
   /** The user's private note on a strand, or null. */

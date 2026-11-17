@@ -131,6 +131,7 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       async bootError() { return null; },
       async retryBoot() { return ok(); },
       async awaken() { return ok({ woken: [], asleep: [] }); },
+      rotate() {},
       async settings(strandId) {
         const listed = data<StrandSummary[]>('Strands').find(s => s.id === strandId);
         return ok({ muted: listed?.muted ?? 'none', archived: listed?.archived ?? false });

@@ -123,6 +123,9 @@ export interface ChatHost {
    * return, the `recentCount` most recently active strands and any active within `recentMs`,
    * one at a time `gapMs` apart; the rest stay asleep until opened. Unset (a computer, an
    * always-on peer): every strand, one at a time, with no pause.
+   *
+   * `rotateMs`: while the app is in front (`strands.rotate(true)`), visit one sleeping strand
+   * this often, so a quiet strand still hears from its members (`rotate` in model.ts).
    */
-  strandStart?: { recentCount: number; recentMs: number; gapMs: number };
+  strandStart?: { recentCount: number; recentMs: number; gapMs: number; rotateMs?: number };
 }

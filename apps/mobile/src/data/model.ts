@@ -13,14 +13,19 @@ import { chatHost } from '../host/chat-host';
 import { cadreService } from '../host/CadreService';
 import { appFixtures } from './mock-fixtures';
 import { USE_SEREUS } from './config';
+import { AppState } from 'react-native';
 
 const sereus: SereusModel | null = USE_SEREUS ? createSereusModel(chatHost) : null;
 const mock: { model: ChatModel; controls: MockControls } | null = USE_SEREUS ? null : createMockModel(appFixtures);
 
 export const chatModel: ChatModel = sereus ? sereus.model : mock!.model;
 
-// Back in front: wake the strand on screen, then the most recently active, one at a time.
-if (sereus) cadreService.onForeground(() => { void chatModel.strands.awaken(); });
+// Back in front: wake the strand on screen, then the most recently active, one at a time, and
+// visit the sleeping ones now and then (the rotation); away: stop visiting.
+if (sereus) {
+  cadreService.onForeground(() => { void chatModel.strands.awaken(); chatModel.strands.rotate(true); });
+  cadreService.onBackground(() => { chatModel.strands.rotate(false); });
+}
 
 /**
  * Start-up for the Sereus model: watch for offered strands, start the node, re-attach
@@ -28,6 +33,8 @@ if (sereus) cadreService.onForeground(() => { void chatModel.strands.awaken(); }
  */
 export async function bootSereus(): Promise<void> {
   await sereus?.boot();
+  // Started in front: the lifecycle runner reports only later changes.
+  if (sereus && AppState.currentState === 'active') chatModel.strands.rotate(true);
 }
 
 /** Mock only: the variant a deep link selected. Signals every store to re-read. */

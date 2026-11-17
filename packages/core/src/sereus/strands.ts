@@ -307,6 +307,16 @@ export class StrandRuntime {
     }
   }
 
+  /** Strands left down at start-up, not yet opened. */
+  deferredIds(): string[] {
+    return [...this.deferred.keys()];
+  }
+
+  /** Still bringing strands up at start-up. */
+  starting(): boolean {
+    return this.pumping || this.queue.size > 0;
+  }
+
   /** Left down at start-up as quiet. */
   isDeferred(strandId: string): boolean {
     return this.deferred.has(strandId);

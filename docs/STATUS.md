@@ -1476,9 +1476,18 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
           viewed, then the recent ones, 2 s apart. S7, 11 strands: cold start worst timer 6.3 s
           (was 35–42 s), 6 left asleep; return worst 2.2 s (was 41 s); an asleep strand opened
           in about 3 s. serchat and other hosts without the setting start every strand, in turn.
+        - **The rotation (2026-11-17), a STAND-IN for sereus#66's auto-wake:** while the app is in
+          front, one sleeping strand is visited every 90 s (`strands.rotate`, `rotateMs`): woken
+          (or started, if left asleep at start-up), held 15 s so members can land queued writes,
+          read, and put back to sleep unless something new arrived; a strand that keeps turning
+          up nothing is visited at most every 30 min. In a two-member strand this is also what
+          lets the other member's writes through. S7: about 19 s per visit, one stall of
+          2.5–3.7 s each time, then 0–2%. **Replace with #66** (ask one's own cadre what
+          changed; wake only those) when sereus has it; keep the rotation for parties with
+          only phones.
         - **Next, with sereus:** background check-ins that ask one's own cadre "what changed?"
           without starting strands, then a local notification; needs an activity record and a
-          control-network query upstream (draft issue, not posted).
+          control-network query upstream: proposed for discussion as gotchoices/sereus#66.
 - [x] **Stack 2026-11-07: sereus 1.22.0, optimystic 1.26.0, quereus 5.0.0** (p2p-fret 1.3.0,
       libp2p 3.3.11 unchanged), with **chat sApp 0.3.0**: index `MessageByTime` on
       `Message (Timestamp, Id)`.

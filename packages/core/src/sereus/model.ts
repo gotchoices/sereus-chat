@@ -49,6 +49,12 @@ const JOIN_STARTING_PATIENCE_MS = 60_000;
 const JOIN_STARTING_RETRY_MS = 3000;
 
 /** Node events after which a strand's database may have appeared or been replaced. */
+/** A rotation visit holds a sleeping strand up this long before reading it… */
+const VISIT_WINDOW_MS = 15_000;
+/** …gives its read this long… */
+const VISIT_READ_MS = 10_000;
+/** …and a strand that keeps turning up nothing is visited at least this often. */
+const VISIT_MAX_EVERY_MS = 30 * 60 * 1000;
 const STRAND_UP_EVENTS = ['strand:started', 'strand:writable', 'strand:waking'] as const;
 /** Node events after which a strand's database is gone. */
 const STRAND_DOWN_EVENTS = ['strand:hibernating', 'strand:stopped'] as const;
@@ -648,6 +654,74 @@ export function createSereusModel(host: ChatHost): SereusModel {
     return { woken, asleep: sleeping.filter(id => !woken.includes(id)) };
   }
 
+  // ── The rotation: sleeping strands visited one at a time while the app is in front ──
+  //
+  // A sleeping strand hears nothing, and in a two-member strand the other member's writes wait
+  // in their outbox until this device takes part (every write needs both). So, while the app is
+  // in front, one sleeping strand at a time is woken for a short window, read, and put back to
+  // sleep unless something new arrived. A STAND-IN for gotchoices/sereus#66 (asking one's own
+  // cadre what changed, then waking only those strands); docs/STATUS.md tracks it.
+  const visitedAt = new Map<string, number>();
+  /** How long until a strand is due again: doubles each visit that finds nothing. */
+  const visitEvery = new Map<string, number>();
+  let rotation: ReturnType<typeof setInterval> | null = null;
+  let visiting = false;
+
+  function rotate(on: boolean): void {
+    const ms = host.strandStart?.rotateMs;
+    if (!on || !ms) {
+      if (rotation) clearInterval(rotation as never);
+      rotation = null;
+      return;
+    }
+    if (rotation) return;
+    rotation = setInterval(() => { void visitOne(ms); }, ms);
+  }
+
+  async function visitOne(baseMs: number): Promise<void> {
+    const node = host.node.node;
+    if (visiting || awakening || runtime.starting() || !node) return;
+    const now = Date.now();
+    const sleeping = [
+      ...runtime.deferredIds(),
+      ...[...node.getStrands()].filter(([id, s]) => s.status === 'hibernating' && !wakesInFlight.has(id)).map(([id]) => id),
+    ];
+    const due = sleeping
+      .filter(id => now - (visitedAt.get(id) ?? 0) >= (visitEvery.get(id) ?? baseMs))
+      .sort((x, y) => (visitedAt.get(x) ?? 0) - (visitedAt.get(y) ?? 0));
+    const id = due[0];
+    if (!id) return;
+    visiting = true;
+    wakesInFlight.add(id);
+    const t0 = Date.now();
+    try {
+      const before = Date.parse((await summaries.read())[id]?.lastMessage?.timestamp ?? '') || 0;
+      if (!(await runtime.attachDeferred(id))) await node.wakeStrand(id);
+      // Long enough for the other members to reach this node and land what they queued.
+      await new Promise(r => setTimeout(r, VISIT_WINDOW_MS));
+      const strand = node.getStrands().get(id);
+      if (!strand?.database) return;
+      const latest = await withTimeout(queryMessages(strand, 1), VISIT_READ_MS, 'a visit read');
+      const after = Date.parse(latest[latest.length - 1]?.Timestamp ?? '') || 0;
+      visitedAt.set(id, Date.now());
+      if (after > before || lastViewedStrand === id) {
+        // Something new (or the user opened it meanwhile): it stays up; the list re-reads it.
+        visitEvery.delete(id);
+        perf('visit', id.slice(0, 8), 'news: stays awake,', Date.now() - t0, 'ms');
+      } else {
+        visitEvery.set(id, Math.min((visitEvery.get(id) ?? baseMs) * 2, VISIT_MAX_EVERY_MS));
+        await node.hibernateStrand(id);
+        perf('visit', id.slice(0, 8), 'nothing new: asleep again,', Date.now() - t0, 'ms');
+      }
+    } catch (err) {
+      visitedAt.set(id, Date.now());
+      console.warn('[sereus-model] visiting', id.slice(0, 8), 'failed:', err instanceof Error ? err.message : err);
+    } finally {
+      wakesInFlight.delete(id);
+      visiting = false;
+    }
+  }
+
   async function listStrands(): Promise<StrandSummary[]> {
     // Bring the node up in the BACKGROUND — never block the list on it, so an empty or
     // partial list renders at once and fills in as strands open.
@@ -995,6 +1069,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
         awakening ??= awaken(opts?.first ?? lastViewedStrand).finally(() => { awakening = null; });
         return awakening;
       }),
+      rotate,
       settings: id => attempt(() => strandPrefs.get(id)),
       note: id => attempt(async () => (await privateStore.notes()).get(id) ?? null),
       setNote: (id, text) => attempt(async () => {

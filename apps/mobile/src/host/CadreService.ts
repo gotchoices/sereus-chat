@@ -135,6 +135,8 @@ const phone = createPhoneNode({
 const runner = createBackgroundRunner({ ...phoneNodeLifecycle(phone), appState: AppState });
 /** Who to tell when the app is back in front with its node up (the model's `awaken`). */
 const foregroundListeners = new Set<() => void>();
+/** Who to tell when the app leaves the front (the model's rotation stops). */
+const backgroundListeners = new Set<() => void>();
 
 runner.onStateChange(state => {
   console.info(
@@ -144,6 +146,7 @@ runner.onStateChange(state => {
   // in what order (the core's `strands.awaken`: not all at once, 2026-11-17). The kit wakes
   // a hibernated strand only on a push (`serviceWake`), and a read or send wakes its own.
   if (state === 'foreground' && !runner.resuming) foregroundListeners.forEach(fn => fn());
+  else if (state !== 'foreground') backgroundListeners.forEach(fn => fn());
 });
 
 class CadreServiceImpl {
@@ -151,6 +154,12 @@ class CadreServiceImpl {
   onForeground(fn: () => void): () => void {
     foregroundListeners.add(fn);
     return () => { foregroundListeners.delete(fn); };
+  }
+
+  /** Run `fn` whenever the app leaves the foreground. */
+  onBackground(fn: () => void): () => void {
+    backgroundListeners.add(fn);
+    return () => { backgroundListeners.delete(fn); };
   }
 
   /**

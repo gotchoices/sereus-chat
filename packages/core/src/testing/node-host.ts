@@ -72,6 +72,8 @@ export async function createTestParty(tag: string, opts: {
   offline?: boolean;
   /** The attachment size limit (`ChatHost.maxAttachmentBytes`). */
   maxAttachmentBytes?: number;
+  /** How strands come up and are visited (`ChatHost.strandStart`); unset, every strand. */
+  strandStart?: ChatHost['strandStart'];
   /** Attachments through the strand file layer (`ChatHost.blocks`, in memory) instead of chunk rows. */
   fileLayer?: boolean;
 }): Promise<TestParty> {
@@ -150,6 +152,7 @@ export async function createTestParty(tag: string, opts: {
   const files = nodeFileAccess(mkdtempSync(join(tmpdir(), `chat-files-${tag}-`)));
   const host: ChatHost = { node: nodeHost, slot: memorySlots(), ownerKeyStore, backgroundFounding: opts.backgroundFounding,
     files, ...(opts.maxAttachmentBytes ? { maxAttachmentBytes: opts.maxAttachmentBytes } : {}),
+    ...(opts.strandStart ? { strandStart: opts.strandStart } : {}),
     ...(opts.fileLayer ? { blocks: new MemoryBlockStore() } : {}) };
   const { model, boot, settle } = createSereusModel(host);
   return { tag, host, node, model, boot, settle, stop: async () => {

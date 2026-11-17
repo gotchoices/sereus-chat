@@ -15,8 +15,10 @@ describe('waking strands after a return', () => {
   const ids: string[] = [];
 
   beforeAll(async () => {
-    a = await createTestParty('aw-a', { listen: true });
-    b = await createTestParty('aw-b', { listen: true });
+    // A writes in offline mode, as a phone does: a write waits in A's outbox while B is asleep.
+    a = await createTestParty('aw-a', { listen: true, offline: true });
+    // B visits a sleeping strand every second (the phone: 90 s).
+    b = await createTestParty('aw-b', { listen: true, strandStart: { recentCount: 99, recentMs: 0, gapMs: 0, rotateMs: 1000 } });
     await a.boot(); await b.boot();
     for (let i = 0; i < 2; i++) {
       const inv = value(await a.model.invitations.create({ grantsInviteRight: false, visibility: 'private' }));
@@ -51,4 +53,23 @@ describe('waking strands after a return', () => {
     value(await b.model.messages.list(ids[0]));
     expect(b.node.getStrands().get(ids[0])?.status).not.toBe('hibernating');
   }, 120_000);
+
+  it('the rotation wakes a sleeping strand that has news, keeps it up, and puts a quiet one back to sleep', async () => {
+    await b.node.hibernateAll();
+    value(await a.model.messages.send(ids[0], { content: 'while you slept' }));
+    b.model.strands.rotate(true);
+    try {
+      await until(async () => {
+        const s = b.node.getStrands().get(ids[0]);
+        if (!s?.database) return false;
+        const msgs = await b.model.messages.list(ids[0]);
+        return msgs.ok && msgs.value.some(m => m.content === 'while you slept');
+      }, 'the news at B through a visit', 120_000);
+      // The quiet one was visited and went back to sleep.
+      await until(async () => b.node.getStrands().get(ids[1])?.status === 'hibernating', 'the quiet strand asleep again', 120_000);
+      expect(b.node.getStrands().get(ids[0])?.status).not.toBe('hibernating');
+    } finally {
+      b.model.strands.rotate(false);
+    }
+  }, 300_000);
 });

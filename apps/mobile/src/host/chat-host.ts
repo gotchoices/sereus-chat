@@ -63,5 +63,6 @@ export const chatHost: ChatHost = {
   ...(FILE_LAYER ? { blocks: phoneBlocks } : {}),
   // A phone brings strands up a few at a time and leaves quiet ones asleep until opened: on
   // the S7, 7–11 strands at once blocked the app for a minute (docs/STATUS.md, 2026-11-17).
-  strandStart: { recentCount: 5, recentMs: 24 * 60 * 60 * 1000, gapMs: 2000 },
+  // While in front, one sleeping strand is visited every 90 s (`strands.rotate`).
+  strandStart: { recentCount: 5, recentMs: 24 * 60 * 60 * 1000, gapMs: 2000, rotateMs: 90_000 },
 };
