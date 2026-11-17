@@ -1425,6 +1425,23 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         (and #58 for representation changes) are fixed. Until then testers wipe
         (`DATA_FORMAT`).
 
+- [x] **Stack 2026-11-16: sereus 1.23.0, optimystic 1.27.0, quereus 5.4.0** (p2p-fret 1.3.0,
+      libp2p 3.3.11 unchanged; `@serfab/quereus-plugin-sereus` 1.23.0 is new under cadre-core
+      and pinned with the rest in `scripts/use-stack.sh`). Quereus 5.4.0, not 5.5.0: 5.4.0 is
+      what sereus 1.23 was tested with.
+      - **No data wipe:** nothing in 1.23 changes stored data, so `DATA_FORMAT` stays
+        `sereus-1.17`; the S21 and S7 opened data written by 1.22.
+      - **App SQL:** Quereus 5.4 refuses a null or negative `limit`/`offset` and `sum`/`avg`
+        over text; chat's one `limit ?` (`queryMessages`) always gets a positive number.
+      - **Not used yet:** `PendingPartyKeyRotation.sealedTo` (chat shows no waiting key
+        replacement).
+      - Tests: core 96/96, strand-ipfs 21, strand-blobs 9, strand-drive 8, serchat 15,
+        `test/cli/serchat-drive.mjs` PASS, and `phone-joins-serchat.mjs` with photos both ways
+        and the drive phase PASS on the S21 and the S7.
+      - **Timing, not from the upgrade:** serchat's photo shows on the S21 18–19 s after the
+        text on both 1.22 and 1.23 (two runs each, same day). The strand-files prototype took
+        3.4 s (`docs/strand-ipfs.md`, Results); the IPFS layers were not timed for this case, so
+        this may be theirs. The S7: 60 s, and its photo at serchat 126 s after sending. To find.
 - [x] **Stack 2026-11-07: sereus 1.22.0, optimystic 1.26.0, quereus 5.0.0** (p2p-fret 1.3.0,
       libp2p 3.3.11 unchanged), with **chat sApp 0.3.0**: index `MessageByTime` on
       `Message (Timestamp, Id)`.
