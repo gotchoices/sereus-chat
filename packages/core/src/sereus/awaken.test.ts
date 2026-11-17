@@ -41,8 +41,14 @@ describe('waking strands after a return', () => {
     const woke: string[] = [];
     let recording = true;
     b.node.on('strand:waking', ({ strandId }) => { if (recording) woke.push(strandId); });
+    // The busy signal goes out before each wake, and clears after.
+    const busy: Array<string | null> = [];
+    const offBusy = b.model.changes.busy(() => { busy.push(b.model.strands.busy()); });
     const result = value(await b.model.strands.awaken({ first: ids[1] }));
     recording = false;
+    offBusy();
+    expect(busy).toContain('waking');
+    expect(b.model.strands.busy()).toBeNull();
     expect(woke[0]).toBe(ids[1]);
     expect(result.woken.sort()).toEqual([...ids].sort());
     expect(value(await b.model.strands.list()).filter(s => ids.includes(s.id)).some(s => s.asleep)).toBe(false);

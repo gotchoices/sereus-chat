@@ -125,7 +125,8 @@ export interface ChatHost {
    * always-on peer): every strand, one at a time, with no pause.
    *
    * `rotateMs`: while the app is in front (`strands.rotate(true)`), visit one sleeping strand
-   * this often, so a quiet strand still hears from its members (`rotate` in model.ts).
+   * this often, so a quiet strand still hears from its members (`rotate` in model.ts), but only
+   * once the user has left the app alone for `idleMs` (`strands.interacted`).
    */
-  strandStart?: { recentCount: number; recentMs: number; gapMs: number; rotateMs?: number };
+  strandStart?: { recentCount: number; recentMs: number; gapMs: number; rotateMs?: number; idleMs?: number };
 }

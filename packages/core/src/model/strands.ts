@@ -73,6 +73,9 @@ export function isSettled(state: Pick<StrandState, 'visibility' | 'managerCount'
   return state.visibility === 'private' && state.managerCount === 0;
 }
 
+/** What a slow device is doing with its strands, so a screen can say why it paused. */
+export type StrandWork = 'starting' | 'waking' | 'checking';
+
 export interface StrandsModel {
   list(): Promise<Result<StrandSummary[]>>;
   /**
@@ -98,6 +101,14 @@ export interface StrandsModel {
    * something new arrived. Off when the app leaves the front.
    */
   rotate(on: boolean): void;
+  /**
+   * Strand work under way that may make the app pause (on a slow phone, a strand starting blocks
+   * everything for a few seconds), or null. Signalled by `changes.busy`, a moment before the
+   * pause, so a screen can show why.
+   */
+  busy(): StrandWork | null;
+  /** The user touched or typed: the rotation waits until they have been idle a while. */
+  interacted(): void;
   /** Device-local (story 33). */
   settings(strandId: string): Promise<Result<StrandSettings>>;
   /** The user's private note on a strand, or null. */

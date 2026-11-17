@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StatusBar, ScrollView, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
+import { StatusBar, ScrollView, Text, StyleSheet, ActivityIndicator, View, Keyboard } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 // Keyboard avoidance that works on every Android version, edge-to-edge included
 // (global/ui.md, "The on-screen keyboard"). Same library as health/apps/mobile.
@@ -14,6 +14,29 @@ import { formatLoopLag, startLoopLag } from '@chat/core/diagnostics';
 import { installDevBridge } from './src/diagnostics/dev-bridge';
 import { useT } from './src/i18n';
 import { typography, spacing } from './src/theme';
+import { StrandWorkLine } from './src/components';
+import { chatModel } from './src/data/model';
+
+/**
+ * Tell the model the user is using the app, so the rotation (a few-second pause on a slow phone)
+ * waits until they stop: every touch, seen without taking it, and every few seconds while the
+ * keyboard is open (typing makes no touch events here).
+ */
+const interacted = () => { chatModel.strands.interacted(); return false; };
+function useKeyboardInteraction(): void {
+  useEffect(() => {
+    let tick: ReturnType<typeof setInterval> | null = null;
+    const show = Keyboard.addListener('keyboardDidShow', () => {
+      interacted();
+      tick ??= setInterval(interacted, 5000);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      if (tick) clearInterval(tick);
+      tick = null;
+    });
+    return () => { show.remove(); hide.remove(); if (tick) clearInterval(tick); };
+  }, []);
+}
 
 // Development builds: one `[perf] loop` line every 30 s, how late timers fire (a blocked
 // JS thread is what made phones spiral). Shared with every app (`@chat/core/diagnostics`).
@@ -49,6 +72,7 @@ function IncompatibleData({ found, expected }: { found: string; expected: string
 /** Themed shell: safe-area background + status bar follow the active theme. */
 function ThemedShell({ format }: { format: DataFormatCheck | null }) {
   const { theme, scheme } = useThemeContext();
+  useKeyboardInteraction();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
       <StatusBar
@@ -58,7 +82,10 @@ function ThemedShell({ format }: { format: DataFormatCheck | null }) {
       {format === null ? (
         <View style={styles.checking}><ActivityIndicator color={theme.textMuted} /></View>
       ) : format.ok ? (
-        <AppNavigator />
+        <View style={styles.app} onStartShouldSetResponderCapture={interacted} onMoveShouldSetResponderCapture={interacted}>
+          <AppNavigator />
+          <StrandWorkLine />
+        </View>
       ) : (
         <IncompatibleData found={format.found} expected={format.expected} />
       )}
@@ -122,6 +149,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   checking: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  app: { flex: 1 },
   incompatible: { padding: spacing[4], gap: spacing[3] },
   para: { lineHeight: 22 },
 });

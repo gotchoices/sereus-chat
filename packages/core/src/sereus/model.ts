@@ -11,7 +11,7 @@ import { FormationRejectedError, readOwnerPrivateKey, type StrandInstance } from
 import { buildInviteUrl, CHAT_SAPP_ID } from '../protocol/index.js';
 import type {
   Attachment, ChatModel, Delivery, DriveFile, DriveFolder, DriveListing, Invitation, InvitationPreview, Member, Message, Prefs, Reaction,
-  SearchBatch, StorageUsage, StrandState, StrandSummary, Visibility,
+  SearchBatch, StorageUsage, StrandState, StrandSummary, StrandWork, Visibility,
 } from '../model/index.js';
 import { fail, INVITATION_VALIDITY, ok, pageMessages } from '../model/index.js';
 import { attempt, ChatFailure, explainJoinFailure, isTransientWriteFailure, withTimeout } from './errors.js';
@@ -49,6 +49,8 @@ const JOIN_STARTING_PATIENCE_MS = 60_000;
 const JOIN_STARTING_RETRY_MS = 3000;
 
 /** Node events after which a strand's database may have appeared or been replaced. */
+/** How long the busy signal leads the work it announces: a frame or two for the screen to draw it. */
+const BUSY_PAINT_MS = 150;
 /** A rotation visit holds a sleeping strand up this long before reading it… */
 const VISIT_WINDOW_MS = 15_000;
 /** …gives its read this long… */
@@ -642,7 +644,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       wakesInFlight.add(id);
       const t0 = Date.now();
       try {
-        await node.wakeStrand(id);
+        await busyWhile('waking', () => node.wakeStrand(id));
         woken.push(id);
         perf('awaken', id.slice(0, 8), 'in', Date.now() - t0, 'ms');
       } catch (err) {
@@ -653,6 +655,30 @@ export function createSereusModel(host: ChatHost): SereusModel {
     }
     return { woken, asleep: sleeping.filter(id => !woken.includes(id)) };
   }
+
+  // ── Strand work the user may notice ─────────────────────────────────────────────
+  //
+  // On a slow phone, starting or waking a strand blocks the JavaScript thread for seconds. The
+  // app shows why (`strands.busy`) with a native spinner, which keeps turning while JavaScript is
+  // blocked: so the signal goes out, and the work waits a moment for the screen to draw it.
+  const busyCounts = new Map<StrandWork, number>();
+  const busyListeners = new Set<() => void>();
+  const currentBusy = (): StrandWork | null =>
+    (['starting', 'waking', 'checking'] as const).find(k => (busyCounts.get(k) ?? 0) > 0) ?? null;
+  async function busyWhile<T>(kind: StrandWork, run: () => Promise<T>): Promise<T> {
+    busyCounts.set(kind, (busyCounts.get(kind) ?? 0) + 1);
+    busyListeners.forEach(fn => fn());
+    try {
+      await new Promise(r => setTimeout(r, BUSY_PAINT_MS));
+      return await run();
+    } finally {
+      busyCounts.set(kind, (busyCounts.get(kind) ?? 1) - 1);
+      busyListeners.forEach(fn => fn());
+    }
+  }
+  runtime.busyWhile = run => busyWhile('starting', run);
+  /** When the user last touched or typed (`strands.interacted`). */
+  let interactedAt = 0;
 
   // ── The rotation: sleeping strands visited one at a time while the app is in front ──
   //
@@ -682,6 +708,8 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const node = host.node.node;
     if (visiting || awakening || runtime.starting() || !node) return;
     const now = Date.now();
+    // Not while the user is using the app: a visit can pause it for a few seconds.
+    if (now - interactedAt < (host.strandStart?.idleMs ?? 0)) return;
     const sleeping = [
       ...runtime.deferredIds(),
       ...[...node.getStrands()].filter(([id, s]) => s.status === 'hibernating' && !wakesInFlight.has(id)).map(([id]) => id),
@@ -696,7 +724,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const t0 = Date.now();
     try {
       const before = Date.parse((await summaries.read())[id]?.lastMessage?.timestamp ?? '') || 0;
-      if (!(await runtime.attachDeferred(id))) await node.wakeStrand(id);
+      await busyWhile('checking', async () => { if (!(await runtime.attachDeferred(id))) await node.wakeStrand(id); });
       // Long enough for the other members to reach this node and land what they queued.
       await new Promise(r => setTimeout(r, VISIT_WINDOW_MS));
       const strand = node.getStrands().get(id);
@@ -710,7 +738,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
         perf('visit', id.slice(0, 8), 'news: stays awake,', Date.now() - t0, 'ms');
       } else {
         visitEvery.set(id, Math.min((visitEvery.get(id) ?? baseMs) * 2, VISIT_MAX_EVERY_MS));
-        await node.hibernateStrand(id);
+        await busyWhile('checking', () => node.hibernateStrand(id));
         perf('visit', id.slice(0, 8), 'nothing new: asleep again,', Date.now() - t0, 'ms');
       }
     } catch (err) {
@@ -1070,6 +1098,8 @@ export function createSereusModel(host: ChatHost): SereusModel {
         return awakening;
       }),
       rotate,
+      busy: currentBusy,
+      interacted() { interactedAt = Date.now(); },
       settings: id => attempt(() => strandPrefs.get(id)),
       note: id => attempt(async () => (await privateStore.notes()).get(id) ?? null),
       setNote: (id, text) => attempt(async () => {
@@ -1448,6 +1478,10 @@ export function createSereusModel(host: ChatHost): SereusModel {
         return () => unsubscribe.forEach(u => u());
       },
       reachability: onChange => host.node.onReachabilityChange(onChange),
+      busy(onChange) {
+        busyListeners.add(onChange);
+        return () => { busyListeners.delete(onChange); };
+      },
       strands(onChange) {
         const events = [...STRAND_UP_EVENTS, ...STRAND_DOWN_EVENTS, 'strand:discovered'] as const;
         const unsubscribe = [...events.map(event => host.node.on(event, () => onChange())), onPrivate(onChange)];

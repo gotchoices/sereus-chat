@@ -1482,7 +1482,12 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
           read, and put back to sleep unless something new arrived; a strand that keeps turning
           up nothing is visited at most every 30 min. In a two-member strand this is also what
           lets the other member's writes through. S7: about 19 s per visit, one stall of
-          2.5–3.7 s each time, then 0–2%. **Replace with #66** (ask one's own cadre what
+          2.5–3.7 s each time, then 0–2%. Visits wait until the user has left the app alone
+          for 20 s (`idleMs`, `strands.interacted`: touches, and the keyboard being open), and a
+          slim line with a native spinner ("Checking quiet strands…", also "Starting strands…"
+          and "Catching up on strands…") shows during each pause (`strands.busy`), so the
+          app does not look hung. S7: no visit during 3 minutes of tapping; one about 40 s
+          after. **Replace with #66** (ask one's own cadre what
           changed; wake only those) when sereus has it; keep the rotation for parties with
           only phones.
         - **Next, with sereus:** background check-ins that ask one's own cadre "what changed?"

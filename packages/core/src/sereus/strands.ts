@@ -50,6 +50,8 @@ export class StrandRuntime {
    */
   private readonly queue = new Map<string, { attach: () => Promise<void>; done: () => void }>();
   private pumping = false;
+  /** Runs a strand start under the model's busy signal (`strands.busy`); set by the model. */
+  busyWhile: <T>(run: () => Promise<T>) => Promise<T> = run => run();
   /** Quiet strands left down at start-up; each attaches when it is opened (`attachDeferred`). */
   private readonly deferred = new Map<string, () => Promise<void>>();
 
@@ -298,7 +300,7 @@ export class StrandRuntime {
         if (ran++ > 0 && policy?.gapMs) await new Promise(r => setTimeout(r, policy.gapMs));
         const t0 = Date.now();
         if (this.host.dev) console.info(`[start-queue] ${strandId.slice(0, 8)} starting (${this.queue.size} waiting)`);
-        try { await entry.attach(); } finally { entry.done(); }
+        try { await this.busyWhile(() => entry.attach()); } finally { entry.done(); }
         if (this.host.dev) console.info(`[start-queue] ${strandId.slice(0, 8)} done in ${Date.now() - t0} ms`);
       }
     } finally {

@@ -132,6 +132,8 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       async retryBoot() { return ok(); },
       async awaken() { return ok({ woken: [], asleep: [] }); },
       rotate() {},
+      busy() { return null; },
+      interacted() {},
       async settings(strandId) {
         const listed = data<StrandSummary[]>('Strands').find(s => s.id === strandId);
         return ok({ muted: listed?.muted ?? 'none', archived: listed?.archived ?? false });
@@ -478,6 +480,7 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       },
       // Nothing the mock writes ever changes where it stands.
       delivery() { return () => {}; },
+      busy() { return () => {}; },
       strand(strandId, onChange) {
         let set = strandListeners.get(strandId);
         if (!set) strandListeners.set(strandId, (set = new Set()));

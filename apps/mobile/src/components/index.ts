@@ -24,3 +24,4 @@ export { IconButton } from './IconButton';
 export type { IconButtonProps } from './IconButton';
 export { SectionHeader } from './SectionHeader';
 export type { SectionHeaderProps } from './SectionHeader';
+export { StrandWorkLine } from './StrandWorkLine';
