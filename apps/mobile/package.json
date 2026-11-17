@@ -35,7 +35,7 @@
     "logs": "sh ./scripts/logs.sh",
     "stack:check": "cd ../../test/stack && node found-strand.mjs",
     "stack:two-party": "cd ../../test/stack && node two-party-formation.mjs",
-    "core:build": "yarn --cwd ../../packages/resources build && yarn --cwd ../../packages/core build"
+    "core:build": "yarn --cwd ../../packages/resources build && yarn --cwd ../../packages/strand-ipfs build && yarn --cwd ../../packages/strand-blobs build && yarn --cwd ../../packages/strand-drive build && yarn --cwd ../../packages/core build"
   },
   "dependencies": {
     "@chat/core": "link:../../packages/core",
