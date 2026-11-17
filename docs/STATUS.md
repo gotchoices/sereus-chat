@@ -1454,6 +1454,21 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         file's import** (messages are written after the blob); **serving from the S7** (about
         8 s per MB). `HOLD_MS` in `phone-joins-serchat.mjs` keeps Maestro out of the window.
         A join refused by serchat ("their side could not finish this join") hit 2 of 6 runs.
+      - **What a strand costs a phone (2026-11-17).** `[loop]` lines in perf builds (how late a
+        250 ms timer fires, every 30 s, with the strands up); `test/gui/strand-load.mjs` joins one
+        strand at a time; `IDLE_COST=1 vitest run src/sereus/idle-cost.test.ts` is the Node side.
+        - **Idle strands whose members are online are cheap:** the S7 with 7–8 strands up, 0–3%
+          blocked. Node: 0.1–0.3% CPU per strand; the file layer adds nothing measurable.
+        - **Start-up is the big cost:** each cold start or return to the app with 7–11 strands
+          blocks the S7 58–94% for about a minute, single timers 27–42 s late. Everything the
+          user does then waits, a photo's import included.
+        - **Strands whose members are unreachable cost a stall a minute:** 11 such strands, the
+          S7 idles at 1% with a 2.3–2.5 s stall about once a minute. In Node the same is 0.6 s of
+          small work a minute spread over FRET ring walks, Optimystic cleanup queues and libp2p
+          timers: no one hot spot; the S7 is just 4–30× slower at all of it.
+        - Not ours: sereus's edge config runs every strand all the time (`hibernation:
+          { enabled: false }`), and push wake works only within one's own cadre, so letting
+          strands hibernate would delay messages from other parties to check-in times.
 - [x] **Stack 2026-11-07: sereus 1.22.0, optimystic 1.26.0, quereus 5.0.0** (p2p-fret 1.3.0,
       libp2p 3.3.11 unchanged), with **chat sApp 0.3.0**: index `MessageByTime` on
       `Message (Timestamp, Id)`.

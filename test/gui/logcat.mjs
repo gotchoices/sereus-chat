@@ -32,6 +32,8 @@ export function collectLogcat(adb, serial) {
   return {
     /** Read the buffer now (before a Maestro flow clears it). */
     flush: collect,
+    /** What has been read so far. */
+    lines: () => [...lines],
     async stop(path) {
       clearInterval(timer);
       await collect();

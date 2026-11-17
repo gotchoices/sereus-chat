@@ -52,6 +52,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { OWNER_GENESIS_TIMEOUT_MS } from './async';
 import { PERF_LOG, STRAND_REACTIVITY, WEBRTC } from '../data/config';
 import { ipfsSmoke } from './ipfs-smoke';
+import { formatLoopLag, startLoopLag } from '@chat/core/diagnostics';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { webRTC } from '@libp2p/webrtc';
@@ -520,6 +521,15 @@ class CadreServiceImpl {
         if (PERF_LOG) {
           const control = status.node.getControlNode();
           if (control) void ipfsSmoke(control as never);
+          // How busy the JS thread is, against how many strands are up (each runs its own node).
+          this.loopNode = status.node;
+          if (!this.stopLoopLag) {
+            this.stopLoopLag = startLoopLag(r => {
+              const strands = [...(this.loopNode?.getStrands().values() ?? [])];
+              const live = strands.filter(s => s.status !== 'hibernating').length;
+              console.info(`[loop] ${live}/${strands.length} strands up: ${formatLoopLag(r)}`);
+            });
+          }
         }
         break;
       case 'failed':
@@ -549,6 +559,9 @@ class CadreServiceImpl {
    * most useful signal we have about how the stack is doing on a phone. Address SETS
    * are compared, because the event also fires for changes that leave them unchanged.
    */
+  private stopLoopLag: (() => void) | null = null;
+  private loopNode: CadreNode | null = null;
+
   private watchReachability(node: CadreNode): void {
     this.unwatchReachability();
     const controlNode = node.getControlNode();

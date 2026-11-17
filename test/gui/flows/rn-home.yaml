@@ -1,0 +1,14 @@
+# Back to the strand list from wherever the app is (strand-load.mjs).
+appId: org.sereus.chat
+---
+- launchApp:
+    stopApp: false
+- repeat:
+    while:
+      notVisible: "Strands"
+    times: 5
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: "Strands"
+    timeout: 30000
