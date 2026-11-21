@@ -114,6 +114,16 @@ keeps blocks in files.
 3. **The copy drain's schedule** (`NodeOptions.blobs.copy`) is not exposed. Optional: the reader's
    fetch already covers chat's latency.
 
+Standalone reproductions, sereus and Optimystic only, one node, no peers
+(`test/stack/solo-node.mjs` builds the node and a strand of a one-table sApp):
+
+- `node test/stack/blobref-type.mjs`, for gap 1. On stock sereus 1.23.0, founding the strand fails
+  with `AppSchemaRefusedError: … Unknown type 'blobref' for column 'Content' of table 'App.Photo':
+  register the type (Database.registerType) before using it`. With the one-loop patch it passes:
+  a reference is stored and a non-reference is refused.
+- `node test/stack/blob-survives-hibernate.mjs`, for gap 2. A 1 MB blob put on the strand node
+  reads `here`; after `hibernateStrand` and `wakeStrand` it reads `unknown`, with 0 bytes held.
+
 ## What adoption would want (for Nate)
 
 1. Sereus gaps 1 and 2 fixed. Without 2, a photo sent just before the phone sleeps is lost.
