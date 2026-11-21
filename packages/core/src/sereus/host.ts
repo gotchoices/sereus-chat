@@ -128,5 +128,12 @@ export interface ChatHost {
    * this often, so a quiet strand still hears from its members (`rotate` in model.ts), but only
    * once the user has left the app alone for `idleMs` (`strands.interacted`).
    */
+  /**
+   * EVALUATION (branch `blobs-eval`): which layer moves attachment bytes. `'ours'` (default): the
+   * strand file layer (`strand-media.ts`, `ipfs:<CID>`). `'optimystic'`: Optimystic 1.29's native
+   * blobs on the strand's own node (`node.blobs`, `ob:<ref>`), with our IPFS layer not started.
+   * The drive stays on ours either way.
+   */
+  blobEngine?: 'ours' | 'optimystic';
   strandStart?: { recentCount: number; recentMs: number; gapMs: number; rotateMs?: number; idleMs?: number };
 }

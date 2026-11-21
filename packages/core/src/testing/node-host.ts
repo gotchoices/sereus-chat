@@ -74,6 +74,8 @@ export async function createTestParty(tag: string, opts: {
   maxAttachmentBytes?: number;
   /** How strands come up and are visited (`ChatHost.strandStart`); unset, every strand. */
   strandStart?: ChatHost['strandStart'];
+  /** Which layer moves attachment bytes (`ChatHost.blobEngine`); default from `BLOB_ENGINE`. */
+  blobEngine?: ChatHost['blobEngine'];
   /** Attachments through the strand file layer (`ChatHost.blocks`, in memory) instead of chunk rows. */
   fileLayer?: boolean;
 }): Promise<TestParty> {
@@ -153,6 +155,7 @@ export async function createTestParty(tag: string, opts: {
   const host: ChatHost = { node: nodeHost, slot: memorySlots(), ownerKeyStore, backgroundFounding: opts.backgroundFounding,
     files, ...(opts.maxAttachmentBytes ? { maxAttachmentBytes: opts.maxAttachmentBytes } : {}),
     ...(opts.strandStart ? { strandStart: opts.strandStart } : {}),
+    blobEngine: opts.blobEngine ?? (process.env.BLOB_ENGINE === 'optimystic' ? 'optimystic' : 'ours'),
     ...(opts.fileLayer ? { blocks: new MemoryBlockStore() } : {}) };
   const { model, boot, settle } = createSereusModel(host);
   return { tag, host, node, model, boot, settle, stop: async () => {

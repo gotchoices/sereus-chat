@@ -62,3 +62,10 @@ export const PERF_LOG = false;
  * branch.
  */
 export const FILE_LAYER = true;
+
+/**
+ * EVALUATION (branch `blobs-eval`): which layer moves attachment bytes. `'ours'`: the strand file
+ * layer (`ipfs:<CID>`); `'optimystic'`: Optimystic 1.29's native blobs on the strand's own node
+ * (`ob:<ref>`). Both sides of a test must use the same engine.
+ */
+export const BLOB_ENGINE: 'ours' | 'optimystic' = 'optimystic';

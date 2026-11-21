@@ -43,7 +43,7 @@ describe('attachments through the strand file layer', () => {
       attachments: [{ id: 'local', type: 'image', uri: file, name: 'holiday.jpg', mimeType: 'image/jpeg', locality: 'local' }],
     }));
     const sendMs = Date.now() - t0;
-    expect(sent.attachments[0].blob).toMatch(/^ipfs:bafy[a-z2-7]+$/);
+    expect(sent.attachments[0].blob).toMatch(/^(ipfs|ob):bafy[a-z2-7]+$/);
     expect(sent.attachments[0].locality).toBe('local');
 
     // B lists the message; the background fetch brings the file without B asking for it.

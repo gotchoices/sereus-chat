@@ -234,6 +234,9 @@ export function createCliHost(opts: HostOptions): CliHost {
     dev: opts.dev,
     // Attachment bytes (docs/blobs.md): this profile's copies of blobs, under `<profile>/files`.
     files: nodeFileAccess(join(dirs.root, 'files')),
+    // Evaluation (branch `blobs-eval`): BLOB_ENGINE=optimystic moves attachments with Optimystic's
+    // native blobs instead of the strand file layer.
+    blobEngine: process.env.BLOB_ENGINE === 'optimystic' ? 'optimystic' : 'ours',
     // The strand file layer (gotchoices/sereus#62): attachments as files between members, its
     // blocks under `<profile>/file-blocks`. SERCHAT_CHUNK_STORE=1 sends as chunk rows instead.
     ...(process.env.SERCHAT_CHUNK_STORE === '1' ? {} : { blocks: nodeBlockStore(join(dirs.root, 'file-blocks')) }),

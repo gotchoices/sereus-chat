@@ -114,6 +114,21 @@ function toAttachment(a: AttachmentRow, held?: string | null): Attachment {
 const DEFAULT_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 /** An attachment ref naming a file on IPFS-on-a-strand (`strand-media.ts`): `ipfs:` + its CID. */
 const FILE_REF = IPFS_REF;
+/** An attachment moved by Optimystic's native blobs (`ChatHost.blobEngine: 'optimystic'`). */
+const OB_REF = 'ob:';
+
+/** The part of Optimystic 1.29's `BlobService` (`node.blobs`) chat uses. */
+type NodeBlobs = {
+  put(source: AsyncIterable<Uint8Array>): Promise<{ ref: string; size: number }>;
+  fetch(ref: string, options?: { waitMs?: number }): Promise<void>;
+  read(ref: string, options?: { from?: 'anywhere' | 'here' }): AsyncIterable<Uint8Array>;
+};
+/** The strand node's blob service, present from Optimystic 1.29. */
+function nodeBlobs(strand: StrandInstance): NodeBlobs {
+  const blobs = (strand.libp2pNode as { blobs?: NodeBlobs } | undefined)?.blobs;
+  if (!blobs) throw new ChatFailure('not-supported', 'This strand node has no blob service (Optimystic 1.29 or later).', { retryable: false });
+  return blobs;
+}
 
 export function createSereusModel(host: ChatHost): SereusModel {
   const runtime = new StrandRuntime(host);
@@ -172,7 +187,8 @@ export function createSereusModel(host: ChatHost): SereusModel {
   /** The strand's IPFS node, on its current libp2p node. */
   const ipfsFor = (strandId: string, strand?: StrandInstance) =>
     media ? media.ensure(strandId, strand ?? host.node.node?.getStrands().get(strandId)) : Promise.resolve(undefined);
-  if (media) {
+  const optimysticBlobs = host.blobEngine === 'optimystic';
+  if (media && !optimysticBlobs) {
     // A wake rebuilds the strand's node (`strand:waking`, not `strand:started`): IPFS on the new
     // one, which also offers what nobody else holds yet. Going down stops it.
     for (const event of STRAND_UP_EVENTS) {
@@ -362,7 +378,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const max = host.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES;
     for (const a of attachments) {
       const ref = (a as Attachment & { blob?: string | null }).blob;
-      if (!ref?.startsWith(FILE_REF) || a.locality === 'local' || (a.byteSize ?? 0) > max || prefetching.has(a.id)) continue;
+      if (!(ref?.startsWith(FILE_REF) || ref?.startsWith(OB_REF)) || a.locality === 'local' || (a.byteSize ?? 0) > max || prefetching.has(a.id)) continue;
       prefetching.add(a.id);
       void fetchAttachment(strandId, a.id)
         .catch(() => {})
@@ -372,8 +388,15 @@ export function createSereusModel(host: ChatHost): SereusModel {
 
   /** Store a file in the strand file layer; its ref is `cid:` + the file's CID. */
   async function putFile(strand: StrandInstance, uri: string): Promise<{ ref: string; size: number }> {
-    await ipfsFor(strand.strandId, strand);
     const files = host.files!;
+    if (optimysticBlobs) {
+      // Optimystic's native blobs: 256 KiB pieces in the node's piece store, fetched by the reader.
+      const t0 = Date.now();
+      const { ref, size } = await nodeBlobs(strand).put(files.read(uri, CHUNK_SIZE));
+      perf('ob put', size, 'bytes in', Date.now() - t0, 'ms');
+      return { ref: `${OB_REF}${ref}`, size };
+    }
+    await ipfsFor(strand.strandId, strand);
     // Stored as a UnixFS file, announced to the members online, and provided on FRET.
     const { cid, size } = await media!.blobs.putPath(strand.strandId, uri, () => files.read(uri, CHUNK_SIZE));
     return { ref: `${FILE_REF}${cid}`, size };
@@ -443,7 +466,15 @@ export function createSereusModel(host: ChatHost): SereusModel {
     if (await files.exists(path).catch(() => false)) return { uri: path };
     const t0 = Date.now();
     try {
-      if (row.Blob.startsWith(FILE_REF)) {
+      if (row.Blob.startsWith(OB_REF)) {
+        const blobs = nodeBlobs(strand);
+        const ref = row.Blob.slice(OB_REF.length);
+        await blobs.fetch(ref);
+        const fetched = Date.now();
+        // The viewable copy: the pieces through JavaScript (on a phone, base64 to the file library).
+        await files.write(path, blobs.read(ref, { from: 'here' }));
+        perf('ob fetch', attachmentId.slice(0, 8), 'pieces in', fetched - t0, 'ms, file written in', Date.now() - fetched, 'ms');
+      } else if (row.Blob.startsWith(FILE_REF)) {
         if (!media) throw new ChatFailure('not-supported', 'This app cannot read files sent this way.', { retryable: false });
         await ipfsFor(strandId, strand);
         const cid = row.Blob.slice(FILE_REF.length);
@@ -455,7 +486,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       }
       perf('fetch', attachmentId.slice(0, 8), 'whole in', Date.now() - t0, 'ms');
     } catch (err) {
-      if (err instanceof NotAvailableError) {
+      if (err instanceof NotAvailableError || (err instanceof Error && /BlobUnavailable|BlobTransferStalled/.test(err.name))) {
         perf('fetch', attachmentId.slice(0, 8), 'not reachable yet:', err.message);
         throw new ChatFailure('unavailable', 'Still arriving: no member who has this file is reachable yet.', { retryable: true, reason: 'still-arriving' });
       }
