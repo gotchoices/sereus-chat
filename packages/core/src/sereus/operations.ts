@@ -304,11 +304,14 @@ export async function insertAttachments(
   const rows: AttachmentRow[] = [];
   for (const a of attachments) {
     const id = newId();
+    // blobs-eval: bytes in Optimystic's native blobs are also referenced by a `blobref` column,
+    // so the commit pins and announces them and the strand's cohort pulls them.
+    const blobRef = a.blob?.startsWith('ob:') ? a.blob.slice('ob:'.length) : null;
     await db.exec(
-      `insert into App.Attachment (Id, MessageId, Type, Uri, MimeType, Name, ByteSize, DurationMs, Blob)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `insert into App.Attachment (Id, MessageId, Type, Uri, MimeType, Name, ByteSize, DurationMs, Blob, BlobRef)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, messageId, a.type, a.uri ?? null, a.mimeType ?? null, a.name ?? null,
-       a.byteSize ?? null, a.durationMs ?? null, a.blob ?? null],
+       a.byteSize ?? null, a.durationMs ?? null, a.blob ?? null, blobRef],
     );
     rows.push({
       Id: id, MessageId: messageId, Type: a.type, Uri: a.uri ?? null,

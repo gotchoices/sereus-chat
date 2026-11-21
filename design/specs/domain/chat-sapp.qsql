@@ -64,6 +64,9 @@ table Attachment (
     ByteSize integer null,
     DurationMs integer null,            -- video and voice
     Blob text null,                     -- the content's ref (docs/blobs.md), e.g. 'chunks:1:<sha-256>'
+    -- blobs-eval: Optimystic 1.29's reference to the same bytes, when they went through its native
+    -- blobs. A `blobref` column keeps the bytes alive on the strand's cohort and has it pull them.
+    BlobRef blobref null,
     foreign key (MessageId) references Message(Id)
 ) with tags ("optimystic.network_watch" = true);
 

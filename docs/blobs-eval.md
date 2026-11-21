@@ -63,22 +63,65 @@ one state and ours 18.3 s in a busier one. The phone's load decides those number
 - **The relay is not a problem with our relay.** Optimystic's doc warns that a stock relay (128 KiB)
   cannot carry a piece. relay.sereus.org carried every transfer.
 
+## Optimystic's full path: a `blobref` column (added the same day)
+
+Chat's schema (sApp 0.6.0, this branch only) gains `Attachment.BlobRef blobref null`, written
+with the bare reference whenever the bytes went through `node.blobs`. Getting the type into a
+strand database took a local patch to sereus (`.yarn/patches`, below).
+
+- **It works.** The commit pins and announces the blob, B pulls it without anyone reading it, and A
+  hears durability go `local 1/2`, then `full 2/2` (`src/sereus/blobref.test.ts`).
+- **The cohort's own pull waits for the copy drain:** B held the bytes 6.4 s after the send, three
+  runs alike. That is the drain's 5 s debounce (`DEFAULT_BLOB_COPY_DRAIN_CONFIG`, shared with the
+  block drain), not transfer time. A reader that fetches when the message is listed, as chat
+  does, has the bytes in about 0.4 s. So the column buys durability and lifetime, and the read
+  keeps it fast.
+- **On the phones it adds nothing to the times:** S21 1.5–1.6 s out and 4.6–4.7 s in, S7 6.8–7.5 s
+  out and 10.2–11.1 s in, cleared before each run.
+
+## Sleep and wake (`test/gui/phone-wakes.mjs`, S21, cleared before each engine)
+
+| case | ours | optimystic + blobref |
+|---|---|---|
+| 1. phone asleep while serchat sends; photo shown after it returns | 17.3 s (mostly Maestro's own time) | 16.4 s |
+| 2. phone sends, then goes to the background | serchat had it in 0.5 s | 0.5 s |
+| 3. both away: the phone's message and photo wait, then both return | **8.4 s, pass** | **fail: never** |
+
+Case 3 fails because the pieces were in memory. Sereus passes the strand node no `pieceStorage`
+or persistent `kvStore`, so Optimystic uses `MemoryPieceStore`. A strand that hibernates (the app
+in the background) is rebuilt on waking, empty, and the sender no longer has the photo: serchat's
+fetch answers `not-held` for good. The same in Node: after A's strand sleeps and wakes, A's
+`stat` of the blob says `unknown`, and B never gets it (second test in `blobref.test.ts`). Ours
+keeps blocks in files.
+
 ## Not yet compared
 
-- Optimystic's full path: a `blobref` column, pins that follow commits, the announce, and the
-  cohort pulling the file without anyone reading it, which is their counterpart of our
-  announce-and-prefetch. This branch only swaps the byte layer under a text column.
-- A persistent piece store on a phone; sleep and wake on phones; the drive (still on ours); CPU
-  while serving (the lag meter); memory with many photos held in a `MemoryPieceStore`.
+- A persistent piece store on a phone (sereus does not wire one), and with it the serving speed
+  of the S7 from disk rather than memory.
+- CPU while serving (the lag meter), memory with many photos, the drive on `blobref`.
 - APK size: both builds contain both layers here.
+
+## Sereus gaps found
+
+1. **The `blobref` type is not registered in a strand database.** `applyRegistrations` in
+   `quereus-plugin-sereus` (`compose-strand.js`) registers the plugin's vtables, functions and
+   collations, but not `types`, which Optimystic 1.29 added. A schema declaring `blobref` is then
+   refused. The fix is one loop, `db.registerType(type.name, type.definition)`; this branch
+   carries it as a Yarn patch.
+2. **No persistent `pieceStorage` or `kvStore` for blobs on strand nodes,** so blobs do not survive
+   a hibernate and wake (or a restart). Phones need the LevelDB piece store, and with it a
+   measurement of serving from storage.
+3. **The copy drain's schedule** (`NodeOptions.blobs.copy`) is not exposed. Optional: the reader's
+   fetch already covers chat's latency.
 
 ## What adoption would want (for Nate)
 
-1. A persistent piece store measured on a device, keeping the serving speed above.
+1. Sereus gaps 1 and 2 fixed. Without 2, a photo sent just before the phone sleeps is lost.
+   Then a persistent piece store measured on a device, keeping the serving speed above.
 2. A native path for phones: put from a file path and read to a file path without the bytes
    passing through JavaScript (a host-supplied piece store over files, or put and export hooks).
    On the S7 that is 1–3 s each way.
-3. The `blobref` path tested on phones, including a receiver that was asleep.
+3. The three sleep-and-wake cases passing on phones, as ours does.
 
 Going back: a phone that has run Optimystic 1.28 or later keeps commit proofs in a new form, and
 an older build cannot read them, so returning these phones to the `strand-ipfs` build needs a

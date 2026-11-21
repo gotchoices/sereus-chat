@@ -2441,6 +2441,25 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@serfab/quereus-plugin-sereus@patch:@serfab/quereus-plugin-sereus@npm%3A1.23.0#~/.yarn/patches/@serfab-quereus-plugin-sereus-npm-1.23.0-3e6e5b5200.patch":
+  version: 1.23.0
+  resolution: "@serfab/quereus-plugin-sereus@patch:@serfab/quereus-plugin-sereus@npm%3A1.23.0#~/.yarn/patches/@serfab-quereus-plugin-sereus-npm-1.23.0-3e6e5b5200.patch::version=1.23.0&hash=c0a8b8"
+  dependencies:
+    "@libp2p/circuit-relay-v2": "npm:^4.2.13"
+    "@libp2p/interface": "npm:^3.3.0"
+    "@libp2p/websockets": "npm:^10.1.21"
+    "@optimystic/db-core": "npm:^1.27.0"
+    "@optimystic/db-p2p": "npm:^1.27.0"
+    "@optimystic/db-p2p-storage-fs": "npm:^1.27.0"
+    "@optimystic/db-p2p-storage-web": "npm:^1.27.0"
+    "@optimystic/quereus-plugin-crypto": "npm:^1.27.0"
+    "@optimystic/quereus-plugin-optimystic": "npm:^1.27.0"
+    "@quereus/quereus": "npm:^5.4.0"
+    debug: "npm:^4.4.3"
+  checksum: 10c0/e3c62676cdbd07279399b5010e9f6c06f97069e8a9b1f617741ae57825b9a90c616fa3b65291e5f8290954c79e35024c79cd68318f79c25ab731ac1ccdf87532
+  languageName: node
+  linkType: hard
+
 "@sindresorhus/fnv1a@npm:^3.1.0":
   version: 3.1.0
   resolution: "@sindresorhus/fnv1a@npm:3.1.0"

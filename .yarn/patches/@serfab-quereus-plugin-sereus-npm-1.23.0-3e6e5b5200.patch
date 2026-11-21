@@ -1,0 +1,15 @@
+diff --git a/dist/compose-strand.js b/dist/compose-strand.js
+index ec4160e242f39d7fc68dbbd60f4607157ebdf7fa..cd6be01a861b07e35ca0b1fd841355a01ce7fcd8 100644
+--- a/dist/compose-strand.js
++++ b/dist/compose-strand.js
+@@ -68,6 +68,10 @@ export function applyRegistrations(db, result) {
+     for (const collation of result.collations ?? []) {
+         db.registerCollation(collation.name, collation.func, collation.normalizer);
+     }
++    // sereus-chat blobs-eval: Optimystic 1.29 returns column types (`blobref`) too.
++    for (const type of result.types ?? []) {
++        db.registerType(type.name, type.definition);
++    }
+ }
+ /**
+  * Connect a Quereus `Database` to a Sereus strand. This is the single shared

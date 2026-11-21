@@ -18,7 +18,7 @@ export const CHAT_SAPP_ID = 'org.sereus.chat';
  * 0.4.0: blobs (docs/blobs.md): `Attachment.Blob`, tables `BlobChunk` and `Blob`.
  * 0.5.0: the strand drive (`@chat/strand-drive`): tables `DriveFolder` and `DriveFile`.
  */
-export const CHAT_SAPP_VERSION = '0.5.0';
+export const CHAT_SAPP_VERSION = '0.6.0';
 
 /** The drive's tables carry this prefix in chat's schema (`App.DriveFolder`, `App.DriveFile`). */
 export const DRIVE_PREFIX = 'Drive';
