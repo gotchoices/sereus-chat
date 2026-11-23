@@ -1,16 +1,41 @@
-# Stack check
+# Stack checks
 
-Validates the **sereus stack** against a new release, in Node — no app, no device,
-no emulator. Run it whenever `@serfab/cadre-core` or `@optimystic/*` moves.
+The **sereus stack** checked on its own, in Node: no app, no device, no emulator. This folder is
+chat's stack regression suite, apart from chat's own tests (`packages/core`, `apps/cli`), so that
+"did the stack break?" has an answer separate from "did chat break?".
+
+## The suite
 
 ```sh
-cd test/stack && yarn install    # first run only
-yarn stack:check                 # from the repo root
+yarn stack:suite                     # from the repo root: every check, about ten minutes
+node test/stack/run.mjs found        # the checks whose name contains "found"
 ```
 
-Roughly two seconds. Exit code 0 = converged, 1 = did not.
+`scripts/use-stack.sh npm --install` runs it after every stack change (`--no-check` skips it).
 
-## Why this exists
+- **The checks** are listed in `suite.json`: each is a script here that exits 0 when the stack does
+  what it asks.
+- **Expected failures:** `expect: "fail"` marks behaviour the stack does not have yet, with the issue
+  that tracks it. The run fails when any check does something other than expected, including such a
+  check passing: then the stack has changed, so drop the mark and revisit what chat does about it.
+- **Relays:** checks that need one get it on loopback, in the runner's process (`local-relay.mjs`).
+- **Writing a check:** use only the stack's packages (`solo-node.mjs` builds one node and a strand of
+  a tiny sApp), state the question in the header, exit 1 when the answer is wrong and 2 or more when
+  the rig itself failed, then add it to `suite.json`.
+
+Not in the suite, and kept as tools:
+- **Measurements:** `cpu-cost`, `formation-cost`, `handshake-cost`, `history-scale`,
+  `large-write-cost`, `message-latency`, `slow-peer`, `optimystic-insert-scale`,
+  `relay-reservation-cap`, `webrtc-phone-to-phone`, `probe-services`.
+- **Helpers:** `classic-level-driver`, `local-relay`, `solo-node`, `loop-hog`, `ws-latency`,
+  `ws-trace`, `rn-timers`, `longest-outage.py`.
+- **One-off repros:** `contention-repro.sh`, `small-cohort-repro.sh`.
+- **Settled upstream by design:** `lens-over-strand` (two schema versions on one strand). Optimystic
+  1.29 refuses a write under a replaced table description, and sereus 1.24 refuses an outdated app.
+
+## found-strand: where this folder started
+
+### Why it exists
 
 Founding a strand on a device does not converge for us — see
 `design/specs/mobile/STATUS.md` and gotchoices/Optimystic#8. The upstream
@@ -29,7 +54,7 @@ That substitution is legitimate rather than a hack: the storage classes depend o
 on the `LevelDBLike` interface and never import `rn-leveldb` (which is why it is a
 PEER dependency), and the package's own tests use the same approach.
 
-## What a result means
+### What a result means
 
 | outcome | reading |
 | --- | --- |
@@ -40,7 +65,7 @@ As of cadre-core 0.13.0 + `@optimystic/*` 1.0.0-beta.3 it **passes in ~0.2 s**, 
 or without a listen address (`LISTEN_ADDRS=none` matches the phone, which cannot
 listen). The same call on a real device had not converged after 44 minutes.
 
-## What has been ruled out with this harness
+### What has been ruled out with this harness
 
 - **Per-operation storage latency is NOT the variable.** `STORAGE_OP_DELAY_MS` sleeps
   before every raw-storage op (the same idea as the integration harness's own

@@ -1439,9 +1439,9 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         The old layer is in git at tag `strand-files-ipfs-final`. The APK is 0.9 MB smaller.
       - **Known gap, tested:** blobs live only in memory under sereus 1.24 (gotchoices/sereus#67,
         backlog `feat-strand-blobs-persist`). A file nobody else has fetched is lost when its
-        sender's strand sleeps or its process ends. `src/upstream/blobs.test.ts` (one node,
-        nothing of chat) and `file-transient.test.ts` state it as `it.fails`, so they turn red
-        the day sereus fixes it.
+        sender's strand sleeps or its process ends. The stack suite's
+        `test/stack/blob-survives-hibernate.mjs` (expected to fail) and chat's
+        `file-transient.test.ts` (`it.fails`) state it, so they turn red the day sereus fixes it.
       - **Mitigations that stay right after the fix:**
         - a one-shot host waits (bounded) until its files are held by a majority (`settle`);
         - a fetch waits up to 15 s for a holder to become reachable.

@@ -124,6 +124,7 @@ const outcome = await new Promise(resolve => {
     }
   });
 });
+let lastRead = [];
 log(outcome.ok ? `addStrand OK in ${outcome.ms} ms` : `addStrand FAILED after ${outcome.ms ?? '?'} ms: ${outcome.error}`);
 if (outcome.ok) {
   const db = A.getStrands().get(strandId)?.database;
@@ -136,7 +137,9 @@ if (outcome.ok) {
     const again = [];
     try { for await (const r of db.getDatabase().eval('select Id from App.Message')) again.push(r.Id); } catch (e) { log('read failed:', e.message); }
     log(`… ${wait} s later: ${again.join(', ')}`);
+    lastRead = again;
   }
 }
 await A.stop();
-process.exit(0);
+// The check (test/stack suite): after its restart A still reads both rows, B's included.
+process.exit(outcome.ok && lastRead.length >= 2 ? 0 : 1);

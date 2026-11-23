@@ -124,6 +124,7 @@ const outcome = await new Promise(resolve => {
     }
   });
 });
+let lastRows = [];
 log(outcome.ok ? `addStrand OK in ${outcome.ms} ms` : `addStrand FAILED after ${outcome.ms ?? '?'} ms: ${outcome.error}`);
 if (outcome.ok) {
   const db = A.getStrands().get(strandId)?.database;
@@ -170,6 +171,7 @@ if (outcome.ok) {
     const again = [];
     try { for await (const r of db.getDatabase().eval('select Id from App.Message')) again.push(r.Id); } catch (e) { log('read failed:', e.message); }
     log(`after ${wait} s more: rows ${again.join(', ')}`);
+    lastRows = again;
   }
   if (CHANGE === 'index') {
     // Is the new index there and used: an ordered read walks it instead of sorting.
@@ -180,4 +182,6 @@ if (outcome.ok) {
   }
 }
 await A.stop();
-process.exit(0);
+// The check (test/stack suite): after the schema change, with B offline, A's strand opens and A
+// still reads both rows, B's included.
+process.exit(outcome.ok && lastRows.length >= 2 ? 0 : 1);

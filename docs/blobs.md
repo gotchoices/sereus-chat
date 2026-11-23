@@ -44,8 +44,10 @@ alike. So:
 - A device that has shown a file keeps its own viewable copy, but cannot serve it to others.
 
 This is sereus's backlog `feat-strand-blobs-persist`. Tests that state what chat needs and mark it
-as not yet true (`it.fails`): `src/upstream/blobs.test.ts` (one node, nothing of chat) and both
-cases of `src/sereus/file-transient.test.ts`. When sereus fixes it they fail, which is the signal
+as not yet true:
+- in the stack suite, `test/stack/blob-survives-hibernate.mjs`: one node, nothing of chat,
+  `expect: "fail"` in `suite.json`;
+- in chat's tests, both cases of `src/sereus/file-transient.test.ts`, as `it.fails`. When sereus fixes it they fail, which is the signal
 to drop the marks. `test/cli/serchat-drive.mjs` keeps the adding profile up for the whole run for
 the same reason.
 

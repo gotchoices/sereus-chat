@@ -53,7 +53,8 @@ import { setWsDelayMs } from './ws-latency.mjs';
 import './cpu-cost.mjs';
 // Starves the loop without slowing any operation (LOOP_HOG_DUTY).
 import './loop-hog.mjs';
-import { CadreNode, ControlFormationUsageRecorder, generateStrandMemberKey } from '@serfab/cadre-core';
+import { CadreNode, ControlFormationUsageRecorder, InMemoryKeyStore, generateStrandMemberKey } from '@serfab/cadre-core';
+import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { LevelDBRawStorage } from '@optimystic/db-p2p-storage-rn';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
@@ -177,11 +178,9 @@ async function makeParty(tag, relayAddr) {
   });
 
   await node.start();
-  const { privateKeyB64, publicKeyB64 } = node.getIdentityOwnerKey();
-  const control = node.getControlDatabase();
-  if (!control) throw new Error(`${tag}: no control database after start`);
-  await control.ensureOwnerKey(publicKeyB64);
-  node.initializeSeedBootstrap(privateKeyB64);
+  // The party's owner key, apart from the machine's identity (sereus 1.17): genesis enrols it.
+  const genesis = await runOwnerGenesis(node, { keyStore: new InMemoryKeyStore(), label: tag });
+  if (genesis !== 'enrolled') throw new Error(`${tag}: owner genesis did not enrol (${String(genesis)})`);
 
   log(`${tag}: party ${partyId} peer ${node.peerId?.toString?.()}`);
   return node;

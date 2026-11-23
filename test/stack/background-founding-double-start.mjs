@@ -98,4 +98,6 @@ for (let attempt = 1; attempt <= 6 && !joined; attempt++) {
   }
 }
 say(`RESULT mode=${MODE}: ${joined ? 'joiner got in' : 'joiner NEVER got in'}; strand:discovered offers seen by the founder: ${offered}`);
-await Promise.allSettled([A.stop(), B.stop()]); await relay.stop(); process.exit(0);
+await Promise.allSettled([A.stop(), B.stop()]); await relay.stop();
+// The check (test/stack suite): the joiner gets in.
+process.exit(joined ? 0 : 1);

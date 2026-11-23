@@ -26,11 +26,13 @@
 # Usage:
 #   bash scripts/use-stack.sh                 # status: mode and specs per consumer
 #   bash scripts/use-stack.sh npm|local       # rewrite every consumer
-#   bash scripts/use-stack.sh npm --install   # and run `yarn install` at the root and in each app
+#   bash scripts/use-stack.sh npm --install   # and run `yarn install` at the root and in each app,
+#                                             # then the stack suite (test/stack/run.mjs)
+#   bash scripts/use-stack.sh npm --install --no-check   # the same without the suite
 #
 # To adopt a newer stack: change the versions in PACKAGES (and COMPAT_PINS if the
-# stack's libp2p line moved), run `npm --install`, then validate with the core's tests
-# and test/stack before touching an app. For iOS also run `pod install` in the app.
+# stack's libp2p line moved), run `npm --install` (which runs the stack suite, about ten
+# minutes), then the core's tests, before touching an app. For iOS also run `pod install`.
 #
 # apps/mobile/metro.config.js reads the app's package.json to decide whether to alias
 # the stack to local source, so it follows the mode with no second switch.
@@ -40,8 +42,9 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CMD="${1:-status}"
 DO_INSTALL=0
+DO_CHECK=1
 for arg in "$@"; do
-  case "$arg" in --install) DO_INSTALL=1 ;; esac
+  case "$arg" in --install) DO_INSTALL=1 ;; --no-check) DO_CHECK=0 ;; esac
 done
 
 case "$CMD" in
@@ -168,4 +171,8 @@ if [ "$CMD" != status ] && [ "$DO_INSTALL" = 1 ]; then
     (cd "$app" && yarn install) || exit $?
   done
   echo "For iOS also run: (cd apps/mobile/ios && pod install)"
+  if [ "$DO_CHECK" = 1 ]; then
+    echo "==> stack suite (test/stack/run.mjs; --no-check skips it)"
+    (cd "$ROOT" && node test/stack/run.mjs) || exit $?
+  fi
 fi

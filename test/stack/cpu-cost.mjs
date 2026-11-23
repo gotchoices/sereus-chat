@@ -46,10 +46,15 @@
  * Usage:  CPU_SLOWDOWN=1 node two-party-formation.mjs     # full S7 cost
  *         CPU_SLOWDOWN=0.25 node two-party-formation.mjs  # quarter of it
  */
-// Bypasses the package `exports` map; same resolved file, same module instance.
-const cryptoModule = await import(
-  new URL('./node_modules/@chainsafe/libp2p-noise/dist/src/crypto/index.js', import.meta.url).href
-);
+// Bypasses the package `exports` map; same resolved file, same module instance. The package is in
+// this folder's node_modules or, hoisted, the repository root's.
+const { existsSync } = await import('node:fs');
+const { fileURLToPath } = await import('node:url');
+const noiseCrypto = ['./node_modules/', '../../node_modules/']
+  .map(dir => new URL(`${dir}@chainsafe/libp2p-noise/dist/src/crypto/index.js`, import.meta.url))
+  .find(url => existsSync(fileURLToPath(url)));
+if (!noiseCrypto) throw new Error('@chainsafe/libp2p-noise is not installed here or at the repository root');
+const cryptoModule = await import(noiseCrypto.href);
 const { defaultCrypto } = cryptoModule;
 
 /** 1.0 == the deltas measured on the S7. 0 disables. */

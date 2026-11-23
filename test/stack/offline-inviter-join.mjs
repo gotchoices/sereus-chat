@@ -29,7 +29,11 @@
  *   RELAY_ADDR=/dns4/relay.sereus.org/tcp/4011/ws/p2p/12D3Koo… node offline-inviter-join.mjs
  *   JOINER_RESTART=1 WAIT_MS=180000 RELAY_ADDR=… node offline-inviter-join.mjs
  */
-import { CadreNode, ControlFormationUsageRecorder, generateStrandMemberKey, KeyStoreJoinedStrandStore } from '@serfab/cadre-core';
+import { CadreNode, ControlFormationUsageRecorder, InMemoryKeyStore, generateStrandMemberKey, KeyStoreJoinedStrandStore } from '@serfab/cadre-core';
+import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
+
+/** Each party's owner key store, kept across its restarts. */
+const ownerKeyStores = new Map();
 import { LevelDBRawStorage } from '@optimystic/db-p2p-storage-rn';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
@@ -142,9 +146,11 @@ async function startParty(tag, partyId) {
   });
   autoAttach(node, tag);
   await node.start();
-  const owner = node.getIdentityOwnerKey();
-  await node.getControlDatabase().ensureOwnerKey(owner.publicKeyB64);
-  node.initializeSeedBootstrap(owner.privateKeyB64);
+  // The party's owner key, apart from the machine's identity (sereus 1.17): enrolled at the first
+  // start, and the same key store at every restart in this process.
+  const keyStore = ownerKeyStores.get(tag) ?? ownerKeyStores.set(tag, new InMemoryKeyStore()).get(tag);
+  const genesis = await runOwnerGenesis(node, { keyStore, label: tag });
+  if (genesis !== 'enrolled') throw new Error(`${tag}: owner genesis did not enrol (${String(genesis)})`);
   // The formation responder, installed at every start as an app does at boot.
   node.initializeStrandSolicitation({
     formationUsageRecorder: new ControlFormationUsageRecorder(node.getControlDatabase()),

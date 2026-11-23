@@ -16,7 +16,8 @@
  * KNOWN GAP (gotchoices/sereus#67, backlog `feat-strand-blobs-persist`). Sereus builds strand
  * nodes with no persistent piece store, so pieces live in memory. A blob no other member has
  * fetched yet is lost when its sender's strand sleeps (on a phone, every trip to the
- * background) or restarts. `src/upstream/blobs.test.ts` marks the day this changes.
+ * background) or restarts. The stack suite's `test/stack/blob-survives-hibernate.mjs` (expected to
+ * fail, `suite.json`) marks the day this changes.
  */
 import type { StrandInstance } from '@serfab/cadre-core';
 import type { FileAccess } from './host.js';

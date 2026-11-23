@@ -37,7 +37,11 @@
  * dir) and is REUSED by phase 2 — that reuse is the whole point, so the script
  * refuses to run phase 2 if it cannot reopen what phase 1 wrote.
  */
-import { CadreNode, ControlFormationUsageRecorder, generateStrandMemberKey } from '@serfab/cadre-core';
+import { CadreNode, ControlFormationUsageRecorder, InMemoryKeyStore, generateStrandMemberKey } from '@serfab/cadre-core';
+import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
+
+/** Each party's owner key store, kept across its restarts. */
+const ownerKeyStores = new Map();
 import { LevelDBRawStorage } from '@optimystic/db-p2p-storage-rn';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
@@ -256,9 +260,11 @@ async function startParty(tag, partyId) {
   // poll is not missed.
   autoAttach(node, tag);
   await node.start();
-  const owner = node.getIdentityOwnerKey();
-  await node.getControlDatabase().ensureOwnerKey(owner.publicKeyB64);
-  node.initializeSeedBootstrap(owner.privateKeyB64);
+  // The party's owner key, apart from the machine's identity (sereus 1.17): enrolled at the first
+  // start, and the same key store at every restart in this process.
+  const keyStore = ownerKeyStores.get(tag) ?? ownerKeyStores.set(tag, new InMemoryKeyStore()).get(tag);
+  const genesis = await runOwnerGenesis(node, { keyStore, label: tag });
+  if (genesis !== 'enrolled') throw new Error(`${tag}: owner genesis did not enrol (${String(genesis)})`);
   return node;
 }
 

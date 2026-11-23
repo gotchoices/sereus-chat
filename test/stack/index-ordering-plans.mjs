@@ -49,8 +49,14 @@ for (const kind of ['memory', 'optimystic']) {
   await new Promise(r => setTimeout(r, 3000)); // let the bulk insert settle
   for (const q of QUERIES) (results[q] ??= {})[kind] = { ms: await median(db, q), plan: await plan(db, q) };
 }
+// The check (test/stack suite): wherever the memory table's plan uses the index, so does the
+// Optimystic table's (Optimystic#52).
+const usesIndex = plan => /INDEX|SEEK/i.test(plan);
+let misses = 0;
 for (const q of QUERIES) {
   const { memory: m, optimystic: o } = results[q];
-  console.log(`\n${q}\n  memory:     ${m.ms.toFixed(1).padStart(7)} ms  ${m.plan}\n  optimystic: ${o.ms.toFixed(1).padStart(7)} ms  ${o.plan}`);
+  const miss = usesIndex(m.plan) && !usesIndex(o.plan);
+  if (miss) misses++;
+  console.log(`\n${q}\n  memory:     ${m.ms.toFixed(1).padStart(7)} ms  ${m.plan}\n  optimystic: ${o.ms.toFixed(1).padStart(7)} ms  ${o.plan}${miss ? '  <- no index' : ''}`);
 }
-process.exit(0);
+process.exit(misses ? 1 : 0);

@@ -11,7 +11,8 @@
   "scripts": {
     "stack": "bash scripts/use-stack.sh",
     "relay": "sh scripts/relay.sh",
-    "cli": "yarn workspace serchat build && node apps/cli/dist/serchat.js"
+    "cli": "yarn workspace serchat build && node apps/cli/dist/serchat.js",
+    "stack:suite": "node test/stack/run.mjs"
   },
   "resolutions": {
     "@optimystic/db-core": "1.29.0",

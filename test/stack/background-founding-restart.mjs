@@ -92,4 +92,5 @@ console.log(`run 2 after ${Math.round((30_000 - (deadline - Date.now())) / 1000)
 await second.node.stop();
 await relay.stop();
 await rm(dir, { recursive: true, force: true }).catch(() => {}); // a late write may still land
-process.exit(0);
+// The check (test/stack suite): both strands run again after the restart.
+process.exit(running.includes(fg) && running.includes(bg) ? 0 : 1);

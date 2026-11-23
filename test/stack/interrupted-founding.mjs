@@ -231,4 +231,5 @@ console.log(`RESULT mode=${MODE} stop=${stopPoint} first=${finishedBeforeStop ? 
   `resume=${r2.ok ? `OK ${ms2}ms` : `FAILED ${ms2}ms ${errText(r2.e)}`}`);
 await settle(node.stop());
 log(`files: ${dir}`);
-process.exit(0);
+// The check (test/stack suite): the second founding resumes and the strand is writable.
+process.exit(r2.ok && readable.includes('OK') ? 0 : 1);

@@ -1,0 +1,19 @@
+{
+  "about": "The stack regression suite (test/stack/run.mjs). Each check is a script here that exits 0 when the stack does what it asks. `expect: \"fail\"` marks behaviour the stack does not have yet, with the issue that tracks it: such a check passing is a signal, not a success, and the runner says so.",
+  "checks": [
+    { "script": "found-strand.mjs", "expect": "pass", "about": "founding one strand converges over the phone's LevelDB adapter" },
+    { "script": "background-founding-double-start.mjs", "expect": "pass", "about": "a strand founded in the background, started twice: the joiner gets in" },
+    { "script": "background-founding-restart.mjs", "expect": "pass", "about": "foreground- and background-founded strands both run again after a restart" },
+    { "script": "interrupted-founding.mjs", "expect": "pass", "about": "a founding interrupted by a stop resumes, and the strand is writable" },
+    { "script": "restart-after-replicated-write.mjs", "expect": "pass", "about": "a replicated row survives a restart while its writer is offline" },
+    { "script": "schema-change-offline-peer.mjs", "expect": "pass", "about": "a strand opens after a schema change (a column tag) with its other member offline" },
+    { "script": "index-ordering-plans.mjs", "expect": "pass", "about": "an Optimystic table uses an index wherever a memory table does (Optimystic#52)" },
+    { "script": "control-db-app-tables.mjs", "expect": "pass", "about": "an app's private tables in the cadre's control database" },
+    { "script": "two-party-formation.mjs", "expect": "pass", "relay": true, "about": "two parties form a strand through a relay, writes cross both ways" },
+    { "script": "restart-reconverge.mjs", "expect": "pass", "relay": true, "about": "two relay-only parties converge again after a restart" },
+    { "script": "offline-inviter-join.mjs", "expect": "pass", "relay": true, "env": { "JOIN_MODE": "request" }, "timeoutS": 400, "about": "a join requested while the inviter is offline completes on its own (requestJoin, sereus#25)" },
+    { "script": "blobref-type.mjs", "expect": "pass", "about": "a strand schema can declare a blobref column (sereus#67, gap 1, fixed in 1.24)" },
+    { "script": "blob-survives-hibernate.mjs", "expect": "fail", "issue": "gotchoices/sereus#67", "about": "a blob survives its strand hibernating and waking (blob pieces are in memory)" },
+    { "script": "owner-recovery.mjs", "expect": "fail", "issue": "triage", "about": "recovery with an offline backup owner key: the step 'R admits the new phone P as an owner' times out on sereus 1.24 — not yet known whether the stack or this script is out of date" }
+  ]
+}

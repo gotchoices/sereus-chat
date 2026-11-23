@@ -70,12 +70,12 @@ async function memoryAnchor() {
   return PersistentTrustedOwnerStore.open(slot, partyId);
 }
 
-async function startNode(label, privateKey, { bootstrap = [], pinnedKeys = [], profile = 'transaction' } = {}) {
+async function startNode(label, privateKey, { bootstrap = [], pinnedKeys = [], nodeClass = 'device' } = {}) {
   const scopes = new Map();
   const node = new CadreNode({
     privateKey,
     controlNetwork: { partyId, bootstrapNodes: bootstrap },
-    profile,
+    nodeClass,
     strandFilter: { mode: 'none' },
     hostUnclaimedStrands: false,
     storage: { provider: scope => scopes.get(scope) ?? scopes.set(scope, new MemoryRawStorage()).get(scope) },

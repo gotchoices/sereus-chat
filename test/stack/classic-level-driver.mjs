@@ -27,12 +27,20 @@ class ClassicLevelAdapter {
    */
   constructor(db, opDelayMs = 0) { this.db = db; this.opDelayMs = opDelayMs; }
 
+  /** `classic-level` honours `write({ sync: true })` (Optimystic 1.29's `LevelDBLike.canSync`). */
+  get canSync() { return true; }
+
   async #pause() { if (this.opDelayMs > 0) await sleep(this.opDelayMs); }
 
   async get(key) {
     await this.#pause();
     const value = await this.db.get(key);
     return value === undefined ? undefined : new Uint8Array(value);
+  }
+  /** The value as UTF-8 text (Optimystic 1.29's `LevelDBLike.getText`), decoded here rather than by the engine. */
+  async getText(key) {
+    const value = await this.get(key);
+    return value === undefined ? undefined : textDecoder.decode(value);
   }
   async put(key, value) { await this.#pause(); await this.db.put(key, value); }
   async delete(key) { await this.#pause(); await this.db.del(key); }
@@ -42,7 +50,7 @@ class ClassicLevelAdapter {
     return {
       put(key, value) { chain.put(key, value); return this; },
       delete(key) { chain.del(key); return this; },
-      write: async () => { await this.#pause(); await chain.write(); },
+      write: async (options = {}) => { await this.#pause(); await chain.write({ sync: !!options.sync }); },
     };
   }
 
@@ -60,8 +68,22 @@ class ClassicLevelAdapter {
     };
   }
 
+  /** `iterator`, each value read as `getText` reads one (Optimystic 1.29's `LevelDBLike.textIterator`). */
+  textIterator(options = {}) {
+    const inner = this.iterator(options);
+    return {
+      next: async () => {
+        const entry = await inner.next();
+        return entry === undefined ? undefined : [entry[0], textDecoder.decode(entry[1])];
+      },
+      close: () => inner.close(),
+    };
+  }
+
   async close() { await this.db.close(); }
 }
+
+const textDecoder = new TextDecoder();
 
 /**
  * One file-backed database.
