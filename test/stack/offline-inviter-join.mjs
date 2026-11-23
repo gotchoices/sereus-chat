@@ -67,7 +67,7 @@ const SAPP = {
     Id text primary key,
     Name text not null
 );`,
-  signature: '',
+  signature: '', schemaVersion: 1,
   latencyHint: 'interactive',
 };
 
@@ -128,7 +128,7 @@ async function startParty(tag, partyId) {
     bootstrapPeers: { store: await FileBootstrapPeerStore.open(join(STORE_ROOT, `${tag}-bootstrap`), partyId) },
     strandNetworkState: { store: await FileStrandNetworkStateStore.open(join(STORE_ROOT, `${tag}-strandnet`), partyId) },
     joinedStrands: { store: new KeyStoreJoinedStrandStore(new FileKeyStore(join(STORE_ROOT, `${tag}-keys`)), partyId) },
-    profile: 'transaction',
+    nodeClass: 'device',
     strandFilter: { mode: 'all' },
     storage: { provider: storageFor(tag) },
     network: {

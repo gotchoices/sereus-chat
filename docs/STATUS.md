@@ -1425,6 +1425,26 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         (and #58 for representation changes) are fixed. Until then testers wipe
         (`DATA_FORMAT`).
 
+- [x] **Stack 2026-11-22: sereus 1.24.0, optimystic 1.29.0, quereus 5.6.1** (p2p-fret 1.3.0,
+      libp2p 3.3.11 unchanged). A data wipe: `DATA_FORMAT` `sereus-1.24` (phone and serchat).
+      - **Breaking changes taken:**
+        - `SAppConfig.schemaVersion` is required: chat's is `CHAT_SCHEMA_VERSION` = 5 (schema
+          0.5.0), raised with every schema change;
+        - a strand refuses an app below its recorded schema version (`AppSchemaOutdatedError`):
+          the model's `app-outdated` kind, and the list shows "Update the app to open this strand";
+        - `profile: 'transaction'` is now `nodeClass: 'device'` (test hosts, serchat, the extra
+          node, `test/stack`);
+        - the control schema moved to version 5, and every member of a strand must run 1.24 or later.
+      - **Not taken yet:** per-node `roles`, notably `strandCohortMember: false` (a phone that runs
+        strands as a client and stores none of their blocks; needs an always-on member).
+      - **Blobs (gotchoices/sereus#67):** 1.24 registers Optimystic's column types (gap 1 fixed:
+        `blobref-type.mjs` passes on stock 1.24). Strand nodes still keep blob pieces in memory
+        (gap 2, backlog `feat-strand-blobs-persist`; `blob-survives-hibernate.mjs` still fails), so
+        attachments and the drive stay on our file layer.
+      - Tests: core 101 (an `app-outdated` mapping test added), serchat 15,
+        `test/cli/serchat-drive.mjs` PASS. `phone-joins-serchat.mjs` with photos both ways and the
+        drive PASS on the S21 and the S7 from cleared storage. Photo timing: S21 → serchat 1.9 s,
+        serchat → S21 3.4 s, S7 → serchat 6.7 s, serchat → S7 7.5 s.
 - [x] **Stack 2026-11-16: sereus 1.23.0, optimystic 1.27.0, quereus 5.4.0** (p2p-fret 1.3.0,
       libp2p 3.3.11 unchanged; `@serfab/quereus-plugin-sereus` 1.23.0 is new under cadre-core
       and pinned with the rest in `scripts/use-stack.sh`). Quereus 5.4.0, not 5.5.0: 5.4.0 is

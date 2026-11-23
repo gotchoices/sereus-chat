@@ -10,7 +10,7 @@ import { openTestDb } from './classic-level-driver.mjs';
 const node = new CadreNode({
   privateKey: await generateKeyPair('Ed25519'),
   controlNetwork: { partyId: randomUUID(), bootstrapNodes: [] },
-  profile: 'transaction',
+  nodeClass: 'device',
   strandFilter: { mode: 'all' },
   storage: { provider: (id) => new LevelDBRawStorage(openTestDb(`probe-${id}`, 0).db) },
   network: { transports: [webSockets(), circuitRelayTransport()], listenAddrs: [], requireRelay: false },

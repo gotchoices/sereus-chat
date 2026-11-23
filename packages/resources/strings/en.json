@@ -143,6 +143,7 @@
     "you": "you"
   },
   "errors": {
+    "app-outdated": "A newer version of the app has changed this strand. Update the app to open it.",
     "claim-failed": {
       "default": "Adding the machine did not finish. Trying again is safe.",
       "busy": "A machine is already being added."
@@ -419,6 +420,7 @@
     "muteHardNow": "Currently silent whatever happens",
     "muteHint": "Stays in your list; you are just not told about it",
     "muteSoftNow": "Currently quiet unless somebody names you",
+    "needsUpdate": "Update the app to open this strand",
     "noInvitationOut": "No invitation out",
     "noMessages": "No messages yet",
     "nothingNew": "Nothing new.",

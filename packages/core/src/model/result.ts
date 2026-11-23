@@ -55,6 +55,8 @@ export type ChatErrorKind =
   | 'invalid-input'
   /** The operation exists in the model but this implementation cannot do it yet. */
   | 'not-supported'
+  /** A newer version of the app has changed this strand's schema: update the app to open it. Final. */
+  | 'app-outdated'
   /** Anything else. */
   | 'unexpected';
 
@@ -65,7 +67,7 @@ const KINDS: Record<ChatErrorKind, true> = {
   'join-refused': true, 'join-host-busy': true, 'join-host-outdated': true, 'join-incomplete': true,
   'invitation-unusable': true, 'not-allowed': true, 'not-found': true, 'invalid-input': true, 'invalid-node-code': true, 'node-unreachable': true,
   'claim-refused': true, 'claim-failed': true, 'unsent-messages': true, 'rejected': true, 'not-supported': true,
-  'unexpected': true,
+  'app-outdated': true, 'unexpected': true,
 };
 export const CHAT_ERROR_KINDS = Object.keys(KINDS) as readonly ChatErrorKind[];
 

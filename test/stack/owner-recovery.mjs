@@ -146,7 +146,7 @@ async function admit(owner, member) {
 }
 
 await step('D (always-on, keyless) is admitted by A, trusting A', async () => {
-  D = await startNode('D', await generateKeyPair('Ed25519'), { pinnedKeys: [A.owner.publicKeyB64], profile: 'storage' });
+  D = await startNode('D', await generateKeyPair('Ed25519'), { pinnedKeys: [A.owner.publicKeyB64], nodeClass: 'server' });
   await D.node.enableSeedListener();
   await admit(A, D);
   // (`listAuthorizedMembers` lists the OTHER members: a node does not list itself.)
@@ -239,7 +239,7 @@ await step('P acts as an owner on its own: it authorizes a new node T, and D acc
   await until('P to hold the owner table with itself in it', async () =>
     (await ownerKeys(P.node)).includes(P.owner.publicKeyB64));
   await P.node.initializeSeedBootstrap(P.owner.privateKeyB64);
-  T = await startNode('T', await generateKeyPair('Ed25519'), { pinnedKeys: [P.owner.publicKeyB64], profile: 'storage' });
+  T = await startNode('T', await generateKeyPair('Ed25519'), { pinnedKeys: [P.owner.publicKeyB64], nodeClass: 'server' });
   await T.node.enableSeedListener();
   await admit(P, T);
   await until('D to authorize T', async () => (await authorized(D.node)).includes(T.peerId));

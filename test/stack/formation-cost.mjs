@@ -120,7 +120,7 @@ const SAPP = {
     table Member (Id text primary key, Name text not null) with tags ("optimystic.network_watch" = true);
     table Message (Id text primary key, MemberId text not null, Content text not null) with tags ("optimystic.network_watch" = true);
   ` + (process.env.INDEXES ? indexTables() : ''),
-  signature: '',
+  signature: '', schemaVersion: 1,
   latencyHint: 'interactive',
 };
 
@@ -160,7 +160,7 @@ async function makeParty(tag, relayAddr) {
   const node = new CadreNode({
     privateKey: await generateKeyPair('Ed25519'),
     controlNetwork: { partyId: `${tag}-${randomUUID()}`, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     strandFilter: { mode: 'all' },
     storage: { provider: () => new MemoryRawStorage() },
     network: {

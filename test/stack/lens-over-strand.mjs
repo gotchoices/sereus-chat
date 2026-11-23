@@ -37,7 +37,7 @@ import { FileKVStore, FileRawStorage } from '@optimystic/db-p2p-storage-fs';
 
 const OFFLINE = process.env.OFFLINE === '1';
 const SAPP_ID = 'org.example.lens';
-const V1 = { id: SAPP_ID, version: '1.0.0', signature: '', latencyHint: 'interactive',
+const V1 = { id: SAPP_ID, version: '1.0.0', signature: '', schemaVersion: 1, latencyHint: 'interactive',
   schema: 'table Contact (Id text primary key, Name text not null) with tags ("optimystic.network_watch" = true);' };
 const LENS = `declare logical schema ChatV2 {
   table Person (Id text primary key, DisplayName text not null);
@@ -70,7 +70,7 @@ async function party(tag, partyId) {
   const node = new CadreNode({
     keyStore, identityKeyId: DEFAULT_IDENTITY_KEY_ID,
     controlNetwork: { partyId, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     // The embedder that builds a store closes it (Optimystic IRawStorage.close), below.
     storage: { provider: scope => { const st = new FileRawStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
     network: { transports: [webSockets()], listenAddrs: ['/ip4/127.0.0.1/tcp/0/ws'], relayAddrs: [], requireRelay: false,

@@ -266,7 +266,10 @@ export default function StrandList() {
                   : s.lastMessage.previewText
                 : t('strands.noMessages');
             const connecting = t('strands.connecting');
-            const subtitle = s.opening
+            const subtitle = s.needsUpdate
+              // A newer app changed this strand's schema (sereus 1.24): only an update opens it.
+              ? t('strands.needsUpdate')
+              : s.opening
               // Known from the last list, not open yet: say so instead of guessing.
               ? (s.lastMessage ? `${connecting} · ${preview}` : connecting)
               : awaiting

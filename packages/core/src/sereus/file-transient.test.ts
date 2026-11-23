@@ -106,7 +106,7 @@ describe("Alice's party has a cadre member", () => {
     // An always-on machine: storage profile, every strand of its party as a replica.
     const base = (): Omit<CadreNodeConfig, 'controlNetwork'> => ({
       privateKey,
-      profile: 'storage',
+      nodeClass: 'server',
       strandFilter: { mode: 'all' },
       storage: { provider: (scope: string) => scopes.get(scope) ?? scopes.set(scope, new MemoryRawStorage()).get(scope)! },
       network: {

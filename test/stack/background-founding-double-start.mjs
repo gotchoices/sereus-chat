@@ -32,7 +32,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const MODE = process.env.MODE ?? 'double';
-const SAPP = { id: 'org.example.double-start', version: '0.1.0', signature: '', latencyHint: 'interactive', schema: 'table Note (Id text primary key, Body text not null);' };
+const SAPP = { id: 'org.example.double-start', version: '0.1.0', signature: '', schemaVersion: 1, latencyHint: 'interactive', schema: 'table Note (Id text primary key, Body text not null);' };
 const t0 = Date.now();
 const say = line => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s] ${line}`);
 
@@ -43,7 +43,7 @@ async function party(tag) {
   const node = new CadreNode({
     privateKey: await generateKeyPair('Ed25519'),
     controlNetwork: { partyId: `${tag}-${randomUUID()}`, bootstrapNodes: [] },
-    profile: 'transaction', strandFilter: { mode: 'all' },
+    nodeClass: 'device', strandFilter: { mode: 'all' },
     storage: { provider: process.env.STORAGE === 'file' ? (dir => scope => new FileRawStorage(join(dir, scope)))(mkdtempSync(join(tmpdir(), `double-${tag}-`))) : () => new MemoryRawStorage() },
     network: { transports: [webSockets(), circuitRelayTransport()], listenAddrs: [], relayAddrs: [relayAddr], requireRelay: false, connectionGater: { denyDialMultiaddr: () => false } },
     hibernation: { enabled: false }, requireSignedSchemas: false,

@@ -33,7 +33,7 @@ import { FileKVStore, FileRawStorage } from '@optimystic/db-p2p-storage-fs';
 const OFFLINE = process.env.OFFLINE === '1';
 const SAPP_ID = 'org.example.offline-restart';
 const SAPP = {
-  id: SAPP_ID, version: '1.0.0', signature: '', latencyHint: 'interactive',
+  id: SAPP_ID, version: '1.0.0', signature: '', schemaVersion: 1, latencyHint: 'interactive',
   schema: 'table Message (Id text primary key, Content text not null) with tags ("optimystic.network_watch" = true);',
 };
 
@@ -49,7 +49,7 @@ async function party(tag, partyId) {
   const node = new CadreNode({
     keyStore, identityKeyId: DEFAULT_IDENTITY_KEY_ID,
     controlNetwork: { partyId, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     // The embedder that builds a storage closes it (Optimystic IRawStorage.close); CLOSE=0 skips it.
     storage: { provider: scope => { const st = new FileRawStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
     network: { transports: [webSockets()], listenAddrs: ['/ip4/127.0.0.1/tcp/0/ws'], relayAddrs: [], requireRelay: false,

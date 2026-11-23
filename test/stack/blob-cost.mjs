@@ -48,7 +48,7 @@ async function party(tag, partyId) {
   const node = new CadreNode({
     keyStore, identityKeyId: DEFAULT_IDENTITY_KEY_ID,
     controlNetwork: { partyId, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     // The embedder that builds a store closes it (Optimystic IRawStorage.close), below.
     storage: { provider: scope => { const st = new FileRawStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
     network: { transports: [webSockets()], listenAddrs: ['/ip4/127.0.0.1/tcp/0/ws'], relayAddrs: [], requireRelay: false,

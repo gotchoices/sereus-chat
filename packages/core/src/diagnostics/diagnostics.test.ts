@@ -52,7 +52,7 @@ describe('two-party check', () => {
           const node = new CadreNode({
             privateKey: await generateKeyPair('Ed25519'),
             controlNetwork: { partyId, bootstrapNodes: [] },
-            profile: 'transaction',
+            nodeClass: 'device',
             strandFilter: { mode: 'all' },
             storage: { provider: () => new MemoryRawStorage() },
             network: {

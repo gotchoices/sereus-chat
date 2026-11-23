@@ -84,7 +84,7 @@ async function startA() {
   const node = new CadreNode({
     keyStore, identityKeyId: DEFAULT_IDENTITY_KEY_ID,
     controlNetwork: { partyId, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     strandFilter: { mode: 'none' },
     storage: { provider: scope => { const st = new FileRawStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
     network: { transports: [webSockets()], listenAddrs: [LISTEN], relayAddrs: [], requireRelay: false,
@@ -111,7 +111,7 @@ async function startD(bootstrap, pinnedKeys) {
   const node = new CadreNode({
     privateKey: await generateKeyPair('Ed25519'),
     controlNetwork: { partyId, bootstrapNodes: bootstrap },
-    profile: 'transaction',
+    nodeClass: 'device',
     strandFilter: { mode: 'none' },
     hostUnclaimedStrands: false,
     storage: { provider: scope => scopes.get(scope) ?? scopes.set(scope, new MemoryRawStorage()).get(scope) },

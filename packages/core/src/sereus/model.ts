@@ -14,7 +14,7 @@ import type {
   SearchBatch, StorageUsage, StrandState, StrandSummary, StrandWork, Visibility,
 } from '../model/index.js';
 import { fail, INVITATION_VALIDITY, ok, pageMessages } from '../model/index.js';
-import { attempt, ChatFailure, explainJoinFailure, isTransientWriteFailure, withTimeout } from './errors.js';
+import { appOutdatedOf, attempt, ChatFailure, explainJoinFailure, isTransientWriteFailure, withTimeout } from './errors.js';
 import type { ChatHost } from './host.js';
 import { LocalRecords, OutgoingInvitations, StrandPrefsStore, SummaryCache } from './local-state.js';
 import {
@@ -195,6 +195,21 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const daily = setInterval(collect, 24 * 60 * 60 * 1000) as { unref?: () => void };
     daily.unref?.();
   }
+  /**
+   * STRANDS A NEWER APP HAS MOVED ON (sereus 1.24). A strand records the highest app schema
+   * version any member applied and refuses an app below it: the node stops the strand and reports
+   * `strand:error` with an `AppSchemaOutdatedError`, once, and does not relaunch it. Listed as
+   * needing an update, and refused with `app-outdated` when opened.
+   */
+  const outdatedStrands = new Set<string>();
+  host.node.on('strand:error', ({ strandId, error }) => {
+    const outdated = appOutdatedOf(error);
+    if (!outdated) return;
+    outdatedStrands.add(strandId);
+    console.warn(`[sereus-model] strand ${strandId.slice(0, 8)} needs a newer app: schema ${outdated.strandSchemaVersion ?? '?'} here ${outdated.appSchemaVersion ?? '?'}`);
+    for (const listener of [...privateListeners]) listener();
+  });
+
   /** Attachments being fetched in the background, so one fetch per attachment at a time. */
   const prefetching = new Set<string>();
 
@@ -237,6 +252,9 @@ export function createSereusModel(host: ChatHost): SereusModel {
    */
   async function strandFor(strandId: string): Promise<StrandInstance> {
     if (!strandId) throw new ChatFailure('not-attached', 'No strand was named.');
+    if (outdatedStrands.has(strandId)) {
+      throw new ChatFailure('app-outdated', 'A newer version of the app has changed this strand. Update the app to open it.', { retryable: false });
+    }
     const node = requireNode();
     const pending = opening.get(strandId);
     if (pending && !node.getStrands().get(strandId)?.database) {
@@ -826,7 +844,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
         || runtime.isDeferred(known.id);
       listed.push({
         ...known, unreadCount: 0, mentioned: false, draftPreview: null, pending: false,
-        ...(asleep ? { asleep: true } : { opening: true }),
+        ...(outdatedStrands.has(known.id) ? { needsUpdate: true } : asleep ? { asleep: true } : { opening: true }),
         note: notes.get(known.id) ?? null,
         muted: prefsById[known.id]?.muted ?? 'none', archived: prefsById[known.id]?.archived ?? false,
       });

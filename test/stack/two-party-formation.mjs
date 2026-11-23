@@ -113,7 +113,7 @@ const SAPP = {
   id: 'org.sereus.chat',
   version: '0.1.0',
   schema: extractInnerDDL(CHAT_QSQL),
-  signature: '',
+  signature: '', schemaVersion: 1,
   latencyHint: 'interactive',
 };
 
@@ -138,7 +138,7 @@ async function makeParty(tag, relayAddr) {
   const node = new CadreNode({
     privateKey,
     controlNetwork: { partyId, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     strandFilter: { mode: 'all' },
     storage: { provider: storageFor(tag) },
     network: {

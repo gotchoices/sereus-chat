@@ -24,7 +24,7 @@ const SAPP = {
   id: 'org.sereus.chat.stackcheck',
   version: '0.1.0',
   schema: SCHEMA,
-  signature: '',
+  signature: '', schemaVersion: 1,
   latencyHint: 'interactive',
 } as SAppConfig;
 
@@ -77,7 +77,7 @@ export async function runFoundStrandCheck(platform: FoundStrandPlatform, opts: F
     node = new CadreNode({
       privateKey: platform.privateKey,
       controlNetwork: { partyId, bootstrapNodes: [] },
-      profile: 'transaction',
+      nodeClass: 'device',
       strandFilter: opts.strandFilter === 'sAppId' ? { mode: 'sAppId', sAppId: SAPP.id } : { mode: 'all' },
       storage: { provider: platform.storage },
       network: { transports: platform.transports, listenAddrs: platform.listenAddrs ?? [] },

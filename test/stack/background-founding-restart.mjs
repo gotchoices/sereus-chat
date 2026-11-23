@@ -26,7 +26,7 @@ import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { FileRawStorage } from '@optimystic/db-p2p-storage-fs';
 
 const SAPP = {
-  id: 'org.example.background-founding', version: '0.1.0', signature: '', latencyHint: 'interactive',
+  id: 'org.example.background-founding', version: '0.1.0', signature: '', schemaVersion: 1, latencyHint: 'interactive',
   schema: 'table Note (Id text primary key, Body text not null);',
 };
 
@@ -45,7 +45,7 @@ async function startNode() {
   const node = new CadreNode({
     keyStore, identityKeyId: DEFAULT_IDENTITY_KEY_ID,
     controlNetwork: { partyId, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     strandFilter: { mode: 'sAppId', sAppId: SAPP.id },
     storage: { provider: scope => new FileRawStorage(join(dir, 'blocks', scope)) },
     network: { transports: [webSockets(), circuitRelayTransport()], listenAddrs: [], relayAddrs: [relayAddr], requireRelay: false, connectionGater: { denyDialMultiaddr: () => false } },

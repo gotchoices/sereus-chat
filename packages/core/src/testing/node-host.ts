@@ -88,7 +88,7 @@ export async function createTestParty(tag: string, opts: {
   const node = new CadreNode({
     privateKey: await generateKeyPair('Ed25519'),
     controlNetwork: { partyId, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     strandFilter: { mode: 'sAppId', sAppId: CHAT_SAPP_ID },
     storage: {
       provider: (scope: string) => {

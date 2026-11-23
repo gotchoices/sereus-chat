@@ -47,7 +47,7 @@ describe('claiming a node', () => {
     node = new CadreNode({
       privateKey: await generateKeyPair('Ed25519'),
       controlNetwork: { partyId: 'unclaimed', bootstrapNodes: [] },
-      profile: 'transaction',
+      nodeClass: 'device',
       claim: { secret, record: async claim => { recorded = claim; } },
       storage: {
         provider: (scope: string) => {

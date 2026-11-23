@@ -47,8 +47,20 @@ export function isTransientWriteFailure(err: unknown): boolean {
   return /Failed to get super-majority/i.test(describeThrown(err));
 }
 
+/** The `AppSchemaOutdatedError` `err` is or wraps (sereus 1.24): a newer app changed the strand's schema. */
+export function appOutdatedOf(err: unknown): (Error & { appSchemaVersion?: number; strandSchemaVersion?: number }) | undefined {
+  for (let e: unknown = err, depth = 0; e instanceof Error && depth < 8; e = (e as { cause?: unknown }).cause, depth++) {
+    if (e.name === 'AppSchemaOutdatedError') return e as Error & { appSchemaVersion?: number; strandSchemaVersion?: number };
+  }
+  return undefined;
+}
+
 export function toChatError(err: unknown): ChatError {
   if (err instanceof ChatFailure) return err.chatError;
+  const outdated = appOutdatedOf(err);
+  if (outdated) {
+    return { kind: 'app-outdated', message: describeThrown(outdated), retryable: false, cause: err };
+  }
   const message = describeThrown(err);
   const name = err instanceof Error ? err.name : '';
   const kind: ChatErrorKind =

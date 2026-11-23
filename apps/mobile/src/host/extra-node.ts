@@ -21,7 +21,7 @@ export const createExtraNode: CreateExtraNode = async ({ tag, partyId, relayAddr
   const config = {
     privateKey: await generateKeyPair('Ed25519'),
     controlNetwork: { partyId, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     strandFilter: { mode: 'all' },
     storage: {
       // One storage per scope, as the kit keeps (Optimystic 1.23): the storage claims its

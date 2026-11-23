@@ -43,8 +43,12 @@ import { STORAGE_KEYS, STORAGE_KEY_PREFIX } from './persisted-names';
  *                control stores record their schema version: a store written by 1.16 or
  *                earlier is refused at start (`ControlStoreIncompatibleError`); optimystic
  *                1.15.0, p2p-fret 1.1.0.
+ *   sereus-1.24  apps declare a schema version and each strand records the highest applied
+ *                (`Strand.AppSchemaVersion`); the control schema is at version 5; every member of a
+ *                strand must run 1.24 or later. Optimystic 1.29 (commit proofs stored once, a
+ *                form earlier builds cannot read).
  */
-const STACK_FORMAT = 'sereus-1.17';
+const STACK_FORMAT = 'sereus-1.24';
 
 /**
  * The format marker: the stack format above, plus the chat sApp (schema) version, so a schema

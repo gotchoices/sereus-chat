@@ -30,7 +30,7 @@ const scopes = new Map();
 const node = new CadreNode({
   privateKey: await generateKeyPair('Ed25519'),
   controlNetwork: { partyId: `scale-${randomUUID()}`, bootstrapNodes: [] },
-  profile: 'transaction',
+  nodeClass: 'device',
   storage: { provider: s => scopes.get(s) ?? scopes.set(s, new MemoryRawStorage()).get(s) },
   network: { transports: [webSockets()], listenAddrs: [], relayAddrs: [], requireRelay: false },
   requireSignedSchemas: false,

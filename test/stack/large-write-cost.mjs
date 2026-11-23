@@ -40,7 +40,7 @@ async function party(tag, partyId) {
   const node = new CadreNode({
     keyStore, identityKeyId: DEFAULT_IDENTITY_KEY_ID,
     controlNetwork: { partyId, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     // The embedder that builds a store closes it (Optimystic IRawStorage.close), below.
     storage: { provider: scope => { const st = new FileRawStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
     network: { transports: [webSockets()], listenAddrs: ['/ip4/127.0.0.1/tcp/0/ws'], relayAddrs: [], requireRelay: false,
@@ -70,7 +70,7 @@ async function party(tag, partyId) {
 
 
 const SAPP_ID = 'org.example.large-write';
-const sApp = { id: SAPP_ID, version: '1.0.0', signature: '', latencyHint: 'interactive',
+const sApp = { id: SAPP_ID, version: '1.0.0', signature: '', schemaVersion: 1, latencyHint: 'interactive',
   schema: `table Member (Id text primary key, Name text not null);
   table BlobChunk (Hash text primary key, Bytes blob not null);` };
 const A = await party('a', `a-${randomUUID()}`);

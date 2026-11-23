@@ -35,6 +35,11 @@ export type StrandSummary = {
    */
   asleep?: boolean;
   /**
+   * A newer version of the app has changed this strand's schema, so this one cannot open it
+   * (sereus 1.24, `AppSchemaOutdatedError`). The row is the last one this device showed.
+   */
+  needsUpdate?: boolean;
+  /**
    * The user's private note on this strand: what it is for, who they invited. Only the user's
    * own machines hold it; no other member ever sees it.
    */

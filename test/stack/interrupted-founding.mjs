@@ -80,10 +80,10 @@ const STOP_AT = process.env.STOP_AT ?? 'ms';
 const STOP_AFTER_MS = Number(process.env.STOP_AFTER_MS ?? 300);
 const SAPP = PROFILE ? {
   // serchat's private strand sApp (packages/core/src/protocol/private-sapp.ts)
-  id: 'org.sereus.chat.private', version: '0.1.0', signature: '', latencyHint: 'interactive',
+  id: 'org.sereus.chat.private', version: '0.1.0', signature: '', schemaVersion: 1, latencyHint: 'interactive',
   schema: 'table Label (Key text primary key, Text text not null, UpdatedAt text not null) with tags ("optimystic.network_watch" = true);',
 } : {
-  id: 'org.example.interrupted-founding', version: '1.0.0', signature: '', latencyHint: 'interactive',
+  id: 'org.example.interrupted-founding', version: '1.0.0', signature: '', schemaVersion: 1, latencyHint: 'interactive',
   schema: 'table Label (Key text primary key, Text text not null);',
 };
 
@@ -114,7 +114,7 @@ async function startNode() {
   const node = new CadreNode({
     keyStore, identityKeyId: DEFAULT_IDENTITY_KEY_ID,
     controlNetwork: { partyId, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     // The embedder that builds a store closes it (Optimystic IRawStorage.close), in stop() below.
     storage: { provider: scope => { const st = new FileRawStorage(join(dir, 'blocks', scope)); built.push(st); return watchStore(scope, st); } },
     network: { transports: [webSockets()], listenAddrs: ['/ip4/127.0.0.1/tcp/0/ws'], relayAddrs: [], requireRelay: false,

@@ -20,6 +20,14 @@ export const CHAT_SAPP_ID = 'org.sereus.chat';
  */
 export const CHAT_SAPP_VERSION = '0.5.0';
 
+/**
+ * Sereus 1.24's schema version (`SAppConfig.schemaVersion`): a whole number raised with EVERY change
+ * to the `App` schema. A strand refuses an app whose number is lower than the highest any member
+ * has applied (`AppSchemaOutdatedError`), so an older app can never drop what a newer one added.
+ * 5 for schema 0.5.0; raise it together with `CHAT_SAPP_VERSION`.
+ */
+export const CHAT_SCHEMA_VERSION = 5;
+
 /** The drive's tables carry this prefix in chat's schema (`App.DriveFolder`, `App.DriveFile`). */
 export const DRIVE_PREFIX = 'Drive';
 
@@ -47,6 +55,7 @@ export function getChatSAppConfig(): SAppConfig {
   return {
     id: CHAT_SAPP_ID,
     version: CHAT_SAPP_VERSION,
+    schemaVersion: CHAT_SCHEMA_VERSION,
     schema: CHAT_SCHEMA_DDL,
     // Unsigned. cadre-core verifies schemas fail-closed, so the node is built with
     // `requireSignedSchemas: false`. Signing requires `id` to be an ed25519 author

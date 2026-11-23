@@ -89,7 +89,7 @@ table Message (
     ReplyToId text null,
     foreign key (MemberId) references Member(Id)
 );`;
-const SAPP = { id: 'org.sereus.chat', version: '0.1.0', schema: SCHEMA, signature: '', latencyHint: 'interactive' };
+const SAPP = { id: 'org.sereus.chat', version: '0.1.0', schema: SCHEMA, signature: '', schemaVersion: 1, latencyHint: 'interactive' };
 
 const t0 = Date.now();
 const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s] ${ROLE.toUpperCase()}:`, ...a);
@@ -123,7 +123,7 @@ async function startParty(tag, partyId) {
     bootstrapPeers: { store: await FileBootstrapPeerStore.open(join(STORE_ROOT, `${tag}-bootstrap`), partyId) },
     strandNetworkState: { store: await FileStrandNetworkStateStore.open(join(STORE_ROOT, `${tag}-strandnet`), partyId) },
     joinedStrands: { store: new KeyStoreJoinedStrandStore(new FileKeyStore(join(STORE_ROOT, `${tag}-keys`)), partyId) },
-    profile: 'transaction',
+    nodeClass: 'device',
     strandFilter: { mode: 'sAppId', sAppId: SAPP.id },
     storage: { provider: storageFor(tag) },
     network: {

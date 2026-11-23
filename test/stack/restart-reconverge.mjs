@@ -119,7 +119,7 @@ const SAPP = {
   id: 'org.sereus.chat.restartcheck',
   version: '0.1.0',
   schema: SCHEMA,
-  signature: '',
+  signature: '', schemaVersion: 1,
   latencyHint: 'interactive',
 };
 
@@ -239,7 +239,7 @@ async function startParty(tag, partyId) {
       ? { strandNetworkState: { store: strandPeerStore } }
       : { strandPeers: { store: strandPeerStore } }),
     joinedStrands: { store: joinedStore },
-    profile: 'transaction',
+    nodeClass: 'device',
     strandFilter: { mode: 'all' },
     storage: { provider: storageFor(tag) },
     network: {

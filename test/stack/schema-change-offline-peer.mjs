@@ -33,7 +33,7 @@ const schema = tagged => `
   table Message (Id text primary key${tagged ? ' with tags ("optimystic.fresh" = true)' : ''}, Content text not null)
     with tags ("optimystic.network_watch" = true);
 `;
-const V1 = { id: SAPP_ID, version: '1.0.0', schema: schema(false), signature: '', latencyHint: 'interactive' };
+const V1 = { id: SAPP_ID, version: '1.0.0', schema: schema(false), signature: '', schemaVersion: 1, latencyHint: 'interactive' };
 const V2 = CHANGE === 'tag' ? { ...V1, version: '1.1.0', schema: schema(true) }
   : CHANGE === 'index' ? { ...V1, version: '1.1.0', schema: `${schema(false)}\n  index MessageByContent on Message (Content);` }
   : V1;
@@ -50,7 +50,7 @@ async function party(tag, partyId) {
   const node = new CadreNode({
     keyStore, identityKeyId: DEFAULT_IDENTITY_KEY_ID,
     controlNetwork: { partyId, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     // The embedder that builds a store closes it (Optimystic IRawStorage.close), below.
     storage: { provider: scope => { const st = new FileRawStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
     network: { transports: [webSockets()], listenAddrs: ['/ip4/127.0.0.1/tcp/0/ws'], relayAddrs: [], requireRelay: false,

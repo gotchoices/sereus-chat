@@ -123,7 +123,7 @@ export function createCliHost(opts: HostOptions): CliHost {
       keyStore,
       identityKeyId: DEFAULT_IDENTITY_KEY_ID,
       controlNetwork: { partyId, bootstrapNodes: [] },
-      profile: 'transaction',
+      nodeClass: 'device',
       storage: {
         provider: opts.memoryBlocks
           ? (scope: string) => memoryScopes.get(scope) ?? memoryScopes.set(scope, new MemoryRawStorage()).get(scope)!

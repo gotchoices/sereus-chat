@@ -41,7 +41,7 @@ const OFFLINE = process.env.OFFLINE === '1';
 const ICE_FAIL = process.env.ICE_FAIL === '1';
 const HIBERNATE = process.env.HIBERNATE === '1';
 const SAPP_ID = 'org.example.p2p-webrtc';
-const sApp = { id: SAPP_ID, version: '1.0.0', signature: '', latencyHint: 'interactive',
+const sApp = { id: SAPP_ID, version: '1.0.0', signature: '', schemaVersion: 1, latencyHint: 'interactive',
   schema: 'table Note (Id text primary key, Bytes blob not null);' };
 const root = mkdtempSync(join(tmpdir(), 'p2p-webrtc-'));
 const t0 = Date.now();
@@ -65,7 +65,7 @@ async function party(tag, partyId, relayAddr) {
   const node = new CadreNode({
     keyStore, identityKeyId: DEFAULT_IDENTITY_KEY_ID,
     controlNetwork: { partyId, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     // The embedder that builds a store closes it (Optimystic IRawStorage.close), below.
     storage: { provider: scope => { const st = new FileRawStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
     // A PHONE: no listen address of its own; reachable only through the relay (a reservation
