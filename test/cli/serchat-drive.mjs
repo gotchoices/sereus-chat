@@ -3,6 +3,11 @@
  * relay; A makes a folder only A adds to and adds a file; B lists it, is refused adding there,
  * gets the file (A online to serve it) and checks it is the same bytes; A removes it.
  *
+ * A stays up for the whole run and acts through the development bridge, while B uses serchat's
+ * own one-shot `drive` commands. A file's bytes live only in memory on the strand nodes that hold
+ * them (gotchoices/sereus#67, gap 2), so a one-shot A would take its file with it when it exited.
+ * Once sereus keeps blobs on disk, A can go back to one-shot commands too.
+ *
  *   node test/cli/serchat-drive.mjs
  *
  * Env: RELAY (default relay.sereus.org), BRIDGE_PORT (default 9303), SIZE (bytes, default 3 MB).
@@ -53,16 +58,13 @@ try {
   for (const [p, name] of [['a', 'Priya'], ['b', 'Bob']]) run(p, ['profile', 'set', `name=${name}`, ';', 'relay', 'add', RELAY]);
   log(`two profiles with relay ${RELAY}`);
 
+  // A: up for the whole run, driven through the bridge.
   const a = await idle('a', true);
   running.push(a);
   const bridge = await connectBridge(`node:${PORT}`);
   const { url, strandId } = await bridge.call('invite');
   run('b', ['join', url, '--yes']);
   log(`B joined strand ${strandId.slice(0, 8)}`);
-  bridge.close();
-  log('stopping A');
-  await a.stop(); running.pop();
-  log('A stopped');
 
   const file = join(home, 'ridge-route.pdf');
   const bytes = randomBytes(SIZE);
@@ -70,13 +72,14 @@ try {
   const sha = b => createHash('sha256').update(b).digest('hex');
 
   // A write in a two-member strand needs the other member up to agree to it.
-  running.push(await idle('b'));
-  const made = run('a', ['drive', strandId, 'mkdir', 'Routes', '--creator', ';', 'drive', strandId, 'add', file, '--to', 'Routes', '--keep', 'year']).rows;
-  log(`A: folder ${made[0].name} (${made[0].policy}), file ${made[1].name} ${made[1].bytes} bytes in ${made[1].addMs} ms`);
+  const bUp = await idle('b');
+  const routes = await bridge.call('drive', strandId, 'addFolder', null, 'Routes', { addPolicy: 'creator' });
+  const tAdd = Date.now();
+  const added = await bridge.call('drive', strandId, 'addFile', routes.id, { uri: file, name: 'ridge-route.pdf', mimeType: 'application/pdf', keepFor: 'year' });
+  log(`A: folder Routes (creator), file ${added.name} ${added.size} bytes in ${Date.now() - tAdd} ms`);
+  await bUp.stop();
 
-  await running.pop().stop();
-
-  running.push(await idle('a'));
+  // B: serchat's own commands, one run each, with A up to serve the file.
   let listed = [];
   for (let i = 0; i < 10 && !listed.some(r => r.name === 'ridge-route.pdf'); i++) {
     listed = run('b', ['drive', strandId, 'ls', 'Routes']).rows;
@@ -91,13 +94,15 @@ try {
   const got = run('b', ['drive', strandId, 'get', 'Routes/ridge-route.pdf', '-o', out]).rows[0];
   const same = sha(readFileSync(out)) === sha(bytes);
   log(`B got the file in ${got.fetchMs} ms; ${same ? 'identical' : 'DIFFERENT'}`);
-  await running.pop().stop();
 
-  running.push(await idle('b'));
-  run('a', ['drive', strandId, 'rm', 'Routes/ridge-route.pdf', ';', 'drive', strandId, 'rm', 'Routes']);
-  const after = run('a', ['drive', strandId, 'ls']).rows;
-  log(`A removed both; the top now holds ${after.length} things`);
-  code = same && after.length === 0 ? 0 : 1;
+  const bAgain = await idle('b');
+  await bridge.call('drive', strandId, 'remove', 'file', added.id);
+  await bridge.call('drive', strandId, 'remove', 'folder', routes.id);
+  const after = await bridge.call('drive', strandId, 'list', null);
+  log(`A removed both; the top now holds ${after.folders.length + after.files.length} things`);
+  await bAgain.stop();
+  bridge.close();
+  code = same && after.folders.length + after.files.length === 0 ? 0 : 1;
 } catch (err) {
   log(`FAIL: ${err.message}`);
 } finally {

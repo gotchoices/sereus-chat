@@ -4,7 +4,6 @@
  * for the relay-only topology phones live in.
  */
 import { nodeFileAccess } from './node-files.js';
-import { MemoryBlockStore } from '../files/index.js';
 import { CadreNode, InMemoryKeyStore } from '@serfab/cadre-core';
 import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { MemoryRawStorage } from '@optimystic/db-p2p';
@@ -74,8 +73,6 @@ export async function createTestParty(tag: string, opts: {
   maxAttachmentBytes?: number;
   /** How strands come up and are visited (`ChatHost.strandStart`); unset, every strand. */
   strandStart?: ChatHost['strandStart'];
-  /** Attachments through the strand file layer (`ChatHost.blocks`, in memory) instead of chunk rows. */
-  fileLayer?: boolean;
 }): Promise<TestParty> {
   const scopes = new Map<string, MemoryRawStorage>();
   const journals = new Map<string, FileKVStore>();
@@ -153,10 +150,11 @@ export async function createTestParty(tag: string, opts: {
   const host: ChatHost = { node: nodeHost, slot: memorySlots(), ownerKeyStore, backgroundFounding: opts.backgroundFounding,
     files, ...(opts.maxAttachmentBytes ? { maxAttachmentBytes: opts.maxAttachmentBytes } : {}),
     ...(opts.strandStart ? { strandStart: opts.strandStart } : {}),
-    ...(opts.fileLayer ? { blocks: new MemoryBlockStore() } : {}) };
+  };
   const { model, boot, settle } = createSereusModel(host);
   return { tag, host, node, model, boot, settle, stop: async () => {
-    await settle();
+    // Bounded: a file whose only copy never reached anyone (sereus#67) would hold a stop forever.
+    await Promise.race([settle(), new Promise<void>(r => setTimeout(() => r(), 15_000))]);
     await node.stop();
     // The builder of a store closes it (Optimystic `IKVStore`/`IRawStorage`): flushes what it still holds.
     await Promise.allSettled([...journals.values()].map(j => j.close()));

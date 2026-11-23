@@ -10,9 +10,9 @@ naming a blob. It's built to move into the sereus stack as a module any sApp can
 - **`StrandDrive`:** reads and writes those rows under the spec's rules. It needs only a database
   that runs SQL (`exec`, `eval`: Quereus's, on the strand), the schema name, the prefix, and the
   viewer's member id.
-- **No bytes here.** The app puts a file's bytes in its blob layer (`@chat/strand-blobs`) and
-  passes the ref (`ipfs:<CID>`). `blobs()` lists the refs that live files name, which the app
-  keeps alive.
+- **No bytes here.** The app puts a file's bytes in the strand's blob service (Optimystic native
+  blobs under sereus) and passes the reference (a CID). The column is a `blobref`, so the stack keeps
+  the bytes alive for as long as a row names them. `blobs()` lists the references live files name.
 
 Concurrent edits merge row by row in the database: two members adding at once are two rows, and
 same names coexist by design.

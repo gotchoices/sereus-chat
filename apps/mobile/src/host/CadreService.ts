@@ -51,7 +51,6 @@ import { NODE_STORAGE_NAMES, STORAGE_KEYS } from '../data/persisted-names';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { OWNER_GENESIS_TIMEOUT_MS } from './async';
 import { PERF_LOG, STRAND_REACTIVITY, WEBRTC } from '../data/config';
-import { ipfsSmoke } from './ipfs-smoke';
 import { formatLoopLag, startLoopLag } from '@chat/core/diagnostics';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
@@ -502,8 +501,6 @@ class CadreServiceImpl {
         this.watchReachability(status.node);
         this.logConnections(status.node);
         if (PERF_LOG) {
-          const control = status.node.getControlNode();
-          if (control) void ipfsSmoke(control as never);
           // How busy the JS thread is, against how many strands are up (each runs its own node).
           this.loopNode = status.node;
           if (!this.stopLoopLag) {

@@ -67,7 +67,7 @@ describe('loader', () => {
     const l = loader<number>({
       load: async () => {
         concurrent++; maxConcurrent = Math.max(maxConcurrent, concurrent);
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise<void>(r => setTimeout(() => r(), 100));
         concurrent--;
         return ok(++n);
       },

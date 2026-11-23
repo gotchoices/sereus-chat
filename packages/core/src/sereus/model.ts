@@ -21,12 +21,10 @@ import {
   addReaction, insertAttachments, insertMessage, newId, queryAttachments, queryMembers, queryMessages,
   queryReactions, removeMessage, removeReaction, updateMessage, type AttachmentRow,
 } from './operations.js';
-import { BlobNotHereError, CHUNK_SIZE, putBlob, readBlob } from './blob-store.js';
 import { ensureBenchHandler } from './bench.js';
-import { NotAvailableError } from '@chat/strand-blobs';
 import { StrandDrive, DriveError, type DriveDb, type DriveFile as DriveFileRow, type DriveFolder as DriveFolderRow } from '@chat/strand-drive';
 import { DRIVE_PREFIX } from '../protocol/sapp.js';
-import { IPFS_REF, StrandMedia } from './strand-media.js';
+import { StrandFiles } from './strand-files.js';
 import { createChatStrand, foundChatStrandInBackground } from './sapp-strands.js';
 import { classifyClaimFailure, nodeReach, readNodeCode } from './node-code.js';
 import { ownerFingerprint, type CadreMachine, type CadreStatus } from '../model/index.js';
@@ -71,7 +69,8 @@ export interface SereusModel {
   boot(): Promise<void>;
   /**
    * Resolves when work started in the background has settled (with `backgroundFounding`, a
-   * new conversation still starting). A short-lived host awaits it before stopping.
+   * new conversation still starting), and every file put here is held by another member too.
+   * A short-lived host awaits it, bounded, before stopping.
    */
   settle(): Promise<void>;
 }
@@ -97,9 +96,9 @@ async function retryAfterRestart<T>(write: () => Promise<T>, perf: (...a: unknow
 }
 
 /**
- * An attachment as the app sees it. With a blob (0.4.0 on), `held` is this device's cached copy,
- * if it has one: held means `local`, not yet means `fetching` (never absent). A row from before
- * 0.4.0 carries only the sender's own path, which means something on that device alone.
+ * An attachment as the app sees it. `held` is this device's viewable copy, if it has one: held
+ * means `local`, not yet means `fetching` (never absent). A row without a file (sent by a device
+ * that keeps no files) has nothing to fetch.
  */
 function toAttachment(a: AttachmentRow, held?: string | null): Attachment {
   const common = {
@@ -107,13 +106,11 @@ function toAttachment(a: AttachmentRow, held?: string | null): Attachment {
     mimeType: a.MimeType, name: a.Name, byteSize: a.ByteSize ?? null, durationMs: a.DurationMs ?? null,
   };
   if (a.Blob) return { ...common, uri: held ?? null, blob: a.Blob, locality: held ? 'local' : 'fetching' };
-  return { ...common, uri: a.Uri, locality: a.Uri ? 'local' : 'fetching' };
+  return { ...common, uri: null, locality: 'unreachable' };
 }
 
 /** The most an attachment may be by default (story 20: the user's own limit). */
 const DEFAULT_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-/** An attachment ref naming a file on IPFS-on-a-strand (`strand-media.ts`): `ipfs:` + its CID. */
-const FILE_REF = IPFS_REF;
 
 export function createSereusModel(host: ChatHost): SereusModel {
   const runtime = new StrandRuntime(host);
@@ -158,43 +155,11 @@ export function createSereusModel(host: ChatHost): SereusModel {
   }
 
   /**
-   * Chat's files on IPFS-on-a-strand (`strand-media.ts`, gotchoices/sereus#62): with a host that
-   * keeps blocks, an attachment is a UnixFS file exchanged between members, and the strand carries
-   * only its CID (`ipfs:…`). Each strand's node runs an IPFS node (remade on a wake) that serves
-   * that strand's files.
+   * Files (attachments, the drive's files): bytes in the strand node's blob service, named by a
+   * row's `blobref` column (`strand-files.ts`). Without a host that keeps files, none move.
    */
-  const media = host.blocks && host.files
-    ? new StrandMedia(host.blocks, {
-      maxAnnouncedBytes: () => host.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES,
-      log: line => console.info(line),
-    })
-    : null;
-  /** The strand's IPFS node, on its current libp2p node. */
-  const ipfsFor = (strandId: string, strand?: StrandInstance) =>
-    media ? media.ensure(strandId, strand ?? host.node.node?.getStrands().get(strandId)) : Promise.resolve(undefined);
-  if (media) {
-    // A wake rebuilds the strand's node (`strand:waking`, not `strand:started`): IPFS on the new
-    // one, which also offers what nobody else holds yet. Going down stops it.
-    for (const event of STRAND_UP_EVENTS) {
-      host.node.on(event, ({ strandId }) => {
-        void ipfsFor(strandId).catch(err => console.warn('[media] starting IPFS failed:', err instanceof Error ? err.message : err));
-      });
-    }
-    for (const event of STRAND_DOWN_EVENTS) {
-      host.node.on(event, ({ strandId }) => { void media.stop(strandId); });
-    }
-    // Expired files go: once soon after start, then daily. A file stays while its records are
-    // read (`reference` in `withLocality`), or for a lease after it last moved.
-    const collect = () => {
-      void media.blobs.gc()
-        .then(r => { if (r.files || r.blocks) console.info(`[media] gc removed ${r.files} file(s), ${r.blocks} block(s)`); })
-        .catch(err => console.warn('[media] gc failed:', err instanceof Error ? err.message : err));
-    };
-    const first = setTimeout(collect, 60_000) as { unref?: () => void };
-    first.unref?.();
-    const daily = setInterval(collect, 24 * 60 * 60 * 1000) as { unref?: () => void };
-    daily.unref?.();
-  }
+  const strandFiles = host.files ? new StrandFiles(host.files, (...a: unknown[]) => perf(...a)) : null;
+
   /**
    * STRANDS A NEWER APP HAS MOVED ON (sereus 1.24). A strand records the highest app schema
    * version any member applied and refuses an app below it: the node stops the strand and reports
@@ -358,14 +323,12 @@ export function createSereusModel(host: ChatHost): SereusModel {
   }
 
   /** Attachments with their locality on this device (a cached copy of the blob, or not yet). */
-  async function withLocality(rows: AttachmentRow[], strandId?: string): Promise<Attachment[]> {
+  async function withLocality(rows: AttachmentRow[]): Promise<Attachment[]> {
     const files = host.files;
     return Promise.all(rows.map(async a => {
       if (!a.Blob || !files) return toAttachment(a);
       const path = files.cachePath(a.Blob, a.Name);
       const here = await files.exists(path).catch(() => false);
-      // A record here points at the file: keep it (and serve it) for as long as that holds.
-      if (here && strandId && media && a.Blob.startsWith(FILE_REF)) void media.blobs.reference(strandId, a.Blob.slice(FILE_REF.length));
       return toAttachment(a, here ? path : null);
     }));
   }
@@ -376,11 +339,11 @@ export function createSereusModel(host: ChatHost): SereusModel {
    * is not reachable yet.
    */
   function prefetchFiles(strandId: string, attachments: Attachment[]): void {
-    if (!media) return;
+    if (!strandFiles) return;
     const max = host.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES;
     for (const a of attachments) {
       const ref = (a as Attachment & { blob?: string | null }).blob;
-      if (!ref?.startsWith(FILE_REF) || a.locality === 'local' || (a.byteSize ?? 0) > max || prefetching.has(a.id)) continue;
+      if (!ref || a.locality === 'local' || (a.byteSize ?? 0) > max || prefetching.has(a.id)) continue;
       prefetching.add(a.id);
       void fetchAttachment(strandId, a.id)
         .catch(() => {})
@@ -388,28 +351,18 @@ export function createSereusModel(host: ChatHost): SereusModel {
     }
   }
 
-  /** Store a file in the strand file layer; its ref is `cid:` + the file's CID. */
-  async function putFile(strand: StrandInstance, uri: string): Promise<{ ref: string; size: number }> {
-    await ipfsFor(strand.strandId, strand);
-    const files = host.files!;
-    // Stored as a UnixFS file, announced to the members online, and provided on FRET.
-    const { cid, size } = await media!.blobs.putPath(strand.strandId, uri, () => files.read(uri, CHUNK_SIZE));
-    return { ref: `${FILE_REF}${cid}`, size };
-  }
-
   /**
-   * Store each attachment's file as a blob in the strand (docs/blobs.md) and keep this device's
-   * copy where any member's would be. Sizes are checked first, so nothing is written for a send
-   * that one file over the limit refuses. Without `host.files` the attachments pass as they are.
+   * Put each attachment's file into the strand (`strand-files.ts`), keeping this device's viewable
+   * copy where any member's would be. Sizes are checked first, so nothing moves for a send that one
+   * file over the limit refuses. Without a host that keeps files the attachments pass as they are.
    */
   async function storeAttachmentFiles(strand: StrandInstance, attachments: Attachment[]): Promise<Array<Attachment & { blob?: string | null }>> {
-    const files = host.files;
-    const toStore = files ? attachments.filter(a => a.uri && !a.blob) : [];
-    if (!files || !toStore.length) return attachments;
+    const toStore = strandFiles ? attachments.filter(a => a.uri && !a.blob) : [];
+    if (!strandFiles || !toStore.length) return attachments;
     const max = host.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES;
     const sizes = new Map<Attachment, number>();
     for (const a of toStore) {
-      const size = await files.size(a.uri!);
+      const size = await strandFiles.size(a.uri!);
       if (size > max) {
         const mb = (n: number) => (n / 1024 / 1024).toFixed(1);
         throw new ChatFailure('too-large', `${a.name ?? 'That file'} is ${mb(size)} MB; the limit is ${mb(max)} MB.`, { retryable: false });
@@ -419,14 +372,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const out: Array<Attachment & { blob?: string | null }> = [];
     for (const a of attachments) {
       if (!sizes.has(a)) { out.push(a); continue; }
-      const { ref, size } = media
-        ? await putFile(strand, a.uri!)
-        : await putBlob(strand, files.read(a.uri!, CHUNK_SIZE));
-      const cached = files.cachePath(ref, a.name);
-      if (!(await files.exists(cached))) {
-        if (files.copy) await files.copy(a.uri!, cached);
-        else await files.write(cached, files.read(a.uri!, CHUNK_SIZE));
-      }
+      const { ref, size } = await strandFiles.put(strand, a.uri!, a.name);
       // The sender's own path is its device's business: the strand carries the ref.
       out.push({ ...a, uri: null, blob: ref, byteSize: size });
     }
@@ -448,44 +394,19 @@ export function createSereusModel(host: ChatHost): SereusModel {
   }
 
   async function fetchAttachmentOnce(strandId: string, attachmentId: string): Promise<{ uri: string }> {
-    const files = host.files;
-    if (!files) throw new ChatFailure('not-supported', 'This app cannot keep files.');
+    if (!strandFiles) throw new ChatFailure('not-supported', 'This app cannot keep files.');
     const strand = await strandFor(strandId);
     const row = (await queryAttachments(strand)).find(r => r.Id === attachmentId);
     if (!row) throw new ChatFailure('unavailable', 'That attachment has not arrived yet.', { retryable: true, reason: 'still-arriving' });
-    if (!row.Blob) {
-      if (row.Uri && await files.exists(row.Uri).catch(() => false)) return { uri: row.Uri };
-      throw new ChatFailure('unavailable', 'This attachment was sent without its file (by an older version of the app).', { retryable: false });
-    }
-    const path = files.cachePath(row.Blob, row.Name);
-    if (await files.exists(path).catch(() => false)) return { uri: path };
+    if (!row.Blob) throw new ChatFailure('unavailable', 'This attachment was sent without its file.', { retryable: false });
     const t0 = Date.now();
-    try {
-      if (row.Blob.startsWith(FILE_REF)) {
-        if (!media) throw new ChatFailure('not-supported', 'This app cannot read files sent this way.', { retryable: false });
-        await ipfsFor(strandId, strand);
-        const cid = row.Blob.slice(FILE_REF.length);
-        if (!(await media.blobs.saveAs(strandId, cid, path))) {
-          await files.write(path, media.blobs.read(strandId, cid));
-        }
-      } else {
-        await files.write(path, readBlob(strand, row.Blob));
-      }
-      perf('fetch', attachmentId.slice(0, 8), 'whole in', Date.now() - t0, 'ms');
-    } catch (err) {
-      if (err instanceof NotAvailableError) {
-        perf('fetch', attachmentId.slice(0, 8), 'not reachable yet:', err.message);
-        throw new ChatFailure('unavailable', 'Still arriving: no member who has this file is reachable yet.', { retryable: true, reason: 'still-arriving' });
-      }
-      if (err instanceof BlobNotHereError) {
-        perf('fetch', attachmentId.slice(0, 8), 'still arriving:', err.missing === 'manifest' ? 'no manifest yet' : err.message);
-        throw new ChatFailure('unavailable', 'Still arriving: not every part of this file is here yet.', { retryable: true, reason: 'still-arriving' });
-      }
-      throw err;
-    }
+    const already = await strandFiles.here(row.Blob, row.Name);
+    if (already) return { uri: already };
+    const uri = await strandFiles.bring(strand, row.Blob, row.Name);
+    perf('fetch', attachmentId.slice(0, 8), 'whole in', Date.now() - t0, 'ms');
     // Lists showing it as "still arriving" re-read.
     for (const listener of [...privateListeners]) listener();
-    return { uri: path };
+    return { uri };
   }
 
   // ------------------------------------------------------------------ the strand drive (story 23)
@@ -528,12 +449,6 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const files = host.files;
     const path = files?.cachePath(f.blob, f.name);
     const here = path ? await files!.exists(path).catch(() => false) : false;
-    // A record here points at the file: keep its blob (and serve it) while the row is live.
-    // A drive file may be kept longer than a blob's lease (a year): hold it as long as the row.
-    if (media && f.blob.startsWith(FILE_REF)) {
-      const cid = f.blob.slice(FILE_REF.length);
-      void media.blobs.reference(strandId, cid).then(() => media!.blobs.touch(cid, Date.parse(f.expiresAt) - Date.now()));
-    }
     return {
       id: f.id, folderId: f.folderId, name: f.name, size: f.size, mimeType: f.mimeType,
       addedBy: f.addedBy, addedByName: nameOf(f.addedBy), addedAt: f.addedAt, expiresAt: f.expiresAt,
@@ -545,27 +460,6 @@ export function createSereusModel(host: ChatHost): SereusModel {
     id: f.id, parentId: f.parentId, name: f.name, createdBy: f.createdBy, createdByName: nameOf(f.createdBy),
     createdAt: f.createdAt, addPolicy: f.addPolicy, mine: f.mine, canAdd: f.canAdd,
   });
-
-  /** A blob's bytes as a file on this device (the viewable copy), fetched from the strand if needed. */
-  async function materialize(strandId: string, ref: string, name: string | undefined): Promise<string> {
-    const files = host.files;
-    if (!files) throw new ChatFailure('not-supported', 'This app cannot keep files.');
-    const path = files.cachePath(ref, name);
-    if (await files.exists(path).catch(() => false)) return path;
-    if (!media || !ref.startsWith(FILE_REF)) throw new ChatFailure('not-supported', 'This app cannot read files kept this way.', { retryable: false });
-    const strand = await strandFor(strandId);
-    await ipfsFor(strandId, strand);
-    const cid = ref.slice(FILE_REF.length);
-    try {
-      if (!(await media.blobs.saveAs(strandId, cid, path))) await files.write(path, media.blobs.read(strandId, cid));
-    } catch (err) {
-      if (err instanceof NotAvailableError) {
-        throw new ChatFailure('unavailable', 'Still arriving: no member who has this file is reachable yet.', { retryable: true, reason: 'still-arriving' });
-      }
-      throw err;
-    }
-    return path;
-  }
 
   async function listMessages(strandId: string): Promise<Message[]> {
     const t0 = Date.now();
@@ -585,7 +479,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       perf('listMessages', rows.length, 'rows in', Date.now() - t0, 'ms');
     }
     const attByMessage = new Map<string, Attachment[]>();
-    const located = await withLocality(atts, strandId);
+    const located = await withLocality(atts);
     prefetchFiles(strandId, located);
     if (host.dev) {
       // When each attachment's row, then its file, first shows here, against the message's send time.
@@ -658,7 +552,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     const woken: string[] = [];
     for (const [i, id] of order.entries()) {
       if (node.getStrands().get(id)?.status !== 'hibernating') continue;
-      if (i > 0 && policy?.gapMs) await new Promise(r => setTimeout(r, policy.gapMs));
+      if (i > 0 && policy?.gapMs) await new Promise<void>(r => setTimeout(() => r(), policy.gapMs));
       wakesInFlight.add(id);
       const t0 = Date.now();
       try {
@@ -687,7 +581,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     busyCounts.set(kind, (busyCounts.get(kind) ?? 0) + 1);
     busyListeners.forEach(fn => fn());
     try {
-      await new Promise(r => setTimeout(r, BUSY_PAINT_MS));
+      await new Promise<void>(r => setTimeout(() => r(), BUSY_PAINT_MS));
       return await run();
     } finally {
       busyCounts.set(kind, (busyCounts.get(kind) ?? 1) - 1);
@@ -744,7 +638,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       const before = Date.parse((await summaries.read())[id]?.lastMessage?.timestamp ?? '') || 0;
       await busyWhile('checking', async () => { if (!(await runtime.attachDeferred(id))) await node.wakeStrand(id); });
       // Long enough for the other members to reach this node and land what they queued.
-      await new Promise(r => setTimeout(r, VISIT_WINDOW_MS));
+      await new Promise<void>(r => setTimeout(() => r(), VISIT_WINDOW_MS));
       const strand = node.getStrands().get(id);
       if (!strand?.database) return;
       const latest = await withTimeout(queryMessages(strand, 1), VISIT_READ_MS, 'a visit read');
@@ -894,7 +788,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       timestamp: row.Timestamp,
       replyToId: row.ReplyToId ?? null,
       editedAt: null,
-      attachments: await withLocality(saved, strand.strandId),
+      attachments: await withLocality(saved),
       reactions: [],
       ...(mark ? { delivery: mark } : {}),
     };
@@ -1248,7 +1142,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
     media: {
       list: (id, opts) => attempt(async () => {
         const rows = await queryAttachments(await strandFor(id));
-        return withLocality(rows.filter(r => !opts?.kind || r.Type === opts.kind), id);
+        return withLocality(rows.filter(r => !opts?.kind || r.Type === opts.kind));
       }),
       fetch: (strandId, attachmentId) => attempt(() => fetchAttachment(strandId, attachmentId)),
       storageUsage: () => attempt(async (): Promise<StorageUsage> => {
@@ -1285,11 +1179,10 @@ export function createSereusModel(host: ChatHost): SereusModel {
         return toDriveFolder(f, await driveNames(strandId));
       })),
       addFile: (strandId, folderId, file) => attempt(() => inDrive(async () => {
-        const files = host.files;
-        if (!files || !media) throw new ChatFailure('not-supported', 'This app cannot keep files.');
+        if (!strandFiles) throw new ChatFailure('not-supported', 'This app cannot keep files.');
         const drive = driveFor(strandId);
         // Refused before any bytes move: a folder only its creator adds to, or a file over the limit.
-        const size = await files.size(file.uri);
+        const size = await strandFiles.size(file.uri);
         const max = host.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES;
         if (size > max) {
           const mb = (n: number) => (n / 1024 / 1024).toFixed(1);
@@ -1299,23 +1192,15 @@ export function createSereusModel(host: ChatHost): SereusModel {
           const here = await drive.list(folderId);
           if (!here.canAdd) throw new DriveError('not-allowed', `Only the person who made "${here.folder?.name}" can add to it.`);
         }
-        const strand = await strandFor(strandId);
-        await ipfsFor(strandId, strand);
-        const { cid } = await media.blobs.putPath(strandId, file.uri, () => files.read(file.uri, CHUNK_SIZE));
-        const ref = `${FILE_REF}${cid}`;
-        // The adder's own viewable copy, as for an attachment.
-        const cached = files.cachePath(ref, file.name);
-        if (!(await files.exists(cached).catch(() => false))) {
-          if (files.copy) await files.copy(file.uri, cached);
-          else await files.write(cached, files.read(file.uri, CHUNK_SIZE));
-        }
+        const { ref } = await strandFiles.put(await strandFor(strandId), file.uri, file.name);
         const row = await retryAfterRestart(() => drive.addFile(folderId, { name: file.name, blob: ref, size, mimeType: file.mimeType ?? null, keepFor: file.keepFor }), perf);
         return toDriveFile(strandId, row, await driveNames(strandId));
       })),
       open: (strandId, fileId) => attempt(() => inDrive(async () => {
         const f = await driveFor(strandId).file(fileId);
         if (!f) throw new DriveError('not-found', 'That file is not in the drive (removed or expired).');
-        return { uri: await materialize(strandId, f.blob, f.name) };
+        if (!strandFiles) throw new ChatFailure('not-supported', 'This app cannot keep files.');
+        return { uri: await strandFiles.bring(await strandFor(strandId), f.blob, f.name) };
       })),
       rename: (strandId, kind, id, name) => attempt(() => inDrive(() => driveFor(strandId).rename(kind, id, name))),
       move: (strandId, kind, id, to) => attempt(() => inDrive(() => driveFor(strandId).move(kind, id, to))),
@@ -1567,6 +1452,8 @@ export function createSereusModel(host: ChatHost): SereusModel {
     boot: () => runtime.boot(),
     async settle() {
       while (background.size) await Promise.allSettled([...background]);
+      // Files put here and held nowhere else yet (`StrandFiles.settled`).
+      await strandFiles?.settled();
     },
   };
 }

@@ -55,10 +55,3 @@ export const WEBRTC = false;
  */
 export const PERF_LOG = false;
 
-/**
- * Attachments through the strand file layer (`@chat/core/files`, gotchoices/sereus#62): files
- * exchanged member to member, outside the database, with only their id in the strand. Off:
- * attachments as chunk rows in the strand (docs/blobs.md). A prototype, on the `strand-files`
- * branch.
- */
-export const FILE_LAYER = true;

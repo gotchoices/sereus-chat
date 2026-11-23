@@ -27,8 +27,8 @@ describe('the strand drive', () => {
   writeFileSync(route, bytes);
 
   beforeAll(async () => {
-    a = await createTestParty('dr-a', { listen: true, fileLayer: true });
-    b = await createTestParty('dr-b', { listen: true, fileLayer: true });
+    a = await createTestParty('dr-a', { listen: true });
+    b = await createTestParty('dr-b', { listen: true });
     await a.boot(); await b.boot();
     const inv = value(await a.model.invitations.create({ grantsInviteRight: false, visibility: 'private' }));
     strandId = value(await b.model.invitations.accept(inv.token)).strandId;

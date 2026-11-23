@@ -17,16 +17,18 @@ export const CHAT_SAPP_ID = 'org.sereus.chat';
  * 0.3.0: index `MessageByTime` on `Message (Timestamp, Id)` for the message list (Optimystic#52).
  * 0.4.0: blobs (docs/blobs.md): `Attachment.Blob`, tables `BlobChunk` and `Blob`.
  * 0.5.0: the strand drive (`@chat/strand-drive`): tables `DriveFolder` and `DriveFile`.
+ * 0.6.0: files in the stack's blobs (docs/blobs.md): `Attachment.Blob` and `DriveFile.Blob` are
+ *        `blobref` columns; `Attachment.Uri` and the chunk tables `BlobChunk` and `Blob` are gone.
  */
-export const CHAT_SAPP_VERSION = '0.5.0';
+export const CHAT_SAPP_VERSION = '0.6.0';
 
 /**
  * Sereus 1.24's schema version (`SAppConfig.schemaVersion`): a whole number raised with EVERY change
  * to the `App` schema. A strand refuses an app whose number is lower than the highest any member
  * has applied (`AppSchemaOutdatedError`), so an older app can never drop what a newer one added.
- * 5 for schema 0.5.0; raise it together with `CHAT_SAPP_VERSION`.
+ * 6 for schema 0.6.0; raise it together with `CHAT_SAPP_VERSION`.
  */
-export const CHAT_SCHEMA_VERSION = 5;
+export const CHAT_SCHEMA_VERSION = 6;
 
 /** The drive's tables carry this prefix in chat's schema (`App.DriveFolder`, `App.DriveFile`). */
 export const DRIVE_PREFIX = 'Drive';

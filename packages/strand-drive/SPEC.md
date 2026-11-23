@@ -2,7 +2,8 @@
 
 A strand's drive is a tree of folders and files that every member of the strand sees and can add to.
 The structure (folders, names, who added what, until when) is rows in the strand's database; the
-bytes of each file are a blob on IPFS-on-a-strand (`packages/strand-blobs`), named by its CID.
+bytes of each file are a blob in the strand's blob service (Optimystic native blobs under sereus),
+named by its CID in a `blobref` column.
 
 This spec lives with the module, not with any app: the drive is meant to become a **sereus module**
 that any sApp can include (gotchoices/sereus#62), and the spec leaves with it. Chat is the first user,
@@ -45,7 +46,7 @@ table DriveFile (
     Id text primary key,                  -- fresh UUID
     FolderId text null,                   -- the folder; null at the top
     Name text not null check (length(Name) between 1 and 255),
-    Blob text not null,                   -- the bytes: an IPFS ref, 'ipfs:<CID>'
+    Blob blobref not null,                -- the bytes: the blob's CID (Optimystic `blobref`)
     Size integer not null check (Size >= 0),
     MimeType text null,
     AddedBy text not null,                -- member id of whoever added it
@@ -110,16 +111,17 @@ Files expire on their own:
   (`ExpiresAt` only moves later). Keeping a useful file shouldn't depend on its author still being
   around.
 - **Expiry.** Past `ExpiresAt`, every app stops showing the file. Any member's app may then remove
-  the row, and each member's blob layer lets the bytes go at its next gc.
+  the row, and once no row references the blob, the stack reclaims it (Optimystic's reclaim pass,
+  after its grace period).
 
 Folders don't expire. An empty folder stays until its creator removes it.
 
 ## Removal
 
 Removing a file or folder takes it out of every member's drive as the row deletion replicates, and
-each member's blob layer lets the bytes go. Removal does not reach copies made outside the drive: a
-member may have saved, exported or forwarded the file, and any member's device may hold a cached
-copy until its gc runs. The UI says so when a member removes something (as chat's story 13 does for
+the stack reclaims the bytes once no row references them. Removal does not reach copies made outside
+the drive: a member may have saved, exported or forwarded the file, and any member's device may hold
+its own viewable copy. The UI says so when a member removes something (as chat's story 13 does for
 messages): "Removed from the drive. Anyone who already has a copy keeps it."
 
 ## Operations (the module's surface)
@@ -130,7 +132,7 @@ The operations an app calls. `prefix` is configured once, and member ids come fr
 |---|---|
 | `drive.list(folderId \| null)` | The folders and unexpired files directly in a folder (or the top level), with names, sizes, authors, times, fingerprints and whether the viewer may add, rename or remove each |
 | `drive.addFolder(parentId \| null, name, addPolicy)` | A new folder, if the viewer may add there |
-| `drive.addFile(folderId \| null, name, source, mimeType, keepFor)` | Puts the bytes in the blob layer, then writes the row. The size check is the app's own limit, as for attachments. |
+| `drive.addFile(folderId \| null, name, source, mimeType, keepFor)` | Puts the bytes in the strand's blob service, then writes the row naming them. The size check is the app's own limit, as for attachments. |
 | `drive.open(fileId)` | The file's bytes (fetched from members if needed), or "still arriving" / "not reachable" |
 | `drive.rename(id, name)`, `drive.move(id, folderId)` | Under the rules above |
 | `drive.keep(fileId, keepFor)` | Extends `ExpiresAt` |
@@ -138,9 +140,11 @@ The operations an app calls. `prefix` is configured once, and member ids come fr
 | `drive.setAddPolicy(folderId, policy)` | Creator only |
 | `drive.snapshot(folderId)` (later) | The folder as it is now, as one UnixFS directory: a single CID to export, archive or verify |
 
-Blob lifetime follows the rows. Whenever the app lists a folder, it calls the blob layer's
-`reference` for each file shown. An expired or removed file's blob gets no further references and
-goes at gc. This is the same rule chat's attachments follow.
+Blob lifetime follows the rows, through the `blobref` column: a committed row pins the blob and has
+the strand's cohort hold it, and the stack reclaims a blob no row references (Optimystic
+docs/blobs.md, "Lifetime"). The module itself never touches bytes. `driveSchema(prefix, { blobType:
+'text' })` declares the column as text for a database without Optimystic's type (this module's own
+tests).
 
 ## Not in this spec
 

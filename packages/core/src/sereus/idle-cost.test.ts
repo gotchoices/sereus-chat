@@ -5,7 +5,6 @@
  * 7× with 13 strands, docs/STATUS.md). Opt-in, a few minutes:
  *
  *   IDLE_COST=1 npx vitest run src/sereus/idle-cost.test.ts
- *   IDLE_COST=1 FILE_LAYER=0 …          # without the strand file layer (IPFS, FRET routing, blobs)
  *   IDLE_COST=1 PROFILE=<dir> …         # a CPU profile of the last window
  *   IDLE_COST=1 PEER_GONE=1 …           # the other member stops before the window: what a
  *                                       # strand costs while its members are unreachable
@@ -18,7 +17,6 @@ import { join } from 'node:path';
 import { createTestParty, until, type TestParty } from '../testing/node-host.js';
 
 const RUN = !!process.env.IDLE_COST;
-const FILE_LAYER = process.env.FILE_LAYER !== '0';
 const WINDOW_MS = Number(process.env.WINDOW_MS ?? 60_000);
 const SETTLE_MS = Number(process.env.SETTLE_MS ?? 20_000);
 const STEPS = (process.env.STEPS ?? '1,5,10').split(',').map(Number);
@@ -42,9 +40,9 @@ function nodes(p: TestParty): NodeLike[] {
 }
 
 describe.skipIf(!RUN)('the cost of idle strands', () => {
-  it(`N = ${STEPS.join(', ')} strands, file layer ${FILE_LAYER ? 'on' : 'off'}`, async () => {
-    const a = await createTestParty('idle-a', { listen: true, fileLayer: FILE_LAYER });
-    const b = await createTestParty('idle-b', { listen: true, fileLayer: FILE_LAYER });
+  it(`N = ${STEPS.join(', ')} strands, the stack's blobs`, async () => {
+    const a = await createTestParty('idle-a', { listen: true });
+    const b = await createTestParty('idle-b', { listen: true });
     try {
       await a.boot(); await b.boot();
       const rows: string[] = [];
@@ -59,10 +57,10 @@ describe.skipIf(!RUN)('the cost of idle strands', () => {
           }, 'the strand open at A', 120_000);
           have++;
         }
-        await new Promise(r => setTimeout(r, SETTLE_MS));
+        await new Promise<void>(r => setTimeout(() => r(), SETTLE_MS));
         // The last step only: B leaves the network for good, and A carries on alone.
         const gone = PEER_GONE && n === STEPS[STEPS.length - 1];
-        if (gone) { await b.stop(); await new Promise(r => setTimeout(r, SETTLE_MS)); }
+        if (gone) { await b.stop(); await new Promise<void>(r => setTimeout(() => r(), SETTLE_MS)); }
 
         const session = process.env.PROFILE && n === STEPS[STEPS.length - 1] ? new Session() : null;
         if (session) { session.connect(); await session.post('Profiler.enable'); await session.post('Profiler.start'); }
@@ -80,13 +78,13 @@ describe.skipIf(!RUN)('the cost of idle strands', () => {
         const timer = setInterval(sample, Number(process.env.SAMPLE_MS ?? 250));
         const cpu0 = process.cpuUsage();
         const elu0 = performance.eventLoopUtilization();
-        await new Promise(r => setTimeout(r, WINDOW_MS));
+        await new Promise<void>(r => setTimeout(() => r(), WINDOW_MS));
         const cpu = process.cpuUsage(cpu0);
         const elu = performance.eventLoopUtilization(elu0);
         clearInterval(timer);
         if (session) {
           const { profile } = await session.post('Profiler.stop');
-          writeFileSync(join(process.env.PROFILE!, `idle-${n}-${FILE_LAYER ? 'files' : 'nofiles'}${PEER_GONE ? '-gone' : ''}.cpuprofile`), JSON.stringify(profile));
+          writeFileSync(join(process.env.PROFILE!, `idle-${n}-blobs${PEER_GONE ? '-gone' : ''}.cpuprofile`), JSON.stringify(profile));
           session.disconnect();
         }
         const cpuPct = ((cpu.user + cpu.system) / 1000 / WINDOW_MS) * 100;
@@ -95,7 +93,7 @@ describe.skipIf(!RUN)('the cost of idle strands', () => {
         rows.push(`N=${n}${PEER_GONE && n === STEPS[STEPS.length - 1] ? ' (peer gone)' : ''}: CPU ${cpuPct.toFixed(1)}% (both parties), event loop ${(elu.utilization * 100).toFixed(1)}% busy, streams/min ${perMin([...streams.values()].reduce((s, k) => s + k, 0))}: ${top}`);
         process.stderr.write(`[idle-cost] ${rows[rows.length - 1]}\n`);
       }
-      process.stderr.write(`[idle-cost] file layer ${FILE_LAYER ? 'on' : 'off'}\n${rows.map(r => `  ${r}`).join('\n')}\n`);
+      process.stderr.write(`[idle-cost] the stack's blobs\n${rows.map(r => `  ${r}`).join('\n')}\n`);
     } finally {
       await Promise.allSettled([a.stop(), b.stop()]);
     }

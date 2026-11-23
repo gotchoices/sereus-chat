@@ -9,10 +9,9 @@ import { createExtraNode } from './extra-node';
 import { STORAGE_KEYS } from '../data/persisted-names';
 import { cadreService } from './CadreService';
 import { phoneFiles } from './files';
-import { phoneBlocks } from './blocks';
 import { SecureStoreKeyStore } from '@serfab/cadre-rn/key-store';
 import { keychainSecureStore } from './keychain';
-import { FILE_LAYER, PERF_LOG } from '../data/config';
+import { PERF_LOG } from '../data/config';
 
 function storageKey(name: SlotName, key?: string): string {
   switch (name) {
@@ -58,9 +57,6 @@ export const chatHost: ChatHost = {
   dev: __DEV__ || PERF_LOG,
   // Attachment bytes (docs/blobs.md): read picked files, keep copies of blobs in the cache.
   files: phoneFiles,
-  // The strand file layer (gotchoices/sereus#62, `FILE_LAYER`): attachments as files between
-  // members, the strand carrying only their id. Off: as chunk rows in the strand.
-  ...(FILE_LAYER ? { blocks: phoneBlocks } : {}),
   // A phone brings strands up a few at a time and leaves quiet ones asleep until opened: on
   // the S7, 7–11 strands at once blocked the app for a minute (docs/STATUS.md, 2026-11-17).
   // While in front, one sleeping strand is visited every 90 s (`strands.rotate`), once the user

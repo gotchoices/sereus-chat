@@ -15,7 +15,7 @@ const blob = (n: number): string => `ipfs:bafkreiexample${String(n).padStart(6, 
 
 beforeEach(async () => {
   db = new Database()
-  await db.exec(`declare schema App { ${driveSchema()} }; apply schema App;`)
+  await db.exec(`declare schema App { ${driveSchema('Drive', { blobType: 'text' })} }; apply schema App;`)
   clock = Date.parse('2026-11-15T12:00:00Z')
 })
 

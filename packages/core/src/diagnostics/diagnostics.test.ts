@@ -13,7 +13,7 @@ describe('diagnostics', () => {
   it('reports loop lag on its interval', async () => {
     const reports: string[] = [];
     const stop = startLoopLag(r => reports.push(formatLoopLag(r)), { tickMs: 10, reportMs: 60 });
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise<void>(r => setTimeout(() => r(), 200));
     stop();
     expect(reports.length).toBeGreaterThan(0);
     expect(reports[0]).toMatch(/^worst \d+ ms late/);

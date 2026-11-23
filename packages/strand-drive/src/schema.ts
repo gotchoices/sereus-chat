@@ -5,8 +5,19 @@
  */
 export const DEFAULT_PREFIX = 'Drive'
 
-export function driveSchema (prefix = DEFAULT_PREFIX): string {
+export interface DriveSchemaOptions {
+  /**
+   * The column type of a file's blob reference. `blobref` (the default) is Optimystic's: it pins
+   * the bytes when the row commits and keeps them alive while the row exists. `text` is for a
+   * database without that type (this module's own tests).
+   */
+  blobType?: 'blobref' | 'text'
+}
+
+export function driveSchema (prefix = DEFAULT_PREFIX, options: DriveSchemaOptions = {}): string {
   if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(prefix)) throw new Error(`not a table prefix: ${prefix}`)
+  const blobType = options.blobType ?? 'blobref'
+  if (blobType !== 'blobref' && blobType !== 'text') throw new Error(`not a blob column type: ${String(blobType)}`)
   return `
 -- The strand drive (a sereus module's schema fragment; see packages/strand-drive/SPEC.md).
 -- A folder. Top-level folders have no parent. Folders never expire.
@@ -19,12 +30,13 @@ table ${prefix}Folder (
     AddPolicy text not null default 'anyone' check (AddPolicy in ('anyone', 'creator'))
 ) with tags ("optimystic.network_watch" = true, "optimystic.fresh" = true);
 
--- A file: a name in a folder for a blob ('ipfs:<CID>'), kept until ExpiresAt.
+-- A file: a name in a folder for a blob (its reference in the strand's blob service), kept
+-- until ExpiresAt.
 table ${prefix}File (
     Id text primary key,
     FolderId text null,
     Name text not null check (length(Name) between 1 and 255),
-    Blob text not null,
+    Blob ${blobType} not null,
     Size integer not null check (Size >= 0),
     MimeType text null,
     AddedBy text not null,

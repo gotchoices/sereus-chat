@@ -1425,6 +1425,37 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         (and #58 for representation changes) are fixed. Until then testers wipe
         (`DATA_FORMAT`).
 
+- [x] **Files on the stack's blobs (2026-11-23, branch `sereus-blobs`).** Chat keeps no file
+      transport of its own. Attachments and the drive's files are Optimystic 1.29 native blobs on
+      each strand's node, named by `blobref` columns (sApp 0.6.0, schema version 6, a wipe). One
+      module, `packages/core/src/sereus/strand-files.ts`, does all of it: put, here, bring, settled.
+      See `docs/blobs.md`.
+      - **Removed:**
+        - `packages/strand-ipfs` and `packages/strand-blobs`, with Helia and its dependencies;
+        - chat's per-strand IPFS wiring, the chunk-row tables (`BlobChunk`, `Blob`) and
+          `Attachment.Uri`;
+        - the hosts' block stores and `FILE_LAYER`, and the Metro workarounds Helia needed.
+
+        The old layer is in git at tag `strand-files-ipfs-final`. The APK is 0.9 MB smaller.
+      - **Known gap, tested:** blobs live only in memory under sereus 1.24 (gotchoices/sereus#67,
+        backlog `feat-strand-blobs-persist`). A file nobody else has fetched is lost when its
+        sender's strand sleeps or its process ends. `src/upstream/blobs.test.ts` (one node,
+        nothing of chat) and `file-transient.test.ts` state it as `it.fails`, so they turn red
+        the day sereus fixes it.
+      - **Mitigations that stay right after the fix:**
+        - a one-shot host waits (bounded) until its files are held by a majority (`settle`);
+        - a fetch waits up to 15 s for a holder to become reachable.
+      - **Lost for now:** native import on phones, which stored a photo 3–7× faster. To offer
+        upstream as a hook.
+      - **Tests:**
+        - core 99, plus 3 expected failures for sereus#67; serchat 15;
+        - `test/cli/serchat-drive.mjs` PASS (3 MB, B fetched it in 1.4 s; A now stays up through
+          the bridge);
+        - `phone-joins-serchat.mjs` with photos both ways and the drive PASS on the S21 and the S7
+          from cleared storage. S21 → serchat 1.7 s, serchat → S21 3.5 s; S7 → serchat 7.4 s,
+          serchat → S7 8.0 s.
+        - `phone-wakes.mjs` on the S21: cases 1 and 2 pass (0.5 s for case 2). Case 3 (both away,
+          the phone's photo queued) fails as expected, #67.
 - [x] **Stack 2026-11-22: sereus 1.24.0, optimystic 1.29.0, quereus 5.6.1** (p2p-fret 1.3.0,
       libp2p 3.3.11 unchanged). A data wipe: `DATA_FORMAT` `sereus-1.24` (phone and serchat).
       - **Breaking changes taken:**

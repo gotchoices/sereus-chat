@@ -1,5 +1,5 @@
 /**
- * Files across a phone's sleep (the strand file layer, packages/core/src/files): the phone joins
+ * Files across a phone's sleep (`packages/core/src/sereus/strand-files.ts`): the phone joins
  * serchat's conversation, then
  *   1. goes to the background (its strand hibernates); serchat sends a photo; the phone comes
  *      back, and must show the photo;
@@ -7,9 +7,12 @@
  *      sleeps; the phone comes back, and serchat must then fetch the photo from it;
  *   3. both away: serchat stops, the phone sends a photo (its message and file wait on the
  *      phone) and goes to the background; then both come back at the same moment, and serchat
- *      must get the message and the photo (the phone's queue and its file outbox).
- * Each step is timed. Needs the app with FILE_LAYER, a relay both can reach (the phone set up
- * with it), Maestro, serchat built.
+ *      must get the message and the photo (the phone's offline queue, then the photo's bytes).
+ * Case 3 fails until sereus keeps blobs across a sleep (gotchoices/sereus#67): the phone's photo
+ * is in its strand node's memory, and the sleep loses it.
+ *
+ * Each step is timed. Needs the app, a relay both can reach (the phone set up with it), Maestro,
+ * and serchat built.
  *
  *   node test/gui/phone-wakes.mjs [device]   PHOTO=<jpg> PHONE_LOG=<path> SERCHAT_LOG=<path>
  */

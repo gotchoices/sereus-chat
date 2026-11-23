@@ -11,7 +11,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "yarn workspace @chat/resources build && yarn workspace @chat/strand-ipfs build && yarn workspace @chat/strand-blobs build && yarn workspace @chat/strand-drive build && yarn workspace @chat/core build && node scripts/bundle.mjs",
+    "build": "yarn workspace @chat/resources build && yarn workspace @chat/strand-drive build && yarn workspace @chat/core build && node scripts/bundle.mjs",
     "bundle": "node scripts/bundle.mjs",
     "start": "node dist/serchat.js",
     "typecheck": "tsc --noEmit",

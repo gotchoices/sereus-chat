@@ -297,7 +297,7 @@ export class StrandRuntime {
           entry.done();
           continue;
         }
-        if (ran++ > 0 && policy?.gapMs) await new Promise(r => setTimeout(r, policy.gapMs));
+        if (ran++ > 0 && policy?.gapMs) await new Promise<void>(r => setTimeout(() => r(), policy.gapMs));
         const t0 = Date.now();
         if (this.host.dev) console.info(`[start-queue] ${strandId.slice(0, 8)} starting (${this.queue.size} waiting)`);
         try { await this.busyWhile(() => entry.attach()); } finally { entry.done(); }

@@ -4,4 +4,4 @@
 export { createSereusModel, type SereusModel } from './model.js';
 export type { ChatHost, CreateExtraNode, FileAccess, NodeHost, SlotName, DurableSlot } from './host.js';
 export { ChatFailure, toChatError } from './errors.js';
-export { putBlob, readBlob, blobManifest, BlobNotHereError, CHUNK_SIZE, type BlobRef } from './blob-store.js';
+export { StrandFiles } from './strand-files.js';

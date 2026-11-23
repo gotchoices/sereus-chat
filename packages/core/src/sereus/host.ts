@@ -7,7 +7,6 @@
  * a file, memory) and pins their persisted names.
  */
 import type { CadreNode, CadreNodeEvents, DurableSlot, KeyStore } from '@serfab/cadre-core';
-import type { BlockStore } from '../files/index.js';
 
 export type { DurableSlot };
 
@@ -64,8 +63,8 @@ export interface NodeHost {
 export type CreateExtraNode = (opts: { tag: string; partyId: string; relayAddrs: string[] }) => Promise<CadreNode>;
 
 /**
- * The device's files, for blobs (docs/blobs.md): reading a file the user picked, in pieces, and
- * keeping a cached copy of a blob. Supplied by each app (Node `fs`, a React Native file library,
+ * The device's files (docs/blobs.md): reading a file the user picked, in pieces, and keeping a
+ * viewable copy of each file in a strand (`strand-files.ts`). Supplied by each app (Node `fs`, a React Native file library,
  * the browser's own), so `@chat/core` stays platform-free. Without it, attachments carry no bytes.
  */
 export interface FileAccess {
@@ -108,14 +107,8 @@ export interface ChatHost {
   createExtraNode?: CreateExtraNode;
   /** Development build: step timings and narrated joins in the log. */
   dev?: boolean;
-  /** The device's files, for attachment bytes (docs/blobs.md). */
+  /** The device's files: attachments and the drive's files (docs/blobs.md, `strand-files.ts`). */
   files?: FileAccess;
-  /**
-   * Block storage for the strand file layer (`../files`, gotchoices/sereus#62). With it (and
-   * `files`), attachments travel as files exchanged between members, and only their id goes in
-   * the strand; without it, as chunk rows in the strand (`blob-store.ts`).
-   */
-  blocks?: BlockStore;
   /** The largest attachment this device sends, in bytes (story 20: the user's own limit). Default 25 MB. */
   maxAttachmentBytes?: number;
   /**

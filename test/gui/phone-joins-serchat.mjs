@@ -72,7 +72,7 @@ try {
   // -v: the stack's log on stderr, so a failed `arm` reports why ("[dev-bridge] arm: …").
   idle = spawn(process.execPath, serchat('-v', '--bridge', String(PORT), 'idle'), { stdio: ['ignore', 'pipe', 'pipe'] });
   idle.stderr.setEncoding('utf8').on('data', d => { notes += d; });
-  // console.info (the file layer's `[files]` lines) goes to stdout.
+  // console.info (some of the stack's lines) goes to stdout.
   idle.stdout.setEncoding('utf8').on('data', d => { notes += d; });
   while (!notes.includes('idle;')) {
     if (idle.exitCode !== null) throw new Error(`serchat stopped:\n${notes}`);
