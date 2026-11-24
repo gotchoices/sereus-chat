@@ -947,7 +947,12 @@ export function createSereusModel(host: ChatHost): SereusModel {
         break;
       } catch (err) {
         const starting = err instanceof FormationRejectedError && (err.code === 'host-strand-unavailable' || err.code === 'token-unknown');
-        if (!starting || Date.now() + JOIN_STARTING_RETRY_MS > deadline) throw explainJoinFailure(err);
+        if (!starting || Date.now() + JOIN_STARTING_RETRY_MS > deadline) {
+          // Which refusal it was: several read the same to the user ("their side could not finish").
+          const code = err instanceof FormationRejectedError ? err.code : (err instanceof Error ? err.name : 'unknown');
+          console.warn(`[accept] join failed: ${code}${err instanceof FormationRejectedError ? ` (retryable ${err.retryable})` : ''}: ${err instanceof Error ? err.message : String(err)}`);
+          throw explainJoinFailure(err);
+        }
         console.info(`[accept] their side is still starting (${err.code}); asking again`);
         await new Promise<void>(r => setTimeout(() => r(), JOIN_STARTING_RETRY_MS));
       }

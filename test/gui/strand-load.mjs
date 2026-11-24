@@ -7,7 +7,7 @@
  *   node test/gui/strand-load.mjs [device] [count]     default 6a61c968 (the S7), 10 strands
  *
  * Env: RELAY (default relay.sereus.org), BRIDGE_PORT (9304), HOLD_MS (90000: the quiet window
- * after each join), OUT (a file for the table).
+ * after each join), OUT (a file for the table), SERCHAT_LOG (the peer's own log).
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -33,6 +33,7 @@ const home = mkdtempSync(join(tmpdir(), 'serchat-load-'));
 const serchat = (...args) => [SERCHAT, '--home', home, '-p', 'peer', ...args];
 const phoneLog = collectLogcat(ADB, DEVICE);
 let idle;
+let notes = '';
 const rows = [];
 
 /** The `[loop]` lines logged since `since` (phone clock = this machine's, near enough). */
@@ -48,8 +49,8 @@ function loopLines(lines, since) {
 try {
   const setUp = spawnSync(process.execPath, serchat('--wait', '30', 'profile', 'set', 'name=Peer', ';', 'relay', 'add', RELAY), { encoding: 'utf8' });
   if (setUp.status !== 0) throw new Error(`serchat setup failed:\n${setUp.stderr}`);
-  idle = spawn(process.execPath, serchat('--bridge', String(PORT), 'idle'), { stdio: ['ignore', 'pipe', 'pipe'] });
-  let notes = '';
+  idle = spawn(process.execPath, serchat('-v', '--bridge', String(PORT), 'idle'), { stdio: ['ignore', 'pipe', 'pipe'] });
+  idle.stdout.setEncoding('utf8').on('data', d => { notes += d; });
   idle.stderr.setEncoding('utf8').on('data', d => { notes += d; });
   while (!notes.includes('idle;')) {
     if (idle.exitCode !== null) throw new Error('serchat stopped');
@@ -96,6 +97,8 @@ try {
 } finally {
   idle?.kill('SIGINT');
   await new Promise(r => setTimeout(r, 3000));
+  // SERCHAT_LOG: the peer's own log (its stderr and stdout), node codes and links dropped.
+  if (process.env.SERCHAT_LOG) writeFileSync(process.env.SERCHAT_LOG, notes.split('\n').filter(l => !/sereus-join|https?:\/\/|chat:\/\/invite/.test(l)).join('\n'));
   const saved = join(tmpdir(), `strand-load-${DEVICE}.log`);
   await phoneLog.stop(saved);
   // Every [loop] report, whenever it was read: the per-window table above misses reports that

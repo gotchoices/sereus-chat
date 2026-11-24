@@ -1,0 +1,32 @@
+# Claim an always-on node into this phone's cadre with its node code (cadre-cli `cadre code`,
+# or the code cadre-host shows). CODE: the node code, passed by the caller, never logged.
+# Known: on the S7, Maestro's tap on Next does not register; `adb shell input tap` on its
+# bounds (testID cadre-node-code-next) does. The node must be reachable from the phone: one
+# behind NAT or on another subnet needs a relay (CADRE_RELAY_ADDRS) or the claim fails.
+appId: org.sereus.chat
+---
+- openLink: chat://machines
+# A choice left open by an earlier run.
+- runFlow:
+    when:
+      visible: "(?i)paste its code"
+    commands:
+      - tapOn: "(?i)cancel"
+- extendedWaitUntil:
+    visible:
+      id: "cadre-add-my-machines"
+    timeout: 60000
+- tapOn:
+    id: "cadre-add-my-machines"
+# Paste or scan: paste.
+- tapOn: "(?i)paste its code"
+- tapOn:
+    id: "cadre-node-code-input"
+- inputText: ${CODE}
+- hideKeyboard
+- tapOn:
+    id: "cadre-node-code-next"
+- extendedWaitUntil:
+    visible: "(?i)^add$"
+    timeout: 60000
+- tapOn: "(?i)^add$"

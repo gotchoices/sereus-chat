@@ -14,6 +14,6 @@
     { "script": "offline-inviter-join.mjs", "expect": "pass", "relay": true, "env": { "JOIN_MODE": "request" }, "timeoutS": 400, "about": "a join requested while the inviter is offline completes on its own (requestJoin, sereus#25)" },
     { "script": "blobref-type.mjs", "expect": "pass", "about": "a strand schema can declare a blobref column (sereus#67, gap 1, fixed in 1.24)" },
     { "script": "blob-survives-hibernate.mjs", "expect": "fail", "issue": "gotchoices/sereus#67", "about": "a blob survives its strand hibernating and waking (blob pieces are in memory)" },
-    { "script": "owner-recovery.mjs", "expect": "fail", "issue": "triage", "about": "recovery with an offline backup owner key: the step 'R admits the new phone P as an owner' times out on sereus 1.24 — not yet known whether the stack or this script is out of date" }
+    { "script": "owner-recovery.mjs", "expect": "fail", "issue": "the script predates sereus 1.17's owner grants", "about": "recovery with an offline backup owner key. It still admits a new owner with a cadre invitation's `grantsOwner`, which sereus 1.17 replaced with owner grants (createOwnerGrant, then redeemOwnerGrant or joinWithOwnerGrant), so the new phone joins as a machine and never becomes an owner. Rewrite that half with owner grants" }
   ]
 }
