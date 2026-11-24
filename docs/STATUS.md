@@ -2246,6 +2246,69 @@ Basic chat works. In order, stepping through one at a time:
       `react-native-webrtc` (and the browser's own WebRTC), with signaling over a libp2p stream
       on the strand node. No TURN exists for symmetric NATs.
 
+## Cadre client: shared cadre management (started 2026-11-24)
+
+One implementation of cadre management for every Sereus app, instead of each app writing its
+own (health's `CadreService` + `SereusConnections`, chat's, taleus's stubs, the reference
+apps' hand-copied wording). Layer 1, UI-agnostic control, comes first; a React Native UI layer
+on top only if a second app can use it without forking (docs/app-family.md,
+"`packages/cadre-client`").
+
+**Done**
+
+- [x] `packages/cadre-client` (`@chat/cadre-client`): cadre model and results, node codes,
+      address reach, relays, reachability, change signals, stores; `createCadreClient(host)`
+      and a ready-made `edgeNodeHost(edge)` for apps on cadre-core's edge node (what
+      `createPhoneNode` returns). Imports only cadre-core; `standalone.test.ts` enforces it.
+- [x] `@chat/core` builds `ChatModel.cadre`, `.reachability` and the invitation precondition
+      from it, and re-exports its types; core's own copy of the node-code code is gone.
+- [x] **A machine of your own replaces a relay.** A device is reachable when it holds an
+      address, or when one of the party's trusted always-on machines has a public address
+      (cadre-core's `invitationReach()` says `anywhere`). Invitations no longer demand a relay
+      then. The invite screen's "own" option now leads to adding a machine, not to relay
+      instructions; the relay section says when your machine answers for you. Caveat in the
+      package README: a home cadre-host node may complete a join and not sync, because its
+      strand ports are not forwarded.
+- [x] `cadre-ui` depends on `@chat/cadre-client` only (`model: CadreView`), and shows each
+      machine as "Always on · heard from 5 min ago".
+
+**Not verified on devices yet**
+
+- [ ] Invite from a phone with no relay while a claimed public node is up: the panel stays away,
+      the link names the node, and a second party joins and syncs through it. Then the same with
+      the phone switched off after inviting.
+
+**Getting it to other apps** — options, in the order recommended:
+
+1. **Link it, now.** Health and taleus live in the same `ser/` workspace and already build
+   against local clones, so each can depend on the built package by path — health's
+   `apps/mobile`: `"@chat/cadre-client": "link:../../../chat/packages/cadre-client"`; taleus's
+   `packages/taleus-app/apps/mobile`: `"link:../../../../../chat/packages/cadre-client"` — with the same Metro peer pin
+   chat's `metro.config.js` uses for linked packages. No publishing and no waiting. It is the
+   real test of the API: a second and third app will show what is chat-shaped. The cost is a
+   path between repositories, which breaks any build that does not have the sibling checkout.
+2. **Propose it to sereus, in parallel.** Its natural home is next to cadre-rn as
+   `@serfab/cadre-client`, released with cadre-core (sereus ships weekly), where the reference
+   apps could use it too. Sereus took the last request of this kind quickly (sereus#45 became
+   `createEdgeNode` in 1.17). Open an issue offering the package, rather than pushing to sereus
+   directly even with write access: their release tooling publishes every `@serfab/*` package
+   at one version, and the maintainers decide its API.
+3. **Publish it yourself, if sereus declines or is slow.** Move it to its own repository and
+   publish under a scope you control. Immediate and in your hands; the cost is keeping its
+   cadre-core peer range in step with sereus's weekly releases, and a package that may drift
+   from where sereus goes.
+
+- [ ] Health adopts it through a `CadreHost` over its own `CadreService` (it builds its node
+      by hand), replacing `src/cadre/nodeCode*` and the logic in `SereusConnections`.
+- [ ] Taleus adopts it through `edgeNodeHost(phone)` (it uses `createPhoneNode`), replacing
+      the Mode C stubs in `taleus-model/src/engine/local.ts` with real calls.
+- [ ] Decide layer 2 from what health and taleus needed (props vs a fork).
+- [ ] Sereus issue offering the package (draft in `apps/mobile/tmp/` first).
+- [ ] Fill the gaps against reference-app-rn, in the package not in an app: join an existing
+      cadre and the first-launch question; cadre invitations and join approvals; owner keys
+      beyond backup (list, import, remove, grants); `planMachineRemoval` / `removeMachine`; the
+      `removed` state.
+
 ## Phase 8 — Diagnostics and the Node harness
 
 - [x] The dev bridge is in `core/diagnostics` (done with Phase 7a).

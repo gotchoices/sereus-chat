@@ -2,8 +2,9 @@
  * CadreManager — drop-in screen for managing a Sereus cadre: the machines that act for
  * this person, and the owner key that binds them.
  *
- * App-agnostic: it reaches data only through the `ChatModel` it is given (its `cadre`
- * area and `cadreManagerStore`), so it has no host-app imports. See ./SPEC.md.
+ * App-agnostic: it reaches data only through the `CadreView` it is given (a `cadre` model
+ * and its change signal, from `@chat/cadre-client`), so it has no host-app imports. An
+ * app passes its own model when that has both members, or a cadre client. See ./SPEC.md.
  *
  * Adding a machine is sereus's claiming model (1.14): the machine shows a node code
  * (`sereus-join:…`) while it waits; this device reads it, asks, and claims it. The code
@@ -25,13 +26,13 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {
-  cadreManagerStore,
+  cadreStore,
   shortPeerId,
   type CadreMachine,
   type CadreStatus,
-  type ChatModel,
+  type CadreView,
   type NodeCodePreview,
-} from '@chat/core';
+} from '@chat/cadre-client';
 import SecretDisplayModal from './SecretDisplayModal';
 import NodeCodeModal from './NodeCodeModal';
 import {
@@ -64,6 +65,8 @@ const STRINGS = {
   exportHint: 'This is your owner private key. Anyone with it controls your machines. Write it down or store it somewhere secure and offline.',
   thisDevice: 'This device',
   machine: 'Machine',
+  alwaysOn: 'Always on',
+  heard: (ago: string) => `heard from ${ago}`,
   noMachines: 'Only this device so far. Add a machine that stays on, so your messages keep moving while your phone sleeps.',
   addMachine: 'Add a machine',
   addScan: 'Scan its code',
@@ -92,7 +95,8 @@ const STRINGS = {
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
 export interface CadreManagerProps {
-  model: ChatModel;
+  /** The cadre to show: an app's model (if it has `cadre` and `changes.cadre`) or a cadre client. */
+  model: CadreView;
   theme?: Partial<CadreManagerTheme>;
   /** A node code that arrived from outside (the host's scanner, a link): reviewed when it changes. */
   nodeCode?: string;
@@ -114,7 +118,7 @@ export default function CadreManager({ theme: themeOverrides, ...props }: CadreM
 function CadreManagerInner({ model, nodeCode, onNodeCodeHandled, onScan }: Omit<CadreManagerProps, 'theme'>) {
   const theme = useCadreTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const store = useMemo(() => cadreManagerStore(model), [model]);
+  const store = useMemo(() => cadreStore(model), [model]);
   const load = useSyncExternalStore(store.subscribe as (cb: () => void) => () => void, store.get, store.get);
   const status: CadreStatus | undefined = load.value;
 
@@ -363,6 +367,12 @@ function MachineRow({
             {machine.peerId}
           </Text>
         </TouchableOpacity>
+        {!machine.thisDevice && (machine.alwaysOn || machine.lastSeenAt) ? (
+          <Text style={styles.cardSubtitle} numberOfLines={1}>
+            {[machine.alwaysOn ? STRINGS.alwaysOn : null, machine.lastSeenAt ? STRINGS.heard(ago(machine.lastSeenAt)) : null]
+              .filter(Boolean).join(' · ')}
+          </Text>
+        ) : null}
       </View>
       {!machine.thisDevice && (
         <TouchableOpacity onPress={() => onRemove(machine)} hitSlop={HIT_SLOP} testID="cadre-machine-remove">
@@ -371,6 +381,16 @@ function MachineRow({
       )}
     </View>
   );
+}
+
+/** How long ago, coarsely: the machine's own record says when it last re-published, not a live probe. */
+function ago(at: number): string {
+  const minutes = Math.max(0, Math.round((Date.now() - at) / 60_000));
+  if (minutes < 2) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} days ago`;
 }
 
 // ── Styles (theme-driven) ─────────────────────────────────────────────────

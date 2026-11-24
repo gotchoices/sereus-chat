@@ -243,6 +243,12 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@chat/cadre-client@link:../../packages/cadre-client::locator=mobile-ns%40workspace%3A.":
+  version: 0.0.0-use.local
+  resolution: "@chat/cadre-client@link:../../packages/cadre-client::locator=mobile-ns%40workspace%3A."
+  languageName: node
+  linkType: soft
+
 "@chat/core@link:../../packages/core::locator=mobile-ns%40workspace%3A.":
   version: 0.0.0-use.local
   resolution: "@chat/core@link:../../packages/core::locator=mobile-ns%40workspace%3A."
@@ -4564,6 +4570,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "mobile-ns@workspace:."
   dependencies:
+    "@chat/cadre-client": "link:../../packages/cadre-client"
     "@chat/core": "link:../../packages/core"
     "@chat/resources": "link:../../packages/resources"
     "@formatjs/intl-datetimeformat": "npm:^7.4.9"

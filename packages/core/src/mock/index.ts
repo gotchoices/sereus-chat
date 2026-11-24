@@ -19,6 +19,7 @@ import type {
   Result, SearchBatch, StorageUsage, StrandState, StrandSummary,
 } from '../model/index.js';
 import { fail, ok, pageMessages } from '../model/index.js';
+import { cadreFail, cadreOk } from '@chat/cadre-client';
 
 export type FixtureName =
   | 'Strands' | 'Messages' | 'Members' | 'StrandMedia' | 'StrandState'
@@ -439,30 +440,33 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
     },
 
     reachability: {
-      async get() { return { reachable: !isUnreachable(), relayPending: false, relays: prefs.relayAddrs, relayStatus: null }; },
+      async get() {
+        const reachable = !isUnreachable();
+        return { reachable, via: reachable ? 'this-device' as const : null, relayPending: false, relays: prefs.relayAddrs, relayStatus: null };
+      },
     },
 
     cadre: {
       async status() {
-        return ok({
+        return cadreOk({
           running: true, partyId: 'mock-party', peerId: '12D3KooWMockThisDevice', ownerEnrolled: true, ownerFingerprint: 'MockOwnr',
           machines: [
-            { peerId: '12D3KooWMockThisDevice', thisDevice: true, addresses: [] },
-            ...(isEmpty() ? [] : [{ peerId: '12D3KooWMockHomeServer', thisDevice: false, addresses: ['/dns4/home.example/tcp/4002/ws'] }]),
+            { peerId: '12D3KooWMockThisDevice', thisDevice: true, addresses: [], alwaysOn: null, lastSeenAt: null },
+            ...(isEmpty() ? [] : [{ peerId: '12D3KooWMockHomeServer', thisDevice: false, addresses: ['/dns4/home.example/tcp/4002/ws'], alwaysOn: true, lastSeenAt: Date.now() - 60_000 }]),
           ],
         });
       },
       async inspectNodeCode(text) {
-        if (!text.trim().startsWith('sereus-join:')) return fail('invalid-node-code', 'This is not a node code.', { reason: 'not-node-code' });
-        return ok({ peerId: '12D3KooWMockNewNode', addresses: ['/ip4/192.168.1.20/tcp/4002/ws'], reach: 'home-network' as const });
+        if (!text.trim().startsWith('sereus-join:')) return cadreFail('invalid-node-code', 'This is not a node code.', { reason: 'not-node-code' });
+        return cadreOk({ peerId: '12D3KooWMockNewNode', addresses: ['/ip4/192.168.1.20/tcp/4002/ws'], reach: 'home-network' as const });
       },
       async claimNode(text) {
-        if (!text.trim().startsWith('sereus-join:')) return fail('invalid-node-code', 'This is not a node code.', { reason: 'not-node-code' });
-        if (isUnreachable()) return fail('node-unreachable', 'Could not reach that machine.', { reason: 'home-network' });
-        return ok();
+        if (!text.trim().startsWith('sereus-join:')) return cadreFail('invalid-node-code', 'This is not a node code.', { reason: 'not-node-code' });
+        if (isUnreachable()) return cadreFail('node-unreachable', 'Could not reach that machine.', { reason: 'home-network' });
+        return cadreOk();
       },
-      async removeMachine() { return ok(); },
-      async exportOwnerKey() { return ok('mock-owner-key-not-a-secret'); },
+      async removeMachine() { return cadreOk(); },
+      async exportOwnerKey() { return cadreOk('mock-owner-key-not-a-secret'); },
     },
 
     changes: {

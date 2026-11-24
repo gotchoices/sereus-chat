@@ -63,6 +63,8 @@ chat/
     mobile-ns/             NativeScript (only if needed)
   packages/                shared libraries — never deployed on their own
     core/                  @chat/core: protocol, model, Sereus + mock implementations, stores, diagnostics
+    cadre-client/          @chat/cadre-client: cadre management for any Sereus app, UI-agnostic (meant to leave chat)
+    strand-drive/          @chat/strand-drive: a strand's shared drive (meant to move into sereus)
     resources/             @chat/resources: strings, design tokens, brand art
   design/                  Appeus design surface (stories, specs, domain contract)
   test/                    Node harness: integration, repros, cross-runtime runs
@@ -177,7 +179,10 @@ There is no public API or compatibility promise to outside apps.
 
 Whether to offer a public, stable API — so others can build compatible apps —
 is deliberately deferred until the core has stabilized across at least two of
-our own apps. Until then:
+our own apps. The exception being prepared is `@chat/cadre-client`: it is built
+to serve other Sereus apps (health, taleus), so it is the first package that may
+be linked from outside this repository or published. How it gets there is a
+decision, not a default (docs/STATUS.md, "Cadre client"). Until then:
 
 - Do not add publishing steps, npm scopes, or public-API versioning.
 - Keep `core/protocol` free of imports from the rest of the core. It is what a
@@ -232,8 +237,8 @@ One object with a namespace per area of the product:
 | `search` | Streaming search |
 | `profile` | The local profile and its sync to strands |
 | `prefs` | App preferences: behavior settings, storage ceiling |
-| `reachability` | Relays: read the configured relays and the reservation state, change the relays, and say whether this device can be invited |
-| `cadre` | The cadre manager's operations (keys, seeds, devices) |
+| `reachability` | Relays: read the configured relays and the reservation state, change the relays, and say whether this device can be invited — through its own relay reservation, or because one of the party's always-on machines has a public address and answers for it. From `@chat/cadre-client` |
+| `cadre` | The party's machines: list, claim a node by its code, remove; back up the owner key. From `@chat/cadre-client` |
 
 Rules, all inherited from experience with the current adapter:
 
@@ -431,6 +436,25 @@ Platform-neutral data the UIs share:
 
 The JSON files are the source; a build step embeds them into the package's JS, so
 no consumer needs JSON-import support.
+
+## `packages/cadre-client`
+
+Cadre management any Sereus app can use: the party's machines, claiming a node, backing up
+the owner key, relays and reachability, with stores any UI binds to. It is built here but
+belongs to no app: it imports nothing but cadre-core and its own files (a test enforces it),
+and `@chat/core` builds `ChatModel.cadre` and `ChatModel.reachability` from it.
+
+Two layers, decided separately:
+
+1. **Control, UI-agnostic** — this package. Shared by every app, whatever its framework.
+2. **A React Native UI on top** — only if it earns its keep. Chat's `cadre-ui`
+   (`CadreManager`) depends on layer 1 alone and could be offered as-is. If a second app can
+   use it through props (theme, strings, which sections), it becomes a package; if adapting
+   it costs about as much as building a screen from it as an example, it stays an example
+   and only layer 1 is shared.
+
+Details, the reachability rule, and what is not covered yet:
+`packages/cadre-client/README.md`.
 
 ## What each app owns
 

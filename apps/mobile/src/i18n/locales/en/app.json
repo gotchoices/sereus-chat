@@ -8,8 +8,8 @@
     "title": "Scan QR"
   },
   "invite": {
-    "unreachableBody": "A phone cannot accept connections from the Internet on its own, so the person you invite would have no way to answer. A relay fixes that: a machine with a public Internet address that passes connections through to your phone.",
-    "unreachableTitle": "Your phone needs a relay first",
+    "unreachableBody": "A phone cannot accept connections from the Internet on its own, so the person you invite would have no way to answer. Either of two things fixes that: a machine of your own that stays on and has a public address, which answers for you, or a relay, which passes connections through to your phone.",
+    "unreachableTitle": "Nobody can answer an invitation yet",
     "workingFound": "Setting up the strand. On some phones this takes up to a minute."
   },
   "media": {

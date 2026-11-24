@@ -7,7 +7,8 @@
  * (`./host.ts`) and returns the model plus `boot`, the start-up sequence the app runs
  * once its data is known to be usable.
  */
-import { FormationRejectedError, readOwnerPrivateKey, type StrandInstance } from '@serfab/cadre-core';
+import { FormationRejectedError, type StrandInstance } from '@serfab/cadre-core';
+import { createCadreClient } from '@chat/cadre-client/sereus';
 import { buildInviteUrl, CHAT_SAPP_ID } from '../protocol/index.js';
 import type {
   Attachment, ChatModel, Delivery, DriveFile, DriveFolder, DriveListing, Invitation, InvitationPreview, Member, Message, Prefs, Reaction,
@@ -26,8 +27,6 @@ import { StrandDrive, DriveError, type DriveDb, type DriveFile as DriveFileRow, 
 import { DRIVE_PREFIX } from '../protocol/sapp.js';
 import { StrandFiles } from './strand-files.js';
 import { createChatStrand, foundChatStrandInBackground } from './sapp-strands.js';
-import { classifyClaimFailure, nodeReach, readNodeCode } from './node-code.js';
-import { ownerFingerprint, type CadreMachine, type CadreStatus } from '../model/index.js';
 import { StrandRuntime } from './strands.js';
 import { DeliveryTracker, type WriteTarget } from './delivery.js';
 import { PrivateStore } from './private-store.js';
@@ -36,10 +35,6 @@ import { PrivateStore } from './private-store.js';
 const LIST_READ_MS = 3000;
 /** How long to wait on a one-off control-network write before failing fast. */
 const CONTROL_OP_TIMEOUT_MS = 15_000;
-/** Bound on a claim: `claimNode` dials each address in turn (~115 s worst case when none answers). */
-const CLAIM_TIMEOUT_MS = 150_000;
-/** Bound on the control reads behind the machine list; with no cohort they can hang. */
-const CONTROL_READ_MS = 6000;
 /** How long an invitation stays good when the caller does not say: story 02's private-strand default. */
 const INVITE_EXPIRY_MS = INVITATION_VALIDITY.week;
 /** How long a join keeps asking while the inviter's new conversation is still starting. */
@@ -834,11 +829,14 @@ export function createSereusModel(host: ChatHost): SereusModel {
     let t = t0;
     const step = (name: string) => { const n = Date.now(); perf('invite', name, n - t, 'ms'); t = n; };
     const node = requireNode();
-    // Precondition FIRST: with no dialable address nobody could ever answer. Story 02
-    // Alt A presents this as the ordinary starting position, never as a failure.
-    if (node.getMultiaddrs().length === 0) {
-      throw new ChatFailure('unreachable', 'There is nowhere for them to answer yet.');
-    }
+    // Precondition FIRST: somebody must be able to answer. This device does when it holds
+    // an address (a relay reservation, on a phone); so does one of the party's always-on
+    // machines with a public address, which the invitation names (story 42: a machine of
+    // your own instead of a relay). With neither, story 02 Alt A presents this as the
+    // ordinary starting position, never as a failure.
+    const answerer = await cadreClient.invitable();
+    if (!answerer.ok) throw new ChatFailure(answerer.error.kind, answerer.error.message, { reason: answerer.error.reason });
+    step(`answered by ${answerer.value}`);
     // With a `strandId` the conversation exists and its type was fixed at founding;
     // without one, the Private/Open choice is the point of the screen.
     const kind = input.visibility ?? 'private';
@@ -1010,8 +1008,14 @@ export function createSereusModel(host: ChatHost): SereusModel {
     return { strandId };
   }
 
-  /** One claim at a time. */
-  let claiming = false;
+  /**
+   * The cadre: machines, claiming, owner key backup, relays and reachability, from
+   * `@chat/cadre-client` (the UI-agnostic package other Sereus apps can use too).
+   */
+  const cadreClient = createCadreClient(
+    { node: host.node, ownerKeyStore: host.ownerKeyStore },
+    { controlOpMs: CONTROL_OP_TIMEOUT_MS },
+  );
 
   const model: ChatModel = {
     strands: {
@@ -1287,116 +1291,20 @@ export function createSereusModel(host: ChatHost): SereusModel {
         const { relayAddrs, ...rest } = patch;
         const { relayAddrs: _current, ...stored } = { ...(await prefs()), ...rest };
         await records.savePrefs(stored);
-        // Relays are the node's start options; applying them can REBUILD the node, so
-        // it is not awaited: the UI returns at once and reconnects behind it.
-        if (relayAddrs) {
-          void host.node.applyRelays(relayAddrs).catch(err => console.warn('[prefs] applying relays failed:', err));
-        }
+        // Relays are the node's start options; applying them can REBUILD the node, so the
+        // cadre client does not await it: the UI returns at once and reconnects behind it.
+        if (relayAddrs) await cadreClient.relays.set(relayAddrs);
         return prefs();
       }),
     },
 
-    reachability: {
-      async get() {
-        const node = host.node.node;
-        const reachable = !!node && node.getMultiaddrs().length > 0;
-        const relays = await host.node.getRelayAddrs().catch(() => [] as string[]);
-        return { reachable, relayPending: !reachable && relays.length > 0, relays, relayStatus: host.node.relayStatus() };
-      },
-    },
+    reachability: cadreClient.reachability,
 
-    cadre: {
-      status: () => attempt(async (): Promise<CadreStatus> => {
-        const node = host.node.node;
-        const peerId = node?.peerId?.toString() ?? null;
-        let fingerprint: string | null = null;
-        // The owner key this node signs with (sereus 1.17: separate from the machine's identity).
-        const ownerKey = node?.getOwnerSigner()?.publicKey;
-        if (ownerKey) fingerprint = ownerFingerprint(ownerKey);
-        const machines: CadreMachine[] = peerId ? [{ peerId, thisDevice: true, addresses: [] }] : [];
-        if (node) {
-          // Best effort and bounded: the list fills in when the control network answers.
-          const members = await withTimeout(node.listMembers(), CONTROL_READ_MS, 'listMembers').catch(() => []);
-          for (const m of members) {
-            if (m.peerId === peerId) continue;
-            machines.push({ peerId: m.peerId, thisDevice: false, addresses: m.multiaddr ? [m.multiaddr] : [] });
-          }
-        }
-        return {
-          running: !!node,
-          partyId: host.node.partyId(),
-          peerId,
-          ownerEnrolled: host.node.ownerEnrolled(),
-          ownerFingerprint: fingerprint,
-          machines,
-        };
-      }),
-      async inspectNodeCode(text) {
-        const reading = readNodeCode(text);
-        if (!reading.ok) {
-          return fail('invalid-node-code', reading.problem === 'newer-version'
-            ? 'This code comes from a newer version of the node software; update the app to use it.'
-            : reading.problem === 'damaged' ? 'This code is incomplete or damaged.' : 'This is not a node code.',
-          { reason: reading.problem });
-        }
-        const { peerId, multiaddrs } = reading.payload;
-        return ok({ peerId, addresses: multiaddrs, reach: nodeReach(multiaddrs) });
-      },
-      async claimNode(text) {
-        const reading = readNodeCode(text);
-        if (!reading.ok) return fail('invalid-node-code', 'This is not a usable node code.', { reason: reading.problem });
-        if (claiming) return fail('claim-failed', 'A machine is already being added.', { retryable: true, reason: 'busy' });
-        claiming = true;
-        try {
-          const node = requireNode();
-          if (!host.node.ownerEnrolled()) {
-            return fail('unavailable', 'This device is not yet an owner of its cadre; try again in a moment.', { reason: 'owner-not-ready' });
-          }
-          // The code carries the claim secret: log the peer id only.
-          console.info('[sereus-model] claiming node', reading.payload.peerId);
-          try {
-            await withTimeout(node.claimNode(reading.payload), CLAIM_TIMEOUT_MS, 'claimNode');
-          } catch (err) {
-            const failure = classifyClaimFailure(err, reading.payload);
-            const message = failure.kind === 'node-unreachable'
-              ? (failure.reach === 'home-network'
-                ? 'Could not reach that machine. It is only reachable on its own network: join that Wi-Fi and try again.'
-                : 'Could not reach that machine. Check that it is running and try again.')
-              : failure.kind === 'claim-refused'
-                ? `The machine refused: ${failure.detail}`
-                : `Adding the machine did not finish: ${failure.detail}`;
-            return fail(failure.kind, message, {
-              retryable: failure.retryable,
-              reason: failure.kind === 'node-unreachable' ? failure.reach : failure.kind === 'claim-refused' ? failure.refusal : undefined,
-              cause: err,
-            });
-          }
-          console.info('[sereus-model] ✓ node accepted the claim:', reading.payload.peerId);
-          return ok();
-        } finally {
-          claiming = false;
-        }
-      },
-      removeMachine: peerId => attempt(async () => {
-        await withTimeout(requireNode().removePeer(peerId), CONTROL_OP_TIMEOUT_MS, 'removePeer');
-      }),
-      exportOwnerKey: () => attempt(async () => {
-        // The owner key lives in the host's key store (its owner slot), not in the node.
-        const key = host.ownerKeyStore ? await readOwnerPrivateKey(host.ownerKeyStore) : undefined;
-        if (!key) throw new ChatFailure('not-supported', 'This device holds no owner key to export.');
-        return key;
-      }),
-    },
+    cadre: cadreClient.cadre,
 
     changes: {
-      cadre(onChange) {
-        const unsubscribe = [
-          host.node.on('control:connected', () => onChange()),
-          host.node.on('control:disconnected', () => onChange()),
-        ];
-        return () => unsubscribe.forEach(u => u());
-      },
-      reachability: onChange => host.node.onReachabilityChange(onChange),
+      cadre: cadreClient.changes.cadre,
+      reachability: cadreClient.changes.reachability,
       busy(onChange) {
         busyListeners.add(onChange);
         return () => { busyListeners.delete(onChange); };

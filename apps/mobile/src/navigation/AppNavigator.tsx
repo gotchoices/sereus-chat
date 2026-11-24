@@ -263,6 +263,8 @@ function RelaySection() {
   const view = useStore(store);
   const addrs = view.value?.relays ?? NO_RELAYS;
   const status = view.value?.relayStatus ?? null;
+  /** One of this person's always-on machines answers invitations: no relay is needed. */
+  const ownMachineAnswers = view.value?.via === 'own-machine';
 
   const drop = async (a: string) => {
     await model.prefs.set({ relayAddrs: addrs.filter(x => x !== a) });
@@ -283,11 +285,17 @@ function RelaySection() {
       <Text style={{ ...typography.small, color: theme.textSecondary, textTransform: 'uppercase' }}>
         How you are reachable
       </Text>
-      {addrs.length === 0 ? (
+      {addrs.length === 0 && ownMachineAnswers ? (
         <Text style={{ ...typography.body, color: theme.textMuted, lineHeight: 22 }}>
-          No relay yet. A phone cannot accept connections from the Internet on its own, so nobody
-          you invite can answer until you have one — a machine with a public address that passes
-          connections through to your phone.
+          Through your own machine. It stays on and has a public address, so it answers the
+          people you invite for you, and you need no relay.
+        </Text>
+      ) : addrs.length === 0 ? (
+        <Text style={{ ...typography.body, color: theme.textMuted, lineHeight: 22 }}>
+          Not yet. A phone cannot accept connections from the Internet on its own, so nobody you
+          invite can answer until you have either a machine of your own that stays on and has a
+          public address (add one above), or a relay: a machine that passes connections through
+          to your phone.
         </Text>
       ) : (
         addrs.map(a => (

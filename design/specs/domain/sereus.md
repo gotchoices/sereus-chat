@@ -23,11 +23,16 @@ The chat UI never blocks on remote connectivity beyond what the user has explici
 
 ## Code boundary (cadre vs chat)
 
-The long-term goal is a React Native UI library — `@sereus/cadre-rn-ui` or similar — providing drop-in Connections / AddNode / AddGuest / Invitation-accept screens shared across sereus apps. A framework-agnostic engine layer is **not** assumed: sereus's existing `cadre-core` API may already be compact enough to consume directly. Only add an engine wrapper if real friction emerges during wiring.
+The goal is cadre management shared across sereus apps, in two layers decided separately:
+
+1. **A UI-agnostic control layer** — `@chat/cadre-client` (`packages/cadre-client`), first. Machines, claiming nodes, owner keys, relays and reachability, as operations with error codes and stores any UI binds to; platform-neutral, depending on `cadre-core` only. Every app shares it, whatever its framework. (Experience changed the earlier assumption that `cadre-core` could be consumed directly: each app was rewriting the same layer between it and its screens — node-code reading, claim failures, reachability, change signals.)
+2. **A React Native UI layer** on top — only if it earns its keep. Chat's `cadre-ui` depends on layer 1 alone. If a second app can use it through props (theme, strings, sections), it becomes a package; if adapting it costs about as much as building a screen from it as an example, it stays a boilerplate example and only layer 1 is shared.
+
+Distribution and what is not covered yet: `packages/cadre-client/README.md` and `docs/STATUS.md` ("Cadre client").
 
 To keep the eventual UI extraction cheap, all chat code is written against this boundary:
 
-- **Cadre layer** (target: `src/cadre/`) — identity, peer/node management, party/cohort state, strand registry, key/seed flows, the Connections / AddNode / AddGuest screens. **Must not import anything chat-specific.** Must support every cadre/strand option sereus exposes (open and closed strands, any node type, any number of nodes).
+- **Cadre layer** (`packages/cadre-client`, with the RN screens in `apps/mobile/src/cadre-ui`) — identity, peer/node management, party/cohort state, strand registry, key/seed flows, the Connections / AddNode / AddGuest screens. **Must not import anything chat-specific.** Must support every cadre/strand option sereus exposes (open and closed strands, any node type, any number of nodes).
 - **Chat layer** — per-strand `Member`/`Message` schema, message composer/list, attachments, search. May import the cadre layer; the cadre layer never imports back.
 
 A peer effort with the same intent is already underway in [ser/health/apps/mobile](../../../../health/apps/mobile) — see [src/services/CadreService.ts](../../../../health/apps/mobile/src/services/CadreService.ts), [src/screens/SereusConnections.tsx](../../../../health/apps/mobile/src/screens/SereusConnections.tsx), and the matching domain spec [design/specs/domain/cadre.md](../../../../health/design/specs/domain/cadre.md). Align naming and structure with sereus-health where reasonable, so the eventual upstream extraction touches both apps minimally.

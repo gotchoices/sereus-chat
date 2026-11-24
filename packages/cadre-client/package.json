@@ -1,0 +1,37 @@
+{
+  "name": "@chat/cadre-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cadre management for Sereus apps, UI-agnostic and platform-neutral: machines, claiming nodes, owner key backup, relays and reachability (counting the party's own always-on machines), with stores any UI binds to. Built in chat to be lifted out; see README.md.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./sereus": {
+      "types": "./dist/sereus/index.d.ts",
+      "default": "./dist/sereus/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@serfab/cadre-core": "^1.24.0"
+  },
+  "devDependencies": {
+    "@serfab/cadre-core": "1.24.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17"
+  }
+}

@@ -35,9 +35,10 @@
     "logs": "sh ./scripts/logs.sh",
     "stack:check": "cd ../../test/stack && node found-strand.mjs",
     "stack:two-party": "cd ../../test/stack && node two-party-formation.mjs",
-    "core:build": "yarn --cwd ../../packages/resources build && yarn --cwd ../../packages/strand-drive build && yarn --cwd ../../packages/core build"
+    "core:build": "yarn --cwd ../../packages/resources build && yarn --cwd ../../packages/strand-drive build && yarn --cwd ../../packages/cadre-client build && yarn --cwd ../../packages/core build"
   },
   "dependencies": {
+    "@chat/cadre-client": "link:../../packages/cadre-client",
     "@chat/core": "link:../../packages/core",
     "@chat/resources": "link:../../packages/resources",
     "@chat/strand-drive": "link:../../packages/strand-drive",

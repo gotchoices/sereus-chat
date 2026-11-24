@@ -260,9 +260,12 @@ export default function InvitationGenerator() {
               styled or placed as the obvious one. Each says what it costs and
               what happens when tapped, so it can be judged and acted on. Neither
               names an operator — the list lives on sereus.org and may grow. */}
+          {/* A machine of your own answers invitations itself (story 42): add one on the
+              network screen, and the panel goes away once it is up (the reachability store
+              counts the party's always-on machines with a public address). */}
           <Pressable
             accessibilityRole="link"
-            onPress={() => Linking.openURL('https://sereus.org/chat/relays.html#own')}
+            onPress={() => navigation.navigate('CadreManager')}
             style={({ pressed }) => [styles.wayOut, { borderColor: theme.border, backgroundColor: theme.surface },
               pressed && styles.pressed]}
           >
@@ -274,7 +277,7 @@ export default function InvitationGenerator() {
                 {t('invite.wayOwnBody')}
               </Text>
             </View>
-            <Ionicons name="open-outline" size={20} color={theme.textMuted} />
+            <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
           </Pressable>
 
           <Pressable

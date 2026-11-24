@@ -6,7 +6,8 @@
  * never constructs one. The app also decides where slots live (AsyncStorage, IndexedDB,
  * a file, memory) and pins their persisted names.
  */
-import type { CadreNode, CadreNodeEvents, DurableSlot, KeyStore } from '@serfab/cadre-core';
+import type { CadreNode, DurableSlot, KeyStore } from '@serfab/cadre-core';
+import type { CadreNodeHost } from '@chat/cadre-client/sereus';
 
 export type { DurableSlot };
 
@@ -24,9 +25,12 @@ export type SlotName =
   | 'draft'
   | 'readCursor';
 
-export interface NodeHost {
-  /** The running node, or null while stopped or starting. */
-  readonly node: CadreNode | null;
+/**
+ * The node, as the chat model needs it: everything the cadre client needs
+ * (`CadreNodeHost`: the node, events across restarts, relays, party id, owner standing,
+ * reachability changes) plus starting it and hearing about rebuilds.
+ */
+export interface NodeHost extends CadreNodeHost {
   /**
    * Start the node if it is not running — with the options it last ran with, or as a
    * fresh party on first run — and resolve once it runs. Idempotent; concurrent calls
@@ -34,29 +38,10 @@ export interface NodeHost {
    */
   ensureStarted(): Promise<void>;
   /**
-   * Subscribe to node events for the life of the host, not of one node: the host
-   * re-attaches the handler to every node it builds, so a restart drops nothing.
-   */
-  on<K extends keyof CadreNodeEvents>(event: K, handler: (data: CadreNodeEvents[K]) => void): () => void;
-  /**
    * Run after a REBUILD-driven restart (relays changed, say), so the model can re-read
    * anything offered to the old node while it was going away.
    */
   onRebuilt(callback: () => void | Promise<void>): () => void;
-  /**
-   * Relays live in the node's start options, saved with every start: one copy of the
-   * setting. These read them, and change them (restarting the node if it runs).
-   */
-  getRelayAddrs(): Promise<string[]>;
-  applyRelays(addrs: string[]): Promise<void>;
-  /** This party's id: the node's, or the one the next start will use. */
-  partyId(): string | null;
-  /** This device is an enrolled owner (owner genesis ran), so it can sign claims. */
-  ownerEnrolled(): boolean;
-  /** The relay reservation's status now (`RelayReservationState.status`), or null with no node. */
-  relayStatus(): string | null;
-  /** This device's addresses changed (a reservation granted, lost or moved), or its node restarted. */
-  onReachabilityChange(callback: () => void): () => void;
 }
 
 /** Build and start a fresh party's node: relay-only, isolated storage. */

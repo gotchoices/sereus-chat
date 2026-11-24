@@ -1837,6 +1837,12 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@chat/cadre-client@link:../../packages/cadre-client::locator=mobile%40workspace%3A.":
+  version: 0.0.0-use.local
+  resolution: "@chat/cadre-client@link:../../packages/cadre-client::locator=mobile%40workspace%3A."
+  languageName: node
+  linkType: soft
+
 "@chat/core@link:../../packages/core::locator=mobile%40workspace%3A.":
   version: 0.0.0-use.local
   resolution: "@chat/core@link:../../packages/core::locator=mobile%40workspace%3A."
@@ -9722,6 +9728,7 @@ __metadata:
     "@babel/plugin-transform-class-static-block": "npm:^7.24.7"
     "@babel/preset-env": "npm:^7.25.3"
     "@babel/runtime": "npm:^7.29.2"
+    "@chat/cadre-client": "link:../../packages/cadre-client"
     "@chat/core": "link:../../packages/core"
     "@chat/resources": "link:../../packages/resources"
     "@chat/strand-drive": "link:../../packages/strand-drive"

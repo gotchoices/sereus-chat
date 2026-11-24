@@ -2,7 +2,7 @@
   "name": "@sereus-chat/stack-check",
   "private": true,
   "type": "module",
-  "description": "Validates the sereus stack in Node \u2014 no app, no device. See README.md.",
+  "description": "Validates the sereus stack in Node — no app, no device. See README.md.",
   "scripts": {
     "suite": "node run.mjs",
     "check": "node found-strand.mjs",

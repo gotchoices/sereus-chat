@@ -11,7 +11,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "yarn workspace @chat/resources build && yarn workspace @chat/strand-drive build && yarn workspace @chat/core build && node scripts/bundle.mjs",
+    "build": "yarn workspace @chat/resources build && yarn workspace @chat/strand-drive build && yarn workspace @chat/cadre-client build && yarn workspace @chat/core build && node scripts/bundle.mjs",
     "bundle": "node scripts/bundle.mjs",
     "start": "node dist/serchat.js",
     "typecheck": "tsc --noEmit",
@@ -31,6 +31,7 @@
     "libp2p": "3.3.11"
   },
   "devDependencies": {
+    "@chat/cadre-client": "workspace:*",
     "@chat/core": "workspace:*",
     "@chat/resources": "workspace:*",
     "@libp2p/identify": "4.1.15",

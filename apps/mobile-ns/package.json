@@ -5,12 +5,13 @@
   "main": "app/app.ts",
   "description": "Sereus Chat on NativeScript (V8): the engine probe and comparison twin of apps/mobile (docs/app-family.md).",
   "scripts": {
-    "core:build": "yarn --cwd ../../packages/resources build && yarn --cwd ../../packages/core build",
+    "core:build": "yarn --cwd ../../packages/resources build && yarn --cwd ../../packages/cadre-client build && yarn --cwd ../../packages/core build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "android": "yarn core:build && ns run android",
     "build:android": "yarn core:build && ns build android"
   },
   "dependencies": {
+    "@chat/cadre-client": "link:../../packages/cadre-client",
     "@chat/core": "link:../../packages/core",
     "@chat/resources": "link:../../packages/resources",
     "@formatjs/intl-datetimeformat": "^7.4.9",

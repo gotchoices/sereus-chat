@@ -4,11 +4,17 @@ A React Native drop-in screen for viewing and managing a Sereus cadre — the
 user's own machines, and the owner key that binds them. Designed to be
 **app-agnostic** so any sereus app can embed it on a settings/profile route.
 
-Developed in chat first. Much of what sits beneath it (reading node codes,
-sorting a claim's failure) is expected to move into sereus itself
-(gotchoices/sereus#45); health has the same pieces today. The component's
-contract is the `cadre` area of a `ChatModel` (`@chat/core`), so it renders the
-same over the Sereus model or the mock.
+Developed in chat first. Everything beneath it — reading node codes, sorting a
+claim's failure, the machine list, the owner key — is `@chat/cadre-client`
+(`packages/cadre-client`), the UI-agnostic layer every Sereus app can share. The
+component's contract is that package's `CadreView` (a `cadre` model and its
+change signal), so it renders the same over chat's model, its mock, or a bare
+cadre client, and imports nothing from chat.
+
+Whether this component becomes a shared React Native package (layer 2) is
+decided by the next app that tries it: shared if it can use it through props,
+left as an example to copy if adapting it costs as much as rebuilding it
+(`packages/cadre-client/README.md`, "Layers").
 
 ## Scope
 
@@ -45,7 +51,9 @@ The code carries a one-time claim secret: it is never logged or displayed back.
   shows the private key in `SecretDisplayModal`. "Not ready" until owner
   genesis has run, and adding is disabled until then.
 - **My machines** — "This device" first, never removable. Each other machine:
-  short peer id, full peer id (tap to copy), remove (confirmed). `+` offers
+  short peer id, full peer id (tap to copy), "Always on" and when it was last
+  heard from (its own record's last re-publish, not a live probe), remove
+  (confirmed). `+` offers
   *Scan its code* (when the host gave `onScan`) or *Paste its code*.
 
 Status is best-effort and never blocks: the list comes from a bounded read of
@@ -53,7 +61,8 @@ the control network and fills in when it answers.
 
 ## Reusability requirements
 
-- **No host-app imports.** Data only through the `ChatModel` it is given.
+- **No host-app imports.** Data only through the `CadreView` it is given;
+  imports only `@chat/cadre-client`, React Native and its icon set.
 - **Theme via prop or context.** All colors are tokens in [theme.ts](theme.ts);
   `<CadreManager theme={...} />` takes any subset of `CadreManagerTheme`.
 - **i18n-friendly.** Visible strings are centralised at the top of the
@@ -65,7 +74,7 @@ the control network and fills in when it answers.
 import { CadreManager } from './cadre-ui';
 
 <CadreManager
-  model={chatModel}
+  model={chatModel}   // any CadreView: an app's model, its mock, or createCadreClient(...)
   theme={tokens}
   onScan={() => navigation.navigate('QrScanner')}
   nodeCode={route.params?.nodeCode}
@@ -76,7 +85,7 @@ import { CadreManager } from './cadre-ui';
 ## Out of scope (today)
 
 - Device invitations (another phone joining as a peer of this cadre)
-- Live status probes and "last heard from"
+- Live status probes (a machine's last re-publish is shown instead)
 - Device names / labels
 - Opening a node-code link from outside the app (the `sereus-join:` scheme
   would be claimed by every sereus app on the phone)
