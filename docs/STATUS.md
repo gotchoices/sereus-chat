@@ -1425,6 +1425,24 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         (and #58 for representation changes) are fixed. Until then testers wipe
         (`DATA_FORMAT`).
 
+- [x] **A join goes first (2026-11-24).** Opening an invitation from a cold start raced the
+      start-up queue's wake of the other strands. On the S7, formation came back only after
+      those wakes had finished, each 11–37 s of a blocked JavaScript thread: 95–126 s from Accept
+      to the conversation. The S21 took 11 s.
+      - **Fix:**
+        - `StrandRuntime.holdWhile` holds the queue while `invitations.accept` runs, for at most
+          60 s. The strand being joined is attached by the join itself.
+        - The joiner now saves a summary row for the strand, as the inviter already did, so a
+          joined strand is "listed" at the next launch.
+      - **Before that,** a strand the app was killed in before the list re-read it counted as
+        never listed, so the quiet-strand policy started it anyway.
+      - **After:**
+        - the S7 takes 54–61 s, with formation 15–16 s after the tap (it was 43–61 s);
+        - the S21 takes 10 s.
+      - **The rest on the S7** is its own strand start, 34–39 s of attach. The S21 does the
+        same in 4 s.
+      - Test: `src/sereus/start-queue.test.ts`.
+
 - [x] **Files on the stack's blobs (2026-11-23, branch `sereus-blobs`).** Chat keeps no file
       transport of its own. Attachments and the drive's files are Optimystic 1.29 native blobs on
       each strand's node, named by `blobref` columns (sApp 0.6.0, schema version 6, a wipe). One

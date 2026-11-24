@@ -921,12 +921,17 @@ export function createSereusModel(host: ChatHost): SereusModel {
     return minted;
   }
 
+  /** Join first: strands this device already has wait to start until the join is through. */
+  function acceptInvitation(token: string): Promise<{ strandId: string; opening?: boolean }> {
+    return runtime.holdWhile(() => joinByInvitation(token));
+  }
+
   /**
    * Redeem an encoded invitation. Attach with `FormStrandResult.memberPrivateKey`, NOT
    * the invitation's key — a different key, and the wrong one yields a strand nobody can
    * read.
    */
-  async function acceptInvitation(token: string): Promise<{ strandId: string; opening?: boolean }> {
+  async function joinByInvitation(token: string): Promise<{ strandId: string; opening?: boolean }> {
     const node = await startedNode();
     const invitation = node.decodeInvitation(token);
     const profile = await records.profile();
@@ -972,6 +977,12 @@ export function createSereusModel(host: ChatHost): SereusModel {
       : { Id: strandId, MemberPrivateKey: null, Type: 'o' as const, FounderOwnerKey: null, FounderPeerId: null };
     // REMEMBER FIRST, ATTACH SECOND: `memberPrivateKey` is delivered exactly once.
     await runtime.joined.remember(joinedRow);
+    // Known from now on, as a strand this device invited to is: listed while it opens, and
+    // started at the next launch by how recently it was active, not as never seen.
+    await summaries.save([{
+      id: strandId, title: 'Waiting for someone to join', isGroup: false, memberCount: 1, lastMessage: null,
+      avatarUri: null, unreadCount: 0, mentioned: false, muted: 'none', draftPreview: null, archived: false, pending: false,
+    }]);
 
     const t0 = Date.now();
     const tick = host.dev ? setInterval(() => {

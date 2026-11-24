@@ -54,6 +54,15 @@ export class StrandRuntime {
   busyWhile: <T>(run: () => Promise<T>) => Promise<T> = run => run();
   /** Quiet strands left down at start-up; each attaches when it is opened (`attachDeferred`). */
   private readonly deferred = new Map<string, () => Promise<void>>();
+  /**
+   * A JOIN GOES FIRST. While one runs (`holdWhile`), the queue starts nothing; the strand being
+   * joined is attached by the join itself, not from here. Opening an invitation from a cold
+   * start used to race the wake of the recent strands: on the S7 formation finished only after
+   * they all had (95–126 s to the conversation; the S21, 11 s). A strand already starting
+   * finishes.
+   */
+  private holds = 0;
+  private readonly waiters: Array<() => void> = [];
 
   constructor(private readonly host: ChatHost) {
     this.joined = new JoinedStrands(host);
@@ -280,6 +289,11 @@ export class StrandRuntime {
     try {
       let ran = 0;
       while (this.queue.size) {
+        if (this.holds) {
+          if (this.host.dev) console.info(`[start-queue] held for a join (${this.queue.size} waiting)`);
+          await new Promise<void>(r => this.waiters.push(r));
+          continue;
+        }
         const cached = await this.summaries.read();
         const lastAt = (id: string) => Date.parse(cached[id]?.lastMessage?.timestamp ?? '') || 0;
         // Recent: the most recently active few, and anything active lately.
@@ -299,7 +313,7 @@ export class StrandRuntime {
         }
         if (ran++ > 0 && policy?.gapMs) await new Promise<void>(r => setTimeout(() => r(), policy.gapMs));
         const t0 = Date.now();
-        if (this.host.dev) console.info(`[start-queue] ${strandId.slice(0, 8)} starting (${this.queue.size} waiting)`);
+        if (this.host.dev) console.info(`[start-queue] ${strandId.slice(0, 8)} starting (${this.queue.size} waiting${cached[strandId] ? '' : ', never listed'})`);
         try { await this.busyWhile(() => entry.attach()); } finally { entry.done(); }
         if (this.host.dev) console.info(`[start-queue] ${strandId.slice(0, 8)} done in ${Date.now() - t0} ms`);
       }
@@ -307,6 +321,32 @@ export class StrandRuntime {
       this.pumping = false;
       if (this.queue.size) void this.pump();
     }
+  }
+
+  /**
+   * Run a join with the queue held. Held at most `maxMs`: a join still waiting on its first
+   * sync then no longer keeps the rest down.
+   */
+  async holdWhile<T>(run: () => Promise<T>, maxMs = 60_000): Promise<T> {
+    this.holds++;
+    let held = true;
+    const release = () => {
+      if (!held) return;
+      held = false;
+      if (--this.holds === 0) this.kick();
+    };
+    const timer = setTimeout(release, maxMs);
+    try {
+      return await run();
+    } finally {
+      clearTimeout(timer);
+      release();
+    }
+  }
+
+  /** Wake the pump waiting on a hold. */
+  private kick(): void {
+    for (const r of this.waiters.splice(0)) r();
   }
 
   /** Strands left down at start-up, not yet opened. */
