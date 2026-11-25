@@ -43,6 +43,8 @@ he goes looking for the settings, expecting the usual thicket.
      a switch here can fix.
 5.3. He is told that plainly, where he is standing, rather than left to conclude the setting is
      broken. → [42](42-staying-connected.md)
+5.4. Short of that, he can ask to be reminded to look, at an interval he picks — a nudge that knows
+     nothing about what has arrived, but needs nothing awake. → [43](43-reminded-to-check-in.md)
 
 ### Alternative Path B: a strand he has already decided about
 

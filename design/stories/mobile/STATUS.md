@@ -10,7 +10,7 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
 
 ## The set
 
-20 stories. Numbering is gapped so stories can be inserted without renaming.
+21 stories. Numbering is gapped so stories can be inserted without renaming.
 
 | # | Story | State | Outstanding |
 |---|-------|-------|-------------|
@@ -33,6 +33,7 @@ States: **stub** → **drafted** (written, not reviewed) → **reviewed** (human
 | 40 | [My profile](40-my-profile.md) | drafted | review |
 | 41 | [Settings](41-settings.md) | drafted | review |
 | 42 | [Staying connected](42-staying-connected.md) | revised | review — leads with reachability; borrowing a relay and its cost |
+| 43 | [Reminded to check in](43-reminded-to-check-in.md) | revised | review — after first review: power-management caveat at the setting (not asked up front); Alt G finishes a check the user left; interval only, no quiet hours; muting is per strand and does not affect reminders |
 | 90 | [Voice and video call](90-voice-and-video-call.md) | parked | trim; after messaging |
 
 ## Done

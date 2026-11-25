@@ -16,7 +16,7 @@ planned story; it states the topic and what it must cover.
 - **10–13 Everyday messaging** — reading, writing, replying, correcting
 - **20–23 Media** — sending, receiving, passing on, and the strand's shared drive
 - **30–33 Strands and housekeeping** — the list, the membership, finding, managing
-- **40–42 Me and my app** — profile, settings, and what a user notices of their own machines
+- **40–43 Me and my app** — profile, settings, what a user notices of their own machines, and being reminded to look
 - **90 Calls** — kept as an objective, developed last
 
 ## The set
@@ -42,6 +42,7 @@ planned story; it states the topic and what it must cover.
 | 40 | [My profile](40-my-profile.md) | drafted |
 | 41 | [Settings](41-settings.md) | drafted |
 | 42 | [Staying connected](42-staying-connected.md) | drafted |
+| 43 | [Reminded to check in](43-reminded-to-check-in.md) | revised |
 | 90 | [Voice and video call](90-voice-and-video-call.md) | parked |
 
 ## Provenance
