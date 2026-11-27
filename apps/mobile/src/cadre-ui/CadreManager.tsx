@@ -3,7 +3,7 @@
  * this person, and the owner key that binds them.
  *
  * App-agnostic: it reaches data only through the `CadreView` it is given (a `cadre` model
- * and its change signal, from `@chat/cadre-client`), so it has no host-app imports. An
+ * and its change signal, from `@serfab/cadre-client`), so it has no host-app imports. An
  * app passes its own model when that has both members, or a cadre client. See ./SPEC.md.
  *
  * Adding a machine is sereus's claiming model (1.14): the machine shows a node code
@@ -35,7 +35,7 @@ import {
   type CadronPreferences,
   type InvitationsView,
   type NodeCodePreview,
-} from '@chat/cadre-client';
+} from '@serfab/cadre-client';
 import SecretDisplayModal from './SecretDisplayModal';
 import CadronNameModal from './CadronNameModal';
 import NodeCodeModal from './NodeCodeModal';
@@ -114,7 +114,7 @@ export interface CadreManagerProps {
   /** Opens the host app's scanner; "Scan its code" is offered only when given. */
   onScan?: () => void;
   /**
-   * How invitations name the cadrons (`@chat/cadre-client`'s invitations view). Given, each
+   * How invitations name the cadrons (`@serfab/cadre-client`'s invitations view). Given, each
    * machine can be named and starred as preferred, and the number of addresses an invitation
    * names can be set.
    */

@@ -1,6 +1,6 @@
 /**
  * An invitation answered by the person's cadron while their phone sleeps, through the phone's
- * screens (`@chat/cadre-client`'s invitations model):
+ * screens (`@serfab/cadre-client`'s invitations model):
  *   1. a cadre-cli node (the cadron) starts, with a relay, and the phone claims it by its code;
  *   2. the phone makes an invitation; the screen must say it is ready to hand out, and its
  *      details must name the cadron, not this phone;

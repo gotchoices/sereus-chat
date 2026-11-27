@@ -48,3 +48,6 @@ package-lock.json
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Stack packages not on npm yet, packed from their ser/ clones (scripts/pack-local.sh)
+.local-packages/

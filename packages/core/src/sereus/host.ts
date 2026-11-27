@@ -7,7 +7,7 @@
  * a file, memory) and pins their persisted names.
  */
 import type { CadreNode, DurableSlot, KeyStore } from '@serfab/cadre-core';
-import type { CadreNodeHost } from '@chat/cadre-client/sereus';
+import type { CadreNodeHost } from '@serfab/cadre-client/sereus';
 
 export type { DurableSlot };
 
@@ -24,7 +24,7 @@ export type SlotName =
   | 'outbox'
   | 'draft'
   | 'readCursor'
-  /** How invitations name this person's cadrons (`@chat/cadre-client`'s `CadronPreferences`). */
+  /** How invitations name this person's cadrons (`@serfab/cadre-client`'s `CadronPreferences`). */
   | 'cadronPreferences';
 
 /**

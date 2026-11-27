@@ -18,7 +18,7 @@ export const STORAGE_KEYS = {
   outgoingInvitations: '@sereus.chat/outgoingInvitations',
   preparedStrands: '@sereus.chat/preparedStrands',
   outbox: '@sereus.chat/outbox',
-  /** How invitations name this person's cadrons (`@chat/cadre-client`'s `CadronPreferences`). */
+  /** How invitations name this person's cadrons (`@serfab/cadre-client`'s `CadronPreferences`). */
   cadronPreferences: '@sereus.chat/cadronPreferences',
   /** Developer setting: how writes are acknowledged (`CadreService.setSendMode`). */
   sendMode: '@sereus.chat/sendMode',

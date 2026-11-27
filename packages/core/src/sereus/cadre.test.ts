@@ -2,7 +2,7 @@
  * Claiming a node (sereus 1.14): a cadre-core node waiting to be claimed, and party A's
  * Sereus model claiming it from its node code — the path a phone takes with a code
  * scanned from a home server. Reading node codes and the reachability rule are
- * tested in `@chat/cadre-client`.
+ * tested in `@serfab/cadre-client`.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomBytes } from 'node:crypto';

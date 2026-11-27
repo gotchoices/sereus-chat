@@ -35,10 +35,9 @@
     "logs": "sh ./scripts/logs.sh",
     "stack:check": "cd ../../test/stack && node found-strand.mjs",
     "stack:two-party": "cd ../../test/stack && node two-party-formation.mjs",
-    "core:build": "yarn --cwd ../../packages/resources build && yarn --cwd ../../packages/strand-drive build && yarn --cwd ../../packages/cadre-client build && yarn --cwd ../../packages/core build"
+    "core:build": "yarn --cwd ../../packages/resources build && yarn --cwd ../../packages/strand-drive build && yarn --cwd ../../packages/core build"
   },
   "dependencies": {
-    "@chat/cadre-client": "link:../../packages/cadre-client",
     "@chat/core": "link:../../packages/core",
     "@chat/resources": "link:../../packages/resources",
     "@chat/strand-drive": "link:../../packages/strand-drive",
@@ -62,6 +61,7 @@
     "@react-navigation/elements": "^2.9.4",
     "@react-navigation/native": "^7.1.19",
     "@react-navigation/native-stack": "^7.6.2",
+    "@serfab/cadre-client": "file:../../.local-packages/serfab-cadre-client.tgz",
     "@serfab/cadre-core": "1.25.0",
     "@serfab/cadre-rn": "1.25.0",
     "@ungap/structured-clone": "^1.3.0",
@@ -131,6 +131,7 @@
     "@serfab/cadre-core": "1.25.0",
     "@serfab/quereus-plugin-sereus": "1.25.0",
     "p2p-fret": "1.3.0",
+    "@serfab/cadre-client": "file:../../.local-packages/serfab-cadre-client.tgz",
     "@libp2p/interface": "npm:3.3.0",
     "@libp2p/peer-id": "npm:6.0.15",
     "@multiformats/multiaddr": "13.0.3",

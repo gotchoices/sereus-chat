@@ -1,7 +1,7 @@
 /**
  * CadronNameModal — the person's own name for one of their cadrons ("kjeib", "home server"),
  * shown in the machine list and in an invitation's readable view. Kept on this device
- * (`@chat/cadre-client`'s cadron preferences). An empty name clears it.
+ * (`@serfab/cadre-client`'s cadron preferences). An empty name clears it.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';

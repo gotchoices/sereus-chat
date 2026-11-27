@@ -74,7 +74,14 @@ PACKAGES = collections.OrderedDict([
     ('@serfab/cadre-rn',                      ('sereus/packages/cadre-rn',                      '1.25.0', False)),
     ('@serfab/quereus-plugin-sereus',         ('sereus/packages/quereus-plugin-sereus',         '1.25.0', True)),
     ('p2p-fret',                              ('fret/packages/fret',                            '1.3.0',  True)),
+    ('@serfab/cadre-client',                  ('sereus/packages/cadre-client',                  '1.25.0', True)),
 ])
+
+# Not on npm yet: in either mode, a tarball packed from the local clone by scripts/pack-local.sh
+# (a `file:` spec). A tarball, not a portal: installed by copy, the package's peer (cadre-core)
+# resolves from the consumer's node_modules, not the clone's. Drop an entry (and its line in
+# pack-local.sh) once a sereus release includes the package.
+LOCAL_ONLY = {'@serfab/cadre-client': 'serfab-cadre-client.tgz'}
 SENTINEL = '@serfab/cadre-core'
 
 # Non-ser single-copy pins, written into every resolutions owner: one copy of each in
@@ -108,6 +115,8 @@ def load(rel):
 
 def spec_for(rel, name, mode):
     clone, version, _ = PACKAGES[name]
+    if name in LOCAL_ONLY:
+        return 'file:' + os.path.relpath(os.path.join(ROOT, '.local-packages', LOCAL_ONLY[name]), os.path.join(ROOT, rel))
     if mode == 'local':
         return 'portal:' + os.path.relpath(os.path.join(SER, clone), os.path.join(ROOT, rel))
     return version
@@ -163,6 +172,7 @@ for rel, kind in consumers():
 PY
 
 if [ "$CMD" != status ] && [ "$DO_INSTALL" = 1 ]; then
+  bash "$ROOT/scripts/pack-local.sh" || exit $?
   echo "==> yarn install (root)"
   (cd "$ROOT" && yarn install) || exit $?
   for app in "$ROOT"/apps/*/; do

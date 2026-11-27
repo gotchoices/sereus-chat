@@ -6,13 +6,13 @@
  *     words, with the link's size;
  *   - the QR code, which a tap opens full screen at the largest size the screen allows.
  *
- * All of it comes from the model's `cadrons` (`@chat/cadre-client`'s invitations model).
+ * All of it comes from the model's `cadrons` (`@serfab/cadre-client`'s invitations model).
  */
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { invitationReadinessStore, type InvitationText } from '@chat/cadre-client';
+import { invitationReadinessStore, type InvitationText } from '@serfab/cadre-client';
 import type { Invitation } from '@chat/core';
 import { useModel } from '../data/bind';
 import { useT } from '../i18n';

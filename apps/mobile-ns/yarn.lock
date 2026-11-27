@@ -243,12 +243,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@chat/cadre-client@link:../../packages/cadre-client::locator=mobile-ns%40workspace%3A.":
-  version: 0.0.0-use.local
-  resolution: "@chat/cadre-client@link:../../packages/cadre-client::locator=mobile-ns%40workspace%3A."
-  languageName: node
-  linkType: soft
-
 "@chat/core@link:../../packages/core::locator=mobile-ns%40workspace%3A.":
   version: 0.0.0-use.local
   resolution: "@chat/core@link:../../packages/core::locator=mobile-ns%40workspace%3A."
@@ -1997,6 +1991,17 @@ __metadata:
     temporal-polyfill: "npm:^0.3.0"
     uint8arrays: "npm:^6.1.1"
   checksum: 10c0/161501b32255a6d6ea220a0e24128aa68a950703c9414c28362280b8169e0c6d8629e298cff055740800dd074ed06c99ed5fa571ac4a55a073ae6b9d89afa275
+  languageName: node
+  linkType: hard
+
+"@serfab/cadre-client@file:../../.local-packages/serfab-cadre-client.tgz::locator=mobile-ns%40workspace%3A.":
+  version: 1.25.0
+  resolution: "@serfab/cadre-client@file:../../.local-packages/serfab-cadre-client.tgz#../../.local-packages/serfab-cadre-client.tgz::hash=650cec&locator=mobile-ns%40workspace%3A."
+  dependencies:
+    "@multiformats/multiaddr": "npm:^13.0.3"
+  peerDependencies:
+    "@serfab/cadre-core": ^1.25.0
+  checksum: 10c0/903faadaa0c11c8955cde3d2dc409f29904ab13ae23b33605747e5a234368e00e7092f92e62ba207ae100f52487fa7d2889e74f7d6eb8586490a36fb196df58a
   languageName: node
   linkType: hard
 
@@ -4570,7 +4575,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "mobile-ns@workspace:."
   dependencies:
-    "@chat/cadre-client": "link:../../packages/cadre-client"
     "@chat/core": "link:../../packages/core"
     "@chat/resources": "link:../../packages/resources"
     "@formatjs/intl-datetimeformat": "npm:^7.4.9"
@@ -4595,6 +4599,7 @@ __metadata:
     "@optimystic/db-p2p": "npm:1.30.0"
     "@optimystic/db-p2p-storage-ns": "npm:1.30.0"
     "@quereus/quereus": "npm:5.7.1"
+    "@serfab/cadre-client": "file:../../.local-packages/serfab-cadre-client.tgz"
     "@serfab/cadre-core": "npm:1.25.0"
     "@types/readable-stream": "npm:^4"
     "@ungap/structured-clone": "npm:^1.3.0"

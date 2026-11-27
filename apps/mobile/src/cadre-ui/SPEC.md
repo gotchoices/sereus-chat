@@ -5,7 +5,7 @@ user's own machines, and the owner key that binds them. Designed to be
 **app-agnostic** so any sereus app can embed it on a settings/profile route.
 
 Developed in chat first. Everything beneath it — reading node codes, sorting a
-claim's failure, the machine list, the owner key — is `@chat/cadre-client`
+claim's failure, the machine list, the owner key — is `@serfab/cadre-client`
 (`packages/cadre-client`), the UI-agnostic layer every Sereus app can share. The
 component's contract is that package's `CadreView` (a `cadre` model and its
 change signal), so it renders the same over chat's model, its mock, or a bare
@@ -62,7 +62,7 @@ the control network and fills in when it answers.
 ## Reusability requirements
 
 - **No host-app imports.** Data only through the `CadreView` it is given;
-  imports only `@chat/cadre-client`, React Native and its icon set.
+  imports only `@serfab/cadre-client`, React Native and its icon set.
 - **Theme via prop or context.** All colors are tokens in [theme.ts](theme.ts);
   `<CadreManager theme={...} />` takes any subset of `CadreManagerTheme`.
 - **i18n-friendly.** Visible strings are centralised at the top of the

@@ -1837,12 +1837,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@chat/cadre-client@link:../../packages/cadre-client::locator=mobile%40workspace%3A.":
-  version: 0.0.0-use.local
-  resolution: "@chat/cadre-client@link:../../packages/cadre-client::locator=mobile%40workspace%3A."
-  languageName: node
-  linkType: soft
-
 "@chat/core@link:../../packages/core::locator=mobile%40workspace%3A.":
   version: 0.0.0-use.local
   resolution: "@chat/core@link:../../packages/core::locator=mobile%40workspace%3A."
@@ -4041,6 +4035,17 @@ __metadata:
   dependencies:
     nanoid: "npm:^3.3.11"
   checksum: 10c0/85f6cb9ac71e0492845aa87637c7c745d85aa15e4ad7e71a8d910080f5d5a469dd348f59ffaaed8c488cb92708fae56350a0bfc7bc5750c65e12da1f0d4eca70
+  languageName: node
+  linkType: hard
+
+"@serfab/cadre-client@file:../../.local-packages/serfab-cadre-client.tgz::locator=mobile%40workspace%3A.":
+  version: 1.25.0
+  resolution: "@serfab/cadre-client@file:../../.local-packages/serfab-cadre-client.tgz#../../.local-packages/serfab-cadre-client.tgz::hash=650cec&locator=mobile%40workspace%3A."
+  dependencies:
+    "@multiformats/multiaddr": "npm:^13.0.3"
+  peerDependencies:
+    "@serfab/cadre-core": ^1.25.0
+  checksum: 10c0/903faadaa0c11c8955cde3d2dc409f29904ab13ae23b33605747e5a234368e00e7092f92e62ba207ae100f52487fa7d2889e74f7d6eb8586490a36fb196df58a
   languageName: node
   linkType: hard
 
@@ -9728,7 +9733,6 @@ __metadata:
     "@babel/plugin-transform-class-static-block": "npm:^7.24.7"
     "@babel/preset-env": "npm:^7.25.3"
     "@babel/runtime": "npm:^7.29.2"
-    "@chat/cadre-client": "link:../../packages/cadre-client"
     "@chat/core": "link:../../packages/core"
     "@chat/resources": "link:../../packages/resources"
     "@chat/strand-drive": "link:../../packages/strand-drive"
@@ -9759,6 +9763,7 @@ __metadata:
     "@react-navigation/elements": "npm:^2.9.4"
     "@react-navigation/native": "npm:^7.1.19"
     "@react-navigation/native-stack": "npm:^7.6.2"
+    "@serfab/cadre-client": "file:../../.local-packages/serfab-cadre-client.tgz"
     "@serfab/cadre-core": "npm:1.25.0"
     "@serfab/cadre-rn": "npm:1.25.0"
     "@types/jest": "npm:^29.5.13"

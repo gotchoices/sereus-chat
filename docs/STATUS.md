@@ -1425,7 +1425,23 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         (and #58 for representation changes) are fixed. Until then testers wipe
         (`DATA_FORMAT`).
 
-- [x] **Invitations name the person's cadrons (2026-11-27, `@chat/cadre-client`).** "Cadron" is
+- [x] **cadre-client moved to sereus (2026-11-27): `@serfab/cadre-client`.**
+      - **In sereus:** pushed to sereus master (`packages/cadre-client`, its doc
+        `docs/cadre/cadre-client.md`, its lockfile entry). Registering it in the rest of the tree
+        (publish chain, lint, glossary, docs index) is gotchoices/sereus#68.
+      - **In the move:** tabs, tests in `test/*.spec.ts` behind sereus's stale-build guard,
+        addresses parsed with `@multiformats/multiaddr`, its own `describeThrown`, and the
+        stack-free entry kept free of cadre-core by a test. It passes sereus's lint, docs,
+        typecheck and test-coverage checks.
+      - **Chat's copy is deleted.** Chat installs a tarball packed from the sereus clone
+        (`scripts/pack-local.sh`, `.local-packages/`), written as `file:` specs by
+        `scripts/use-stack.sh` (`LOCAL_ONLY`). A portal was tried first: through it,
+        cadre-client's peer resolved to sereus's own cadre-core, a second copy, which fails
+        `instanceof` checks and gives TypeScript two `CadreNode` types.
+      - **Checked:** core 101 tests; serchat builds, 15 tests; the phone app typechecks and
+        bundles (single cadre-core); mobile-ns typechecks.
+
+- [x] **Invitations name the person's cadrons (2026-11-27, `@serfab/cadre-client`).** "Cadron" is
       one machine of a person's cadre; the package introduces the term (see its README).
       - **The address list:** `invitations.bootstrapPlan` / `withBootstrap` replaces cadre-core's
         list before chat encodes an invitation.
@@ -2316,7 +2332,7 @@ on top only if a second app can use it without forking (docs/app-family.md,
 
 **Done**
 
-- [x] `packages/cadre-client` (`@chat/cadre-client`): cadre model and results, node codes,
+- [x] `packages/cadre-client` (`@serfab/cadre-client`): cadre model and results, node codes,
       address reach, relays, reachability, change signals, stores; `createCadreClient(host)`
       and a ready-made `edgeNodeHost(edge)` for apps on cadre-core's edge node (what
       `createPhoneNode` returns). Imports only cadre-core; `standalone.test.ts` enforces it.
@@ -2329,7 +2345,7 @@ on top only if a second app can use it without forking (docs/app-family.md,
       instructions; the relay section says when your machine answers for you. Caveat in the
       package README: a home cadre-host node may complete a join and not sync, because its
       strand ports are not forwarded.
-- [x] `cadre-ui` depends on `@chat/cadre-client` only (`model: CadreView`), and shows each
+- [x] `cadre-ui` depends on `@serfab/cadre-client` only (`model: CadreView`), and shows each
       machine as "Always on · heard from 5 min ago".
 
 **Not verified on devices yet**
@@ -2342,7 +2358,7 @@ on top only if a second app can use it without forking (docs/app-family.md,
 
 1. **Link it, now.** Health and taleus live in the same `ser/` workspace and already build
    against local clones, so each can depend on the built package by path — health's
-   `apps/mobile`: `"@chat/cadre-client": "link:../../../chat/packages/cadre-client"`; taleus's
+   `apps/mobile`: `"@serfab/cadre-client": "link:../../../chat/packages/cadre-client"`; taleus's
    `packages/taleus-app/apps/mobile`: `"link:../../../../../chat/packages/cadre-client"` — with the same Metro peer pin
    chat's `metro.config.js` uses for linked packages. No publishing and no waiting. It is the
    real test of the API: a second and third app will show what is chat-shaped. The cost is a

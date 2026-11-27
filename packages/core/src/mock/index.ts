@@ -19,7 +19,7 @@ import type {
   Result, SearchBatch, StorageUsage, StrandState, StrandSummary,
 } from '../model/index.js';
 import { fail, ok, pageMessages } from '../model/index.js';
-import { cadreFail, cadreOk, describeInvitation, normalizePreferences, planBootstrap, type CadronPreferences } from '@chat/cadre-client';
+import { cadreFail, cadreOk, describeInvitation, normalizePreferences, planBootstrap, type CadronPreferences } from '@serfab/cadre-client';
 
 export type FixtureName =
   | 'Strands' | 'Messages' | 'Members' | 'StrandMedia' | 'StrandState'

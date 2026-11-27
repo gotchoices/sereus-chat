@@ -35,7 +35,7 @@ export interface ChatModel {
   /**
    * How invitations name this person's cadrons: preferred cadrons and their names, how many
    * addresses an invitation names, the plan, whether a new invitation is ready to hand out, and
-   * an invitation in words (`@chat/cadre-client`'s invitations model).
+   * an invitation in words (`@serfab/cadre-client`'s invitations model).
    */
   cadrons: CadronsModel;
   changes: ChangesModel;

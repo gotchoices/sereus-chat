@@ -8,7 +8,7 @@
  * once its data is known to be usable.
  */
 import { FormationRejectedError, type StrandInstance } from '@serfab/cadre-core';
-import { createCadreClient } from '@chat/cadre-client/sereus';
+import { createCadreClient } from '@serfab/cadre-client/sereus';
 import { buildInviteUrl, CHAT_SAPP_ID } from '../protocol/index.js';
 import type {
   Attachment, ChatModel, Delivery, DriveFile, DriveFolder, DriveListing, Invitation, InvitationPreview, Member, Message, Prefs, Reaction,
@@ -895,7 +895,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
         console.warn('[sereus-model] could not keep the strand note:', err instanceof Error ? err.message : err));
     }
     // Which addresses it names: the person's cadrons that reach from anywhere, few and best
-    // first (`@chat/cadre-client`'s plan), not cadre-core's list, which can name a VPS cadron by
+    // first (`@serfab/cadre-client`'s plan), not cadre-core's list, which can name a VPS cadron by
     // loopback and private addresses alone. Kept as cadre-core made it on any problem.
     const token = node.encodeInvitation(await cadreClient.invitations.withBootstrap(invitation));
     const minted: Invitation = {
@@ -1014,7 +1014,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
 
   /**
    * The cadre: machines, claiming, owner key backup, relays and reachability, from
-   * `@chat/cadre-client` (the UI-agnostic package other Sereus apps can use too).
+   * `@serfab/cadre-client` (the UI-agnostic package other Sereus apps can use too).
    */
   const cadreClient = createCadreClient(
     { node: host.node, ownerKeyStore: host.ownerKeyStore, preferences: host.slot('cadronPreferences') },

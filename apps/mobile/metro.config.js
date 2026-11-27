@@ -24,7 +24,7 @@ const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // (docs/app-family.md, "Linked code must resolve the app's copy of the stack".)
 const packagesDir = path.join(projectRoot, 'packages') + path.sep;
 // Every linked package's peers (the core's, and the IPFS and blob layers': Helia's pieces and friends).
-const corePeers = [...new Set(['core', 'strand-drive', 'cadre-client'].flatMap(name => Object.keys(
+const corePeers = [...new Set(['core', 'strand-drive'].flatMap(name => Object.keys(
   require(path.join(projectRoot, `packages/${name}/package.json`)).peerDependencies ?? {},
 )))];
 const isCorePeer = name => corePeers.some(p => name === p || name.startsWith(p + '/'));

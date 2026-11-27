@@ -5,13 +5,12 @@
   "main": "app/app.ts",
   "description": "Sereus Chat on NativeScript (V8): the engine probe and comparison twin of apps/mobile (docs/app-family.md).",
   "scripts": {
-    "core:build": "yarn --cwd ../../packages/resources build && yarn --cwd ../../packages/cadre-client build && yarn --cwd ../../packages/core build",
+    "core:build": "yarn --cwd ../../packages/resources build && yarn --cwd ../../packages/core build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "android": "yarn core:build && ns run android",
     "build:android": "yarn core:build && ns build android"
   },
   "dependencies": {
-    "@chat/cadre-client": "link:../../packages/cadre-client",
     "@chat/core": "link:../../packages/core",
     "@chat/resources": "link:../../packages/resources",
     "@formatjs/intl-datetimeformat": "^7.4.9",
@@ -33,6 +32,7 @@
     "@optimystic/db-p2p": "1.30.0",
     "@optimystic/db-p2p-storage-ns": "1.30.0",
     "@quereus/quereus": "5.7.1",
+    "@serfab/cadre-client": "file:../../.local-packages/serfab-cadre-client.tgz",
     "@serfab/cadre-core": "1.25.0",
     "@ungap/structured-clone": "^1.3.0",
     "@valor/nativescript-websockets": "patch:@valor/nativescript-websockets@npm%3A2.0.3#~/.yarn/patches/@valor-nativescript-websockets-npm-2.0.3-1d4fb0b2f4.patch",
@@ -64,6 +64,7 @@
     "@serfab/cadre-core": "1.25.0",
     "@serfab/quereus-plugin-sereus": "1.25.0",
     "p2p-fret": "1.3.0",
+    "@serfab/cadre-client": "file:../../.local-packages/serfab-cadre-client.tgz",
     "@libp2p/interface": "npm:3.3.0",
     "@libp2p/peer-id": "npm:6.0.15",
     "@multiformats/multiaddr": "13.0.3",

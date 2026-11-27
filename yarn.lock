@@ -68,26 +68,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@chat/cadre-client@workspace:*, @chat/cadre-client@workspace:packages/cadre-client":
-  version: 0.0.0-use.local
-  resolution: "@chat/cadre-client@workspace:packages/cadre-client"
-  dependencies:
-    "@serfab/cadre-core": "npm:1.25.0"
-    "@types/node": "npm:^24.0.0"
-    typescript: "npm:^5.9.3"
-    vitest: "npm:^4.0.17"
-  peerDependencies:
-    "@serfab/cadre-core": ^1.25.0
-  languageName: unknown
-  linkType: soft
-
 "@chat/core@workspace:*, @chat/core@workspace:packages/core":
   version: 0.0.0-use.local
   resolution: "@chat/core@workspace:packages/core"
   dependencies:
     "@chainsafe/libp2p-noise": "npm:17.0.0"
     "@chainsafe/libp2p-yamux": "npm:8.0.1"
-    "@chat/cadre-client": "workspace:*"
     "@chat/strand-drive": "workspace:*"
     "@libp2p/circuit-relay-v2": "npm:4.2.14"
     "@libp2p/crypto": "npm:5.1.24"
@@ -99,6 +85,7 @@ __metadata:
     "@optimystic/db-p2p": "npm:1.30.0"
     "@optimystic/db-p2p-storage-fs": "npm:1.30.0"
     "@quereus/quereus": "npm:5.7.1"
+    "@serfab/cadre-client": "file:../../.local-packages/serfab-cadre-client.tgz"
     "@serfab/cadre-core": "npm:1.25.0"
     "@types/node": "npm:^24.0.0"
     libp2p: "npm:3.3.11"
@@ -106,12 +93,12 @@ __metadata:
     typescript: "npm:^5.9.3"
     vitest: "npm:^4.0.17"
   peerDependencies:
-    "@chat/cadre-client": "*"
     "@chat/strand-drive": "*"
     "@noble/ciphers": ^2.2.0
     "@noble/curves": ^2.2.0
     "@noble/hashes": ^2.0.0
     "@quereus/quereus": ^5.7.1
+    "@serfab/cadre-client": ^1.25.0
     "@serfab/cadre-core": ^1.25.0
     p2p-fret: ^1.3.0
   languageName: unknown
@@ -1499,6 +1486,17 @@ __metadata:
     libp2p: "npm:^3.3.11"
   languageName: unknown
   linkType: soft
+
+"@serfab/cadre-client@file:.local-packages/serfab-cadre-client.tgz::locator=sereus-chat%40workspace%3A.":
+  version: 1.25.0
+  resolution: "@serfab/cadre-client@file:.local-packages/serfab-cadre-client.tgz#.local-packages/serfab-cadre-client.tgz::hash=650cec&locator=sereus-chat%40workspace%3A."
+  dependencies:
+    "@multiformats/multiaddr": "npm:^13.0.3"
+  peerDependencies:
+    "@serfab/cadre-core": ^1.25.0
+  checksum: 10c0/903faadaa0c11c8955cde3d2dc409f29904ab13ae23b33605747e5a234368e00e7092f92e62ba207ae100f52487fa7d2889e74f7d6eb8586490a36fb196df58a
+  languageName: node
+  linkType: hard
 
 "@serfab/cadre-core@npm:1.25.0":
   version: 1.25.0
@@ -3040,7 +3038,6 @@ __metadata:
   dependencies:
     "@chainsafe/libp2p-noise": "npm:17.0.0"
     "@chainsafe/libp2p-yamux": "npm:8.0.1"
-    "@chat/cadre-client": "workspace:*"
     "@chat/core": "workspace:*"
     "@chat/resources": "workspace:*"
     "@libp2p/circuit-relay-v2": "npm:4.2.14"
@@ -3050,6 +3047,7 @@ __metadata:
     "@optimystic/db-p2p": "npm:1.30.0"
     "@optimystic/db-p2p-storage-fs": "npm:1.30.0"
     "@quereus/quereus": "npm:5.7.1"
+    "@serfab/cadre-client": "file:../../.local-packages/serfab-cadre-client.tgz"
     "@serfab/cadre-core": "npm:1.25.0"
     "@types/node": "npm:^24.0.0"
     esbuild: "npm:^0.28.2"

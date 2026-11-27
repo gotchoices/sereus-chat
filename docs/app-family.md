@@ -63,7 +63,6 @@ chat/
     mobile-ns/             NativeScript (only if needed)
   packages/                shared libraries — never deployed on their own
     core/                  @chat/core: protocol, model, Sereus + mock implementations, stores, diagnostics
-    cadre-client/          @chat/cadre-client: cadre management for any Sereus app, UI-agnostic (meant to leave chat)
     strand-drive/          @chat/strand-drive: a strand's shared drive (meant to move into sereus)
     resources/             @chat/resources: strings, design tokens, brand art
   design/                  Appeus design surface (stories, specs, domain contract)
@@ -179,10 +178,8 @@ There is no public API or compatibility promise to outside apps.
 
 Whether to offer a public, stable API — so others can build compatible apps —
 is deliberately deferred until the core has stabilized across at least two of
-our own apps. The exception being prepared is `@chat/cadre-client`: it is built
-to serve other Sereus apps (health, taleus), so it is the first package that may
-be linked from outside this repository or published. How it gets there is a
-decision, not a default (docs/STATUS.md, "Cadre client"). Until then:
+our own apps. `@serfab/cadre-client`, which serves other Sereus apps too, already left:
+it lives in sereus (`packages/cadre-client`) and is released with it. Until then:
 
 - Do not add publishing steps, npm scopes, or public-API versioning.
 - Keep `core/protocol` free of imports from the rest of the core. It is what a
@@ -237,8 +234,8 @@ One object with a namespace per area of the product:
 | `search` | Streaming search |
 | `profile` | The local profile and its sync to strands |
 | `prefs` | App preferences: behavior settings, storage ceiling |
-| `reachability` | Relays: read the configured relays and the reservation state, change the relays, and say whether this device can be invited — through its own relay reservation, or because one of the party's always-on machines has a public address and answers for it. From `@chat/cadre-client` |
-| `cadre` | The party's machines: list, claim a node by its code, remove; back up the owner key. From `@chat/cadre-client` |
+| `reachability` | Relays: read the configured relays and the reservation state, change the relays, and say whether this device can be invited — through its own relay reservation, or because one of the party's always-on machines has a public address and answers for it. From `@serfab/cadre-client` |
+| `cadre` | The party's machines: list, claim a node by its code, remove; back up the owner key. From `@serfab/cadre-client` |
 
 Rules, all inherited from experience with the current adapter:
 
@@ -437,12 +434,20 @@ Platform-neutral data the UIs share:
 The JSON files are the source; a build step embeds them into the package's JS, so
 no consumer needs JSON-import support.
 
-## `packages/cadre-client`
+## `@serfab/cadre-client` (in sereus)
 
-Cadre management any Sereus app can use: the party's machines, claiming a node, backing up
-the owner key, relays and reachability, with stores any UI binds to. It is built here but
-belongs to no app: it imports nothing but cadre-core and its own files (a test enforces it),
-and `@chat/core` builds `ChatModel.cadre` and `ChatModel.reachability` from it.
+Cadre management any Sereus app can use: the person's cadrons (the cadre's machines),
+claiming a node, backing up the owner key, relays, reachability, and which cadrons an
+invitation names, with stores any UI binds to. It lives in sereus, `packages/cadre-client`
+(model: sereus `docs/cadre/cadre-client.md`; usage: its README). `@chat/core` builds
+`ChatModel.cadre`, `ChatModel.reachability` and `ChatModel.cadrons` from it.
+
+**Until a sereus release includes it**, chat installs it from a tarball packed from the
+sereus clone beside chat: `scripts/pack-local.sh` builds and packs it into `.local-packages/`,
+and `scripts/use-stack.sh` writes the `file:` specs (`LOCAL_ONLY`) in either stack mode. A
+tarball, not a portal: installed by copy, its peer (cadre-core) resolves from each consumer's
+own `node_modules`, so there is one copy. After changing it in sereus: `bash scripts/use-stack.sh
+npm --install` (packs, then installs everywhere).
 
 Two layers, decided separately:
 
@@ -453,8 +458,7 @@ Two layers, decided separately:
    it costs about as much as building a screen from it as an example, it stays an example
    and only layer 1 is shared.
 
-Details, the reachability rule, and what is not covered yet:
-`packages/cadre-client/README.md`.
+Details, the reachability rule, and what is not covered yet: the package's README in sereus.
 
 ## What each app owns
 
