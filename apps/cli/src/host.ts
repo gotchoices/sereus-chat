@@ -19,8 +19,8 @@ import { FileTrustedOwnerStore } from '@serfab/cadre-core/trusted-owner-store-fi
 import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-file';
 import { FileEnrolledMachineStore } from '@serfab/cadre-core/enrolled-machine-store-file';
 import { FileStrandNetworkStateStore } from '@serfab/cadre-core/strand-network-state-file';
-import { FileKVStore, FileRawStorage } from '@optimystic/db-p2p-storage-fs';
-import { MemoryRawStorage } from '@optimystic/db-p2p';
+import { FileKVStore, fileNodeStorage } from '@optimystic/db-p2p-storage-fs';
+import { memoryNodeStorage, type OpenNodeStorage } from '@optimystic/db-p2p';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { CHAT_SAPP_ID } from '@chat/core';
@@ -101,17 +101,18 @@ export function createCliHost(opts: HostOptions): CliHost {
   const rebuildHooks = new Set<() => void | Promise<void>>();
   const reachabilityCallbacks = new Set<() => void>();
 
-  const memoryScopes = new Map<string, MemoryRawStorage>();
+  const memoryScopes = new Map<string, OpenNodeStorage>();
   const journals = new Map<string, FileKVStore>();
   /**
-   * Every block store this host built. The one that builds a store closes it (Optimystic
-   * `IRawStorage.close`): writes are grouped in memory and flushed on a timer, so a store left
-   * open loses the last moments' writes, a block just replicated here included, when the
-   * process exits. Measured: a node stopped about 3 s after taking the other member's write
+   * Every scope's storage this host opened (blocks, node-local records, blob pieces: sereus
+   * 1.25's `storage.open`). The one that opens it closes it, after the node stops (the node
+   * closes nothing it was handed): writes are grouped in memory and flushed on a timer, so a
+   * store left open loses the last moments' writes, a block just replicated here included, when
+   * the process exits. Measured: a node stopped about 3 s after taking the other member's write
    * did not have it after a restart (test/stack/offline-restart-hides-peer-rows.mjs, CLOSE=0).
    */
-  const stores: FileRawStorage[] = [];
-  const track = (store: FileRawStorage) => { stores.push(store); return store; };
+  const stores: OpenNodeStorage[] = [];
+  const track = (store: OpenNodeStorage) => { stores.push(store); return store; };
   // The node's identity and, in its own slot, the party's owner key (separate since sereus 1.17).
   const keyStore = new FileKeyStore(dirs.keys);
   const relays = () => [...new Set([...config.relays, ...opts.extraRelays])];
@@ -124,9 +125,9 @@ export function createCliHost(opts: HostOptions): CliHost {
       controlNetwork: { partyId, bootstrapNodes: [] },
       nodeClass: 'device',
       storage: {
-        provider: opts.memoryBlocks
-          ? (scope: string) => memoryScopes.get(scope) ?? memoryScopes.set(scope, new MemoryRawStorage()).get(scope)!
-          : (scope: string) => track(new FileRawStorage(join(dirs.blocks, scope))),
+        open: opts.memoryBlocks
+          ? async (scope: string) => memoryScopes.get(scope) ?? memoryScopes.set(scope, memoryNodeStorage()).get(scope)!
+          : async (scope: string) => track(fileNodeStorage(join(dirs.blocks, scope))),
       },
       network: {
         transports: [webSockets(), circuitRelayTransport(), ...await experimentalWebRTC(relays())] as never,

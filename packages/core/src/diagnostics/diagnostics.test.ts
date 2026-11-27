@@ -23,11 +23,11 @@ describe('diagnostics', () => {
 describe('found strand', () => {
   it('founds one strand on one node, in memory', async () => {
     const { runFoundStrandCheck } = await import('./index.js');
-    const { MemoryRawStorage } = await import('@optimystic/db-p2p');
+    const { memoryNodeStorage } = await import('@optimystic/db-p2p');
     const { webSockets } = await import('@libp2p/websockets');
     const { generateKeyPair } = await import('@libp2p/crypto/keys');
     const result = await runFoundStrandCheck({
-      storage: () => new MemoryRawStorage(),
+      storage: async () => memoryNodeStorage(),
       transports: [webSockets()] as never,
       privateKey: await generateKeyPair('Ed25519'),
     }, { timeoutMs: 60_000 });
@@ -40,7 +40,7 @@ describe('two-party check', () => {
     const { runTwoPartyCheck } = await import('./index.js');
     const { startRelay } = await import('../testing/node-host.js');
     const { CadreNode } = await import('@serfab/cadre-core');
-    const { MemoryRawStorage } = await import('@optimystic/db-p2p');
+    const { memoryNodeStorage } = await import('@optimystic/db-p2p');
     const { webSockets } = await import('@libp2p/websockets');
     const { circuitRelayTransport } = await import('@libp2p/circuit-relay-v2');
     const { generateKeyPair } = await import('@libp2p/crypto/keys');
@@ -54,7 +54,7 @@ describe('two-party check', () => {
             controlNetwork: { partyId, bootstrapNodes: [] },
             nodeClass: 'device',
             strandFilter: { mode: 'all' },
-            storage: { provider: () => new MemoryRawStorage() },
+            storage: { open: async () => memoryNodeStorage() },
             network: {
               transports: [webSockets(), circuitRelayTransport()] as never,
               listenAddrs: [],

@@ -24,7 +24,7 @@ import type { ChatHost, DurableSlot, NodeHost } from '@chat/core/sereus';
 import { dbPath } from './db-path';
 import { LocalKeyStore, LocalKVStore, loadOrCreatePeerKey } from './local-kv';
 import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
-import { makeLazyNsStorage } from './ns-storage';
+import { openNsStorage } from './ns-storage';
 import { anchorSlotKey, bootstrapPeersSlotKey, enrolledMachinesSlotKey, kvSlot, strandNetworkSlotKey } from './node-local-slots';
 
 declare const __DEV__: boolean;
@@ -84,8 +84,8 @@ function createNodeHost(): NodeHost {
     const config: CadreNodeConfig = {
       privateKey: await loadOrCreatePeerKey(db),
       controlNetwork: { partyId: opts.partyId, bootstrapNodes: [] },
-      profile: 'transaction',
-      storage: { provider: (scope: string) => makeLazyNsStorage(scope) },
+      nodeClass: 'device',
+      storage: { open: openNsStorage },
       network: {
         transports: [webSockets(), circuitRelayTransport()],
         listenAddrs: [],

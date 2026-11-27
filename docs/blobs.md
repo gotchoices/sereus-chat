@@ -32,24 +32,26 @@ The model uses it in `send` (attachments) and in `drive.addFile` and `drive.open
 lists, attachments whose files are not here yet are fetched in the background, so a file spreads
 to the members who are online while its sender still is.
 
-## Known gap: files live only in memory (gotchoices/sereus#67)
+## Files persist (since sereus 1.25)
 
-Sereus builds strand nodes with no persistent piece store and no persistent `kvStore`, so every
-copy of a file is in memory: on the sender, on each member that pulled it, and on an always-on node
-alike. So:
+Until sereus 1.25 every copy of a file was in memory (gotchoices/sereus#67, gap 2): a file no one
+else had fetched was lost when its sender's strand slept or its process ended. Since 1.25 each
+strand node takes all of its storage from the host (`storage.open`: blocks, node-local records,
+blob pieces), so a file outlives a sleep and a restart on the sender and on every member that
+holds it.
 
-- A file no one else has fetched is lost when its sender's strand sleeps (on a phone, every trip to
-  the background) or its process ends.
-- Once every holder has restarted, the row still names the file but no one has the bytes.
-- A device that has shown a file keeps its own viewable copy, but cannot serve it to others.
+What shows it:
+- `test/cli/serchat-file-survives-restart.mjs`: A sends a photo while B is down and exits; A
+  starts again as a new process, and B fetches the photo byte for byte;
+- both cases of `src/sereus/file-transient.test.ts` (a sleep while no one else holds the file;
+  an always-on member delivering it), which were marked `it.fails` until 1.25.
 
-This is sereus's backlog `feat-strand-blobs-persist`. Tests that state what chat needs and mark it
-as not yet true:
-- in the stack suite, `test/stack/blob-survives-hibernate.mjs`: one node, nothing of chat,
-  `expect: "fail"` in `suite.json`;
-- in chat's tests, both cases of `src/sereus/file-transient.test.ts`, as `it.fails`. When sereus fixes it they fail, which is the signal
-to drop the marks. `test/cli/serchat-drive.mjs` keeps the adding profile up for the whole run for
-the same reason.
+Still open upstream (sereus's backlog `feat-strand-blobs-persist`), and why sereus's own
+`docs/schema-guide.md` still says not to declare `blobref` yet:
+- **No `hold` choice.** A phone that is a strand's cohort member pulls other members' files as
+  eagerly as an always-on machine does.
+- **No app-facing blob service.** Chat reaches it through the strand node
+  (`StrandFiles.blobsOf`, `strand.libp2pNode.blobs`), not a sereus API.
 
 ## Limits
 

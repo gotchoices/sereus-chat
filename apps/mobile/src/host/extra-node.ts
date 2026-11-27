@@ -9,7 +9,8 @@ import { CadreNode, type CadreNodeConfig } from '@serfab/cadre-core';
 import { generateKeyPair } from '@libp2p/crypto/keys';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
-import { LevelDBRawStorage, openOptimysticRNDb } from '@optimystic/db-p2p-storage-rn';
+import { levelDbNodeStorage, openOptimysticRNDb } from '@optimystic/db-p2p-storage-rn';
+import type { OpenNodeStorage } from '@optimystic/db-p2p';
 import { LevelDB, LevelDBWriteBatch } from 'rn-leveldb';
 import { buildNoiseCrypto, DEFAULT_NOISE_CRYPTO_MODE } from '@serfab/cadre-rn/noise-crypto';
 import type { CreateExtraNode } from '@chat/core/sereus';
@@ -17,16 +18,16 @@ import type { FoundStrandPlatform } from '@chat/core/diagnostics';
 
 export const createExtraNode: CreateExtraNode = async ({ tag, partyId, relayAddrs }) => {
   const prefix = `diag2-${Math.random().toString(36).slice(2, 10)}-${tag}`;
-  const stores = new Map<string, LevelDBRawStorage>();
+  const stores = new Map<string, OpenNodeStorage>();
   const config = {
     privateKey: await generateKeyPair('Ed25519'),
     controlNetwork: { partyId, bootstrapNodes: [] },
     nodeClass: 'device',
     strandFilter: { mode: 'all' },
     storage: {
-      // One storage per scope, as the kit keeps (Optimystic 1.23): the storage claims its
-      // handle for its read cache, so a second one over the same database is refused.
-      provider: (scope: string) => stores.get(scope) ?? stores.set(scope, new LevelDBRawStorage(openOptimysticRNDb({
+      // One storage per scope, as the kit keeps: the storage claims its handle for its read
+      // cache, so a second one over the same database is refused (sereus 1.25: `storage.open`).
+      open: async (scope: string) => stores.get(scope) ?? stores.set(scope, levelDbNodeStorage(openOptimysticRNDb({
         openFn: (n: string, createIfMissing: boolean, errorIfExists: boolean) => new LevelDB(n, createIfMissing, errorIfExists),
         WriteBatch: LevelDBWriteBatch,
         name: `${prefix}-${scope}`,
@@ -60,13 +61,13 @@ export const createExtraNode: CreateExtraNode = async ({ tag, partyId, relayAddr
 };
 
 /**
- * The phone's side of the found-strand check: `LevelDBRawStorage` over rn-leveldb under a
+ * The phone's side of the found-strand check: `levelDbNodeStorage` over rn-leveldb under a
  * `diag-` prefix (never the app's own stores), WebSockets, a fresh identity.
  */
 export async function foundStrandPlatform(): Promise<FoundStrandPlatform> {
   const id = Math.random().toString(36).slice(2, 10);
   const dbs = new Map<string, ReturnType<typeof openOptimysticRNDb>>();
-  const stores = new Map<string, LevelDBRawStorage>();
+  const stores = new Map<string, OpenNodeStorage>();
   const openDb = (name: string) => {
     let db = dbs.get(name);
     if (!db) {
@@ -81,7 +82,7 @@ export async function foundStrandPlatform(): Promise<FoundStrandPlatform> {
   };
   return {
     // One storage per scope (see `createExtraNode`).
-    storage: (scope: string) => stores.get(scope) ?? stores.set(scope, new LevelDBRawStorage(openDb(scope))).get(scope)!,
+    storage: async (scope: string) => stores.get(scope) ?? stores.set(scope, levelDbNodeStorage(openDb(scope))).get(scope)!,
     transports: [webSockets()] as never,
     privateKey: await generateKeyPair('Ed25519'),
     cleanup: () => {

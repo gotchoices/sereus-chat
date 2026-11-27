@@ -22,7 +22,7 @@
  *
  * Usage:  yarn stack:check   [STRAND_TIMEOUT_MS=600000]
  */
-import { LevelDBRawStorage } from '@optimystic/db-p2p-storage-rn';
+import { levelDbNodeStorage } from '@optimystic/db-p2p-storage-rn';
 import { webSockets } from '@libp2p/websockets';
 import { generateKeyPair } from '@libp2p/crypto/keys';
 import { runFoundStrandCheck } from '@chat/core/diagnostics';
@@ -30,16 +30,16 @@ import { openTestDb } from './classic-level-driver.mjs';
 
 // The check itself is `@chat/core/diagnostics` — the same function the phone's
 // Diagnostics screen runs over rn-leveldb. This script supplies the Node side:
-// the phone's LevelDBRawStorage over classic-level on disk.
+// the phone's levelDbNodeStorage over classic-level on disk.
 const TIMEOUT_MS = Number(process.env.STRAND_TIMEOUT_MS ?? 10 * 60 * 1000);
 const OP_DELAY_MS = Number(process.env.STORAGE_OP_DELAY_MS ?? 0);
 
 const dbs = [];
 const result = await runFoundStrandCheck({
-  storage: scope => {
+  storage: async scope => {
     const handle = openTestDb(`stack-check-${scope}`, OP_DELAY_MS);
     dbs.push(handle);
-    return new LevelDBRawStorage(handle.db);
+    return levelDbNodeStorage(handle.db);
   },
   transports: [webSockets()],
   privateKey: await generateKeyPair('Ed25519'),

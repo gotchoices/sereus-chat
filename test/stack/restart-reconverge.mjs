@@ -42,7 +42,7 @@ import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 
 /** Each party's owner key store, kept across its restarts. */
 const ownerKeyStores = new Map();
-import { LevelDBRawStorage } from '@optimystic/db-p2p-storage-rn';
+import { levelDbNodeStorage } from '@optimystic/db-p2p-storage-rn';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { generateKeyPair, privateKeyToProtobuf, privateKeyFromProtobuf } from '@libp2p/crypto/keys';
@@ -149,19 +149,19 @@ async function identityFor(tag) {
 
 const openDbs = new Map();
 function storageFor(tag) {
-  return (strandId) => {
+  return async (strandId) => {
     const name = `${tag}-${strandId}`;
     let handle = openDbs.get(name);
     if (!handle) {
       handle = openTestDb(name, 0, STORE_ROOT);
       openDbs.set(name, handle);
     }
-    return new LevelDBRawStorage(handle.db);
+    return handle.storage ??= levelDbNodeStorage(handle.db);
   };
 }
 
 async function closeDbs() {
-  for (const [, h] of openDbs) { try { await h.cleanup(); } catch { /* best effort */ } }
+  for (const [, h] of openDbs) { try { await h.storage?.close(); await h.cleanup(); } catch { /* best effort */ } }
   openDbs.clear();
 }
 
@@ -245,7 +245,7 @@ async function startParty(tag, partyId) {
     joinedStrands: { store: joinedStore },
     nodeClass: 'device',
     strandFilter: { mode: 'all' },
-    storage: { provider: storageFor(tag) },
+    storage: { open: storageFor(tag) },
     network: {
       transports: [webSockets(), circuitRelayTransport()],
       // Relay-only, exactly as a phone is: no listener of our own.
@@ -436,7 +436,7 @@ try {
       log('PHASE 2 — restarting ONLY THE JOINER; the host stays up throughout');
       await joiner.stop();
       for (const [name, h] of openDbs) {
-        if (name.startsWith('joiner-')) { try { await h.cleanup(); } catch { /* best effort */ } openDbs.delete(name); }
+        if (name.startsWith('joiner-')) { try { await h.storage?.close(); await h.cleanup(); } catch { /* best effort */ } openDbs.delete(name); }
       }
       joiner = null;
       await new Promise(r => setTimeout(r, 5000));

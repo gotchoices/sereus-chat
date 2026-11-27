@@ -27,7 +27,7 @@
  *   DEBUG=sereus:cadre:* node owner-recovery.mjs
  */
 import { CadreNode, PersistentTrustedOwnerStore, ed25519KeyPairFromLibp2p } from '@serfab/cadre-core';
-import { MemoryRawStorage } from '@optimystic/db-p2p';
+import { memoryNodeStorage } from '@optimystic/db-p2p';
 import { webSockets } from '@libp2p/websockets';
 import { generateKeyPair } from '@libp2p/crypto/keys';
 import { peerIdFromPrivateKey } from '@libp2p/peer-id';
@@ -78,7 +78,7 @@ async function startNode(label, privateKey, { bootstrap = [], pinnedKeys = [], n
     nodeClass,
     strandFilter: { mode: 'none' },
     hostUnclaimedStrands: false,
-    storage: { provider: scope => scopes.get(scope) ?? scopes.set(scope, new MemoryRawStorage()).get(scope) },
+    storage: { open: async scope => scopes.get(scope) ?? scopes.set(scope, memoryNodeStorage()).get(scope) },
     network: {
       transports: [webSockets()],
       listenAddrs: [LISTEN],

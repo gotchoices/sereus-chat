@@ -27,8 +27,8 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { webSockets } from '@libp2p/websockets';
 import { generateKeyPair } from '@libp2p/crypto/keys';
-import { MemoryRawStorage } from '@optimystic/db-p2p';
-import { FileRawStorage } from '@optimystic/db-p2p-storage-fs';
+import { memoryNodeStorage } from '@optimystic/db-p2p';
+import { fileNodeStorage } from '@optimystic/db-p2p-storage-fs';
 import { CadreNode, DEFAULT_IDENTITY_KEY_ID, PersistentTrustedOwnerStore } from '@serfab/cadre-core';
 import { FileKeyStore } from '@serfab/cadre-core/key-store-file';
 import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
@@ -86,7 +86,7 @@ async function startA() {
     controlNetwork: { partyId, bootstrapNodes: [] },
     nodeClass: 'device',
     strandFilter: { mode: 'none' },
-    storage: { provider: scope => { const st = new FileRawStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
+    storage: { open: async scope => { const st = fileNodeStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
     network: { transports: [webSockets()], listenAddrs: [LISTEN], relayAddrs: [], requireRelay: false,
       connectionGater: { denyDialMultiaddr: () => false } },
     requireSignedSchemas: false,
@@ -114,7 +114,7 @@ async function startD(bootstrap, pinnedKeys) {
     nodeClass: 'device',
     strandFilter: { mode: 'none' },
     hostUnclaimedStrands: false,
-    storage: { provider: scope => scopes.get(scope) ?? scopes.set(scope, new MemoryRawStorage()).get(scope) },
+    storage: { open: async scope => scopes.get(scope) ?? scopes.set(scope, memoryNodeStorage()).get(scope) },
     network: { transports: [webSockets()], listenAddrs: [LISTEN], connectionGater: { denyDialMultiaddr: () => false } },
     trustedOwners: { store: await PersistentTrustedOwnerStore.open(slot, partyId), pinnedKeys },
     requireSignedSchemas: false,

@@ -55,7 +55,7 @@ import './cpu-cost.mjs';
 import './loop-hog.mjs';
 import { CadreNode, ControlFormationUsageRecorder, InMemoryKeyStore, generateStrandMemberKey } from '@serfab/cadre-core';
 import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
-import { LevelDBRawStorage } from '@optimystic/db-p2p-storage-rn';
+import { levelDbNodeStorage } from '@optimystic/db-p2p-storage-rn';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { generateKeyPair } from '@libp2p/crypto/keys';
@@ -124,10 +124,10 @@ const log = (...a) => console.log(`[${since()}]`, ...a);
 
 const dbs = [];
 function storageFor(tag) {
-  return (strandId) => {
+  return async (strandId) => {
     const handle = openTestDb(`twoparty-${tag}-${strandId}`, 0);
     dbs.push(handle);
-    return new LevelDBRawStorage(handle.db);
+    return levelDbNodeStorage(handle.db);
   };
 }
 
@@ -141,7 +141,7 @@ async function makeParty(tag, relayAddr) {
     controlNetwork: { partyId, bootstrapNodes: [] },
     nodeClass: 'device',
     strandFilter: { mode: 'all' },
-    storage: { provider: storageFor(tag) },
+    storage: { open: storageFor(tag) },
     network: {
       transports: [webSockets(), circuitRelayTransport()],
       // A phone cannot listen. Naming a relay is what gives this node an address

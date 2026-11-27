@@ -1425,6 +1425,34 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         (and #58 for representation changes) are fixed. Until then testers wipe
         (`DATA_FORMAT`).
 
+- [x] **Stack 2026-11-27: sereus 1.25.0, optimystic 1.30.0, quereus 5.7.1** (p2p-fret 1.3.0,
+      libp2p 3.3.11 as before). Every machine of a party and of a strand has to be on 1.25. No
+      data migration, so no wipe.
+      - **The change:** `CadreNodeConfig.storage.provider` became an asynchronous
+        `storage.open(scope)` returning all of a scope's stores (`memoryNodeStorage`,
+        `fileNodeStorage`, `levelDbNodeStorage`, `sqliteNodeStorage`).
+      - **Ported:**
+        - the test host (`testing/node-host.ts`) and core's tests;
+        - the found-strand diagnostic, whose platform hook is now `open`;
+        - serchat (`fileNodeStorage` per scope, closed after stop);
+        - the phone's diagnostic nodes;
+        - every `test/stack` script;
+        - `apps/mobile-ns`, whose lazy SQLite proxy is replaced by `sqliteNodeStorage`, and
+          which also lacked 1.24's `nodeClass`. It typechecks; it has not been run on a device.
+      - **Blobs persist (sereus#67, gap 2):**
+        - `blob-survives-hibernate` now passes, and its mark is dropped;
+        - both `file-transient.test.ts` cases pass, with `it.fails` dropped;
+        - the new `test/cli/serchat-file-survives-restart.mjs` passes: a one-shot sender's file is
+          fetched after the sender restarts;
+        - `phone-wakes.mjs` case 3 passes on the S21.
+
+        Still open upstream: `hold`, and an app-facing blob service (`docs/blobs.md`).
+      - **Checked:** the stack suite (14 checks, all as expected); core 99 tests; cadre-client,
+        strand-drive, resources and serchat tests; and on the S21 `phone-joins-serchat` (join,
+        photos both ways, drive) and `phone-wakes`.
+      - **Unchanged in 1.25:** invitation addresses. `test/stack/invitation-sibling-addresses.mjs`
+        still fails: a cadre-host machine's public addresses are cut from an open invitation.
+
 - [x] **A join goes first (2026-11-24).** Opening an invitation from a cold start raced the
       start-up queue's wake of the other strands. On the S7, formation came back only after
       those wakes had finished, each 11–37 s of a blocked JavaScript thread: 95–126 s from Accept

@@ -16,7 +16,7 @@ import { FileTrustedOwnerStore } from '@serfab/cadre-core/trusted-owner-store-fi
 import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-file';
 import { FileEnrolledMachineStore } from '@serfab/cadre-core/enrolled-machine-store-file';
 import { FileStrandNetworkStateStore } from '@serfab/cadre-core/strand-network-state-file';
-import { FileRawStorage } from '@optimystic/db-p2p-storage-fs';
+import { fileNodeStorage } from '@optimystic/db-p2p-storage-fs';
 
 export const SAPP_ID = 'org.example.repro';
 
@@ -30,7 +30,7 @@ export async function soloStrand(tag, ddl) {
     keyStore, identityKeyId: DEFAULT_IDENTITY_KEY_ID,
     controlNetwork: { partyId, bootstrapNodes: [] },
     nodeClass: 'device',
-    storage: { provider: scope => { const st = new FileRawStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
+    storage: { open: async scope => { const st = fileNodeStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
     network: { transports: [webSockets()], listenAddrs: ['/ip4/127.0.0.1/tcp/0/ws'], relayAddrs: [], requireRelay: false,
       connectionGater: { denyDialMultiaddr: () => false } },
     strandFilter: { mode: 'sAppId', sAppId: SAPP_ID },

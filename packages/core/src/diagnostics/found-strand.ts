@@ -33,8 +33,8 @@ type Network = NonNullable<CadreNodeConfig['network']>;
 
 /** What the platform supplies. */
 export interface FoundStrandPlatform {
-  /** Block storage for one storage scope; a fresh store per name, never the app's own. */
-  storage: Storage['provider'];
+  /** All of one storage scope's stores (sereus 1.25: `storage.open`); fresh per name, never the app's own. */
+  storage: Storage['open'];
   transports: Network['transports'];
   /** A fresh Ed25519 identity (an ephemeral libp2p key exposes no owner key to sign with). */
   privateKey: NonNullable<CadreNodeConfig['privateKey']>;
@@ -79,7 +79,7 @@ export async function runFoundStrandCheck(platform: FoundStrandPlatform, opts: F
       controlNetwork: { partyId, bootstrapNodes: [] },
       nodeClass: 'device',
       strandFilter: opts.strandFilter === 'sAppId' ? { mode: 'sAppId', sAppId: SAPP.id } : { mode: 'all' },
-      storage: { provider: platform.storage },
+      storage: { open: platform.storage },
       network: { transports: platform.transports, listenAddrs: platform.listenAddrs ?? [] },
       hibernation: { enabled: false },
       requireSignedSchemas: false,

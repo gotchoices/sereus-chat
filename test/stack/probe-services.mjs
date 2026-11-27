@@ -1,6 +1,6 @@
 /** What libp2p components are reachable from a running CadreNode? */
 import { CadreNode } from '@serfab/cadre-core';
-import { LevelDBRawStorage } from '@optimystic/db-p2p-storage-rn';
+import { levelDbNodeStorage } from '@optimystic/db-p2p-storage-rn';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { generateKeyPair } from '@libp2p/crypto/keys';
@@ -12,7 +12,7 @@ const node = new CadreNode({
   controlNetwork: { partyId: randomUUID(), bootstrapNodes: [] },
   nodeClass: 'device',
   strandFilter: { mode: 'all' },
-  storage: { provider: (id) => new LevelDBRawStorage(openTestDb(`probe-${id}`, 0).db) },
+  storage: { open: async (id) => levelDbNodeStorage(openTestDb(`probe-${id}`, 0).db) },
   network: { transports: [webSockets(), circuitRelayTransport()], listenAddrs: [], requireRelay: false },
   hibernation: { enabled: false },
   requireSignedSchemas: false,

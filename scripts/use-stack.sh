@@ -62,17 +62,17 @@ SER = os.path.dirname(ROOT)  # the ser/ folder holding the clones
 
 # name : (clone path under ser/, exact version, pinned in resolutions)
 PACKAGES = collections.OrderedDict([
-    ('@optimystic/db-core',                   ('optimystic/packages/db-core',                   '1.29.0', True)),
-    ('@optimystic/db-p2p',                    ('optimystic/packages/db-p2p',                    '1.29.0', True)),
-    ('@optimystic/db-p2p-storage-rn',         ('optimystic/packages/db-p2p-storage-rn',         '1.29.0', True)),
-    ('@optimystic/db-p2p-storage-fs',         ('optimystic/packages/db-p2p-storage-fs',         '1.29.0', True)),
-    ('@optimystic/db-p2p-storage-ns',         ('optimystic/packages/db-p2p-storage-ns',         '1.29.0', True)),
-    ('@optimystic/quereus-plugin-crypto',     ('optimystic/packages/quereus-plugin-crypto',     '1.29.0', True)),
-    ('@optimystic/quereus-plugin-optimystic', ('optimystic/packages/quereus-plugin-optimystic', '1.29.0', True)),
-    ('@quereus/quereus',                      ('quereus/packages/quereus',                      '5.6.1' , True)),
-    ('@serfab/cadre-core',                    ('sereus/packages/cadre-core',                    '1.24.0', True)),
-    ('@serfab/cadre-rn',                      ('sereus/packages/cadre-rn',                      '1.24.0', False)),
-    ('@serfab/quereus-plugin-sereus',         ('sereus/packages/quereus-plugin-sereus',         '1.24.0', True)),
+    ('@optimystic/db-core',                   ('optimystic/packages/db-core',                   '1.30.0', True)),
+    ('@optimystic/db-p2p',                    ('optimystic/packages/db-p2p',                    '1.30.0', True)),
+    ('@optimystic/db-p2p-storage-rn',         ('optimystic/packages/db-p2p-storage-rn',         '1.30.0', True)),
+    ('@optimystic/db-p2p-storage-fs',         ('optimystic/packages/db-p2p-storage-fs',         '1.30.0', True)),
+    ('@optimystic/db-p2p-storage-ns',         ('optimystic/packages/db-p2p-storage-ns',         '1.30.0', True)),
+    ('@optimystic/quereus-plugin-crypto',     ('optimystic/packages/quereus-plugin-crypto',     '1.30.0', True)),
+    ('@optimystic/quereus-plugin-optimystic', ('optimystic/packages/quereus-plugin-optimystic', '1.30.0', True)),
+    ('@quereus/quereus',                      ('quereus/packages/quereus',                      '5.7.1' , True)),
+    ('@serfab/cadre-core',                    ('sereus/packages/cadre-core',                    '1.25.0', True)),
+    ('@serfab/cadre-rn',                      ('sereus/packages/cadre-rn',                      '1.25.0', False)),
+    ('@serfab/quereus-plugin-sereus',         ('sereus/packages/quereus-plugin-sereus',         '1.25.0', True)),
     ('p2p-fret',                              ('fret/packages/fret',                            '1.3.0',  True)),
 ])
 SENTINEL = '@serfab/cadre-core'

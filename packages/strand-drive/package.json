@@ -22,7 +22,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@quereus/quereus": "5.6.1",
+    "@quereus/quereus": "5.7.1",
     "@types/node": "^24.0.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17"

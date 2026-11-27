@@ -23,10 +23,10 @@ import { yamux } from '@chainsafe/libp2p-yamux';
 import { identify } from '@libp2p/identify';
 import { circuitRelayServer, circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { generateKeyPair } from '@libp2p/crypto/keys';
-import { MemoryRawStorage } from '@optimystic/db-p2p';
+import { memoryNodeStorage } from '@optimystic/db-p2p';
 import { CadreNode, generateStrandMemberKey, InMemoryKeyStore } from '@serfab/cadre-core';
 import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
-import { FileRawStorage } from '@optimystic/db-p2p-storage-fs';
+import { fileNodeStorage } from '@optimystic/db-p2p-storage-fs';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -44,7 +44,7 @@ async function party(tag) {
     privateKey: await generateKeyPair('Ed25519'),
     controlNetwork: { partyId: `${tag}-${randomUUID()}`, bootstrapNodes: [] },
     nodeClass: 'device', strandFilter: { mode: 'all' },
-    storage: { provider: process.env.STORAGE === 'file' ? (dir => scope => new FileRawStorage(join(dir, scope)))(mkdtempSync(join(tmpdir(), `double-${tag}-`))) : () => new MemoryRawStorage() },
+    storage: { open: process.env.STORAGE === 'file' ? (dir => async scope => fileNodeStorage(join(dir, scope)))(mkdtempSync(join(tmpdir(), `double-${tag}-`))) : async () => memoryNodeStorage() },
     network: { transports: [webSockets(), circuitRelayTransport()], listenAddrs: [], relayAddrs: [relayAddr], requireRelay: false, connectionGater: { denyDialMultiaddr: () => false } },
     hibernation: { enabled: false }, requireSignedSchemas: false,
   });

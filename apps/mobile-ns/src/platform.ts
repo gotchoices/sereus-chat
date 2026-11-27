@@ -13,14 +13,14 @@ import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import type { FoundStrandPlatform } from '@chat/core/diagnostics';
 import type { CreateExtraNode } from '@chat/core/sereus';
-import { makeLazyNsStorage } from './ns-storage';
+import { openNsStorage } from './ns-storage';
 
 const runId = () => Math.random().toString(36).slice(2, 10);
 
 export async function foundStrandPlatform(): Promise<FoundStrandPlatform> {
   const id = runId();
   return {
-    storage: (scope: string) => makeLazyNsStorage(`diag-${id}-${scope}`),
+    storage: (scope: string) => openNsStorage(`diag-${id}-${scope}`),
     transports: [webSockets()] as never,
     privateKey: await generateKeyPair('Ed25519'),
   };
@@ -31,9 +31,9 @@ export const createExtraNode: CreateExtraNode = async ({ tag, partyId, relayAddr
   const node = new CadreNode({
     privateKey: await generateKeyPair('Ed25519'),
     controlNetwork: { partyId, bootstrapNodes: [] },
-    profile: 'transaction',
+    nodeClass: 'device',
     strandFilter: { mode: 'all' },
-    storage: { provider: (scope: string) => makeLazyNsStorage(`${prefix}-${scope}`) },
+    storage: { open: (scope: string) => openNsStorage(`${prefix}-${scope}`) },
     network: {
       transports: [webSockets(), circuitRelayTransport()],
       listenAddrs: [],

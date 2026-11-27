@@ -24,7 +24,7 @@ import { FileTrustedOwnerStore } from '@serfab/cadre-core/trusted-owner-store-fi
 import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-file';
 import { FileEnrolledMachineStore } from '@serfab/cadre-core/enrolled-machine-store-file';
 import { FileStrandNetworkStateStore } from '@serfab/cadre-core/strand-network-state-file';
-import { FileKVStore, FileRawStorage } from '@optimystic/db-p2p-storage-fs';
+import { FileKVStore, fileNodeStorage } from '@optimystic/db-p2p-storage-fs';
 
 const CHANGE = process.env.CHANGE ?? 'tag';
 const OFFLINE = process.env.OFFLINE === '1';
@@ -51,8 +51,8 @@ async function party(tag, partyId) {
     keyStore, identityKeyId: DEFAULT_IDENTITY_KEY_ID,
     controlNetwork: { partyId, bootstrapNodes: [] },
     nodeClass: 'device',
-    // The embedder that builds a store closes it (Optimystic IRawStorage.close), below.
-    storage: { provider: scope => { const st = new FileRawStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
+    // The embedder that builds a store closes it (Optimystic OpenNodeStorage.close), below.
+    storage: { open: async scope => { const st = fileNodeStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
     network: { transports: [webSockets()], listenAddrs: ['/ip4/127.0.0.1/tcp/0/ws'], relayAddrs: [], requireRelay: false,
       connectionGater: { denyDialMultiaddr: () => false } },
     strandFilter: { mode: 'sAppId', sAppId: SAPP_ID },

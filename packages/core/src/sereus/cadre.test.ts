@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { CadreNode, encodeNodeClaimPayload, type NodeClaimRecord } from '@serfab/cadre-core';
-import { MemoryRawStorage } from '@optimystic/db-p2p';
+import { memoryNodeStorage, type OpenNodeStorage } from '@optimystic/db-p2p';
 import { generateKeyPair } from '@libp2p/crypto/keys';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
@@ -20,16 +20,16 @@ describe('claiming a node', () => {
   const secret = randomBytes(32).toString('base64url');
 
   beforeAll(async () => {
-    const scopes = new Map<string, MemoryRawStorage>();
+    const scopes = new Map<string, OpenNodeStorage>();
     node = new CadreNode({
       privateKey: await generateKeyPair('Ed25519'),
       controlNetwork: { partyId: 'unclaimed', bootstrapNodes: [] },
       nodeClass: 'device',
       claim: { secret, record: async claim => { recorded = claim; } },
       storage: {
-        provider: (scope: string) => {
+        open: async (scope: string) => {
           let s = scopes.get(scope);
-          if (!s) scopes.set(scope, (s = new MemoryRawStorage()));
+          if (!s) scopes.set(scope, (s = memoryNodeStorage()));
           return s;
         },
       },

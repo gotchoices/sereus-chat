@@ -4,13 +4,12 @@
  *   2. Alice's party has a second machine, a cadre member (a server-class cadre-core node, no
  *      chat app). Alice sends while Bob is away, then goes away herself: Bob gets the message
  *      from the cadre member's replica, and the photo from whoever holds it (the cadre member
- *      may pull it as a cohort member, but holds it in memory too). Until then, "still
- *      arriving": no error, no hang.
+ *      may pull it as a cohort member). Until then, "still arriving": no error, no hang.
  * "Away" is a strand put to sleep (`hibernateStrand`), as a phone in the background does.
  *
- * BOTH ARE EXPECTED TO FAIL until sereus keeps blobs across a sleep (gotchoices/sereus#67, gap 2):
- * Alice's strand sleeps before anyone has fetched her photo, and its node comes back without the
- * pieces it held in memory. `it.fails` keeps the suite green and turns red the day that changes.
+ * Both failed until sereus 1.25 (gotchoices/sereus#67, gap 2): Alice's strand slept before anyone
+ * had fetched her photo, and its node came back without the pieces it held in memory. Since 1.25
+ * the pieces are in the storage the host hands the node (`storage.open`), so they outlive a sleep.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
@@ -18,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomBytes, createHash } from 'node:crypto';
 import { CadreNode, encodeNodeClaimPayload, type CadreNodeConfig, type NodeClaimRecord } from '@serfab/cadre-core';
-import { MemoryRawStorage } from '@optimystic/db-p2p';
+import { memoryNodeStorage, type OpenNodeStorage } from '@optimystic/db-p2p';
 import { generateKeyPair } from '@libp2p/crypto/keys';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
@@ -77,7 +76,7 @@ describe('two transient members through a relay', () => {
   }, 240_000);
   afterAll(async () => { await Promise.allSettled([alice?.stop(), bob?.stop()]); await relay?.stop(); });
 
-  it.fails('Bob away when Alice sends, then both away, then both back at once: the photo crosses (sereus#67)', async () => {
+  it('Bob away when Alice sends, then both away, then both back at once: the photo crosses', async () => {
     const p = photo('both-away.jpg', 900_000);
     await bob.node.hibernateStrand(strandId);
     await send(alice, strandId, 'sent while you were away', p.path);
@@ -104,7 +103,7 @@ describe("Alice's party has a cadre member", () => {
   beforeAll(async () => {
     relay = await startRelay();
     const secret = randomBytes(32).toString('base64url');
-    const scopes = new Map<string, MemoryRawStorage>();
+    const scopes = new Map<string, OpenNodeStorage>();
     const privateKey = await generateKeyPair('Ed25519');
     let claimed: NodeClaimRecord | null = null;
     // An always-on machine: storage profile, every strand of its party as a replica.
@@ -112,7 +111,7 @@ describe("Alice's party has a cadre member", () => {
       privateKey,
       nodeClass: 'server',
       strandFilter: { mode: 'all' },
-      storage: { provider: (scope: string) => scopes.get(scope) ?? scopes.set(scope, new MemoryRawStorage()).get(scope)! },
+      storage: { open: async (scope: string) => scopes.get(scope) ?? scopes.set(scope, memoryNodeStorage()).get(scope)! },
       network: {
         transports: [webSockets(), circuitRelayTransport()] as never,
         listenAddrs: ['/ip4/127.0.0.1/tcp/0/ws'],
@@ -161,7 +160,7 @@ describe("Alice's party has a cadre member", () => {
     await relay?.stop();
   });
 
-  it.fails("Bob gets the message from the cadre member while Alice is away, and the photo once she is back (sereus#67)", async () => {
+  it("Bob gets the message from the cadre member while Alice is away, and the photo once she is back", async () => {
     const p = photo('member.jpg', 800_000);
     await bob.node.hibernateStrand(strandId);
     await send(alice, strandId, 'the cadre member keeps this', p.path);

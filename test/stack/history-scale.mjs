@@ -13,7 +13,7 @@
  */
 import { webSockets } from '@libp2p/websockets';
 import { generateKeyPair } from '@libp2p/crypto/keys';
-import { MemoryRawStorage } from '@optimystic/db-p2p';
+import { memoryNodeStorage } from '@optimystic/db-p2p';
 import { CadreNode, InMemoryKeyStore, generateStrandMemberKey } from '@serfab/cadre-core';
 import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { getChatSAppConfig } from '@chat/core';
@@ -31,7 +31,7 @@ const node = new CadreNode({
   privateKey: await generateKeyPair('Ed25519'),
   controlNetwork: { partyId: `scale-${randomUUID()}`, bootstrapNodes: [] },
   nodeClass: 'device',
-  storage: { provider: s => scopes.get(s) ?? scopes.set(s, new MemoryRawStorage()).get(s) },
+  storage: { open: async s => scopes.get(s) ?? scopes.set(s, memoryNodeStorage()).get(s) },
   network: { transports: [webSockets()], listenAddrs: [], relayAddrs: [], requireRelay: false },
   requireSignedSchemas: false,
 });

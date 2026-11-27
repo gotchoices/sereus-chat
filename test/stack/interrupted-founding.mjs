@@ -61,7 +61,7 @@ import { FileTrustedOwnerStore } from '@serfab/cadre-core/trusted-owner-store-fi
 import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-file';
 import { FileEnrolledMachineStore } from '@serfab/cadre-core/enrolled-machine-store-file';
 import { FileStrandNetworkStateStore } from '@serfab/cadre-core/strand-network-state-file';
-import { FileRawStorage } from '@optimystic/db-p2p-storage-fs';
+import { fileNodeStorage } from '@optimystic/db-p2p-storage-fs';
 
 if (process.env.SWEEP) {
   for (const ms of process.env.SWEEP.split(',').map(s => s.trim()).filter(Boolean)) {
@@ -115,8 +115,8 @@ async function startNode() {
     keyStore, identityKeyId: DEFAULT_IDENTITY_KEY_ID,
     controlNetwork: { partyId, bootstrapNodes: [] },
     nodeClass: 'device',
-    // The embedder that builds a store closes it (Optimystic IRawStorage.close), in stop() below.
-    storage: { provider: scope => { const st = new FileRawStorage(join(dir, 'blocks', scope)); built.push(st); return watchStore(scope, st); } },
+    // The embedder that builds a store closes it (Optimystic OpenNodeStorage.close), in stop() below.
+    storage: { open: async scope => { const st = fileNodeStorage(join(dir, 'blocks', scope)); built.push(st); watchStore(scope, st.blocks); return st; } },
     network: { transports: [webSockets()], listenAddrs: ['/ip4/127.0.0.1/tcp/0/ws'], relayAddrs: [], requireRelay: false,
       connectionGater: { denyDialMultiaddr: () => false } },
     strandFilter: PROFILE ? { mode: 'all' } : { mode: 'sAppId', sAppId: SAPP.id },

@@ -34,7 +34,7 @@ import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 
 /** Each party's owner key store, kept across its restarts. */
 const ownerKeyStores = new Map();
-import { LevelDBRawStorage } from '@optimystic/db-p2p-storage-rn';
+import { levelDbNodeStorage } from '@optimystic/db-p2p-storage-rn';
 import { webSockets } from '@libp2p/websockets';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { generateKeyPair, privateKeyToProtobuf, privateKeyFromProtobuf } from '@libp2p/crypto/keys';
@@ -92,17 +92,17 @@ async function identityFor(tag) {
 
 const openDbs = new Map();
 function storageFor(tag) {
-  return (scope) => {
+  return async (scope) => {
     const name = `${tag}-${scope}`;
     let h = openDbs.get(name);
     if (!h) { h = openTestDb(name, 0, STORE_ROOT); openDbs.set(name, h); }
-    return new LevelDBRawStorage(h.db);
+    return h.storage ??= levelDbNodeStorage(h.db);
   };
 }
 async function closeDbsFor(tag) {
   for (const [name, h] of openDbs) {
     if (!name.startsWith(`${tag}-`)) continue;
-    try { await h.cleanup(); } catch { /* best effort */ }
+    try { await h.storage?.close(); await h.cleanup(); } catch { /* best effort */ }
     openDbs.delete(name);
   }
 }
@@ -134,7 +134,7 @@ async function startParty(tag, partyId) {
     joinedStrands: { store: new KeyStoreJoinedStrandStore(new FileKeyStore(join(STORE_ROOT, `${tag}-keys`)), partyId) },
     nodeClass: 'device',
     strandFilter: { mode: 'all' },
-    storage: { provider: storageFor(tag) },
+    storage: { open: storageFor(tag) },
     network: {
       transports: [webSockets(), circuitRelayTransport()],
       listenAddrs: [],
@@ -264,6 +264,6 @@ try {
 } finally {
   try { await host?.stop(); } catch { /* best effort */ }
   try { await joiner?.stop(); } catch { /* best effort */ }
-  for (const [, h] of openDbs) { try { await h.cleanup(); } catch { /* best effort */ } }
+  for (const [, h] of openDbs) { try { await h.storage?.close(); await h.cleanup(); } catch { /* best effort */ } }
 }
 process.exit(code);

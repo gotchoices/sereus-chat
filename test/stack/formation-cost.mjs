@@ -31,7 +31,7 @@ import { yamux } from '@chainsafe/libp2p-yamux';
 import { identify } from '@libp2p/identify';
 import { circuitRelayServer, circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { generateKeyPair } from '@libp2p/crypto/keys';
-import { BlockTransferService, MemoryRawStorage, SyncService } from '@optimystic/db-p2p';
+import { BlockTransferService, memoryNodeStorage, SyncService } from '@optimystic/db-p2p';
 import { CadreNode, generateStrandMemberKey, InMemoryKeyStore } from '@serfab/cadre-core';
 import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
 import { randomUUID } from 'node:crypto';
@@ -162,7 +162,7 @@ async function makeParty(tag, relayAddr) {
     controlNetwork: { partyId: `${tag}-${randomUUID()}`, bootstrapNodes: [] },
     nodeClass: 'device',
     strandFilter: { mode: 'all' },
-    storage: { provider: () => new MemoryRawStorage() },
+    storage: { open: async () => memoryNodeStorage() },
     network: {
       transports: [webSockets(), circuitRelayTransport()],
       listenAddrs: DIRECT ? ['/ip4/127.0.0.1/tcp/0/ws'] : [],

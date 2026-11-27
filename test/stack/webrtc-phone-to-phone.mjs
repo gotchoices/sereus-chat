@@ -26,7 +26,7 @@ import { FileTrustedOwnerStore } from '@serfab/cadre-core/trusted-owner-store-fi
 import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-file';
 import { FileEnrolledMachineStore } from '@serfab/cadre-core/enrolled-machine-store-file';
 import { FileStrandNetworkStateStore } from '@serfab/cadre-core/strand-network-state-file';
-import { FileKVStore, FileRawStorage } from '@optimystic/db-p2p-storage-fs';
+import { FileKVStore, fileNodeStorage } from '@optimystic/db-p2p-storage-fs';
 import { circuitRelayServer, circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { webRTC } from '@libp2p/webrtc';
 import { identify } from '@libp2p/identify';
@@ -66,8 +66,8 @@ async function party(tag, partyId, relayAddr) {
     keyStore, identityKeyId: DEFAULT_IDENTITY_KEY_ID,
     controlNetwork: { partyId, bootstrapNodes: [] },
     nodeClass: 'device',
-    // The embedder that builds a store closes it (Optimystic IRawStorage.close), below.
-    storage: { provider: scope => { const st = new FileRawStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
+    // The embedder that builds a store closes it (Optimystic OpenNodeStorage.close), below.
+    storage: { open: async scope => { const st = fileNodeStorage(join(dir, 'blocks', scope)); built.push(st); return st; } },
     // A PHONE: no listen address of its own; reachable only through the relay (a reservation
     // earns it `<relay>/p2p-circuit`), plus `/webrtc` with WEBRTC=1, as the kit's browser does.
     network: {

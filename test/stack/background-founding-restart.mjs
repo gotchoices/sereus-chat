@@ -23,7 +23,7 @@ import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-
 import { FileEnrolledMachineStore } from '@serfab/cadre-core/enrolled-machine-store-file';
 import { FileStrandNetworkStateStore } from '@serfab/cadre-core/strand-network-state-file';
 import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
-import { FileRawStorage } from '@optimystic/db-p2p-storage-fs';
+import { fileNodeStorage } from '@optimystic/db-p2p-storage-fs';
 
 const SAPP = {
   id: 'org.example.background-founding', version: '0.1.0', signature: '', schemaVersion: 1, latencyHint: 'interactive',
@@ -47,7 +47,7 @@ async function startNode() {
     controlNetwork: { partyId, bootstrapNodes: [] },
     nodeClass: 'device',
     strandFilter: { mode: 'sAppId', sAppId: SAPP.id },
-    storage: { provider: scope => new FileRawStorage(join(dir, 'blocks', scope)) },
+    storage: { open: async scope => fileNodeStorage(join(dir, 'blocks', scope)) },
     network: { transports: [webSockets(), circuitRelayTransport()], listenAddrs: [], relayAddrs: [relayAddr], requireRelay: false, connectionGater: { denyDialMultiaddr: () => false } },
     hibernation: { enabled: false },
     requireSignedSchemas: false,

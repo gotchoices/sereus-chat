@@ -4,9 +4,10 @@
  * gets the file (A online to serve it) and checks it is the same bytes; A removes it.
  *
  * A stays up for the whole run and acts through the development bridge, while B uses serchat's
- * own one-shot `drive` commands. A file's bytes live only in memory on the strand nodes that hold
- * them (gotchoices/sereus#67, gap 2), so a one-shot A would take its file with it when it exited.
- * Once sereus keeps blobs on disk, A can go back to one-shot commands too.
+ * own one-shot `drive` commands. That was needed until sereus 1.25, when a file's bytes lived only
+ * in memory (gotchoices/sereus#67, gap 2) and a one-shot A took its file with it when it exited.
+ * Since 1.25 they are on disk (`serchat-file-survives-restart.mjs`), so A could go back to one-shot
+ * commands; left as is, since a running A is what this test was written against.
  *
  *   node test/cli/serchat-drive.mjs
  *

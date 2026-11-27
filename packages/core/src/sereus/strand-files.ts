@@ -13,11 +13,13 @@
  * This device also keeps a viewable copy of every file it has, at `FileAccess.cachePath(ref,
  * name)`, so a screen shows it from a plain file.
  *
- * KNOWN GAP (gotchoices/sereus#67, backlog `feat-strand-blobs-persist`). Sereus builds strand
- * nodes with no persistent piece store, so pieces live in memory. A blob no other member has
- * fetched yet is lost when its sender's strand sleeps (on a phone, every trip to the
- * background) or restarts. The stack suite's `test/stack/blob-survives-hibernate.mjs` (expected to
- * fail, `suite.json`) marks the day this changes.
+ * PERSISTENT SINCE SEREUS 1.25 (gotchoices/sereus#67, gap 2): the pieces are in the storage the
+ * host hands each strand node (`storage.open`), so a blob outlives its sender's strand sleeping
+ * (on a phone, every trip to the background) and its process restarting
+ * (`test/cli/serchat-file-survives-restart.mjs`). Still open upstream, sereus's backlog
+ * `feat-strand-blobs-persist`: a `hold` choice (today a phone stores other members' files as
+ * eagerly as its own) and an app-facing way to reach the blob service (this reaches it through
+ * the strand node, `blobsOf`).
  */
 import type { StrandInstance } from '@serfab/cadre-core';
 import type { FileAccess } from './host.js';
@@ -84,8 +86,9 @@ export class StrandFiles {
 
   /**
    * Resolves once every file put here is held by a majority of its strand (the blob service's
-   * durability), so a short-lived host does not stop while it holds the only copy. Until sereus
-   * keeps blobs on disk (sereus#67) that copy would be lost; after, it would wait for the next run.
+   * durability), so a short-lived host does not stop while it holds the only copy. That copy is on
+   * disk (sereus 1.25), so stopping early would not lose it, only keep the others waiting for the
+   * host's next run.
    * Never rejects; the caller bounds how long it waits.
    */
   async settled(): Promise<void> {
@@ -116,7 +119,7 @@ export class StrandFiles {
   /**
    * The file as a path on this device: its viewable copy, made first if needed by fetching the
    * blob from the members who hold it, waiting up to `waitMs` for one to be reachable. While none
-   * is (or none holds it, sereus#67), fails `unavailable` with reason `still-arriving`, retryably.
+   * is (or none holds it yet), fails `unavailable` with reason `still-arriving`, retryably.
    */
   async bring(strand: StrandInstance, ref: string, name?: string | null, waitMs = FETCH_WAIT_MS): Promise<string> {
     const existing = await this.here(ref, name);

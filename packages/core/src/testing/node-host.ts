@@ -6,7 +6,7 @@
 import { nodeFileAccess } from './node-files.js';
 import { CadreNode, InMemoryKeyStore } from '@serfab/cadre-core';
 import { runOwnerGenesis } from '@serfab/cadre-core/edge-node';
-import { MemoryRawStorage } from '@optimystic/db-p2p';
+import { memoryNodeStorage, type OpenNodeStorage } from '@optimystic/db-p2p';
 import { FileKVStore } from '@optimystic/db-p2p-storage-fs';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -74,7 +74,7 @@ export async function createTestParty(tag: string, opts: {
   /** How strands come up and are visited (`ChatHost.strandStart`); unset, every strand. */
   strandStart?: ChatHost['strandStart'];
 }): Promise<TestParty> {
-  const scopes = new Map<string, MemoryRawStorage>();
+  const scopes = new Map<string, OpenNodeStorage>();
   const journals = new Map<string, FileKVStore>();
   const journalRoot = opts.offline ? mkdtempSync(join(tmpdir(), `chat-journal-${tag}-`)) : '';
   const partyId = `${tag}-${newId()}`;
@@ -88,9 +88,10 @@ export async function createTestParty(tag: string, opts: {
     nodeClass: 'device',
     strandFilter: { mode: 'sAppId', sAppId: CHAT_SAPP_ID },
     storage: {
-      provider: (scope: string) => {
+      // Memoized per scope, so a strand that stops and starts again reads what it wrote.
+      open: async (scope: string) => {
         let storage = scopes.get(scope);
-        if (!storage) scopes.set(scope, (storage = new MemoryRawStorage()));
+        if (!storage) scopes.set(scope, (storage = memoryNodeStorage()));
         return storage;
       },
     },
