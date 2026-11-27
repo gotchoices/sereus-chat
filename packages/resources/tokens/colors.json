@@ -11,6 +11,7 @@
     "accent": "#1a7f5a",
     "accentText": "#ffffff",
     "success": "#2c8a3f",
+    "warning": "#c98a00",
     "danger": "#c4392f",
     "bannerError": "#ffeeee",
     "overlay": "rgba(0,0,0,0.4)"
@@ -27,6 +28,7 @@
     "accent": "#37b283",
     "accentText": "#06231a",
     "success": "#52c46b",
+    "warning": "#e0a82e",
     "danger": "#ef5350",
     "bannerError": "#330000",
     "overlay": "rgba(0,0,0,0.6)"

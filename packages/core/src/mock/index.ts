@@ -451,8 +451,8 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
         return cadreOk({
           running: true, partyId: 'mock-party', peerId: '12D3KooWMockThisDevice', ownerEnrolled: true, ownerFingerprint: 'MockOwnr',
           machines: [
-            { peerId: '12D3KooWMockThisDevice', thisDevice: true, addresses: [], alwaysOn: null, lastSeenAt: null },
-            ...(isEmpty() ? [] : [{ peerId: '12D3KooWMockHomeServer', thisDevice: false, addresses: ['/dns4/home.example/tcp/4002/ws'], alwaysOn: true, lastSeenAt: Date.now() - 60_000 }]),
+            { peerId: '12D3KooWMockThisDevice', thisDevice: true, addresses: [], alwaysOn: null, lastSeenAt: null, connected: true },
+            ...(isEmpty() ? [] : [{ peerId: '12D3KooWMockHomeServer', thisDevice: false, addresses: ['/dns4/home.example/tcp/4002/ws'], alwaysOn: true, lastSeenAt: Date.now() - 60_000, connected: true }]),
           ],
         });
       },

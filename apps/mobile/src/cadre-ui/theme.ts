@@ -29,8 +29,10 @@ export interface CadreManagerTheme {
   accentText: string;
   /** Destructive actions (remove, error). */
   danger: string;
-  /** Online status dot. */
+  /** Status dot: connected to this device now. */
   online: string;
+  /** Status dot: running elsewhere (its record is recent), not connected to this device. */
+  recent: string;
   /** Section header label color. */
   sectionLabel: string;
   /** Modal backdrop overlay. */
@@ -48,6 +50,7 @@ export const DEFAULT_THEME: CadreManagerTheme = {
   accentText: '#fff',
   danger: '#c4392f',
   online: '#2c8a3f',
+  recent: '#c98a00',
   sectionLabel: '#666',
   backdrop: 'rgba(0,0,0,0.4)',
 };

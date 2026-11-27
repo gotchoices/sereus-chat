@@ -38,6 +38,8 @@ export interface Theme {
   accentText: string;
   /** Positive / online status. */
   success: string;
+  /** Caution: running but not confirmed (a cadron alive elsewhere, not connected here). */
+  warning: string;
   /** Destructive actions, errors, unread badge. */
   danger: string;
   /** Error banner background. */

@@ -4040,12 +4040,12 @@ __metadata:
 
 "@serfab/cadre-client@file:../../.local-packages/serfab-cadre-client.tgz::locator=mobile%40workspace%3A.":
   version: 1.25.0
-  resolution: "@serfab/cadre-client@file:../../.local-packages/serfab-cadre-client.tgz#../../.local-packages/serfab-cadre-client.tgz::hash=650cec&locator=mobile%40workspace%3A."
+  resolution: "@serfab/cadre-client@file:../../.local-packages/serfab-cadre-client.tgz#../../.local-packages/serfab-cadre-client.tgz::hash=bc4514&locator=mobile%40workspace%3A."
   dependencies:
     "@multiformats/multiaddr": "npm:^13.0.3"
   peerDependencies:
     "@serfab/cadre-core": ^1.25.0
-  checksum: 10c0/903faadaa0c11c8955cde3d2dc409f29904ab13ae23b33605747e5a234368e00e7092f92e62ba207ae100f52487fa7d2889e74f7d6eb8586490a36fb196df58a
+  checksum: 10c0/5d61ada68057d53ae074b651270297ae2b13b8fb46d451a5a1899318c2452d0d81428513b4fd98966df99a8091a9253fbd3f2c9377e0465e078f6baf415b4bc2
   languageName: node
   linkType: hard
 

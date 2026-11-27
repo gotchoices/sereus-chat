@@ -27,6 +27,7 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {
   cadreStore,
+  cadronPresence,
   MAX_BOOTSTRAP_ADDRS,
   shortPeerId,
   type CadreMachine,
@@ -70,6 +71,12 @@ const STRINGS = {
   thisDevice: 'This device',
   machine: 'Machine',
   alwaysOn: 'Always on',
+  presence: {
+    connected: 'Connected',
+    recent: 'Running',
+    quiet: 'Not heard from lately',
+    unknown: 'Not heard from yet',
+  } as const,
   heard: (ago: string) => `heard from ${ago}`,
   noMachines: 'Only this device so far. Add a machine that stays on, so your messages keep moving while your phone sleeps.',
   addMachine: 'Add a machine',
@@ -445,6 +452,11 @@ function MachineRow({
 }) {
   const theme = useCadreTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  // Connected to this device now; else running elsewhere by its recent record; else quiet.
+  const presence = cadronPresence(machine);
+  const presenceColor = presence === 'connected' ? theme.online
+    : presence === 'recent' ? theme.recent
+    : presence === 'quiet' ? theme.textMuted : theme.border;
   return (
     <View style={styles.card} testID={`cadre-machine-${machine.peerId}`}>
       <Ionicons
@@ -461,12 +473,15 @@ function MachineRow({
             {machine.peerId}
           </Text>
         </TouchableOpacity>
-        {!machine.thisDevice && (machine.alwaysOn || machine.lastSeenAt || machine.preferred) ? (
-          <Text style={styles.cardSubtitle} numberOfLines={1}>
-            {[machine.preferred ? STRINGS.preferred : null, machine.alwaysOn ? STRINGS.alwaysOn : null,
-              machine.lastSeenAt ? STRINGS.heard(ago(machine.lastSeenAt)) : null]
-              .filter(Boolean).join(' · ')}
-          </Text>
+        {!machine.thisDevice ? (
+          <View style={styles.presenceRow}>
+            <View style={[styles.presenceDot, { backgroundColor: presenceColor }]} testID={`cadron-presence-${presence}`} />
+            <Text style={[styles.cardSubtitle, styles.grow]} numberOfLines={1}>
+              {[STRINGS.presence[presence], machine.preferred ? STRINGS.preferred : null, machine.alwaysOn ? STRINGS.alwaysOn : null,
+                presence !== 'connected' && machine.lastSeenAt ? STRINGS.heard(ago(machine.lastSeenAt)) : null]
+                .filter(Boolean).join(' · ')}
+            </Text>
+          </View>
         ) : null}
       </View>
       {!machine.thisDevice && onRename && (
@@ -537,6 +552,8 @@ function makeStyles(theme: CadreManagerTheme) {
     // ellipsizeMode='middle' truncation reads as intended.
     monoLike: { fontFamily: 'monospace', letterSpacing: 0.2 },
     dot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+    presenceRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    presenceDot: { width: 8, height: 8, borderRadius: 4 },
     statusStrip: {
       flexDirection: 'row',
       alignItems: 'center',

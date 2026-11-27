@@ -373,6 +373,7 @@ function ThemedCadreManager({ route, navigation }: any) {
     accentText: theme.accentText,
     danger: theme.danger,
     online: theme.success,
+    recent: theme.warning,
     sectionLabel: theme.textSecondary,
     backdrop: theme.overlay,
   }), [theme]);

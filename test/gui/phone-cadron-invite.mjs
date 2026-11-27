@@ -82,6 +82,19 @@ try {
   log('the phone claimed the cadron');
   await sleep(30_000); // its first record reaches the phone
 
+  // The claim's "Machine added" dialog: dismiss it.
+  const ok = ui().match(/text="OK"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
+  if (ok) adb('shell', 'input', 'tap', String((+ok[1] + +ok[3]) >> 1), String((+ok[2] + +ok[4]) >> 1));
+  // The cadre screen: the cadron's status dot says connected (`cadronPresence`).
+  adb('shell', 'am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'chat://machines', 'org.sereus.chat');
+  let presence = null;
+  for (let i = 0; i < 20 && !presence; i++) {
+    await sleep(1500);
+    presence = ui().match(/resource-id="cadron-presence-([a-z]+)"/)?.[1] ?? null;
+  }
+  log(`the cadre screen shows the cadron as ${presence ?? '(no status dot found)'}`);
+  if (presence !== 'connected') throw new Error('the cadron is not shown as connected');
+
   // 2. The invitation: ready to hand out, and naming the cadron.
   if (flow('rn-invite-show.yaml').status !== 0) throw new Error('invitation flow failed');
   const url = ui().match(/text="(https:\/\/[^"]*invite[^"]*#[^"]+)"/)?.[1];
