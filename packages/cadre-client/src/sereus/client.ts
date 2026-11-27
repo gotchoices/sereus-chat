@@ -22,7 +22,8 @@
  */
 import { readOwnerPrivateKey, type CadreNode } from '@serfab/cadre-core';
 import type {
-  CadreMachine, CadreModel, CadreStatus, CadreView, Reachability, ReachabilityModel, ReachabilityView, ReachedVia, RelaysModel,
+  CadreMachine, CadreModel, CadreStatus, CadreView, InvitationsModel, InvitationsView, Reachability, ReachabilityModel, ReachabilityView,
+  ReachedVia, RelaysModel,
 } from '../model.js';
 import { ownerFingerprint } from '../model.js';
 import { nodeReach } from '../address.js';
@@ -31,6 +32,7 @@ import {
 } from '../result.js';
 import { classifyClaimFailure, readNodeCode } from './node-code.js';
 import type { CadreHost } from './host.js';
+import { createInvitations } from './invitations.js';
 
 export interface CadreClientOptions {
   /** Bound on a claim: `claimNode` dials each address in turn (~115 s worst case when none answers). Default 150 s. */
@@ -45,11 +47,15 @@ export interface CadreClientOptions {
   log?: { info(...args: unknown[]): void; warn(...args: unknown[]): void };
 }
 
-export interface CadreClient extends CadreView, ReachabilityView {
+export interface CadreClient extends CadreView, ReachabilityView, InvitationsView {
   cadre: CadreModel;
   reachability: ReachabilityModel;
   relays: RelaysModel;
+  /** What an invitation names, whether it is ready to hand out, and what it says in words. */
+  invitations: InvitationsModel;
   changes: {
+    /** Cadron preferences changed, or a cadron came to hold a strand (readiness). */
+    invitations(onChange: () => void): () => void;
     /** The control network connected or dropped: the machine list may have changed. */
     cadre(onChange: () => void): () => void;
     /** This device's addresses changed, its node restarted, or the control network connected or dropped. */
@@ -70,6 +76,7 @@ export function createCadreClient(host: CadreHost, opts: CadreClientOptions = {}
   const log = opts.log ?? console;
   let claiming = false;
   let ownMachine: { node: CadreNode; at: number; answers: boolean } | null = null;
+  const { invitations, onChange: onInvitations } = createInvitations({ host, controlReadMs, log });
 
   const requireNode = (): CadreNode => {
     const node = host.node.node;
@@ -149,6 +156,12 @@ export function createCadreClient(host: CadreHost, opts: CadreClientOptions = {}
           seen.add(r.peerId);
           machines.push({ peerId: r.peerId, thisDevice: false, addresses: [], alwaysOn: r.alwaysOn, lastSeenAt: r.lastPublishedAt });
         }
+      }
+      // The person's own names and preferred cadrons.
+      const { names, preferred } = await invitations.preferences();
+      for (const m of machines) {
+        m.name = names[m.peerId]?.trim() || null;
+        m.preferred = preferred.includes(m.peerId);
       }
       return {
         running: !!node,
@@ -245,8 +258,14 @@ export function createCadreClient(host: CadreHost, opts: CadreClientOptions = {}
     cadre,
     reachability,
     relays,
+    invitations,
     changes: {
-      cadre: onControl,
+      cadre: onChange => {
+        const offControl = onControl(onChange);
+        const offPrefs = onInvitations(onChange); // names and preferred show in the machine list
+        return () => { offControl(); offPrefs(); };
+      },
+      invitations: onInvitations,
       reachability(onChange) {
         const offAddrs = host.node.onReachabilityChange(onChange);
         const offControl = onControl(() => { ownMachine = null; onChange(); });

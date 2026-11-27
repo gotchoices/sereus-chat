@@ -3,7 +3,8 @@
  * `ReachabilityView`), so it works over the Sereus client, an app's mock, or an app's
  * whole model when that has the same two members.
  */
-import type { CadreStatus, CadreView, Reachability, ReachabilityView } from './model.js';
+import type { CadreStatus, CadreView, InvitationReadiness, InvitationsView, Reachability, ReachabilityView } from './model.js';
+import { writable, type Readable } from './store.js';
 import { cadreOk } from './result.js';
 import { loader, type Loader } from './loader.js';
 
@@ -33,5 +34,17 @@ export function reachabilityStore(view: ReachabilityView): Loader<Reachability> 
     changes: onChange => view.changes.reachability(onChange),
     debounceMs: 250,
     pollMs: 30_000,
+  });
+}
+
+/**
+ * Whether a new invitation to `strandId` is ready to hand out (`InvitationReadiness`), live: it
+ * turns `ready` when a cadron comes to hold the strand.
+ */
+export function invitationReadinessStore(view: InvitationsView, strandId: string, opts: { newStrand?: boolean } = {}): Readable<InvitationReadiness> {
+  const read = () => view.invitations.readiness(strandId, opts);
+  return writable<InvitationReadiness>(read(), set => {
+    set(read());
+    return view.changes.invitations(() => set(read()));
   });
 }

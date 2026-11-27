@@ -1,9 +1,13 @@
 # @chat/cadre-client
 
-Cadre management for any Sereus app, with no UI: the party's machines, claiming a node by
-its code, removing one, backing up the owner key, relays, and whether anybody can reach this
-device to answer an invitation. Every operation returns a result rather than throwing, and
+Cadre management for any Sereus app, with no UI: the party's machines (its cadrons), claiming a
+node by its code, removing one, backing up the owner key, relays, whether anybody can reach this
+device to answer an invitation, and which cadrons an invitation names. Every operation returns a result rather than throwing, and
 each screen-sized piece of state comes as a store any UI framework binds to.
+
+**Cadron:** one machine of a person's cadre: a phone, a home server, a rented node. This package
+uses the word throughout; sereus's own APIs say machine, node or peer, and its types keep those
+names at the boundary (`CadreMachine` is also exported as `Cadron`).
 
 Built in chat, kept free of chat (a test fails if anything here imports chat code, a UI
 framework or a platform module), and meant to be lifted out so health, taleus and other
@@ -89,6 +93,47 @@ only its control ports; its strand networks listen on ports the router does not 
 outsider can complete a join and still not sync. The rule is meant for a machine with a
 public address and open ports: a server or a rented node. Sereus tracks the general fix
 (`feat-phone-relays-through-its-own-always-on-node`, `feat-cadre-host-children-reserve-on-a-relay`).
+
+## Invitations: which cadrons they name
+
+An open strand invitation carries a bootstrap list: the addresses a joiner dials to reach one of
+the inviter's cadrons. `client.invitations` decides that list and reports on it:
+
+```ts
+await client.invitations.setPreferences({ preferred: [homeServerPeerId], names: { [homeServerPeerId]: 'home' }, maxAddrs: 2 });
+const plan = await client.invitations.bootstrapPlan();       // entries + warnings, before minting
+const inv = await node.createOpenInvitation(sAppId, validForMs);
+const token = node.encodeInvitation(await client.invitations.withBootstrap(inv));
+const ready = invitationReadinessStore(client, strandId, { newStrand: true });   // 'waiting' → 'ready'
+const words = await client.invitations.describe(token, link); // per address: cadron, kind, host, port; link and QR size
+```
+
+- **The list:** preferred cadrons first (the person's order), then other always-on cadrons, newest
+  record first; each cadron's addresses best first (a public name or IP over WebSocket, then a
+  relay, then WebRTC; private ones only if `allowPrivate`; loopback and plain TCP never); one
+  address per cadron before any gets a second; at most `maxAddrs` (default 2). This device's own
+  addresses (a phone's relay) go in only when no cadron reaches from anywhere (`thisDevice:
+  'fallback'`, the default), or always, or never.
+- **The evidence** for a cadron's addresses: a connection this device opened to it with no relay
+  hop, its signed record (all of it, not cadre-core's first four), or, in the minute before its
+  first record arrives, what its node code carried when it was claimed.
+- **Ready to hand out:** a new strand's copy is on a cadron once a commit of it is held elsewhere;
+  only then can the cadron answer a join with this device asleep. Earlier, the join is refused
+  (`host-strand-unavailable`, shown as "their side could not finish"). An established strand is
+  ready when another cadron serves it.
+- **Preferences** are kept per device, in the host's `preferences` slot.
+
+### Workarounds, and what replaces them
+
+| Here | Because sereus does not yet | Replaced by (sereus) |
+|---|---|---|
+| `planBootstrap` replaces cadre-core's bootstrap list | rank an open invitation's addresses, or keep loopback, private and plain-TCP addresses out of a machine's published record (a cadre-host VPS node is named by unusable addresses alone) | ranked open invitations; curated published records |
+| The claim's addresses for a cadron with no record yet | name a just-claimed machine in an invitation at all | the same, once records publish at claim |
+| `readiness` from commit durability | say when an invitation can be answered without its minting machine | a readiness signal on the invitation |
+| `CadronPreferences.preferred` and `maxAddrs`, per device | let a party choose its bootstrap machines and an address cap | a party-level bootstrap setting in the control schema |
+| `withBootstrap` rewrites the invitation before encoding | take a bootstrap list (or a policy) in `createOpenInvitation` | an option on `createOpenInvitation` |
+
+Each site in the code carries a `WORKAROUND(sereus: …)` note naming the same feature.
 
 ## Not covered yet
 

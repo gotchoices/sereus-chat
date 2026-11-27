@@ -894,7 +894,10 @@ export function createSereusModel(host: ChatHost): SereusModel {
       await privateStore.setNote(strandId, input.note).catch(err =>
         console.warn('[sereus-model] could not keep the strand note:', err instanceof Error ? err.message : err));
     }
-    const token = node.encodeInvitation(invitation);
+    // Which addresses it names: the person's cadrons that reach from anywhere, few and best
+    // first (`@chat/cadre-client`'s plan), not cadre-core's list, which can name a VPS cadron by
+    // loopback and private addresses alone. Kept as cadre-core made it on any problem.
+    const token = node.encodeInvitation(await cadreClient.invitations.withBootstrap(invitation));
     const minted: Invitation = {
       // The RAW token, which is unique (the encoded one's prefix is the same for all).
       id: invitation.token,
@@ -908,6 +911,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
       singleUse,
       spent: false,
       direction: 'outgoing',
+      newStrand: !input.strandId,
     };
     // Kept so it can be listed and shared again; a failure to remember it must not cost
     // the user the invitation they are looking at.
@@ -1013,7 +1017,7 @@ export function createSereusModel(host: ChatHost): SereusModel {
    * `@chat/cadre-client` (the UI-agnostic package other Sereus apps can use too).
    */
   const cadreClient = createCadreClient(
-    { node: host.node, ownerKeyStore: host.ownerKeyStore },
+    { node: host.node, ownerKeyStore: host.ownerKeyStore, preferences: host.slot('cadronPreferences') },
     { controlOpMs: CONTROL_OP_TIMEOUT_MS },
   );
 
@@ -1302,8 +1306,11 @@ export function createSereusModel(host: ChatHost): SereusModel {
 
     cadre: cadreClient.cadre,
 
+    cadrons: cadreClient.invitations,
+
     changes: {
       cadre: cadreClient.changes.cadre,
+      cadrons: cadreClient.changes.invitations,
       reachability: cadreClient.changes.reachability,
       busy(onChange) {
         busyListeners.add(onChange);

@@ -6,7 +6,7 @@
  * Chat's product model, not a general one (docs/app-family.md). Semantics:
  * design/specs/domain/ops.md.
  */
-import type { CadreModel } from './cadre.js';
+import type { CadreModel, CadronsModel } from './cadre.js';
 import type { ChangesModel } from './changes.js';
 import type { InvitationsModel } from './invitations.js';
 import type { MediaModel } from './media.js';
@@ -32,5 +32,11 @@ export interface ChatModel {
   prefs: PrefsModel;
   reachability: ReachabilityModel;
   cadre: CadreModel;
+  /**
+   * How invitations name this person's cadrons: preferred cadrons and their names, how many
+   * addresses an invitation names, the plan, whether a new invitation is ready to hand out, and
+   * an invitation in words (`@chat/cadre-client`'s invitations model).
+   */
+  cadrons: CadronsModel;
   changes: ChangesModel;
 }

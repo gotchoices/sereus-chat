@@ -14,6 +14,8 @@ export interface ChangesModel {
   reachability(onChange: () => void): () => void;
   /** The cadre's control network connected or disconnected, or its machines changed. */
   cadre(onChange: () => void): () => void;
+  /** Cadron preferences changed, or a cadron came to hold a strand (`cadrons.readiness`). */
+  cadrons(onChange: () => void): () => void;
   /** `strands.busy()` changed. */
   busy(onChange: () => void): () => void;
 }

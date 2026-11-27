@@ -19,6 +19,8 @@ export type Invitation = {
   spent: boolean;
   direction?: 'outgoing' | 'incoming';
   label?: string;
+  /** Made for a new conversation (not an existing one): `cadrons.readiness(strandId, { newStrand })`. */
+  newStrand?: boolean;
 };
 
 export type InvitationPreview = {

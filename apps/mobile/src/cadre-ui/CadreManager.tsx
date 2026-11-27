@@ -27,13 +27,17 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {
   cadreStore,
+  MAX_BOOTSTRAP_ADDRS,
   shortPeerId,
   type CadreMachine,
   type CadreStatus,
   type CadreView,
+  type CadronPreferences,
+  type InvitationsView,
   type NodeCodePreview,
 } from '@chat/cadre-client';
 import SecretDisplayModal from './SecretDisplayModal';
+import CadronNameModal from './CadronNameModal';
 import NodeCodeModal from './NodeCodeModal';
 import {
   CadreThemeContext,
@@ -90,6 +94,11 @@ const STRINGS = {
   cancel: 'Cancel',
   remove: 'Remove',
   badCode: 'That code cannot be used',
+  invitations: 'INVITATIONS',
+  preferred: 'Preferred for invitations',
+  addrsPerInvitation: 'Addresses per invitation',
+  addrsHint: (n: number) => `An invitation names ${n === 1 ? 'one address' : `${n} addresses`} of your machines: `
+    + 'preferred ones first (the star), then others that stay on. Fewer make a shorter link and a simpler QR code.',
 };
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
@@ -104,6 +113,12 @@ export interface CadreManagerProps {
   onNodeCodeHandled?: () => void;
   /** Opens the host app's scanner; "Scan its code" is offered only when given. */
   onScan?: () => void;
+  /**
+   * How invitations name the cadrons (`@chat/cadre-client`'s invitations view). Given, each
+   * machine can be named and starred as preferred, and the number of addresses an invitation
+   * names can be set.
+   */
+  invitations?: InvitationsView;
 }
 
 export default function CadreManager({ theme: themeOverrides, ...props }: CadreManagerProps) {
@@ -115,7 +130,7 @@ export default function CadreManager({ theme: themeOverrides, ...props }: CadreM
   );
 }
 
-function CadreManagerInner({ model, nodeCode, onNodeCodeHandled, onScan }: Omit<CadreManagerProps, 'theme'>) {
+function CadreManagerInner({ model, nodeCode, onNodeCodeHandled, onScan, invitations }: Omit<CadreManagerProps, 'theme'>) {
   const theme = useCadreTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const store = useMemo(() => cadreStore(model), [model]);
@@ -127,6 +142,31 @@ function CadreManagerInner({ model, nodeCode, onNodeCodeHandled, onScan }: Omit<
   const [exportModal, setExportModal] = useState<{ visible: boolean; value: string | null; error: string | null }>(
     { visible: false, value: null, error: null },
   );
+  const [naming, setNaming] = useState<CadreMachine | null>(null);
+  const [prefs, setPrefs] = useState<CadronPreferences | null>(null);
+  useEffect(() => {
+    if (!invitations) return;
+    const read = () => { void invitations.invitations.preferences().then(setPrefs); };
+    read();
+    return invitations.changes.invitations(read);
+  }, [invitations]);
+  const changePrefs = useCallback((changes: Partial<CadronPreferences>) => {
+    if (!invitations) return;
+    void invitations.invitations.setPreferences(changes).then(r => { if (r.ok) setPrefs(r.value); });
+  }, [invitations]);
+  const togglePreferred = useCallback((machine: CadreMachine) => {
+    if (!prefs) return;
+    const preferred = prefs.preferred.includes(machine.peerId)
+      ? prefs.preferred.filter(id => id !== machine.peerId)
+      : [...prefs.preferred, machine.peerId];
+    changePrefs({ preferred });
+  }, [prefs, changePrefs]);
+  const rename = useCallback((machine: CadreMachine, name: string) => {
+    if (!prefs) return;
+    const names = { ...prefs.names };
+    if (name) names[machine.peerId] = name; else delete names[machine.peerId];
+    changePrefs({ names });
+  }, [prefs, changePrefs]);
 
   const copy = useCallback((text: string) => {
     Clipboard.setString(text);
@@ -280,7 +320,14 @@ function CadreManagerInner({ model, nodeCode, onNodeCodeHandled, onScan }: Omit<
         addDisabled={!status.ownerEnrolled || claiming !== null}
       />
       {status.machines.map(machine => (
-        <MachineRow key={machine.peerId} machine={machine} onCopy={copy} onRemove={onRemove} />
+        <MachineRow
+          key={machine.peerId}
+          machine={machine}
+          onCopy={copy}
+          onRemove={onRemove}
+          onTogglePreferred={invitations && prefs ? togglePreferred : undefined}
+          onRename={invitations && prefs ? setNaming : undefined}
+        />
       ))}
       {others === 0 && claiming === null && (
         <View style={styles.emptyCard}>
@@ -293,6 +340,47 @@ function CadreManagerInner({ model, nodeCode, onNodeCodeHandled, onScan }: Omit<
           <Text style={[styles.cardSubtitle, styles.grow]}>{STRINGS.adding(claiming)}</Text>
         </View>
       )}
+
+      {/* Invitations: how many addresses one names */}
+      {invitations && prefs && (
+        <>
+          <SectionHeader label={STRINGS.invitations} />
+          <View style={styles.card} testID="cadron-invitation-addrs">
+            <Ionicons name="qr-code-outline" size={20} color={theme.textPrimary} />
+            <View style={styles.grow}>
+              <Text style={styles.cardTitle}>{STRINGS.addrsPerInvitation}</Text>
+              <Text style={styles.cardSubtitle}>{STRINGS.addrsHint(prefs.maxAddrs)}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => changePrefs({ maxAddrs: prefs.maxAddrs - 1 })}
+              disabled={prefs.maxAddrs <= 1}
+              hitSlop={HIT_SLOP}
+              style={{ opacity: prefs.maxAddrs <= 1 ? 0.3 : 1 }}
+              testID="cadron-addrs-fewer"
+            >
+              <Ionicons name="remove-circle-outline" size={24} color={theme.accent} />
+            </TouchableOpacity>
+            <Text style={[styles.cardTitle, { minWidth: 22, textAlign: 'center' }]} testID="cadron-addrs-count">{prefs.maxAddrs}</Text>
+            <TouchableOpacity
+              onPress={() => changePrefs({ maxAddrs: prefs.maxAddrs + 1 })}
+              disabled={prefs.maxAddrs >= MAX_BOOTSTRAP_ADDRS}
+              hitSlop={HIT_SLOP}
+              style={{ opacity: prefs.maxAddrs >= MAX_BOOTSTRAP_ADDRS ? 0.3 : 1 }}
+              testID="cadron-addrs-more"
+            >
+              <Ionicons name="add-circle-outline" size={24} color={theme.accent} />
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
+      <CadronNameModal
+        visible={naming !== null}
+        initial={naming?.name ?? ''}
+        subject={naming ? `${STRINGS.machine} ${shortPeerId(naming.peerId)}` : ''}
+        onClose={() => setNaming(null)}
+        onSave={name => { if (naming) rename(naming, name); }}
+      />
 
       <SecretDisplayModal
         visible={exportModal.visible}
@@ -344,10 +432,16 @@ function MachineRow({
   machine,
   onCopy,
   onRemove,
+  onTogglePreferred,
+  onRename,
 }: {
   machine: CadreMachine;
   onCopy: (peerId: string) => void;
   onRemove: (machine: CadreMachine) => void;
+  /** Given: a star to name it first in invitations. */
+  onTogglePreferred?: (machine: CadreMachine) => void;
+  /** Given: a pencil to give it a name of the person's own. */
+  onRename?: (machine: CadreMachine) => void;
 }) {
   const theme = useCadreTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -360,20 +454,31 @@ function MachineRow({
       />
       <View style={styles.grow}>
         <Text style={styles.cardTitle} numberOfLines={1}>
-          {machine.thisDevice ? STRINGS.thisDevice : `${STRINGS.machine} ${shortPeerId(machine.peerId)}`}
+          {machine.thisDevice ? STRINGS.thisDevice : machine.name || `${STRINGS.machine} ${shortPeerId(machine.peerId)}`}
         </Text>
         <TouchableOpacity onPress={() => onCopy(machine.peerId)} hitSlop={HIT_SLOP}>
           <Text style={[styles.cardSubtitle, styles.monoLike]} numberOfLines={1} ellipsizeMode="middle">
             {machine.peerId}
           </Text>
         </TouchableOpacity>
-        {!machine.thisDevice && (machine.alwaysOn || machine.lastSeenAt) ? (
+        {!machine.thisDevice && (machine.alwaysOn || machine.lastSeenAt || machine.preferred) ? (
           <Text style={styles.cardSubtitle} numberOfLines={1}>
-            {[machine.alwaysOn ? STRINGS.alwaysOn : null, machine.lastSeenAt ? STRINGS.heard(ago(machine.lastSeenAt)) : null]
+            {[machine.preferred ? STRINGS.preferred : null, machine.alwaysOn ? STRINGS.alwaysOn : null,
+              machine.lastSeenAt ? STRINGS.heard(ago(machine.lastSeenAt)) : null]
               .filter(Boolean).join(' · ')}
           </Text>
         ) : null}
       </View>
+      {!machine.thisDevice && onRename && (
+        <TouchableOpacity onPress={() => onRename(machine)} hitSlop={HIT_SLOP} testID="cadron-rename">
+          <Ionicons name="pencil-outline" size={20} color={theme.textMuted} />
+        </TouchableOpacity>
+      )}
+      {!machine.thisDevice && onTogglePreferred && (
+        <TouchableOpacity onPress={() => onTogglePreferred(machine)} hitSlop={HIT_SLOP} testID="cadron-preferred">
+          <Ionicons name={machine.preferred ? 'star' : 'star-outline'} size={20} color={machine.preferred ? theme.accent : theme.textMuted} />
+        </TouchableOpacity>
+      )}
       {!machine.thisDevice && (
         <TouchableOpacity onPress={() => onRemove(machine)} hitSlop={HIT_SLOP} testID="cadre-machine-remove">
           <Ionicons name="trash-outline" size={20} color={theme.danger} />

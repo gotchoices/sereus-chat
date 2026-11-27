@@ -18,6 +18,8 @@ import type { CadreHost } from './host.js';
 export interface EdgeNodeHostOptions {
   /** Where this device keeps its owner key, for `exportOwnerKey`; on React Native, the kit's `SecureStoreKeyStore`. */
   ownerKeyStore?: KeyStore;
+  /** Where the cadron preferences are kept (`CadreHost.preferences`); absent, for the session only. */
+  preferences?: CadreHost['preferences'];
 }
 
 export function edgeNodeHost(edge: EdgeNode, opts: EdgeNodeHostOptions = {}): CadreHost {
@@ -43,6 +45,7 @@ export function edgeNodeHost(edge: EdgeNode, opts: EdgeNodeHostOptions = {}): Ca
 
   return {
     ownerKeyStore: opts.ownerKeyStore,
+    preferences: opts.preferences,
     node: {
       get node() { return edge.node; },
       on: (event, handler) => edge.on(event, handler),

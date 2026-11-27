@@ -1425,6 +1425,38 @@ Question: the phones are slow; is it the engine, the build, the hardware or the 
         (and #58 for representation changes) are fixed. Until then testers wipe
         (`DATA_FORMAT`).
 
+- [x] **Invitations name the person's cadrons (2026-11-27, `@chat/cadre-client`).** "Cadron" is
+      one machine of a person's cadre; the package introduces the term (see its README).
+      - **The address list:** `invitations.bootstrapPlan` / `withBootstrap` replaces cadre-core's
+        list before chat encodes an invitation.
+        - Order: preferred cadrons, then always-on ones, newest record first. Each cadron's
+          addresses go best first: a public name or IP over WebSocket, then a relay reached over
+          WebSocket, then WebRTC. Loopback, plain TCP and a relay reached over TCP never;
+          private ones only if allowed.
+        - At most `maxAddrs` (default 2). This phone's relay goes in only as a fallback.
+        - A cadron with no record yet is named by the addresses its claim carried.
+        - *Workaround:* cadre-core names a cadre-host VPS node by loopback and private addresses
+          alone (`test/stack/invitation-sibling-addresses.mjs`).
+      - **Ready to hand out:** `readiness(strandId, { newStrand })`, from commit durability (a
+        commit of the new strand held elsewhere). `join-through-cadre-member.test.ts` showed a
+        cadron must hold the new strand before the inviter sleeps; until then joins are refused
+        `host-strand-unavailable`. Chat's own invitation now names only the member, and a third
+        party joins with the inviter off.
+      - **Settings:** preferred cadrons, names, and addresses per invitation, kept per device
+        (`cadronPreferences` slot).
+      - **Screens:**
+        - cadre manager: a star (preferred), a pencil (name), and an "addresses per
+          invitation" stepper;
+        - invitation screen: the readiness line, "What's in this invitation" (per address:
+          cadron, kind, host and port; the link length and QR version), and the QR full screen
+          on a tap.
+      - **On the S21** (`test/gui/phone-cadron-invite.mjs`): a cadre-cli cadron claimed through
+        the screens. The invitation was ready 2 s after it showed, and its details named the
+        cadron, not the phone. The QR opened full screen. With the phone in the background
+        60 s, serchat joined in 6.5 s.
+      - **Found there:** a relay reached over plain TCP had taken a slot; now dropped (cadre-core
+        has the same blind spot).
+
 - [x] **Stack 2026-11-27: sereus 1.25.0, optimystic 1.30.0, quereus 5.7.1** (p2p-fret 1.3.0,
       libp2p 3.3.11 as before). Every machine of a party and of a strand has to be on 1.25. No
       data migration, so no wipe.

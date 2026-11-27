@@ -11,6 +11,8 @@
  * cadre-core node; an app's mock implements them over sample data.
  */
 import type { CadreResult } from './result.js';
+import type { BootstrapPlan, CadronPreferences } from './bootstrap.js';
+import type { InvitationText } from './invitation-text.js';
 
 export type CadreMachine = {
   peerId: string;
@@ -22,7 +24,17 @@ export type CadreMachine = {
   alwaysOn: boolean | null;
   /** When the machine last re-published its own record (epoch ms): roughly when it was last heard from. Null when unknown. */
   lastSeenAt: number | null;
+  /** The person's own name for it (`CadronPreferences.names`), or null. */
+  name?: string | null;
+  /** Named first in invitations (`CadronPreferences.preferred`). */
+  preferred?: boolean;
 };
+
+/**
+ * A cadron: one machine of a person's cadre (a phone, a home server, a rented node). The term
+ * this package introduces; sereus's own APIs say machine, node or peer.
+ */
+export type Cadron = CadreMachine;
 
 export type CadreStatus = {
   running: boolean;
@@ -104,6 +116,51 @@ export interface RelaysModel {
    * node reconnects behind it; watch reachability for the reservation.
    */
   set(addrs: string[]): Promise<CadreResult<void>>;
+}
+
+/**
+ * Whether a new invitation can be handed out with this device about to go quiet:
+ * - `ready`: another cadron holds the invitation's strand (one of its commits is held
+ *   elsewhere), so it can answer a join without this device;
+ * - `waiting`: not yet (a new strand's copy reaches a cadron a second or two after the
+ *   invitation is made);
+ * - `no-cadron`: no other cadron serves the party's strands; only this device answers.
+ */
+export type InvitationReadiness = 'ready' | 'waiting' | 'no-cadron';
+
+/**
+ * What goes into an invitation, and whether it is ready to hand out. The app mints the
+ * invitation (cadre-core's `createOpenInvitation`), passes it through `withBootstrap` before
+ * encoding it, and shows `readiness` and `describe` on its invitation screen.
+ */
+export interface InvitationsModel {
+  preferences(): Promise<CadronPreferences>;
+  /** Merge and keep; returns what is kept (made whole and in range). */
+  setPreferences(changes: Partial<CadronPreferences>): Promise<CadreResult<CadronPreferences>>;
+  /** The addresses an invitation made now would name, and what to warn about. */
+  bootstrapPlan(): Promise<CadreResult<BootstrapPlan>>;
+  /**
+   * The invitation with its bootstrap list replaced by the plan's. Never fails: on any problem,
+   * or an empty plan, it returns the invitation as it came.
+   */
+  withBootstrap<T extends { bootstrap: string[] }>(invitation: T): Promise<T>;
+  /**
+   * `newStrand`: the invitation founded this strand just now. Its copy reaches a cadron only once
+   * a commit of it is held there (the signal waited for). An established strand counts as ready
+   * when another cadron serves it.
+   */
+  readiness(strandId: string, opts?: { newStrand?: boolean }): InvitationReadiness;
+  /**
+   * An invitation in words, from its encoded form. `link`: the text actually shared (the URL the
+   * QR code carries), for its length; the token's length otherwise.
+   */
+  describe(token: string, link?: string): Promise<CadreResult<InvitationText>>;
+}
+
+/** What an invitation screen needs. */
+export interface InvitationsView {
+  invitations: InvitationsModel;
+  changes: { invitations(onChange: () => void): () => void };
 }
 
 /** What a cadre screen needs: its operations, and a signal to re-read on. An app's whole model can be passed if it has both. */

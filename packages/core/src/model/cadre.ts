@@ -6,5 +6,9 @@
  * keep one import. `ChatModel.cadre` is a `CadreModel`, and its results' error kinds are
  * a subset of chat's own.
  */
-export type { CadreMachine, CadreModel, CadreStatus, CadreView, NodeCodePreview, NodeReach } from '@chat/cadre-client';
+export type {
+  CadreMachine, CadreModel, CadreStatus, CadreView, NodeCodePreview, NodeReach,
+  Cadron, CadronPreferences, BootstrapPlan, BootstrapEntry, BootstrapWarning, InvitationReadiness, InvitationText, InvitationAddressText,
+  InvitationsModel as CadronsModel,
+} from '@chat/cadre-client';
 export { ownerFingerprint, shortPeerId } from '@chat/cadre-client';

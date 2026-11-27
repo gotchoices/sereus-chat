@@ -23,7 +23,9 @@ export type SlotName =
   /** This device's writes still being followed to delivery, and refused ones (`delivery.ts`). */
   | 'outbox'
   | 'draft'
-  | 'readCursor';
+  | 'readCursor'
+  /** How invitations name this person's cadrons (`@chat/cadre-client`'s `CadronPreferences`). */
+  | 'cadronPreferences';
 
 /**
  * The node, as the chat model needs it: everything the cadre client needs

@@ -12,7 +12,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, Switch, StyleSheet, Share, Alert, Linking, ActivityIndicator } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
-import QRCode from 'react-native-qrcode-svg';
 import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import {
   INVITATION_VALIDITY, defaultInvitationTerms, loader, ok, outstandingInvitationsStore, reachabilityStore,
@@ -26,6 +25,7 @@ const NO_INVITATIONS_STORE = loader<Invitation[]>({ load: async () => ok(NO_INVI
 import { useErrorText, useT } from '../i18n';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Banner, IconButton, ListRow, SectionHeader } from '../components';
+import { InvitationDetails, InvitationQr, InvitationReadiness } from '../components/InvitationExtras';
 import { useTheme, typography, spacing, radius } from '../theme';
 
 export default function InvitationGenerator() {
@@ -459,16 +459,13 @@ export default function InvitationGenerator() {
             </Text>
             <Switch value={showQr} onValueChange={setShowQr} />
           </View>
-          {showQr ? (
-            <View style={styles.qr}>
-              <QRCode value={invitation.qrPayload} size={180}
-                backgroundColor={theme.surfaceAlt} color={theme.textPrimary} />
-            </View>
-          ) : null}
+          {showQr ? <InvitationQr value={invitation.qrPayload} /> : null}
 
+          <InvitationReadiness invitation={invitation} />
           <Text style={[typography.small, { color: theme.textMuted }]}>
             {t('invite.nothingYet')}
           </Text>
+          <InvitationDetails invitation={invitation} />
           <View style={styles.shareRow}>
             <IconButton name="copy-outline" size={20} accessibilityLabel={t('common.copy')}
               onPress={() => { Clipboard.setString(invitation.url); Alert.alert(t('common.copied')); }} />
@@ -552,7 +549,6 @@ const styles = StyleSheet.create({
   flex1: { flex: 1 },
   shareRow: { flexDirection: 'row', gap: spacing[1], paddingTop: spacing[1] },
   qrToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing[1] },
-  qr: { alignItems: 'center', paddingVertical: spacing[2] },
   rows: { gap: spacing[1] },
   termsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   terms: { gap: spacing[1], paddingVertical: spacing[1] },

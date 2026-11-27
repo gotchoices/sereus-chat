@@ -19,7 +19,7 @@ import type {
   Result, SearchBatch, StorageUsage, StrandState, StrandSummary,
 } from '../model/index.js';
 import { fail, ok, pageMessages } from '../model/index.js';
-import { cadreFail, cadreOk } from '@chat/cadre-client';
+import { cadreFail, cadreOk, describeInvitation, normalizePreferences, planBootstrap, type CadronPreferences } from '@chat/cadre-client';
 
 export type FixtureName =
   | 'Strands' | 'Messages' | 'Members' | 'StrandMedia' | 'StrandState'
@@ -469,8 +469,49 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       async exportOwnerKey() { return cadreOk('mock-owner-key-not-a-secret'); },
     },
 
+    // The real planner over a sample cadron (the home server: a public name and a relay address).
+    cadrons: (() => {
+      let cadronPrefs: CadronPreferences = normalizePreferences(null);
+      const home = '12D3KooWMockHomeServer';
+      const plan = () => planBootstrap({
+        cadrons: isEmpty() ? [] : [{
+          peerId: home, alwaysOn: true, lastPublishedAt: Date.now() - 60_000,
+          addrs: [
+            { addr: `/ip4/127.0.0.1/tcp/4002/ws/p2p/${home}`, source: 'record' as const },
+            { addr: `/dns4/home.example/tcp/4002/ws/p2p/${home}`, source: 'record' as const },
+            { addr: `/dns4/relay.sereus.org/tcp/4011/ws/p2p/12D3KooWMockRelay/p2p-circuit/p2p/${home}`, source: 'record' as const },
+          ],
+        }],
+        thisDevice: { peerId: '12D3KooWMockThisDevice', addrs: [`/dns4/relay.sereus.org/tcp/4011/ws/p2p/12D3KooWMockRelay/p2p-circuit/p2p/12D3KooWMockThisDevice`] },
+        prefs: cadronPrefs,
+      });
+      return {
+        async preferences() { return cadronPrefs; },
+        async setPreferences(changes: Partial<CadronPreferences>) {
+          cadronPrefs = normalizePreferences({ ...cadronPrefs, ...changes });
+          strandsListeners.forEach(fn => fn());
+          return cadreOk(cadronPrefs);
+        },
+        async bootstrapPlan() { return cadreOk(plan()); },
+        async withBootstrap<T extends { bootstrap: string[] }>(invitation: T) {
+          const { entries } = plan();
+          return entries.length ? { ...invitation, bootstrap: entries.map(e => e.addr) } : invitation;
+        },
+        readiness: () => (isEmpty() ? 'no-cadron' as const : 'ready' as const),
+        async describe(token: string, link?: string) {
+          const expiration = new Date(Date.now() + 7 * 86_400_000);
+          return cadreOk(describeInvitation({ expiration, bootstrap: plan().entries.map(e => e.addr) },
+            { link: link ?? token, names: cadronPrefs.names, thisDevicePeerId: '12D3KooWMockThisDevice' }));
+        },
+      };
+    })(),
+
     changes: {
       cadre(onChange) {
+        strandsListeners.add(onChange);
+        return () => { strandsListeners.delete(onChange); };
+      },
+      cadrons(onChange) {
         strandsListeners.add(onChange);
         return () => { strandsListeners.delete(onChange); };
       },

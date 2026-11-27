@@ -45,3 +45,56 @@ function isPrivateIp6(ip: string): boolean {
   return (first & 0xfe00) === 0xfc00   // fc00::/7 unique local
     || (first & 0xffc0) === 0xfe80;     // fe80::/10 link local
 }
+
+/**
+ * How far an address reaches for a phone dialing it, as cadre-core's `classifyDialAddress` judges
+ * it (mirrored here so this entry point loads no stack code):
+ *
+ * - `relay`: through a relay (`/p2p-circuit`) reached over a WebSocket, from anywhere while the
+ *   reservation holds;
+ * - `webrtc`: a relay hop then WebRTC, from anywhere only if ICE finds a path;
+ * - `name` / `public`: a DNS name or public IP with a WebSocket, from anywhere;
+ * - `private`: a private-network IP, only from the same network;
+ * - `loopback`: the machine itself, never from another one.
+ *
+ * Null when no phone can dial it at all: plain TCP (phones dial WebSocket and relays only), a
+ * relay reached over plain TCP, the unspecified address, or anything unparsable.
+ */
+export type CadronAddressKind = 'relay' | 'webrtc' | 'name' | 'public' | 'private' | 'loopback';
+
+export function addressKind(addr: string): CadronAddressKind | null {
+  const parts = addr.split('/').filter(Boolean);
+  const circuit = parts.indexOf('p2p-circuit');
+  if (circuit >= 0) {
+    // The hop to the relay is dialed like any other address: a phone reaches a relay over a
+    // WebSocket only, never plain TCP. (cadre-core's `classifyDialAddress` calls any relayed
+    // address `relay`, so a relay's TCP port can take an invitation's slot; a sereus issue.)
+    const hop = parts.slice(0, circuit);
+    if (!hop.includes('ws') && !hop.includes('wss')) return null;
+    return parts.slice(circuit + 1).includes('webrtc') ? 'webrtc' : 'relay';
+  }
+  if (!parts.includes('ws') && !parts.includes('wss')) return null;
+  const [proto, host] = parts;
+  if (!host) return null;
+  if (proto === 'dns' || proto === 'dns4' || proto === 'dns6' || proto === 'dnsaddr') return host === 'localhost' ? 'loopback' : 'name';
+  if (proto === 'ip4') {
+    if (host === '0.0.0.0') return null;
+    if (host.startsWith('127.')) return 'loopback';
+    return isPrivateIp4(host) ? 'private' : 'public';
+  }
+  if (proto === 'ip6') {
+    const lower = host.toLowerCase();
+    if (lower === '::') return null;
+    if (lower === '::1') return 'loopback';
+    return isPrivateIp6(lower) ? 'private' : 'public';
+  }
+  return proto === 'ip6zone' ? 'private' : null;
+}
+
+/** Reaches from anywhere: what an invitation should name. */
+export function reachesAnywhere(kind: CadronAddressKind | null): boolean {
+  return kind === 'name' || kind === 'public' || kind === 'relay' || kind === 'webrtc';
+}
+
+/** Best first for an invitation: a direct name or public address, then a relay, then WebRTC, then private. */
+export const ADDRESS_KIND_RANK: Record<CadronAddressKind, number> = { name: 0, public: 0, relay: 1, webrtc: 2, private: 3, loopback: 4 };

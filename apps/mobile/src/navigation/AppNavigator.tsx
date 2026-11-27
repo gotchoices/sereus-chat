@@ -360,6 +360,8 @@ function ThemedCadreManager({ route, navigation }: any) {
   const nodeCode: string | undefined = route?.params?.nodeCode;
   const onNodeCodeHandled = React.useCallback(() => navigation.setParams({ nodeCode: undefined }), [navigation]);
   const onScan = React.useCallback(() => navigation.navigate('QrScanner'), [navigation]);
+  // The model's `cadrons` in the shape cadre-client's screen takes (its `invitations` view).
+  const invitations = React.useMemo(() => ({ invitations: model.cadrons, changes: { invitations: model.changes.cadrons } }), [model]);
   const cadreTheme = React.useMemo(() => ({
     background: theme.background,
     surface: theme.surfaceAlt,
@@ -383,6 +385,7 @@ function ThemedCadreManager({ route, navigation }: any) {
       nodeCode={nodeCode}
       onNodeCodeHandled={onNodeCodeHandled}
       onScan={onScan}
+      invitations={invitations}
     />
     <RelaySection />
     </ScrollView>

@@ -41,4 +41,10 @@ export interface CadreHost {
    * backup; absent, there is nothing to export.
    */
   ownerKeyStore?: KeyStore;
+  /**
+   * Where this device keeps its cadron preferences (preferred bootstrap cadrons, their names,
+   * how many addresses an invitation names): one small text value. Absent, they last for the
+   * session only.
+   */
+  preferences?: { load(): Promise<string | undefined>; save(text: string): Promise<void> };
 }
