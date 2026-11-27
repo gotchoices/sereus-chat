@@ -16,12 +16,8 @@ import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomBytes, createHash } from 'node:crypto';
-import { CadreNode, encodeNodeClaimPayload, type CadreNodeConfig, type NodeClaimRecord } from '@serfab/cadre-core';
-import { memoryNodeStorage, type OpenNodeStorage } from '@optimystic/db-p2p';
-import { generateKeyPair } from '@libp2p/crypto/keys';
-import { webSockets } from '@libp2p/websockets';
-import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { createTestParty, startRelay, until, type TestParty } from '../testing/node-host.js';
+import { claimCadreMember, type CadreMember } from '../testing/cadre-member.js';
 import type { Attachment } from '../model/index.js';
 
 function value<T>(result: { ok: true; value: T } | { ok: false; error: { kind: string; message: string } }): T {
@@ -98,60 +94,18 @@ describe('two transient members through a relay', () => {
 describe("Alice's party has a cadre member", () => {
   let relay: Awaited<ReturnType<typeof startRelay>>;
   let alice: TestParty, bob: TestParty, strandId: string;
-  let member: CadreNode;
+  let member: CadreMember;
 
   beforeAll(async () => {
     relay = await startRelay();
-    const secret = randomBytes(32).toString('base64url');
-    const scopes = new Map<string, OpenNodeStorage>();
-    const privateKey = await generateKeyPair('Ed25519');
-    let claimed: NodeClaimRecord | null = null;
-    // An always-on machine: storage profile, every strand of its party as a replica.
-    const base = (): Omit<CadreNodeConfig, 'controlNetwork'> => ({
-      privateKey,
-      nodeClass: 'server',
-      strandFilter: { mode: 'all' },
-      storage: { open: async (scope: string) => scopes.get(scope) ?? scopes.set(scope, memoryNodeStorage()).get(scope)! },
-      network: {
-        transports: [webSockets(), circuitRelayTransport()] as never,
-        listenAddrs: ['/ip4/127.0.0.1/tcp/0/ws'],
-        relayAddrs: [relay.addr],
-        connectionGater: { denyDialMultiaddr: () => false },
-      },
-      hibernation: { enabled: false },
-      requireSignedSchemas: false,
-    });
-    member = new CadreNode({
-      ...base(),
-      controlNetwork: { partyId: 'unclaimed', bootstrapNodes: [] },
-      claim: { secret, record: async c => { claimed = c; } },
-    } as CadreNodeConfig);
-    await member.start();
     ({ alice, bob, strandId } = await pair(relay.addr, async (a) => {
-      const code = encodeNodeClaimPayload({
-        peerId: member.peerId!.toString(),
-        multiaddrs: member.getMultiaddrs().map(m => m.toString()).filter(x => x.includes('/ws') && !x.includes('p2p-circuit')),
-        secret,
-      });
-      value(await a.model.cadre.claimNode(code));
-      note('Alice claimed her cadre member');
-      // As cadre-cli does: restart into the claimed party, its owner anchored, Alice to dial.
-      const claim = claimed as NodeClaimRecord | null;
-      if (!claim) throw new Error('the claim was not recorded');
-      await member.stop();
-      member = new CadreNode({
-        ...base(),
-        controlNetwork: { partyId: claim.partyId, bootstrapNodes: a.node.getMultiaddrs().map(m => m.toString()) },
-        trustedOwners: { pinnedKeys: [claim.ownerKey], pinnedSource: 'claim' },
-      } as CadreNodeConfig);
-      await member.start();
-      note('the cadre member restarted into Alice\'s party');
+      member = await claimCadreMember(relay.addr, a, note);
     }));
     let lastSeen = '';
     await until(() => {
-      const seen = `party ${member.partyId === alice.node.partyId ? 'Alice' : member.partyId}, awaiting claim ${member.isAwaitingClaim()}, discovered ${[...member.getDiscoveredStrands().keys()].map(k => k.slice(0, 8)).join(',') || '-'}, running ${[...member.getStrands().keys()].map(k => k.slice(0, 8)).join(',') || '-'}, control peers ${member.getControlNode()?.getConnections().length ?? 0}`;
+      const seen = `party ${member.node.partyId === alice.node.partyId ? 'Alice' : member.node.partyId}, awaiting claim ${member.node.isAwaitingClaim()}, discovered ${[...member.node.getDiscoveredStrands().keys()].map(k => k.slice(0, 8)).join(',') || '-'}, running ${[...member.node.getStrands().keys()].map(k => k.slice(0, 8)).join(',') || '-'}, control peers ${member.node.getControlNode()?.getConnections().length ?? 0}`;
       if (seen !== lastSeen) { lastSeen = seen; note(`cadre member: ${seen}`); }
-      return member.getStrands().has(strandId);
+      return member.node.getStrands().has(strandId);
     }, "the strand on Alice's cadre member", 180_000);
     note("the cadre member hosts the strand");
   }, 420_000);
