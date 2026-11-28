@@ -152,6 +152,11 @@
       "default": "The machine refused to join.",
       "claim-rate-limited": "The machine is refusing for now after too many tries. Wait a little and try again."
     },
+    "invalid-address": {
+      "default": "That address cannot be used.",
+      "unparsable": "That is not an address.",
+      "no-peer-id": "The address must end in /p2p/ and the node's id."
+    },
     "invalid-input": "That cannot be done.",
     "invalid-node-code": {
       "default": "This is not a usable node code.",
@@ -178,6 +183,11 @@
     "not-found": "That is no longer there.",
     "not-supported": "That is not possible yet.",
     "rejected": "The other members refused this change.",
+    "removal-refused": {
+      "default": "That machine cannot be removed from here.",
+      "not-an-owner": "This device holds no owner key, so it cannot remove a machine.",
+      "self": "This is this device. To leave, remove the app or erase its data."
+    },
     "too-large": "That file is larger than your limit for attachments.",
     "unavailable": {
       "default": "Could not get through just now. Try again in a moment.",

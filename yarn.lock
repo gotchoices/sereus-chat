@@ -1489,12 +1489,12 @@ __metadata:
 
 "@serfab/cadre-client@file:.local-packages/serfab-cadre-client.tgz::locator=sereus-chat%40workspace%3A.":
   version: 1.25.0
-  resolution: "@serfab/cadre-client@file:.local-packages/serfab-cadre-client.tgz#.local-packages/serfab-cadre-client.tgz::hash=bc4514&locator=sereus-chat%40workspace%3A."
+  resolution: "@serfab/cadre-client@file:.local-packages/serfab-cadre-client.tgz#.local-packages/serfab-cadre-client.tgz::hash=3e09cc&locator=sereus-chat%40workspace%3A."
   dependencies:
     "@multiformats/multiaddr": "npm:^13.0.3"
   peerDependencies:
     "@serfab/cadre-core": ^1.25.0
-  checksum: 10c0/5d61ada68057d53ae074b651270297ae2b13b8fb46d451a5a1899318c2452d0d81428513b4fd98966df99a8091a9253fbd3f2c9377e0465e078f6baf415b4bc2
+  checksum: 10c0/d76b9ad509444921f7bd0b5ccbb4e697391b138b80834cd3cec2077949393067383cbba709db1f7bf42d5761fe53198c101a14e7eda357a149fc7a8d12061afb
   languageName: node
   linkType: hard
 

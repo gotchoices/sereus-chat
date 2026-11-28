@@ -43,6 +43,10 @@ export type ChatErrorKind =
   | 'claim-refused'
   /** Claiming a node: reached, then the exchange or a local step failed. Safe to repeat. */
   | 'claim-failed'
+  /** Removing a cadron was refused. `reason`: `not-an-owner` (no owner key here) or `self` (this device). */
+  | 'removal-refused'
+  /** An address that cannot be used: unparsable (`unparsable`), or naming no node (`no-peer-id`). */
+  | 'invalid-address'
   /** Leaving: this device still holds messages it has not sent. Ask, then leave with `discardUnsent`. */
   | 'unsent-messages'
   /** The other members judged the write invalid. Final: sending it again gets the same answer. */
@@ -66,7 +70,7 @@ const KINDS: Record<ChatErrorKind, true> = {
   'join-inviter-unreachable': true, 'invitation-spent': true, 'invitation-not-ready': true,
   'join-refused': true, 'join-host-busy': true, 'join-host-outdated': true, 'join-incomplete': true,
   'invitation-unusable': true, 'not-allowed': true, 'not-found': true, 'invalid-input': true, 'invalid-node-code': true, 'node-unreachable': true,
-  'claim-refused': true, 'claim-failed': true, 'unsent-messages': true, 'rejected': true, 'not-supported': true,
+  'claim-refused': true, 'claim-failed': true, 'removal-refused': true, 'invalid-address': true, 'unsent-messages': true, 'rejected': true, 'not-supported': true,
   'app-outdated': true, 'unexpected': true,
 };
 export const CHAT_ERROR_KINDS = Object.keys(KINDS) as readonly ChatErrorKind[];

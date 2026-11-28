@@ -98,6 +98,11 @@ const STRINGS = {
   removeTitle: 'Remove this machine?',
   removeBody: 'It will no longer act for you. To bring it back, it will need a new code.',
   removeFailed: 'Could not remove the machine',
+  removeAlso: (invitations: number, strands: number) => [
+    invitations ? `${invitations} invitation${invitations === 1 ? '' : 's'} it could rejoin with ${invitations === 1 ? 'is' : 'are'} closed` : null,
+    strands ? `${strands} private strand${strands === 1 ? ' gets' : 's get'} a new key it cannot read` : null,
+  ].filter(Boolean).join('; '),
+  removeRefused: 'This machine cannot be removed here',
   cancel: 'Cancel',
   remove: 'Remove',
   badCode: 'That code cannot be used',
@@ -225,8 +230,17 @@ function CadreManagerInner({ model, nodeCode, onNodeCodeHandled, onScan, invitat
     ]);
   }, [onScan]);
 
-  const onRemove = useCallback((machine: CadreMachine) => {
-    Alert.alert(STRINGS.removeTitle, STRINGS.removeBody, [
+  const onRemove = useCallback(async (machine: CadreMachine) => {
+    // Confirm with what the removal will do (cadre-client's plan); the removal itself is complete:
+    // the record, the invitations it could rejoin with, and the party's key in each closed strand.
+    const plan = await model.cadre.planRemoval(machine.peerId);
+    if (plan.ok && plan.value.refusal) {
+      Alert.alert(STRINGS.removeRefused, plan.value.refusal === 'self'
+        ? 'It is this device.' : 'This device holds no owner key, so it cannot remove a machine.');
+      return;
+    }
+    const also = plan.ok ? STRINGS.removeAlso(plan.value.invitations, plan.value.closedStrands.length) : '';
+    Alert.alert(STRINGS.removeTitle, STRINGS.removeBody + (also ? `\n\nAlso: ${also}.` : ''), [
       { text: STRINGS.cancel, style: 'cancel' },
       {
         text: STRINGS.remove,
@@ -444,7 +458,7 @@ function MachineRow({
 }: {
   machine: CadreMachine;
   onCopy: (peerId: string) => void;
-  onRemove: (machine: CadreMachine) => void;
+  onRemove: (machine: CadreMachine) => Promise<void>;
   /** Given: a star to name it first in invitations. */
   onTogglePreferred?: (machine: CadreMachine) => void;
   /** Given: a pencil to give it a name of the person's own. */
@@ -495,7 +509,7 @@ function MachineRow({
         </TouchableOpacity>
       )}
       {!machine.thisDevice && (
-        <TouchableOpacity onPress={() => onRemove(machine)} hitSlop={HIT_SLOP} testID="cadre-machine-remove">
+        <TouchableOpacity onPress={() => { void onRemove(machine); }} hitSlop={HIT_SLOP} testID="cadre-machine-remove">
           <Ionicons name="trash-outline" size={20} color={theme.danger} />
         </TouchableOpacity>
       )}

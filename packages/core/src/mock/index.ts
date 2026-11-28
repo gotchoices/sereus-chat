@@ -458,14 +458,24 @@ export function createMockModel(fixtures: FixtureSource): { model: ChatModel; co
       },
       async inspectNodeCode(text) {
         if (!text.trim().startsWith('sereus-join:')) return cadreFail('invalid-node-code', 'This is not a node code.', { reason: 'not-node-code' });
-        return cadreOk({ peerId: '12D3KooWMockNewNode', addresses: ['/ip4/192.168.1.20/tcp/4002/ws'], reach: 'home-network' as const });
+        return cadreOk({
+          peerId: '12D3KooWMockNewNode', addresses: ['/ip4/192.168.1.20/tcp/4002/ws'], reach: 'home-network' as const,
+          partyId: 'mock-party', ownerFingerprint: 'MockOwnr',
+        });
       },
       async claimNode(text) {
         if (!text.trim().startsWith('sereus-join:')) return cadreFail('invalid-node-code', 'This is not a node code.', { reason: 'not-node-code' });
         if (isUnreachable()) return cadreFail('node-unreachable', 'Could not reach that machine.', { reason: 'home-network' });
         return cadreOk();
       },
-      async removeMachine() { return cadreOk(); },
+      async connectNode(address: string) {
+        const peerId = address.split('/p2p/').pop() ?? '';
+        if (!peerId || peerId === address) return cadreFail('invalid-address', 'The address must end in /p2p/<peer id>.', { reason: 'no-peer-id' });
+        return cadreOk({ peerId, delivered: true });
+      },
+      async createSeed() { return cadreOk('mock-seed'); },
+      async planRemoval() { return cadreOk({ refusal: null, alreadyRemoved: false, invitations: 0, closedStrands: [] }); },
+      async removeMachine() { return cadreOk({ withdrawnInvitations: 0, closedStrands: [] }); },
       async exportOwnerKey() { return cadreOk('mock-owner-key-not-a-secret'); },
     },
 
